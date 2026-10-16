@@ -7,6 +7,8 @@ are recorded here when they change (V6).
 ## Unreleased
 
 - `brodo::tree`: the sparse tree, with activation, tiles and their split; `brodo::error`.
+- `brodo::topology` and `brodo::field`: topologies numbered in Morton order, their editor and
+  `Remap`, and fields that refuse a stale topology. `Tree::leaves` and `Tree::tiles`.
 
 ## 0.1.0 (2026-10-16)
 

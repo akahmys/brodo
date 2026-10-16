@@ -8,12 +8,11 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: the minimal tree (`crates/brodo/src/tree.rs`): four levels, activation, tiles
-  at each level and their split down to a leaf, checked against a model in a property
-  test. Two points the design left silent were decided (ADR-0013 amendment); B-011 records
-  the per-voxel active mask.
-- **Next**: `Topology` and `Field<T>`, with `TopologyEditor`, `commit` and `Remap` as
-  ADR-0014 decides (§4.2).
+- **Done**: `Topology` with Morton numbering and stamps, `TopologyEditor`, `commit`,
+  `Remap` and `Field<T>` (ADR-0014 amendment of 2026-10-17), checked by a Reference-tier
+  property test against a model of each field. The merge rule and zerocopy's bounds wait
+  for merges (B-010) and `freeze`.
+- **Next**: `LeafManifest`'s 26-neighbour table (§4.3).
 - **Unresolved problems**: none.
 
 ## 2. Milestones
@@ -47,7 +46,7 @@ kinds of user before the rest is built on them.
       the answer
 - [x] The minimal tree: root and three levels, activation, and splitting a tile into a
       leaf (ARCHITECTURE.md §4.1)
-- [ ] `Topology` and `Field<T>`; `TopologyEditor`, `commit` and `Remap` as the ADR decides
+- [x] `Topology` and `Field<T>`; `TopologyEditor`, `commit` and `Remap` as the ADR decides
       (§4.2)
 - [ ] `LeafManifest`: Morton order and 26 neighbours (§4.3)
 - [ ] The leaf-parallel update and gather (§4.4)

@@ -52,3 +52,14 @@ The spike `spikes/remap/` answered B-001 and B-008 by measurement (its `REPORT.m
 
 Merging many leaves or tiles into a tile above leaf level was not measured; the spike's
 tiles were leaf-sized. It is settled with tiles in full (ROADMAP.md §2).
+
+## Amendment
+
+- **Date**: 2026-10-17
+
+The human decided, before `Topology` was built, that a topology numbers its leaves and
+tiles in the Morton order of their origins and rebuilds the numbering at each commit, so
+that field values are in their final order from the first field on. `LeafManifest` was
+left with the 26-neighbour table only; the leaf list and the coordinate-to-leaf lookup
+moved to `Topology`, which locates a voxel through the tree. The merge rule was left out
+of `remap` until merges exist (B-010).

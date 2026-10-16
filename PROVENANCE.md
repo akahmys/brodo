@@ -17,6 +17,8 @@ papers, public documentation and permissively licensed code (S1, S2) may appear 
 | File | Draws on | For |
 | :--- | :--- | :--- |
 | `crates/brodo/src/error.rs` | none | the crate's error types |
+| `crates/brodo/src/field.rs` | ARCHITECTURE.md §4.2, ADR-0014 only | fields: values by leaf and tile number, the stamp check, the remap |
 | `crates/brodo/src/lib.rs` | none | crate root |
-| `crates/brodo/src/tree.rs` | ARCHITECTURE.md §4.1, ADR-0013 only | the sparse tree: levels, masks, arenas, activation, tiles and their split |
+| `crates/brodo/src/topology.rs` | ARCHITECTURE.md §4.2, ADR-0014 only; Morton order as bit interleaving | topologies: stamps, Morton numbering, the editor, `Remap` |
+| `crates/brodo/src/tree.rs` | ARCHITECTURE.md §4.1, ADR-0013 only | the sparse tree: levels, masks, arenas, activation, tiles and their split, iteration |
 | `crates/colino/src/lib.rs` | none | crate root |

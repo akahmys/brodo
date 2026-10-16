@@ -34,6 +34,19 @@ fn child_index(v: Coord, child_log2: u32, dim_log2: u32) -> usize {
     to_usize(x | (y << dim_log2) | (z << (2 * dim_log2)))
 }
 
+/// The origin of child `i` of a node at `origin`, inverting `child_index`.
+fn child_origin(origin: Coord, i: usize, child_log2: u32, dim_log2: u32) -> Coord {
+    let mask = (1_usize << dim_log2) - 1;
+    let at = [i & mask, (i >> dim_log2) & mask, i >> (2 * dim_log2)];
+    #[expect(
+        clippy::cast_possible_truncation,
+        clippy::cast_possible_wrap,
+        reason = "each part is below 32, the widest node's edge in children"
+    )]
+    let off = at.map(|c| (c as i32) << child_log2);
+    [origin[0] + off[0], origin[1] + off[1], origin[2] + off[2]]
+}
+
 fn to_usize(i: u32) -> usize {
     // Lossless: brodo's targets have pointers of at least 32 bits (`TARGETS`).
     i as usize
@@ -65,6 +78,20 @@ impl<const W: usize> Mask<W> {
         let whole: u32 = self.0[..w].iter().map(|x| x.count_ones()).sum();
         let part = (self.0[w] & ((1_u64 << (i & 63)) - 1)).count_ones();
         to_usize(whole + part)
+    }
+
+    /// The set bits, lowest first.
+    fn ones(&self) -> impl Iterator<Item = usize> + '_ {
+        self.0.iter().enumerate().flat_map(|(w, word)| {
+            let mut bits = *word;
+            std::iter::from_fn(move || {
+                let b = bits.trailing_zeros();
+                (bits != 0).then(|| {
+                    bits &= bits - 1;
+                    (w << 6) + to_usize(b)
+                })
+            })
+        })
     }
 
     fn count(&self) -> usize {
@@ -167,6 +194,22 @@ pub enum TileLevel {
     Lower,
 }
 
+impl TileLevel {
+    /// log2 of the edge, in voxels, of the region a tile at this level stands for.
+    pub fn edge_log2(self) -> u32 {
+        match self {
+            TileLevel::Root => UPPER_SPAN_LOG2,
+            TileLevel::Upper => LOWER_SPAN_LOG2,
+            TileLevel::Lower => LEAF_LOG2,
+        }
+    }
+
+    /// The origin of the region at this level holding the voxel.
+    pub fn origin(self, v: Coord) -> Coord {
+        align(v, self.edge_log2())
+    }
+}
+
 /// What holds a voxel.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Probe {
@@ -208,7 +251,7 @@ fn push<T>(arena: &mut Vec<T>, item: T, kind: NodeKind) -> Result<u32, TreeError
 impl Tree {
     /// An empty tree: every voxel in the background.
     pub fn new() -> Self {
-        Self::default()
+        Self { root: BTreeMap::new(), upper: Vec::new(), lower: Vec::new(), leaves: Vec::new() }
     }
 
     /// The number of leaves.
@@ -228,6 +271,39 @@ impl Tree {
     /// A leaf's origin, its smallest voxel.
     pub fn leaf_origin(&self, leaf: LeafId) -> Result<Coord, TreeError> {
         self.leaves.get(to_usize(leaf.0)).copied().ok_or(TreeError::UnknownLeaf(leaf.0))
+    }
+
+    /// Every leaf with its origin, in the order the leaves were made.
+    pub fn leaves(&self) -> impl Iterator<Item = (LeafId, Coord)> + '_ {
+        self.leaves.iter().zip(0_u32..).map(|(o, i)| (LeafId(i), *o))
+    }
+
+    /// Every tile with its level and origin, by root key, then by place in each node.
+    pub fn tiles(&self) -> Vec<(TileLevel, Coord)> {
+        let mut out = Vec::new();
+        for (key, entry) in &self.root {
+            match entry {
+                RootEntry::Tile => out.push((TileLevel::Root, *key)),
+                RootEntry::Node(u) => self.upper_tiles(*u, *key, &mut out),
+            }
+        }
+        out
+    }
+
+    fn upper_tiles(&self, u: u32, origin: Coord, out: &mut Vec<(TileLevel, Coord)>) {
+        let node = &self.upper[to_usize(u)];
+        let at = |i| child_origin(origin, i, LOWER_SPAN_LOG2, UPPER_DIM_LOG2);
+        out.extend(node.tiles.ones().map(|i| (TileLevel::Upper, at(i))));
+        for (i, l) in node.children.ones().zip(&node.child_ids) {
+            let lower = &self.lower[to_usize(*l)];
+            let o = at(i);
+            out.extend(
+                lower
+                    .tiles
+                    .ones()
+                    .map(|j| (TileLevel::Lower, child_origin(o, j, LEAF_LOG2, LOWER_DIM_LOG2))),
+            );
+        }
     }
 
     /// What holds the voxel.
@@ -453,13 +529,8 @@ mod tests {
 
     // ---- Reference tier: the tree against a model holding regions as plain sets.
 
-    /// log2 of the edge, in voxels, of the region a tile at this level stands for.
     fn span(level: TileLevel) -> u32 {
-        match level {
-            TileLevel::Root => UPPER_SPAN_LOG2,
-            TileLevel::Upper => LOWER_SPAN_LOG2,
-            TileLevel::Lower => LEAF_LOG2,
-        }
+        level.edge_log2()
     }
 
     const LEVELS: [TileLevel; 3] = [TileLevel::Root, TileLevel::Upper, TileLevel::Lower];
@@ -510,8 +581,19 @@ mod tests {
 
         fn add_tile(&mut self, level: TileLevel, v: Coord) -> bool {
             let r = (span(level), align(v, span(level)));
-            let busy = self.leaves.iter().any(|o| Self::meet(r, (LEAF_LOG2, *o)))
-                || self.tiles.iter().any(|(l, o)| Self::meet(r, (span(*l), *o)));
+            // A region meets what holds it (a tile at its level or above) or what it holds
+            // (a leaf or smaller tile whose origin lies in it, found by a range on x).
+            let x = r.1[0]..r.1[0] + (1 << r.0);
+            let inside = |o: &Coord| Self::meet(r, (LEAF_LOG2, *o)) && x.contains(&o[0]);
+            let from = |x0: i32| [x0, i32::MIN, i32::MIN];
+            let busy = LEVELS.iter().any(|l| {
+                (span(*l) >= r.0 && self.tiles.contains(&(*l, align(v, span(*l)))))
+                    || (span(*l) < r.0
+                        && self
+                            .tiles
+                            .range((*l, from(x.start))..(*l, from(x.end)))
+                            .any(|(_, o)| inside(o)))
+            }) || self.leaves.range(from(x.start)..from(x.end)).any(inside);
             if !busy {
                 self.tiles.insert((level, r.1));
             }
@@ -563,12 +645,18 @@ mod tests {
         [axis.clone(), axis.clone(), axis]
     }
 
+    /// A tile level; Root tiles are rarer, as splitting one makes 36 862 tiles, which the model
+    /// holds one by one.
+    fn level() -> impl Strategy<Value = TileLevel> {
+        prop_oneof![1 => Just(TileLevel::Root), 3 => Just(TileLevel::Upper), 3 => Just(TileLevel::Lower)]
+    }
+
     /// Edits on a few shared coordinates, each moved by a voxel or two, so that most
     /// splits find a tile and most activations meet a leaf or a tile.
     fn ops() -> impl Strategy<Value = Vec<Op>> {
         let kind = prop_oneof![
             3 => Just(None),
-            2 => prop::sample::select(LEVELS.to_vec()).prop_map(Some),
+            2 => level().prop_map(Some),
         ];
         let edit = (kind, any::<bool>(), 0..6_usize, [0..2_i32, 0..2, 0..2]);
         (prop::collection::vec(coord(), 6), prop::collection::vec(edit, 1..40)).prop_map(
@@ -647,10 +735,15 @@ mod tests {
                     prop_assert_eq!(seen(&t, p), m.probe(p), "at {:?} after {:?}", p, op);
                 }
                 prop_assert_eq!(t.leaf_count(), m.leaves.len());
-                for l in LEVELS {
-                    prop_assert_eq!(t.tile_count(l), m.tiles.iter().filter(|(x, _)| *x == l).count());
-                }
             }
+            for l in LEVELS {
+                prop_assert_eq!(t.tile_count(l), m.tiles.iter().filter(|(x, _)| *x == l).count());
+            }
+            // Once per case: the iterators list exactly the model's leaves and tiles.
+            let leaves: BTreeSet<Coord> = t.leaves().map(|(_, o)| o).collect();
+            prop_assert_eq!(&leaves, &m.leaves);
+            let tiles: BTreeSet<(TileLevel, Coord)> = t.tiles().into_iter().collect();
+            prop_assert_eq!(&tiles, &m.tiles);
         }
     }
 }

@@ -72,7 +72,7 @@ The dependency order between crates is CODING.md Rule 11, listed in
 ### 4.2 Topology and fields (ADR-0014)
 
 ```rust
-pub struct Topology { /* the tree, the leaf list, where tiles are */ }
+pub struct Topology { /* the tree, its stamp, its leaves and tiles numbered */ }
 pub struct Field<T> {
     leaf_values: Vec<T>,   // leaf count × 512, outside the leaves
     tile_values: Vec<T>,   // one per tile
@@ -81,6 +81,10 @@ pub struct Field<T> {
 ```
 
 - Where a tile is belongs to the topology; its value belongs to each field.
+- A topology numbers its leaves and its tiles in the Morton order of their origins, rebuilt
+  at each `commit`; tiles never share an origin, so the order is total. Leaf numbers, and
+  so the order of field values, follow it. A voxel is located through the tree, then
+  numbered.
 - `Grid<T>` binds one `Topology` and one `Field<T>` for single-field use.
 - Topology changes (activation, dilation, pruning, splitting and merging tiles) go
   through an editor (`TopologyEditor`) and take effect at `commit`, which returns a new
@@ -101,10 +105,9 @@ pub struct Field<T> {
 
 ### 4.3 Leaf manifest (ADR-0014)
 
-`LeafManifest` is derived from the tree and rebuilt at each `commit`; the tree is the only
-source of truth. It holds the leaf coordinates in Morton order, a coordinate-to-leaf
-table, and each leaf's 26 neighbour numbers (`NONE` where absent). Leaf numbers, and so the
-order of field values, follow Morton order.
+`LeafManifest` is derived from the topology and rebuilt at each `commit`; the tree is the
+only source of truth. It holds each leaf's 26 neighbour numbers (`NONE` where absent), in
+leaf-number order (§4.2).
 
 ### 4.4 Access and parallel work (ADR-0015)
 
