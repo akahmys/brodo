@@ -8,19 +8,14 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: `Grid<T>`, the dense-grid reference test, and the slice's two examples,
-  run as tests: diffusion of two fields follows the Gaussian to second order (error ratio
-  3.93 and 4.20 between two grids) and keeps its sums; the union of two sphere SDFs has
-  the exact clamped distance at every voxel. The gate's tests take about 41 s in a debug
-  build (2026-10-17).
-- **Next**: the human decides whether the slice is accepted (§2), given the points below.
-- **Unresolved problems**: points the examples met, none of which needed a workaround:
-  the spheres example first cloned the topology to look up regions inside `Grid::edit`,
-  where the grid is borrowed, and was rewritten to decide its edits before editing; an
-  editor cannot look up the topology it is building. `Topology::leaf_origin` returns a
-  `Result` even for a number the same topology gave. A closure passed to `par_update`
-  names its error type, which must convert from `FieldError`. A solver remaps each field
-  and each buffer by hand at every commit (ADR-0014).
+- **Done**: the human accepted P1's slice (2026-10-17), taking the points the examples met
+  as no workaround: an editor cannot look up the topology it builds, so edits are decided
+  before `Grid::edit`; `Topology::leaf_origin` returns a `Result` for any number; a closure
+  passed to `par_update` names its error type; a solver remaps each field by hand at each
+  commit (ADR-0014). They are for P1's retrospective (PLANNING.md §7).
+- **Next**: tiles in full (§2), starting with the spike on B-010, when the human asks for
+  it.
+- **Unresolved problems**: none.
 
 ## 2. Milestones
 
@@ -64,7 +59,7 @@ kinds of user before the rest is built on them.
         gather; checked against the analytic solution for a Gaussian, and for conservation
   - [x] A sphere SDF and the union of two, on one `Grid<T>`; checked against exact
         distances. The union is written in the example only (ADR-0012)
-- [ ] **Slice accepted when** both examples pass their checks and needed no workaround of
+- [x] **Slice accepted when** both examples pass their checks and needed no workaround of
       the API. A workaround is recorded and sends the design back through an ADR
 
 **Then, in this order**
