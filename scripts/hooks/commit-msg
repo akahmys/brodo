@@ -1,0 +1,12 @@
+#!/bin/sh
+# Scans the commit message, which the pre-commit hook does not see, and checks its language
+# and that a rule change names its ADR (AUDITING.md §2).
+set -e
+command -v betterleaks >/dev/null 2>&1 \
+    || { echo "commit-msg: betterleaks is not installed; refusing to commit unscanned." >&2; exit 1; }
+PERSONAL="${PERSONAL_LEAKS:-$HOME/.config/betterleaks/personal.toml}"
+[ -f "$PERSONAL" ] \
+    || { echo "commit-msg: no personal rules (AUDITING.md §2); refusing to commit unscanned." >&2; exit 1; }
+betterleaks stdin --no-banner --redact -c .betterleaks.toml < "$1"
+betterleaks stdin --no-banner --redact -c "$PERSONAL" < "$1"
+python3 scripts/hooks/commit_msg_check.py "$1"

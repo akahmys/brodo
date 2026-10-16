@@ -1,0 +1,13 @@
+#!/bin/sh
+# Scans the staged change for secrets, personal data and paths outside the project
+# (AUDITING.md §2). Installed with `git config core.hooksPath scripts/hooks`.
+# Fails closed: a missing scanner or rule file stops the commit.
+set -e
+command -v betterleaks >/dev/null 2>&1 \
+    || { echo "pre-commit: betterleaks is not installed; refusing to commit unscanned." >&2; exit 1; }
+PERSONAL="${PERSONAL_LEAKS:-$HOME/.config/betterleaks/personal.toml}"
+[ -f "$PERSONAL" ] \
+    || { echo "pre-commit: no personal rules (AUDITING.md §2); refusing to commit unscanned." >&2; exit 1; }
+betterleaks git --pre-commit --staged --no-banner --redact -c .betterleaks.toml
+betterleaks git --pre-commit --staged --no-banner --redact -c "$PERSONAL"
+python3 scripts/audit/paths.py >/dev/null || { python3 scripts/audit/paths.py; exit 1; }

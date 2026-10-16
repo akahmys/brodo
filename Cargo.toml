@@ -1,0 +1,48 @@
+[workspace]
+members = ["crates/*"]
+# Spikes are throwaway and never built with the workspace (PLANNING.md §3); the fuzzer
+# builds on nightly (ADR-0006).
+exclude = ["spikes", "fuzz"]
+resolver = "3"
+
+[workspace.package]
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.98"
+license = "MIT OR Apache-2.0"
+# Registration on crates.io is a later decision (ROADMAP.md §4).
+publish = false
+
+# Every dependency, internal or external, is declared here once and inherited by
+# `name.workspace = true` (CODING.md Rule 20).
+[workspace.dependencies]
+brodo = { path = "crates/brodo" }
+colino = { path = "crates/colino" }
+
+# Every member declares `[lints] workspace = true`; the audit fails one that does not.
+# Changing a level here is changing a rule (AGENTS.md, "Changing the rules").
+# What each lint enforces is in CODING.md.
+[workspace.lints.rust]
+# Rule 4. `deny`, not `forbid`, so that the one module in UNSAFE_MODULES can carry an
+# `#[expect]` (ADR-0008); `scripts/audit/source.py` fails `unsafe` anywhere else.
+unsafe_code = "deny"
+missing_docs = "warn"
+
+[workspace.lints.clippy]
+allow_attributes = "deny"               # Rule 19: an exception is `#[expect]`, which fails once unneeded
+allow_attributes_without_reason = "deny"  # Rule 19: and carries a reason
+too_many_lines = "deny"                 # Rule 1 (threshold in clippy.toml)
+undocumented_unsafe_blocks = "deny"     # Rule 4: every unsafe block states why it is sound
+multiple_unsafe_ops_per_block = "deny"  # Rule 4: one unsafe operation, one justification
+disallowed_types = "deny"               # Rule 6
+wildcard_enum_match_arm = "deny"        # Rule 7
+match_wildcard_for_single_variants = "deny"  # Rule 7: the case the lint above skips
+let_underscore_must_use = "deny"        # Rule 9
+infinite_loop = "deny"                  # Rule 16: catches a loop with no exit only
+cast_possible_truncation = "deny"       # Rule 17
+cast_possible_wrap = "deny"             # Rule 17
+cast_sign_loss = "deny"                 # Rule 17
+float_cmp = "deny"                      # Rule 17
+dbg_macro = "deny"                      # Rule 18
+print_stdout = "deny"                   # Rule 18
+print_stderr = "deny"                   # Rule 18

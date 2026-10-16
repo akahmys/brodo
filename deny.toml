@@ -1,0 +1,43 @@
+# cargo-deny policy (AUDITING.md §3). The one place the licence allow-list is written.
+
+[graph]
+all-features = true
+
+[advisories]
+# A known vulnerability fails the audit; an exception is listed here with its reason.
+ignore = []
+
+[licenses]
+# Permissive licences only, so that no dependency imposes copyleft terms on the project
+# (ADR-0005). Adding a copyleft licence (GPL, LGPL, AGPL, MPL, EPL and the like) is a rule
+# change and needs an ADR.
+allow = [
+    "MIT",
+    "MIT-0",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Zlib",
+    "0BSD",
+    "CC0-1.0",
+    "Unlicense",
+    "BSL-1.0",
+    "Unicode-3.0",
+]
+confidence-threshold = 0.9
+
+[licenses.private]
+ignore = true
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+allow-wildcard-paths = true
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

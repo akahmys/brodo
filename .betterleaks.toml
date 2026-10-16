@@ -1,0 +1,23 @@
+title = "betterleaks config"
+
+# Load betterleaks' default rules as well. Without this line the rules below are the only
+# ones and every secret the defaults know would pass. The audit fails when fewer than 100
+# rules load (AUDITING.md §2).
+[extend]
+useDefault = true
+
+# A path outside the project: a home directory or a machine's temporary directory. It
+# names the machine and its owner, and nothing in the repository may depend on it.
+[[rules]]
+id = "path-outside-project"
+description = "Absolute path into a home or temporary directory"
+regex = '''(?:/Users/|/home/|[A-Za-z]:\\Users\\|/private/tmp/|/private/var/folders/|/var/folders/)[A-Za-z0-9._-]+'''
+keywords = ["/users/", "/home/", ":\\users\\", "/private/", "/var/folders/"]
+
+[[allowlists]]
+description = "Build output, git internals, and git-ignored per-machine settings"
+paths = [
+    '''(^|/)target/''',
+    '''(^|/)\.git/''',
+    '''^\.claude/settings\.local\.json$''',
+]

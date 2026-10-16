@@ -1,0 +1,11 @@
+# Thresholds and bans for the lints Cargo.toml's [workspace.lints] enables (CODING.md).
+
+# Rule 1.
+too-many-lines-threshold = 50
+
+# Rule 6: iteration order must not depend on a hash seed. A path that resolves to nothing
+# is only a warning that `-D warnings` does not promote; the audit fails on it.
+disallowed-types = [
+    { path = "std::collections::HashMap", reason = "iteration order is not deterministic (CODING.md Rule 6); use BTreeMap" },
+    { path = "std::collections::HashSet", reason = "iteration order is not deterministic (CODING.md Rule 6); use BTreeSet" },
+]

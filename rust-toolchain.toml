@@ -1,0 +1,6 @@
+# The toolchain the gate runs on. `cargo fmt --check` and `cargo clippy -D warnings` are
+# version-sensitive, so the gate gives the same answer only on a pinned compiler.
+# `rust-version` in Cargo.toml states the same version; the audit holds the two equal.
+[toolchain]
+channel = "1.98.1"
+components = ["rustfmt", "clippy"]

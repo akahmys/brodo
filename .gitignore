@@ -1,0 +1,13 @@
+/target/
+.DS_Store
+# Run output and the environments tools build (CODING.md L2).
+/out/
+# Claude Code's per-machine settings, which can hold absolute paths.
+/.claude/settings.local.json
+# Spikes build on their own (PLANNING.md §3).
+/spikes/*/target/
+# cargo-fuzz builds, and keeps its corpus and findings, here (TESTING.md T6).
+/fuzz/target/
+/fuzz/corpus/
+/fuzz/artifacts/
+/fuzz/coverage/
