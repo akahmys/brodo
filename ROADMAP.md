@@ -8,11 +8,12 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: P0 closed as 0.1.0, after its retrospective.
+- **Done**: P0 closed as 0.1.0, after its retrospective. Measured that a fresh Claude
+  Code session opened in the repository loads AGENTS.md as project instructions
+  (2026-10-16). The crate docs now point at ARCHITECTURE.md §4 and §5.
 - **Next**: the human approves the slice's dependencies (§4); then the P1 spike on B-001
   and B-008.
-- **Unresolved problems**: whether Claude Code loads AGENTS.md at the start of a session
-  is not measured (§4).
+- **Unresolved problems**: none.
 
 ## 2. Milestones
 
@@ -118,8 +119,4 @@ implementation (PLANNING.md §2).
 - Before registering on crates.io: `publish`, and each crate's description and keywords
   naming its function (sparse volume, VDB, SDF, level set, voxel). Both names were found
   unregistered on 2026-10-16, per the design.
-- Whether Claude Code loads AGENTS.md at the start of a session: in the session that
-  set up P0, moving into the repository loaded no project instructions. To be measured in
-  a fresh session; if it does not, the human decides how it is loaded (CLAUDE.md is
-  refused by the audit).
 - Requests from users: none yet.
