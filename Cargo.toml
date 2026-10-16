@@ -18,6 +18,9 @@ publish = false
 [workspace.dependencies]
 brodo = { path = "crates/brodo" }
 colino = { path = "crates/colino" }
+proptest = "1.12.0"
+rayon = "1.12.0"
+thiserror = "2.0.21"
 
 # Every member declares `[lints] workspace = true`; the audit fails one that does not.
 # Changing a level here is changing a rule (AGENTS.md, "Changing the rules").

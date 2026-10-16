@@ -8,11 +8,10 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: P0 closed as 0.1.0, after its retrospective. Measured that a fresh Claude
-  Code session opened in the repository loads AGENTS.md as project instructions
-  (2026-10-16). The crate docs now point at ARCHITECTURE.md §4 and §5.
-- **Next**: the human approves the slice's dependencies (§4); then the P1 spike on B-001
-  and B-008.
+- **Done**: the slice's dependencies, approved by the human and added to `brodo`:
+  `thiserror` 2.0.21, `rayon` 1.12.0, and `proptest` 1.12.0 for tests, all MIT OR
+  Apache-2.0 (`cargo info`, 2026-10-16).
+- **Next**: the P1 spike on B-001 and B-008, when the human asks for it (PLANNING.md §3).
 - **Unresolved problems**: none.
 
 ## 2. Milestones
@@ -39,7 +38,7 @@ kinds of user before the rest is built on them.
 
 **First: the spike and the slice**
 
-- [ ] Dependencies for the slice approved by the human (CODING.md Rule 20): see §4
+- [x] Dependencies for the slice approved by the human (CODING.md Rule 20): see §4
 - [ ] Measure that `zerocopy`'s derives pass `unsafe_code = "deny"`, which ADR-0008
       assumes; if not, amend ADR-0008 before `freeze`
 - [ ] Spike `spikes/remap/` answers B-001 and B-008 by comparing designs; an ADR records
@@ -111,8 +110,7 @@ implementation (PLANNING.md §2).
 
 ## 4. Administrative items still open
 
-- Dependencies for P1, each to be approved before it is added (CODING.md Rule 20). For
-  the slice: `thiserror`, `rayon`, and for tests a property-testing crate. Later:
+- Dependencies for P1, each to be approved before it is added (CODING.md Rule 20):
   `zerocopy`, a memory-mapping crate.
 - Before any distribution: confirm the licence terms for that form of distribution
   (ADR-0007).
