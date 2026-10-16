@@ -117,10 +117,12 @@ fastest. A neighbour beyond the `i32` coordinate range is the background.
   path for nearby access, and is held one per thread. It serves reads beyond the
   neighbour table.
 - The leaf-parallel update (`rayon`) reads the old field by `&` and writes the new field by
-  `&mut`, one 512-value chunk per leaf.
+  `&mut`, one 512-value chunk per leaf. Its function may fail; the error returned is that of
+  the lowest-numbered failing leaf.
 - A gather copies a leaf and one ghost layer from its 26 neighbours into a dense 10³
   array, filling missing neighbours with tile or background values.
-- Reductions have a fixed-order mode whose result does not depend on the thread count.
+- Reductions have a fixed-order mode whose result does not depend on the thread count: a
+  partial result per leaf, in parallel, folded in leaf order.
 
 ### 4.5 Topology analysis
 

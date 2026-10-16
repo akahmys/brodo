@@ -8,11 +8,12 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: `LeafManifest`, part of `Topology` and built at each commit: each leaf's 26
-  neighbours as a `Location` (ADR-0014 amendment of 2026-10-17), checked against
-  neighbours computed from coordinates. Building it took about 2.3 ms of a commit of
-  10 000 leaves (fastest of 15, two runs, 2026-10-17; not by TESTING.md T5).
-- **Next**: the leaf-parallel update and gather (§4.4).
+- **Done**: the leaf-parallel update, the fixed-order reduction and the gather, with tile
+  values (ADR-0015 amendment of 2026-10-17); a gather is checked against the field read
+  voxel by voxel. One gathered diffusion step over 10 000 leaves took 17.1 ms on one thread
+  and 2.7 ms on ten (fastest of 15, two runs, Apple M5, 2026-10-17; not by TESTING.md T5).
+- **Next**: the reference tier's remaining property, random activation and writes against
+  a dense grid (TESTING.md §1); then the two examples.
 - **Unresolved problems**: none.
 
 ## 2. Milestones
@@ -49,7 +50,7 @@ kinds of user before the rest is built on them.
 - [x] `Topology` and `Field<T>`; `TopologyEditor`, `commit` and `Remap` as the ADR decides
       (§4.2)
 - [x] `LeafManifest`: Morton order and 26 neighbours (§4.3)
-- [ ] The leaf-parallel update and gather (§4.4)
+- [x] The leaf-parallel update and gather (§4.4)
 - [ ] Reference tier: property tests against a dense grid (TESTING.md §1)
 - [ ] Two examples in `crates/brodo/examples/`, run by tests, written from textbook
       material (AGENTS.md S1):
@@ -62,7 +63,7 @@ kinds of user before the rest is built on them.
 
 **Then, in this order**
 
-- [ ] Tiles in full: merging, and tiles in the gather and the examples (§4.1); B-010
+- [ ] Tiles in full: merging, and tiles in the examples (§4.1); B-010
       answered first, by a spike
 - [ ] `ValueAccessor` (§4.4)
 - [ ] `freeze` and `GridView` (§4.6); the cache profile (§4.7), its reader in

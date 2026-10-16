@@ -10,6 +10,8 @@ are recorded here when they change (V6).
 - `brodo::topology` and `brodo::field`: topologies numbered in Morton order, their editor and
   `Remap`, and fields that refuse a stale topology. `Tree::leaves` and `Tree::tiles`.
 - `brodo::manifest`: each leaf's 26 neighbours, built with its topology at each commit.
+- `brodo::parallel` and `brodo::gather`: the leaf-parallel update, the fixed-order reduction,
+  and the gather of a leaf with one ghost layer.
 
 ## 0.1.0 (2026-10-16)
 

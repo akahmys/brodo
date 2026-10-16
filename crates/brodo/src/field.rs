@@ -49,6 +49,21 @@ impl<T: Copy + Send + Sync + 'static> Field<T> {
         if self.stamp == t.stamp() { Ok(()) } else { Err(FieldError::StaleField) }
     }
 
+    /// Every leaf's values, by leaf number, if the field belongs to `t`.
+    pub(crate) fn leaves(&self, t: &Topology) -> Result<&[[T; LEAF_VOXELS]], FieldError> {
+        self.check(t)?;
+        Ok(self.leaf_values.as_chunks().0)
+    }
+
+    /// Every leaf's values to write, by leaf number, if the field belongs to `t`.
+    pub(crate) fn leaves_mut(
+        &mut self,
+        t: &Topology,
+    ) -> Result<&mut [[T; LEAF_VOXELS]], FieldError> {
+        self.check(t)?;
+        Ok(self.leaf_values.as_chunks_mut().0)
+    }
+
     fn leaf_slice(&self, n: LeafNumber) -> Result<&[T], FieldError> {
         let s = n.get() as usize * LEAF_VOXELS;
         self.leaf_values.get(s..s + LEAF_VOXELS).ok_or(FieldError::UnknownLeaf(n.get()))

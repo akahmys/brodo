@@ -1,6 +1,6 @@
 # ADR-0015: Parallel updates and stencil gathers work per leaf, with a fixed-order mode
 
-- **Status**: Accepted
+- **Status**: Amended
 - **Date**: 2026-10-16
 
 ## Context
@@ -23,3 +23,18 @@ compared between runs or solvers.
 
 The ghost width is open (ROADMAP.md §3, B-002). These structures are needed in P1 even
 though the API is not fixed until later.
+
+## Amendment
+
+- **Date**: 2026-10-17
+
+Three points were decided by the human before the update and the gather were built.
+
+- The update's function may fail. Every leaf is visited, and the error returned is that
+  of the lowest-numbered leaf that failed, so it does not depend on the thread count. A
+  function that could not fail would have had to read other fields through views that are
+  still fallible for a leaf number from another topology.
+- The fixed-order reduction was built with them, as the diffusion example's conservation
+  check needs it: a partial result per leaf in parallel, folded in leaf order.
+- The gather takes tile values from the start, since the leaf manifest already names each
+  neighbouring tile. Its width stayed one layer; B-002 was not answered.

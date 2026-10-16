@@ -4,6 +4,8 @@
 
 pub mod error;
 pub mod field;
+pub mod gather;
 pub mod manifest;
+pub mod parallel;
 pub mod topology;
 pub mod tree;
