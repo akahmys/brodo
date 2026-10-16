@@ -8,13 +8,11 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: the human accepted P1's slice (2026-10-17), taking the points the examples met
-  as no workaround: an editor cannot look up the topology it builds, so edits are decided
-  before `Grid::edit`; `Topology::leaf_origin` returns a `Result` for any number; a closure
-  passed to `par_update` names its error type; a solver remaps each field by hand at each
-  commit (ADR-0014). They are for P1's retrospective (PLANNING.md §7).
-- **Next**: tiles in full (§2), starting with the spike on B-010, when the human asks for
-  it.
+- **Done**: the spike `spikes/merge/` measured candidates for B-010 (its `REPORT.md`). The
+  answer is drafted as a proposed amendment to ADR-0014: parts in one shared list, a rule
+  on values with voxel counts, leaves and tiles merged at once, empty regions refused.
+- **Next**: the human accepts or changes the amendment; then merging in brodo (tiles in
+  full, §2).
 - **Unresolved problems**: none.
 
 ## 2. Milestones
@@ -105,10 +103,11 @@ implementation (PLANNING.md §2).
 | B-006 | Does `vdb-rs` pass Rules 12 and 13 (no C, permissive licence) on every target? | To be checked before it is added |
 | B-007 | Which harness runs the benchmarks? | None chosen |
 | B-009 | Which older format versions does each reader accept (TESTING.md V6)? | To be decided before `freeze` |
-| B-010 | When leaves or tiles merge into a tile above leaf level, how does `Remap` name the several sources, and what does the merge rule see? | None yet; `spikes/remap/` had leaf-sized tiles only (ADR-0014) |
+| B-010 | When leaves or tiles merge into a tile above leaf level, how does `Remap` name the several sources, and what does the merge rule see? | Measured by `spikes/merge/`: parts in one shared list, a rule on values with voxel counts (ADR-0014 amendment, proposed) |
 | B-011 | Do dilation, erosion and flood fill (§4.5) need a per-voxel active mask in each leaf? | None yet; a leaf has no per-voxel state now (ADR-0013) |
 
-No spike is running. `spikes/remap/` answered B-001 and B-008 (ADR-0014).
+No spike is running. `spikes/remap/` answered B-001 and B-008, and `spikes/merge/` B-010
+(ADR-0014).
 
 ## 4. Administrative items still open
 

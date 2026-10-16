@@ -83,3 +83,27 @@ The human decided to build `Grid<T>` with P1's slice rather than after it, so th
 slice checks single-field use, as by a shape kernel, as well as a solver's many fields.
 Its `edit` takes a closure because an editor borrows the topology it edits; it commits
 and remaps in one step and leaves the grid unchanged on any error.
+
+## Amendment
+
+- **Date**: 2026-10-17 (third)
+- **Status**: Proposed
+
+The spike `spikes/merge/` answered B-010 by measurement (its `REPORT.md`), one level above
+leaves.
+
+- A merged tile's sources are a list of parts: old leaves, old tiles, and counts of empty
+  regions. `Remap` holds one list for all merged tiles, each tile its range in it; a list
+  per tile held 2.8 times more for 32 768 small merges and was never smaller.
+- The merge rule sees values with the number of voxels holding each, `Fn(&[(T, u32)]) ->
+  Option<T>`, instead of every voxel's value: a tile is one entry, which made merging tiles
+  into a larger tile 200 to 250 times faster, and leaves cost the same. The uniform rule and
+  a weighted mean are both written on it.
+- A merge takes leaves and tiles at once (S2), in one commit; requiring tiles only (S1)
+  took two commits to prune a sphere SDF to the same result in as many lines.
+- A region that holds nothing refuses the merge (B-a), so a merge changes values only, not
+  which voxels are active. Merging it as the background (B-b) worked as well and cost the
+  same.
+
+A rule that refuses one tile refuses the whole commit, so code that prunes decides what
+is uniform before it commits. Merges into the upper nodes and the root were not measured.
