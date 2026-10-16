@@ -8,11 +8,11 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: the harness, adapted from the template; the design split into ARCHITECTURE.md
-  and ADR-0012 to ADR-0017; P1 planned as a vertical slice first.
-- **Next**: the retrospective on the harness and version 0.1.0, closing P0; then the P1
-  spike on B-001 and B-008.
-- **Unresolved problems**: none.
+- **Done**: P0 closed as 0.1.0, after its retrospective.
+- **Next**: the human approves the slice's dependencies (§4); then the P1 spike on B-001
+  and B-008.
+- **Unresolved problems**: whether Claude Code loads AGENTS.md at the start of a session
+  is not measured (§4).
 
 ## 2. Milestones
 
@@ -27,9 +27,9 @@ before its version is set (TESTING.md V2).
 - [x] `brodo` and `colino` crates, listed in `scripts/audit/project.py`
 - [x] Licence: MIT OR Apache-2.0 (ADR-0010)
 - [x] The first commit, with the gate passing
-- [ ] Retrospective on the harness (PLANNING.md §7)
-- [ ] Version 0.1.0 in `Cargo.toml` and CHANGELOG.md, tag `v0.1.0` (TESTING.md V2–V4)
-- [ ] **Accepted when** the repository exists with its rules and the gate passes
+- [x] Retrospective on the harness (PLANNING.md §7)
+- [x] Version 0.1.0 in `Cargo.toml` and CHANGELOG.md, tag `v0.1.0` (TESTING.md V2–V4)
+- [x] **Accepted when** the repository exists with its rules and the gate passes
 
 ### P1 — `brodo`
 
@@ -39,6 +39,8 @@ kinds of user before the rest is built on them.
 **First: the spike and the slice**
 
 - [ ] Dependencies for the slice approved by the human (CODING.md Rule 20): see §4
+- [ ] Measure that `zerocopy`'s derives pass `unsafe_code = "deny"`, which ADR-0008
+      assumes; if not, amend ADR-0008 before `freeze`
 - [ ] Spike `spikes/remap/` answers B-001 and B-008 by comparing designs; an ADR records
       the answer
 - [ ] The minimal tree: root and three levels, activation, and splitting a tile into a
@@ -116,4 +118,8 @@ implementation (PLANNING.md §2).
 - Before registering on crates.io: `publish`, and each crate's description and keywords
   naming its function (sparse volume, VDB, SDF, level set, voxel). Both names were found
   unregistered on 2026-10-16, per the design.
+- Whether Claude Code loads AGENTS.md at the start of a session: in the session that
+  set up P0, moving into the repository loaded no project instructions. To be measured in
+  a fresh session; if it does not, the human decides how it is loaded (CLAUDE.md is
+  refused by the audit).
 - Requests from users: none yet.

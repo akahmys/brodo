@@ -4,11 +4,11 @@ version = 4
 
 [[package]]
 name = "brodo"
-version = "0.0.0"
+version = "0.1.0"
 
 [[package]]
 name = "colino"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "brodo",
 ]
