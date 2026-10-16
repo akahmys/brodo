@@ -11,3 +11,7 @@
 /fuzz/corpus/
 /fuzz/artifacts/
 /fuzz/coverage/
+# proptest's saved failure seeds: T3 breaks code on purpose and leaves them behind
+# (TESTING.md T3); a real finding becomes a named test instead.
+proptest-regressions/
+*.proptest-regressions
