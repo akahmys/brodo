@@ -1,6 +1,6 @@
 # ADR-0013: The tree has four fixed levels with tiles, nodes in arenas, and a BTreeMap root
 
-- **Status**: Accepted
+- **Status**: Amended
 - **Date**: 2026-10-16
 
 ## Context
@@ -26,3 +26,17 @@ proposed, iterates in an order that varies between runs, which CODING.md Rule 6 
 
 Root iteration is deterministic. Root lookups cost O(log n) in the number of top-level
 nodes, which is small.
+
+## Amendment
+
+- **Date**: 2026-10-17
+
+Two points the design left silent were decided by the human before the minimal tree was
+built.
+
+- A leaf holds no per-voxel active state: every voxel of a leaf is active. This matched
+  the design as written and the remap spike. Whether dilation, erosion and flood fill need
+  a per-voxel mask was recorded as B-011, to be answered before them.
+- Activating a voxel inside a tile changes nothing, since a tile's region is active
+  already. A tile becomes leaves only by an explicit split, which turns each level on the
+  path into a node whose other children are tiles, down to one leaf.

@@ -16,5 +16,7 @@ papers, public documentation and permissively licensed code (S1, S2) may appear 
 
 | File | Draws on | For |
 | :--- | :--- | :--- |
+| `crates/brodo/src/error.rs` | none | the crate's error types |
 | `crates/brodo/src/lib.rs` | none | crate root |
+| `crates/brodo/src/tree.rs` | ARCHITECTURE.md §4.1, ADR-0013 only | the sparse tree: levels, masks, arenas, activation, tiles and their split |
 | `crates/colino/src/lib.rs` | none | crate root |

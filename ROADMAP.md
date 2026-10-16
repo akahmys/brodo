@@ -8,9 +8,12 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: the human accepted the ADR-0014 amendment answering B-001 and B-008 from the
-  spike `spikes/remap/`; ARCHITECTURE.md §4.2 follows it.
-- **Next**: the minimal tree (§4.1).
+- **Done**: the minimal tree (`crates/brodo/src/tree.rs`): four levels, activation, tiles
+  at each level and their split down to a leaf, checked against a model in a property
+  test. Two points the design left silent were decided (ADR-0013 amendment); B-011 records
+  the per-voxel active mask.
+- **Next**: `Topology` and `Field<T>`, with `TopologyEditor`, `commit` and `Remap` as
+  ADR-0014 decides (§4.2).
 - **Unresolved problems**: none.
 
 ## 2. Milestones
@@ -42,7 +45,7 @@ kinds of user before the rest is built on them.
       assumes; if not, amend ADR-0008 before `freeze`
 - [x] Spike `spikes/remap/` answers B-001 and B-008 by comparing designs; an ADR records
       the answer
-- [ ] The minimal tree: root and three levels, activation, and splitting a tile into a
+- [x] The minimal tree: root and three levels, activation, and splitting a tile into a
       leaf (ARCHITECTURE.md §4.1)
 - [ ] `Topology` and `Field<T>`; `TopologyEditor`, `commit` and `Remap` as the ADR decides
       (§4.2)
@@ -102,6 +105,7 @@ implementation (PLANNING.md §2).
 | B-007 | Which harness runs the benchmarks? | None chosen |
 | B-009 | Which older format versions does each reader accept (TESTING.md V6)? | To be decided before `freeze` |
 | B-010 | When leaves or tiles merge into a tile above leaf level, how does `Remap` name the several sources, and what does the merge rule see? | None yet; `spikes/remap/` had leaf-sized tiles only (ADR-0014) |
+| B-011 | Do dilation, erosion and flood fill (§4.5) need a per-voxel active mask in each leaf? | None yet; a leaf has no per-voxel state now (ADR-0013) |
 
 No spike is running. `spikes/remap/` answered B-001 and B-008 (ADR-0014).
 

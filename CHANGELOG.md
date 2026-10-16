@@ -6,6 +6,8 @@ are recorded here when they change (V6).
 
 ## Unreleased
 
+- `brodo::tree`: the sparse tree, with activation, tiles and their split; `brodo::error`.
+
 ## 0.1.0 (2026-10-16)
 
 Closes P0: the repository with its rules, the `brodo` and `colino` crates (empty), and the
