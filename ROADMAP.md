@@ -12,7 +12,7 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   and ADR-0012 to ADR-0017; P1 planned as a vertical slice first.
 - **Next**: the retrospective on the harness and version 0.1.0, closing P0; then the P1
   spike on B-001 and B-008.
-- **Unresolved problems**: whether S4 covers `examples/` (§4).
+- **Unresolved problems**: none.
 
 ## 2. Milestones
 
@@ -111,9 +111,6 @@ implementation (PLANNING.md §2).
 - Dependencies for P1, each to be approved before it is added (CODING.md Rule 20). For
   the slice: `thiserror`, `rayon`, and for tests a property-testing crate. Later:
   `zerocopy`, a memory-mapping crate.
-- Whether AGENTS.md S4 ("no CFD concept in its code") covers `examples/`: the diffusion
-  example needs it not to. Proposed: S4 binds library code under `src/` only, by amending
-  ADR-0007. Awaiting the human's decision.
 - Before any distribution: confirm the licence terms for that form of distribution
   (ADR-0007).
 - Before registering on crates.io: `publish`, and each crate's description and keywords

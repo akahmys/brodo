@@ -56,7 +56,7 @@ not even as a translation or a memory of how something was written (ADR-0007).
 | **S1** | Never read, translate or port the source of **the solver**, **OpenVDB** or **OpenFOAM**, nor the solver's or the design platform's design documents or code. Read only brodo's own files, papers, public documentation (NanoVDB's for its data-structure ideas only), and a dependency's public API and documentation | `scripts/hooks/provenance_guard.py` blocks paths and URLs naming them; a name written another way, **nothing** |
 | **S2** | Code is copied from another crate only when its licence is on `deny.toml`'s allow-list, with its notice kept, and recorded in PROVENANCE.md | nothing |
 | **S3** | Every source file under `crates/*/src/` has a row in PROVENANCE.md naming the papers and documents it draws on and for what, added in the commit that adds the file | `scripts/audit/documents.py` (the row exists); its truth, **nothing** |
-| **S4** | brodo knows nothing of its users: no CFD, solver or design-platform concept in its code. A feature outside ARCHITECTURE.md §1's scope is recorded as a request (ROADMAP.md §4), not implemented | nothing |
+| **S4** | brodo knows nothing of its users: no CFD, solver or design-platform concept in library code (`crates/*/src/`). Examples, tests and benchmarks may use them to exercise the API, written from textbook material (S1). A feature outside ARCHITECTURE.md §1's scope is recorded as a request (ROADMAP.md §4), not implemented | nothing |
 
 ## Writing rules
 

@@ -1,6 +1,6 @@
 # ADR-0007: Copyleft and sibling sources are never read, and every source file records what it drew on
 
-- **Status**: Accepted
+- **Status**: Amended
 - **Date**: 2026-10-16
 
 ## Context
@@ -30,3 +30,12 @@ The hook is bypassed by a name written without a slash before it, and what was r
 no trace, so S1 rests on the agent. PLANNING.md §6 reads documentation rather than a
 dependency's source. The licence is to be confirmed for each form of distribution before
 any is made (ROADMAP.md §4).
+
+## Amendment
+
+- **Date**: 2026-10-16
+
+S4 was limited to library code under `crates/*/src/`. P1's vertical slice checks the API
+with examples written as its users would use it, a diffusion over several fields among
+them; a ban on solver concepts in all code would have forbidden that. Examples, tests and
+benchmarks may use such concepts, written from textbook material under S1.
