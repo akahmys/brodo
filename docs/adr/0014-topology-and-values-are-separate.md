@@ -25,3 +25,31 @@ Changing a topology shared by several fields silently invalidates them all.
 
 How a stale field is refused by type (a generation number checked by the field is the
 proposal) is open (ROADMAP.md §3, B-001).
+
+## Amendment
+
+- **Date**: 2026-10-16
+- **Status**: Proposed
+
+The spike `spikes/remap/` answered B-001 and B-008 by measurement (its `REPORT.md`).
+
+- **B-001.** Three ways to refuse a stale field were compared: a stamp per topology checked
+  by each field, a topology that owns its fields, and a brand (an invariant lifetime)
+  shared by a topology and its fields. The brand refused a stale field at compile time, but
+  confined each topology to a closure: a time loop with commits became recursion one level
+  per commit, which CODING.md Rule 15 refuses. The owning topology needed two workarounds
+  in the slice's scenarios and type erasure. None cost measurably more than another. The
+  stamp was chosen: every topology carries a stamp unique in the process, each field
+  records the stamp it was made or remapped for, and any use with another topology, a
+  remap included, is the typed error `StaleField`. `commit` leaves the old topology usable,
+  so a refused remap leaves the caller its old topology and fields.
+- **B-008.** `Remap` records where each new leaf's values come from (an old leaf, the tile
+  it was split from, or the background) and each new tile's value (an old tile, a merged
+  leaf, or the background). A split leaf takes each field's own tile value. A merged tile's
+  value comes from a merge rule each field is given at remap, `Fn(&[T]) -> Option<T>`;
+  `None` refuses the merge. brodo provides the rule that accepts only values with the same
+  bits; any other is the caller's. Rules run only for merged regions that survive the
+  commit, in leaf order.
+
+Merging many leaves or tiles into a tile above leaf level was not measured; the spike's
+tiles were leaf-sized. It is settled with tiles in full (ROADMAP.md §2).

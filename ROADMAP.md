@@ -8,10 +8,12 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: the slice's dependencies, approved by the human and added to `brodo`:
-  `thiserror` 2.0.21, `rayon` 1.12.0, and `proptest` 1.12.0 for tests, all MIT OR
-  Apache-2.0 (`cargo info`, 2026-10-16).
-- **Next**: the P1 spike on B-001 and B-008, when the human asks for it (PLANNING.md §3).
+- **Done**: the spike `spikes/remap/` measured three candidates for B-001 and a remap
+  with leaf and tile sources and per-field merge rules for B-008 (its `REPORT.md`). The
+  answer is drafted as a proposed amendment to ADR-0014: a stamp per topology, checked by
+  each field.
+- **Next**: the human accepts or changes the ADR-0014 amendment; then ARCHITECTURE.md
+  §4.2 is updated to it, and the minimal tree is built.
 - **Unresolved problems**: none.
 
 ## 2. Milestones
@@ -94,14 +96,14 @@ implementation (PLANNING.md §2).
 
 | # | Question | Proposal so far |
 | :--- | :--- | :--- |
-| B-001 | How does the type system refuse a field not remapped after a topology commit? | A generation number in the topology, checked by each field |
+| B-001 | How does the type system refuse a field not remapped after a topology commit? | Measured by `spikes/remap/`: a stamp per topology, checked by each field (ADR-0014 amendment, proposed) |
 | B-002 | How wide is the ghost layer? | One layer; a macro makes two possible |
 | B-003 | Do level-set operations (CSG, redistancing) belong in brodo? | No, until shown to be general |
 | B-004 | Does a shared IR schema crate live in this repository? | Undecided; for brodo's users to agree, not for brodo to anticipate |
 | B-005 | What is the archive profile's default compressor, and is it pure Rust (CODING.md Rule 12)? | Zstd, LZ4 when decompression speed is asked for; whether a pure-Rust implementation suffices is to be measured |
 | B-006 | Does `vdb-rs` pass Rules 12 and 13 (no C, permissive licence) on every target? | To be checked before it is added |
 | B-007 | Which harness runs the benchmarks? | None chosen |
-| B-008 | `Remap` maps old leaves to new ones only. Where do a new leaf's values come from when a tile splits, and where does a tile's value come from when leaves merge into it? | None yet; the design is silent |
+| B-008 | `Remap` maps old leaves to new ones only. Where do a new leaf's values come from when a tile splits, and where does a tile's value come from when leaves merge into it? | Measured by `spikes/remap/`: per-leaf and per-tile sources, and a merge rule per field (ADR-0014 amendment, proposed); merges above leaf level open |
 | B-009 | Which older format versions does each reader accept (TESTING.md V6)? | To be decided before `freeze` |
 
 | Spike | What | Answers |
