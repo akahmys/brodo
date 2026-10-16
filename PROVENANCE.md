@@ -19,6 +19,7 @@ papers, public documentation and permissively licensed code (S1, S2) may appear 
 | `crates/brodo/src/error.rs` | none | the crate's error types |
 | `crates/brodo/src/gather.rs` | ARCHITECTURE.md §4.4, ADR-0015 only | the gather of a leaf and one ghost layer |
 | `crates/brodo/src/field.rs` | ARCHITECTURE.md §4.2, ADR-0014 only | fields: values by leaf and tile number, the stamp check, the remap |
+| `crates/brodo/src/grid.rs` | ARCHITECTURE.md §4.2, ADR-0014 only | a grid: one topology and one field, edited in one step |
 | `crates/brodo/src/lib.rs` | none | crate root |
 | `crates/brodo/src/manifest.rs` | ARCHITECTURE.md §4.3, ADR-0014 only | the leaf manifest: 26 directions and each leaf's neighbours |
 | `crates/brodo/src/parallel.rs` | ARCHITECTURE.md §4.4, ADR-0015 only | the leaf-parallel update and the fixed-order reduction |

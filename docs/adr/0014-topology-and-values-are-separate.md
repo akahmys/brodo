@@ -74,3 +74,12 @@ its level, or the background, so a gather can fill from a tile or the background
 another lookup. A row costs 208 bytes per leaf instead of 104, measured by
 `size_of` in `manifest.rs`'s tests. The manifest was made part of
 `Topology` and built at each commit, so it needs no stamp of its own.
+
+## Amendment
+
+- **Date**: 2026-10-17 (second)
+
+The human decided to build `Grid<T>` with P1's slice rather than after it, so that the
+slice checks single-field use, as by a shape kernel, as well as a solver's many fields.
+Its `edit` takes a closure because an editor borrows the topology it edits; it commits
+and remaps in one step and leaves the grid unchanged on any error.

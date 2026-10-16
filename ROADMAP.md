@@ -8,13 +8,19 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: the leaf-parallel update, the fixed-order reduction and the gather, with tile
-  values (ADR-0015 amendment of 2026-10-17); a gather is checked against the field read
-  voxel by voxel. One gathered diffusion step over 10 000 leaves took 17.1 ms on one thread
-  and 2.7 ms on ten (fastest of 15, two runs, Apple M5, 2026-10-17; not by TESTING.md T5).
-- **Next**: the reference tier's remaining property, random activation and writes against
-  a dense grid (TESTING.md §1); then the two examples.
-- **Unresolved problems**: none.
+- **Done**: `Grid<T>`, the dense-grid reference test, and the slice's two examples,
+  run as tests: diffusion of two fields follows the Gaussian to second order (error ratio
+  3.93 and 4.20 between two grids) and keeps its sums; the union of two sphere SDFs has
+  the exact clamped distance at every voxel. The gate's tests take about 41 s in a debug
+  build (2026-10-17).
+- **Next**: the human decides whether the slice is accepted (§2), given the points below.
+- **Unresolved problems**: points the examples met, none of which needed a workaround:
+  the spheres example first cloned the topology to look up regions inside `Grid::edit`,
+  where the grid is borrowed, and was rewritten to decide its edits before editing; an
+  editor cannot look up the topology it is building. `Topology::leaf_origin` returns a
+  `Result` even for a number the same topology gave. A closure passed to `par_update`
+  names its error type, which must convert from `FieldError`. A solver remaps each field
+  and each buffer by hand at every commit (ADR-0014).
 
 ## 2. Milestones
 
@@ -51,12 +57,12 @@ kinds of user before the rest is built on them.
       (§4.2)
 - [x] `LeafManifest`: Morton order and 26 neighbours (§4.3)
 - [x] The leaf-parallel update and gather (§4.4)
-- [ ] Reference tier: property tests against a dense grid (TESTING.md §1)
+- [x] Reference tier: property tests against a dense grid (TESTING.md §1)
 - [ ] Two examples in `crates/brodo/examples/`, run by tests, written from textbook
       material (AGENTS.md S1):
-  - [ ] Diffusion over several fields, double-buffered, with the leaf-parallel update and
+  - [x] Diffusion over several fields, double-buffered, with the leaf-parallel update and
         gather; checked against the analytic solution for a Gaussian, and for conservation
-  - [ ] A sphere SDF and the union of two, on one `Grid<T>`; checked against exact
+  - [x] A sphere SDF and the union of two, on one `Grid<T>`; checked against exact
         distances. The union is written in the example only (ADR-0012)
 - [ ] **Slice accepted when** both examples pass their checks and needed no workaround of
       the API. A workaround is recorded and sends the design back through an ADR
@@ -68,7 +74,7 @@ kinds of user before the rest is built on them.
 - [ ] `ValueAccessor` (§4.4)
 - [ ] `freeze` and `GridView` (§4.6); the cache profile (§4.7), its reader in
       `UNTRUSTED_INPUT` and fuzzed, its mapping module in `UNSAFE_MODULES`
-- [ ] `Grid<T>` (§4.2) and flood fill (§4.5)
+- [ ] Flood fill (§4.5); `Grid<T>` was built with the slice (ADR-0014)
 - [ ] Benchmarks and their first baselines (TESTING.md §1)
 - [ ] Retrospective and refactoring; fuzz round; Miri run
 - [ ] **Accepted when** flood fill, neighbour traversal and a double-buffered update work,

@@ -16,3 +16,12 @@ proptest.workspace = true
 
 [lints]
 workspace = true
+
+# The slice's examples run as tests (ROADMAP.md, P1).
+[[example]]
+name = "diffusion"
+test = true
+
+[[example]]
+name = "spheres"
+test = true

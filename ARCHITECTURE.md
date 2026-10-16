@@ -85,7 +85,9 @@ pub struct Field<T> {
   at each `commit`; tiles never share an origin, so the order is total. Leaf numbers, and
   so the order of field values, follow it. A voxel is located through the tree, then
   numbered.
-- `Grid<T>` binds one `Topology` and one `Field<T>` for single-field use.
+- `Grid<T>` binds one `Topology` and one `Field<T>` for single-field use. Its `edit` takes
+  the edits as a closure, commits them and remaps the field in one step; if any part fails,
+  the grid is unchanged.
 - Topology changes (activation, dilation, pruning, splitting and merging tiles) go
   through an editor (`TopologyEditor`) and take effect at `commit`, which returns a new
   topology and a `Remap` to it, and leaves the old topology usable. Every field on the old
