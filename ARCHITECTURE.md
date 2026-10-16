@@ -105,9 +105,11 @@ pub struct Field<T> {
 
 ### 4.3 Leaf manifest (ADR-0014)
 
-`LeafManifest` is derived from the topology and rebuilt at each `commit`; the tree is the
-only source of truth. It holds each leaf's 26 neighbour numbers (`NONE` where absent), in
-leaf-number order (§4.2).
+`LeafManifest` is part of a topology, derived from its tree and rebuilt at each `commit`;
+the tree is the only source of truth. It holds, in leaf-number order (§4.2), what lies one
+leaf away from each leaf in each of the 26 directions: a leaf, a tile with its level, or
+the background, as a `Location` (CODING.md Rule 5). Directions are numbered with x
+fastest. A neighbour beyond the `i32` coordinate range is the background.
 
 ### 4.4 Access and parallel work (ADR-0015)
 

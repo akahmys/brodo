@@ -63,3 +63,14 @@ that field values are in their final order from the first field on. `LeafManifes
 left with the 26-neighbour table only; the leaf list and the coordinate-to-leaf lookup
 moved to `Topology`, which locates a voxel through the tree. The merge rule was left out
 of `remap` until merges exist (B-010).
+
+## Amendment
+
+- **Date**: 2026-10-17
+
+The design gave each leaf 26 neighbour numbers with `NONE` where absent, which CODING.md
+Rule 5 forbids. The human decided that each neighbour is a `Location`: a leaf, a tile with
+its level, or the background, so a gather can fill from a tile or the background without
+another lookup. A row costs 208 bytes per leaf instead of 104, measured by
+`size_of` in `manifest.rs`'s tests. The manifest was made part of
+`Topology` and built at each commit, so it needs no stamp of its own.

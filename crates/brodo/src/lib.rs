@@ -4,5 +4,6 @@
 
 pub mod error;
 pub mod field;
+pub mod manifest;
 pub mod topology;
 pub mod tree;

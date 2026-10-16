@@ -6,6 +6,7 @@ use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::error::TreeError;
+use crate::manifest::{DIRECTIONS, LeafManifest};
 use crate::tree::{Activation, Coord, LeafId, Probe, TileLevel, Tree};
 
 static NEXT_STAMP: AtomicU64 = AtomicU64::new(1);
@@ -92,6 +93,7 @@ pub struct Topology {
     tiles: Vec<(TileLevel, Coord)>,
     /// Tile numbers, by origin; tiles never share one.
     tile_numbers: BTreeMap<Coord, u32>,
+    manifest: LeafManifest,
 }
 
 impl Default for Topology {
@@ -110,6 +112,7 @@ impl Topology {
             leaf_numbers: Vec::new(),
             tiles: Vec::new(),
             tile_numbers: BTreeMap::new(),
+            manifest: LeafManifest::default(),
         }
     }
 
@@ -124,14 +127,17 @@ impl Topology {
         u32::try_from(tiles.len()).map_err(|_| TreeError::TooManyTiles)?;
         tiles.sort_by_cached_key(|(_, o)| morton(*o));
         let tile_numbers = tiles.iter().zip(0_u32..).map(|((_, o), n)| (*o, n)).collect();
-        Ok(Self {
+        let mut t = Self {
             tree,
             stamp: next_stamp(),
             leaves: leaves.into_iter().map(|(_, o)| o).collect(),
             leaf_numbers,
             tiles,
             tile_numbers,
-        })
+            manifest: LeafManifest::default(),
+        };
+        t.manifest = LeafManifest::build(&t.leaves, |v| t.locate(v));
+        Ok(t)
     }
 
     pub(crate) fn stamp(&self) -> u64 {
@@ -168,6 +174,16 @@ impl Topology {
     /// A tile's level and origin.
     pub fn tile(&self, n: TileNumber) -> Result<(TileLevel, Coord), TreeError> {
         self.tiles.get(to_usize(n.0)).copied().ok_or(TreeError::UnknownTile(n.0))
+    }
+
+    /// The leaf manifest: what lies next to each leaf (§4.3).
+    pub fn manifest(&self) -> &LeafManifest {
+        &self.manifest
+    }
+
+    /// What lies next to a leaf, by direction number (`Offset`).
+    pub fn neighbours(&self, n: LeafNumber) -> Result<&[Location; DIRECTIONS], TreeError> {
+        self.manifest.neighbours(n)
     }
 
     /// What holds the voxel.
@@ -342,6 +358,44 @@ mod tests {
         assert_ne!(t1.stamp(), t2.stamp());
         assert_eq!(r.leaf_sources(), &[LeafSource::Background, LeafSource::Leaf(LeafNumber(0))]);
         assert_eq!(r.tile_sources(), &[TileSource::Background]);
+    }
+
+    fn neighbour(t: &Topology, at: Coord, d: [i32; 3]) -> Location {
+        let Location::Leaf(n) = t.locate(at) else { panic!("no leaf at {at:?}") };
+        let o = crate::manifest::Offset::all().find(|o| o.delta() == d).unwrap();
+        t.manifest().neighbour(n, o).unwrap()
+    }
+
+    #[test]
+    fn neighbours_cross_root_boundaries_and_meet_tiles() {
+        let (t, _) = commit_with(&Topology::new(), |e| {
+            for v in [[4095, 0, 0], [4096, 0, 0], [-1, -1, -1], [0, 0, 0], [120, 0, 0]] {
+                e.activate(v).unwrap();
+            }
+            e.add_tile(TileLevel::Upper, [128, 0, 0]).unwrap();
+        });
+        let leaf_at = |v| t.locate(v);
+        assert_eq!(neighbour(&t, [4095, 0, 0], [1, 0, 0]), leaf_at([4096, 0, 0]));
+        assert_eq!(neighbour(&t, [4096, 0, 0], [-1, 0, 0]), leaf_at([4095, 0, 0]));
+        assert_eq!(neighbour(&t, [0, 0, 0], [-1, -1, -1]), leaf_at([-1, -1, -1]));
+        assert_eq!(neighbour(&t, [-1, -1, -1], [1, 1, 1]), leaf_at([0, 0, 0]));
+        assert_eq!(neighbour(&t, [0, 0, 0], [0, 1, 0]), Location::Background);
+        assert!(matches!(
+            neighbour(&t, [120, 0, 0], [1, 0, 0]),
+            Location::Tile(_, TileLevel::Upper)
+        ));
+    }
+
+    #[test]
+    fn neighbours_beyond_the_coordinate_range_are_the_background() {
+        let (t, _) = commit_with(&Topology::new(), |e| {
+            e.activate([i32::MAX, i32::MIN, 0]).unwrap();
+            e.activate([i32::MAX - 8, i32::MIN, 0]).unwrap();
+        });
+        let at = [i32::MAX, i32::MIN, 0];
+        assert_eq!(neighbour(&t, at, [1, 0, 0]), Location::Background);
+        assert_eq!(neighbour(&t, at, [0, -1, 0]), Location::Background);
+        assert_eq!(neighbour(&t, at, [-1, 0, 0]), t.locate([i32::MAX - 8, i32::MIN, 0]));
     }
 
     #[test]

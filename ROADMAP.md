@@ -8,11 +8,11 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: `Topology` with Morton numbering and stamps, `TopologyEditor`, `commit`,
-  `Remap` and `Field<T>` (ADR-0014 amendment of 2026-10-17), checked by a Reference-tier
-  property test against a model of each field. The merge rule and zerocopy's bounds wait
-  for merges (B-010) and `freeze`.
-- **Next**: `LeafManifest`'s 26-neighbour table (§4.3).
+- **Done**: `LeafManifest`, part of `Topology` and built at each commit: each leaf's 26
+  neighbours as a `Location` (ADR-0014 amendment of 2026-10-17), checked against
+  neighbours computed from coordinates. Building it took about 2.3 ms of a commit of
+  10 000 leaves (fastest of 15, two runs, 2026-10-17; not by TESTING.md T5).
+- **Next**: the leaf-parallel update and gather (§4.4).
 - **Unresolved problems**: none.
 
 ## 2. Milestones
@@ -48,7 +48,7 @@ kinds of user before the rest is built on them.
       leaf (ARCHITECTURE.md §4.1)
 - [x] `Topology` and `Field<T>`; `TopologyEditor`, `commit` and `Remap` as the ADR decides
       (§4.2)
-- [ ] `LeafManifest`: Morton order and 26 neighbours (§4.3)
+- [x] `LeafManifest`: Morton order and 26 neighbours (§4.3)
 - [ ] The leaf-parallel update and gather (§4.4)
 - [ ] Reference tier: property tests against a dense grid (TESTING.md §1)
 - [ ] Two examples in `crates/brodo/examples/`, run by tests, written from textbook
