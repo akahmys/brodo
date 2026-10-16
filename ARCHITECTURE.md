@@ -96,12 +96,17 @@ pub struct Field<T> {
   topology it was made or remapped for; using it with another topology, a remap included,
   is the typed error `StaleField`.
 - `Remap` records, for each new leaf, where its values come from: an old leaf, the tile it
-  was split from, or the background. For each new tile it records an old tile, a merged
-  leaf, or the background. A split leaf takes each field's own tile value.
-- A merged tile's value comes from a merge rule given to each field's remap,
-  `Fn(&[T]) -> Option<T>`; `None` refuses the merge with a typed error. brodo provides the
-  rule that accepts only values with the same bits. Rules run only for merged regions that
-  survive the commit, in leaf order, so the error does not depend on the thread count.
+  was split from, or the background. For each new tile it records an old tile, the
+  background, or the parts it merges: old leaves and old tiles, in one list for all merged
+  tiles, each tile holding its range in it. A split leaf takes each field's own tile value.
+- A merge takes leaves and tiles at once; a region that holds nothing refuses it, so a
+  merge changes values, not which voxels are active.
+- A merged tile's value comes from a merge rule given to each field's remap, which sees
+  each value with the number of voxels holding it, `Fn(&[(T, u32)]) -> Option<T>`; `None`
+  refuses the merge, and so the commit's remap, with a typed error. brodo provides the
+  rule that accepts only values with the same bits. Rules run only for merged tiles that
+  exist after the commit, in tile order, so the error does not depend on the thread
+  count.
 - Values are updated and the topology edited in separate phases; while values change, the
   topology is read-only.
 

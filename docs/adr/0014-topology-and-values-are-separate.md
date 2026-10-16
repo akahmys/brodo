@@ -87,7 +87,6 @@ and remaps in one step and leaves the grid unchanged on any error.
 ## Amendment
 
 - **Date**: 2026-10-17 (third)
-- **Status**: Proposed
 
 The spike `spikes/merge/` answered B-010 by measurement (its `REPORT.md`), one level above
 leaves.

@@ -8,11 +8,9 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: the spike `spikes/merge/` measured candidates for B-010 (its `REPORT.md`). The
-  answer is drafted as a proposed amendment to ADR-0014: parts in one shared list, a rule
-  on values with voxel counts, leaves and tiles merged at once, empty regions refused.
-- **Next**: the human accepts or changes the amendment; then merging in brodo (tiles in
-  full, §2).
+- **Done**: the human accepted the ADR-0014 amendment answering B-010 from `spikes/merge/`;
+  ARCHITECTURE.md §4.2 follows it.
+- **Next**: merging in brodo (tiles in full, §2), once its plan is agreed.
 - **Unresolved problems**: none.
 
 ## 2. Milestones
@@ -62,8 +60,8 @@ kinds of user before the rest is built on them.
 
 **Then, in this order**
 
-- [ ] Tiles in full: merging, and tiles in the examples (§4.1); B-010
-      answered first, by a spike
+- [ ] Tiles in full: merging, and tiles in the examples (§4.1); B-010 answered by
+      `spikes/merge/` (ADR-0014)
 - [ ] `ValueAccessor` (§4.4)
 - [ ] `freeze` and `GridView` (§4.6); the cache profile (§4.7), its reader in
       `UNTRUSTED_INPUT` and fuzzed, its mapping module in `UNSAFE_MODULES`
@@ -103,7 +101,6 @@ implementation (PLANNING.md §2).
 | B-006 | Does `vdb-rs` pass Rules 12 and 13 (no C, permissive licence) on every target? | To be checked before it is added |
 | B-007 | Which harness runs the benchmarks? | None chosen |
 | B-009 | Which older format versions does each reader accept (TESTING.md V6)? | To be decided before `freeze` |
-| B-010 | When leaves or tiles merge into a tile above leaf level, how does `Remap` name the several sources, and what does the merge rule see? | Measured by `spikes/merge/`: parts in one shared list, a rule on values with voxel counts (ADR-0014 amendment, proposed) |
 | B-011 | Do dilation, erosion and flood fill (§4.5) need a per-voxel active mask in each leaf? | None yet; a leaf has no per-voxel state now (ADR-0013) |
 
 No spike is running. `spikes/remap/` answered B-001 and B-008, and `spikes/merge/` B-010
