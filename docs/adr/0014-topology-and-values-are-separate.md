@@ -1,6 +1,6 @@
 # ADR-0014: Topology and values are separate, and a topology edit returns a remap
 
-- **Status**: Accepted
+- **Status**: Amended
 - **Date**: 2026-10-16
 
 ## Context
@@ -29,7 +29,6 @@ proposal) is open (ROADMAP.md §3, B-001).
 ## Amendment
 
 - **Date**: 2026-10-16
-- **Status**: Proposed
 
 The spike `spikes/remap/` answered B-001 and B-008 by measurement (its `REPORT.md`).
 

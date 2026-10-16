@@ -79,8 +79,19 @@ pub struct Field<T> {
 - Where a tile is belongs to the topology; its value belongs to each field.
 - `Grid<T>` binds one `Topology` and one `Field<T>` for single-field use.
 - Topology changes (activation, dilation, pruning, splitting and merging tiles) go
-  through an editor (`TopologyEditor`) and take effect at `commit`, which returns a
-  `Remap` from old to new leaf numbers. Every field on that topology is remapped by it.
+  through an editor (`TopologyEditor`) and take effect at `commit`, which returns a new
+  topology and a `Remap` to it, and leaves the old topology usable. Every field on the old
+  topology is remapped by it.
+- Every topology carries a stamp unique in the process. A field records the stamp of the
+  topology it was made or remapped for; using it with another topology, a remap included,
+  is the typed error `StaleField`.
+- `Remap` records, for each new leaf, where its values come from: an old leaf, the tile it
+  was split from, or the background. For each new tile it records an old tile, a merged
+  leaf, or the background. A split leaf takes each field's own tile value.
+- A merged tile's value comes from a merge rule given to each field's remap,
+  `Fn(&[T]) -> Option<T>`; `None` refuses the merge with a typed error. brodo provides the
+  rule that accepts only values with the same bits. Rules run only for merged regions that
+  survive the commit, in leaf order, so the error does not depend on the thread count.
 - Values are updated and the topology edited in separate phases; while values change, the
   topology is read-only.
 
