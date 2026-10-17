@@ -14,7 +14,7 @@ ERROR=0
 fail() { echo "  FAIL: $*"; ERROR=1; }
 # Each compiler error with its location, without the warnings around it.
 errors_only() { awk '/^error/ { e = $0; next } e && /^ *--> / { print e; print; e = "" }' | head -40; }
-for tool in cargo cargo-deny betterleaks python3 git; do
+for tool in cargo cargo-deny cargo-mutants betterleaks python3 git; do
     command -v "$tool" >/dev/null 2>&1 || { echo "missing tool: $tool"; exit 1; }
 done
 # The project's own settings (scripts/audit/project.py).
@@ -150,6 +150,9 @@ python3 scripts/audit/documents.py || ERROR=1
 if ! out=$(RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --quiet 2>&1); then
     echo "$out" | head -20; fail "cargo doc"
 fi
+
+echo "[T11] Every mutant excluded as equivalent says why, and still exists..."
+python3 scripts/audit/mutants.py || ERROR=1
 
 echo "[Rule 13] cargo deny check (licences, advisories, bans, sources)..."
 if out=$(cargo deny check 2>&1); then echo "  PASS"

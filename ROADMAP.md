@@ -8,9 +8,10 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: P1 accepted by the human and closed as 0.2.0 (2026-10-17).
-- **Next**: a spike on mutation testing (the audit review's proposal C), for which a tool
-  needs the human's approval; then P2, `colino`.
+- **Done**: the mutation-testing spike (`spikes/mutants/`) and TESTING.md T11: a mutation
+  run behind a memory guard closes each milestone (ADR-0023). Three of brodo's modules
+  were run, none missed but 3 equivalent mutants; the whole crate has not been run yet.
+- **Next**: P2, `colino`.
 - **Unresolved problems**: Miri's Stacked Borrows reports undefined behaviour in
   `crossbeam-epoch` under rayon; Tree Borrows does not (ADR-0015). The leaf-parallel
   update's benchmark disagrees within a pair by up to 17 %; whether a load average of 3.0
@@ -20,7 +21,7 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
 
 Named after the project group's phases (ADR-0011). Every milestone closes with a
 retrospective and refactoring (PLANNING.md §7), a fuzz round with no finding (TESTING.md
-T6) and a Miri run (T7), and benchmarks compared with their baselines (TESTING.md §1),
+T6), a Miri run (T7) and a mutation run with none missed (T11), and benchmarks compared with their baselines (TESTING.md §1),
 before its version is set (TESTING.md V2).
 
 ### P0 — Repository with its rules
@@ -97,7 +98,7 @@ Not part of P1's acceptance, and not started while ParaView suffices (ADR-0018).
 - [ ] Generalised winding number and the narrow-band output (§5.1)
 - [ ] Topology report, layers 1 and 2 (§5.2)
 - [ ] README and examples for publishing on its own
-- [ ] Retrospective and refactoring; fuzz round; Miri run
+- [ ] Retrospective and refactoring; fuzz round; Miri run; mutation run (ADR-0023)
 - [ ] **Accepted when** the invariants are right for a sphere, a torus and a double torus;
       a holed mesh leaks no sign; a wall thinner than a voxel is reported
 
@@ -122,7 +123,7 @@ implementation (PLANNING.md §2).
 | B-011 | Do dilation and erosion (§4.5) need a per-voxel active mask in each leaf? | None yet; a leaf has no per-voxel state now, and labelling works on values without one (ADR-0013) |
 
 No spike is running. `spikes/remap/` answered B-001 and B-008, and `spikes/merge/` B-010
-(ADR-0014); `spikes/vtk/` answered B-012 (ADR-0018); `spikes/bench/` B-007 (ADR-0019); `spikes/threads/` B-014, rayon kept (ADR-0015).
+(ADR-0014); `spikes/vtk/` answered B-012 (ADR-0018); `spikes/bench/` B-007 (ADR-0019); `spikes/threads/` B-014, rayon kept (ADR-0015); `spikes/mutants/` the audit review's proposal C (ADR-0023).
 
 ## 4. Administrative items still open
 

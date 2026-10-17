@@ -4,13 +4,13 @@
 > [CODING.md](CODING.md) and [TESTING.md](TESTING.md).
 
 One script runs everything, the tests last: [`scripts/audit/verify_compliance.sh`](scripts/audit/verify_compliance.sh).
-It must end `=== AUDIT PASSED ===`. It needs `cargo`, `cargo-deny`, `betterleaks`,
-`python3` and `git`, and stops if one is missing. It runs with `RUSTFLAGS` empty, which
+It must end `=== AUDIT PASSED ===`. It needs `cargo`, `cargo-deny`, `cargo-mutants`,
+`betterleaks`, `python3` and `git`, and stops if one is missing. It runs with `RUSTFLAGS` empty, which
 overrides `rustflags` in any cargo configuration, so no configuration outside the
 repository can switch a lint off.
 
-Not in it: the fuzzer and Miri, which build on nightly; TESTING.md T6 and T7 say when
-they run.
+Not in it: the fuzzer and Miri, which build on nightly, and the mutation run, which takes
+hours; TESTING.md T6, T7 and T11 say when they run.
 
 The project's own settings (layers, application crates, modules that parse untrusted
 input, the unsafe module, targets) are in [`scripts/audit/project.py`](scripts/audit/project.py),
@@ -39,6 +39,7 @@ grep -E '^echo "\[' scripts/audit/verify_compliance.sh
 | `cargo tree … -i cc` per member and target | 12 |
 | test files in `src/`, and `#[ignore]` reasons, direct or under `cfg_attr`, in every target | T1 |
 | `scripts/audit/documents.py`, and `cargo doc` with warnings denied | AGENTS.md writing rules 1, 2, 6, S3, and no `CLAUDE.md`; Rule 10 |
+| `scripts/audit/mutants.py`: each pattern in `.cargo/mutants.toml`'s `exclude_re` has a comment above it and excludes a mutant | T11 |
 | `cargo deny check` | 13 |
 | hooks installed; betterleaks over the tree and the history, personal rules, `scripts/audit/paths.py` (also: each of `OUTPUT_DIRS` git-ignored and in betterleaks' allow-list) | 14, L2 |
 | `cargo test --workspace` | TESTING.md §4 |
