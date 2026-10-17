@@ -259,6 +259,14 @@ pub(crate) enum Step {
     Done(Probe),
 }
 
+/// What a node's place holds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Place {
+    Child,
+    Tile,
+    Empty,
+}
+
 /// What activating a voxel did.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Activation {
@@ -404,6 +412,34 @@ impl Tree {
             Slot::Tile => Probe::Tile(TileLevel::Lower),
             Slot::Child(id) => Probe::Leaf(LeafId(id)),
         }
+    }
+
+    /// Whether an upper node holds the region of 4096³ voxels holding the voxel.
+    pub(crate) fn has_upper_node(&self, v: Coord) -> bool {
+        matches!(self.root.get(&align(v, UPPER_SPAN_LOG2)), Some(RootEntry::Node(_)))
+    }
+
+    /// What each place of the upper node at `key` holds, x fastest; nothing if no upper
+    /// node is there.
+    pub(crate) fn upper_places(&self, key: Coord) -> Vec<Place> {
+        let Some(RootEntry::Node(u)) = self.root.get(&key) else { return Vec::new() };
+        let node = &self.upper[to_usize(*u)];
+        (0..32 * 32 * 32)
+            .map(|i| {
+                if node.children.get(i) {
+                    Place::Child
+                } else if node.tiles.get(i) {
+                    Place::Tile
+                } else {
+                    Place::Empty
+                }
+            })
+            .collect()
+    }
+
+    /// The root's keys, upper nodes' and root tiles' alike, in key order.
+    pub(crate) fn root_keys(&self) -> impl Iterator<Item = Coord> + '_ {
+        self.root.keys().copied()
     }
 
     /// Whether a lower node holds the region of 128³ voxels holding the voxel: if not, and no

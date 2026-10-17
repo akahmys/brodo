@@ -17,6 +17,7 @@ papers, public documentation and permissively licensed code (S1, S2) may appear 
 | File | Draws on | For |
 | :--- | :--- | :--- |
 | `crates/brodo/src/accessor.rs` | ARCHITECTURE.md §4.4, ADR-0015 only | value accessors: reads and leaf-only writes from a cached path |
+| `crates/brodo/src/analysis.rs` | ARCHITECTURE.md §4.5, ADR-0013 only; union-find and breadth-first search as textbook material | connected-component labelling and flood fill on the sparse tree |
 | `crates/brodo/src/cache.rs` | ARCHITECTURE.md §4.7, ADR-0016 only | the cache profile: writing and checking a file of grids with their metadata |
 | `crates/brodo/src/error.rs` | none | the crate's error types |
 | `crates/brodo/src/frozen.rs` | ARCHITECTURE.md §4.6, ADR-0016 only; `zerocopy`'s public API documentation (0.8.63) | the frozen layout, version 1, and `freeze` |

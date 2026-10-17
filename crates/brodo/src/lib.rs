@@ -3,6 +3,7 @@
 //! and fields are in place; the rest follows (ROADMAP.md, P1).
 
 pub mod accessor;
+pub mod analysis;
 pub mod cache;
 pub mod error;
 pub mod field;

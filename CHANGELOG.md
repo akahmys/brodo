@@ -30,6 +30,10 @@ are recorded here when they change (V6).
 - `CacheFile::map`: a cache file read by memory mapping, without a copy; the caller keeps
   the file unchanged while it is mapped (ADR-0008).
 
+- `brodo::analysis`: connected-component labelling (`label`) and flood fill (`flood_fill`)
+  on a condition on values, with 6- or 26-connectivity, tiles and the background
+  included, each component saying whether it reaches the outside.
+
 ### Breaking
 
 - `Field::remap` takes a merge rule: `remap(&remap, &uniform)` keeps the earlier behaviour.

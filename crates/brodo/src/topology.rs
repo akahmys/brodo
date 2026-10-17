@@ -140,6 +140,26 @@ impl Topology {
         Ok(t)
     }
 
+    /// Whether an upper node holds the voxel's region of 4096³ voxels.
+    pub(crate) fn has_upper_node(&self, v: Coord) -> bool {
+        self.tree.has_upper_node(v)
+    }
+
+    /// Whether a lower node holds the voxel's region of 128³ voxels.
+    pub(crate) fn has_lower_node(&self, v: Coord) -> bool {
+        self.tree.has_lower_node(v)
+    }
+
+    /// What each place of the upper node at `key` holds, x fastest.
+    pub(crate) fn upper_places(&self, key: Coord) -> Vec<crate::tree::Place> {
+        self.tree.upper_places(key)
+    }
+
+    /// The root's keys, in key order.
+    pub(crate) fn root_keys(&self) -> impl Iterator<Item = Coord> + '_ {
+        self.tree.root_keys()
+    }
+
     pub(crate) fn stamp(&self) -> u64 {
         self.stamp
     }

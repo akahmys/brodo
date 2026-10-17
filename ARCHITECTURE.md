@@ -145,8 +145,18 @@ fastest. A neighbour beyond the `i32` coordinate range is the background.
 
 ### 4.5 Topology analysis
 
-- Flood fill and connected-component labelling on the sparse tree, tiles included, with
-  6- or 26-connectivity.
+- Connected-component labelling on the sparse tree, tiles included, with 6- or
+  26-connectivity, of the voxels whose value meets a condition (`Fn(T) -> bool`), applied
+  alike to leaf voxels, tiles and the background; no per-voxel mask is needed. Flood fill
+  is the component of a seed, built on the labelling. Each component says whether it
+  reaches the unbounded background outside the tree.
+- The units joined are leaf voxels, tiles, the empty places of lower and upper nodes and
+  of the root (each a region of its own size), and the outside. Empty regions at the root
+  are found on a grid compressed along each axis around the root's keys, so enclosed
+  background stays apart from the outside. Adjacency between regions of different sizes
+  is found by descending the levels with an explicit stack, never voxel by voxel over a
+  large region. Components are numbered in the order of their first unit, so labels do
+  not depend on anything but the input.
 - The Euler characteristic, summed from a table of 2×2×2 local patterns, computable per
   leaf in parallel.
 - Dilation and erosion, of topology and values.

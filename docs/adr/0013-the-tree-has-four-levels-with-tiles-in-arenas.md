@@ -40,3 +40,16 @@ built.
 - Activating a voxel inside a tile changes nothing, since a tile's region is active
   already. A tile becomes leaves only by an explicit split, which turns each level on the
   path into a node whose other children are tiles, down to one leaf.
+
+## Amendment
+
+- **Date**: 2026-10-17
+
+Before flood fill was built, the human decided three points. Labelling and flood fill
+work on a condition on values, applied alike to leaf voxels, tiles and the background, as
+the topology report needs components of φ < 0 and φ > 0 (ARCHITECTURE.md §5.2), so they
+need no per-voxel mask; B-011 was narrowed to dilation and erosion. Flood fill was built on
+the labelling, one mechanism, as the component of its seed. And the background was not
+taken as one region: each empty place of a node, and each empty region at the root, is a
+unit of its own size, with one more for the unbounded outside, so that background
+enclosed by the tree is a component apart from it.

@@ -8,14 +8,15 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: U3 of `freeze` (ADR-0008 amendment of 2026-10-17): `CacheFile::map` reads a
-  cache file by memory mapping through the same parser as `CacheFile::read`; the mapping
-  is `crates/brodo/src/mapping.rs`, in `UNSAFE_MODULES`, one unsafe call under a `SAFETY`
-  argument. Opening a 40 MB file and reading a value took 3.7 ms by copy and 0.05 ms by
-  mapping (fastest of 15, two runs, Apple M5, 2026-10-17; not by TESTING.md T5).
-- **Next**: flood fill (§4.5).
-- **Unresolved problems**: none. Miri was installed on nightly with the human's leave; it
-  cannot run a file mapping, as ADR-0008 assumed (measured 2026-10-17).
+- **Done**: connected-component labelling and flood fill (ADR-0013 amendment of
+  2026-10-17), on a condition on values, tiles and the background included, enclosed
+  background apart from the outside; checked against a breadth-first search on a dense
+  grid. Classifying each node's places once, and numbering empty places per node, took
+  the reference test's 24 cases from 4.9 s to 0.54 s in a release build (2026-10-17; not
+  by TESTING.md T5); labelling's own cost waits for the benchmarks.
+- **Next**: the checking output (§6.1), starting with the PNG encoder's approval and
+  B-012's spike.
+- **Unresolved problems**: none.
 
 ## 2. Milestones
 
@@ -69,7 +70,7 @@ kinds of user before the rest is built on them.
 - [x] `ValueAccessor` (§4.4)
 - [x] `freeze` and `GridView` (§4.6); the cache profile (§4.7), its reader in
       `UNTRUSTED_INPUT` and fuzzed, its mapping module in `UNSAFE_MODULES`
-- [ ] Flood fill (§4.5); `Grid<T>` was built with the slice (ADR-0014)
+- [x] Flood fill (§4.5); `Grid<T>` was built with the slice (ADR-0014)
 - [ ] Checking output (ARCHITECTURE.md §6.1, ADR-0018): a slice as PNG and a field for
       ParaView, behind cargo features; the PNG encoder approved first (§4), B-012 answered
       first, by a spike; golden slice tests (TESTING.md §1)
@@ -121,7 +122,7 @@ implementation (PLANNING.md §2).
 | B-007 | Which harness runs the benchmarks? | None chosen |
 | B-012 | Which VTK format does the checking output write: a multiblock of rectilinear grids, one per leaf, or an unstructured grid? | None yet; the reason is recorded with the answer (ADR-0018) |
 | B-013 | Which crates handle `piatto`'s window, input and GUI parts? | `winit` and `egui`, to be measured against Rules 12 and 13 (ADR-0018) |
-| B-011 | Do dilation, erosion and flood fill (§4.5) need a per-voxel active mask in each leaf? | None yet; a leaf has no per-voxel state now (ADR-0013) |
+| B-011 | Do dilation and erosion (§4.5) need a per-voxel active mask in each leaf? | None yet; a leaf has no per-voxel state now, and labelling works on values without one (ADR-0013) |
 
 No spike is running. `spikes/remap/` answered B-001 and B-008, and `spikes/merge/` B-010
 (ADR-0014).
