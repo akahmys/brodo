@@ -45,3 +45,18 @@ P1 gains the checking output and a golden slice test in its acceptance; `piatto`
 part of P1's acceptance and waits while ParaView suffices. Writing `.vdb` stays after P2.
 The crate list (ARCHITECTURE.md §2) and README name `piatto` before it exists; it joins
 `LAYERS` in `scripts/audit/project.py` when it is created.
+
+## Amendment
+
+- **Date**: 2026-10-17
+- **Status**: Proposed
+
+The spike `spikes/vtk/` answered B-012 (its `REPORT.md`). The published documentation
+read gave ImageData and UnstructuredGrid with ASCII data, but neither the multiblock nor the
+hierarchical-box structure, nor binary data's header; the human limited the candidates to
+those documented, leaving binary for when its documentation is found. Both candidates read
+back exactly in VTK. One UnstructuredGrid of VTK_VOXEL cells was chosen: one file, with
+tiles as larger cells, against per-leaf ImageData files, 4 to 6 times smaller and 3 times
+faster but one file per leaf and tile, 5631 for a sphere of radius 80, with nothing to tie
+them. VTK_VOXEL is 11, from VTK's public Python API, and its points are written x fastest,
+then y, then z, which reading the files back confirmed.

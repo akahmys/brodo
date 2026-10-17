@@ -1,0 +1,13 @@
+# Throwaway spike for B-012 (ROADMAP.md §3): which VTK format the checking output writes.
+# Never imported by `crates/` (PLANNING.md §3); its own workspace.
+[package]
+name = "vtk-spike"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+brodo = { path = "../../crates/brodo" }
+
+[workspace]
+members = ["."]

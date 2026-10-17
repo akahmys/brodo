@@ -8,14 +8,13 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: V1 of the checking output: `brodo::slice`, a slice drawn and encoded as PNG,
-  with golden images of a sphere's SDF, a torus's SDF and a field with tiles, compared as
-  decoded pixels. Looking at the first images (TESTING.md T8) showed the zero contour
-  broken into dashes; it now checks all four neighbours, and the old rule fails the golden
-  test.
-- **Next**: V2, B-012's spike in `spikes/vtk/`, with VTK's Python package in a virtual
-  environment under `out/`, which the human allowed.
-- **Unresolved problems**: none.
+- **Done**: the spike `spikes/vtk/` measured the documented VTK formats for B-012 (its
+  `REPORT.md`); the answer is drafted as a proposed amendment to ADR-0018: one ASCII
+  UnstructuredGrid of VTK_VOXEL cells.
+- **Next**: the human accepts or changes the amendment; then the VTK output in `brodo`.
+- **Unresolved problems**: CODING.md L2 says the secret scan skips `target/` and `out/`,
+  but `.betterleaks.toml` skips only `target/`; a Python environment under `out/` failed the
+  gate, so it was moved to `target/`. Changing either is a change of rule, for the human.
 
 ## 2. Milestones
 
@@ -119,7 +118,7 @@ implementation (PLANNING.md §2).
 | B-005 | What is the archive profile's default compressor, and is it pure Rust (CODING.md Rule 12)? | Zstd, LZ4 when decompression speed is asked for; whether a pure-Rust implementation suffices is to be measured |
 | B-006 | Does `vdb-rs` pass Rules 12 and 13 (no C, permissive licence) on every target? | To be checked before it is added |
 | B-007 | Which harness runs the benchmarks? | None chosen |
-| B-012 | Which VTK format does the checking output write: a multiblock of rectilinear grids, one per leaf, or an unstructured grid? | None yet; the reason is recorded with the answer (ADR-0018) |
+| B-012 | Which VTK format does the checking output write: a multiblock of rectilinear grids, one per leaf, or an unstructured grid? | Measured by `spikes/vtk/`: one ASCII UnstructuredGrid of VTK_VOXEL cells (ADR-0018 amendment, proposed) |
 | B-013 | Which crates handle `piatto`'s window, input and GUI parts? | `winit` and `egui`, to be measured against Rules 12 and 13 (ADR-0018) |
 | B-011 | Do dilation and erosion (§4.5) need a per-voxel active mask in each leaf? | None yet; a leaf has no per-voxel state now, and labelling works on values without one (ADR-0013) |
 
