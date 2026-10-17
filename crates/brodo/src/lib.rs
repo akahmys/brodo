@@ -19,3 +19,5 @@ pub mod slice;
 pub mod topology;
 pub mod tree;
 pub mod view;
+#[cfg(feature = "vtk")]
+pub mod vtk;

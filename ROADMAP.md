@@ -8,9 +8,9 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: the human approved skipping `out/` in the secret scan, as CODING.md L2 says
-  (ADR-0003 amended); the VTK spike's Python environment is back under `out/`.
-- **Next**: the VTK output in `brodo` (V2, ARCHITECTURE.md §6.1).
+- **Done**: checking output V2, `brodo::vtk`: a field as one ASCII `.vtu`, read back
+  exactly in VTK 9.6.2 (2026-10-17); ADR-0018 amended with the NaN and infinity rule.
+- **Next**: benchmarks and their first baselines; B-007 (the harness) first.
 - **Unresolved problems**: none.
 
 ## 2. Milestones
@@ -68,7 +68,7 @@ kinds of user before the rest is built on them.
 - [x] Flood fill (§4.5); `Grid<T>` was built with the slice (ADR-0014)
 - [x] Checking output, V1 (ARCHITECTURE.md §6.1, ADR-0018): a slice as PNG, feature
       `slice-png` on by default, `png` approved; golden slice tests (TESTING.md §1)
-- [ ] Checking output, V2: a field for ParaView as one ASCII `.vtu` (B-012 answered by
+- [x] Checking output, V2: a field for ParaView as one ASCII `.vtu` (B-012 answered by
       `spikes/vtk/`, ADR-0018)
 - [ ] Benchmarks and their first baselines (TESTING.md §1)
 - [ ] Retrospective and refactoring; fuzz round; Miri run

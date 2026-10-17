@@ -210,3 +210,30 @@ pub enum SliceError {
     #[error(transparent)]
     Encode(#[from] png::EncodingError),
 }
+
+/// Why a field could not be written as `.vtu` (ARCHITECTURE.md §6.1).
+#[derive(Debug, thiserror::Error)]
+pub enum VtkError {
+    /// The field does not belong to the topology.
+    #[error(transparent)]
+    Field(#[from] FieldError),
+    /// The topology refused a lookup by number.
+    #[error(transparent)]
+    Tree(#[from] TreeError),
+    /// The name is empty, or holds a character other than printable ASCII and space, or one
+    /// of `<>&"'`.
+    #[error("the name {0:?} is not one or more printable ASCII characters, none of <>&\"'")]
+    Name(String),
+    /// A cell's value is infinite, which VTK does not read back as written (ADR-0018).
+    #[error("the cell at {origin:?} holds an infinite value, which VTK reads back wrongly")]
+    Infinite {
+        /// The cell's lowest corner.
+        origin: Coord,
+    },
+    /// A cell's corner was not among the shared points.
+    #[error("a cell's corner is missing from the shared points")]
+    Inconsistent,
+    /// Writing failed.
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+}

@@ -10,6 +10,11 @@ cargo run --release --manifest-path spikes/vtk/Cargo.toml -- out/vtk
 out/vtk-venv/bin/python -I spikes/vtk/check.py out/vtk
 ```
 
+`check.py` compared values within 1e-6 when the spike ran; it now compares them exactly at
+`Float32` precision, a NaN matching a NaN, since brodo's own files hold values near 100
+whose shortest text differs from them by more (2026-10-17). The spike's results hold
+under either.
+
 ## Question
 
 **B-012**: which VTK format does the checking output write?

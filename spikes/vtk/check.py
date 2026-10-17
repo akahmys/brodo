@@ -3,11 +3,24 @@ the spike wrote (cell centres and expected values); times each read. Run with th
 interpreter: out/vtk-venv/bin/python -I spikes/vtk/check.py out/vtk."""
 
 import glob
+import math
 import os
+import struct
 import sys
 import time
 
 import vtk
+
+
+def f32(x):
+    return struct.unpack("f", struct.pack("f", x))[0]
+
+
+def same(got, want):
+    """Exact at Float32 precision; a NaN matches a NaN."""
+    if math.isnan(want):
+        return math.isnan(got)
+    return f32(got) == f32(want)
 
 
 def samples(base):
@@ -29,7 +42,7 @@ def check_vtu(base, pts):
     bad = 0
     for x, y, z, v in pts:
         cid = loc.FindCell((x, y, z))
-        if cid < 0 or abs(values.GetValue(cid) - v) > 1e-6:
+        if cid < 0 or not same(values.GetValue(cid), v):
             bad += 1
     vols = [grid.GetCell(i).GetBounds() for i in range(0, grid.GetNumberOfCells(), 997)]
     flat = sum(1 for b in vols if b[1] <= b[0] or b[3] <= b[2] or b[5] <= b[4])
@@ -57,7 +70,7 @@ def check_vti(base, pts):
                 if cid >= 0:
                     found = im.GetCellData().GetArray("value").GetValue(cid)
                     break
-        if found is None or abs(found - v) > 1e-6:
+        if found is None or not same(found, v):
             bad += 1
     return cells, took, bad
 

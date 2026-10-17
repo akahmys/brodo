@@ -260,10 +260,15 @@ In `brodo`, each behind a cargo feature:
   the same bytes. The encoder is `png`, pure Rust. The slices kept as golden images are
   written to `out/slices/` for a look by
   `cargo test -p brodo --test slice_images -- --ignored`.
-- **A field for ParaView**, written from the published file-format documentation only, as
-  one ASCII UnstructuredGrid (`.vtu`): a VTK_VOXEL cell per leaf voxel, a tile one cell of
-  its region's size, points shared, values as cell data (ADR-0018, B-012). Binary data
-  waits for its header's documentation.
+- **A field for ParaView** (`brodo::vtk`, feature `vtk`, on by default), written from the
+  published file-format documentation only, as one ASCII UnstructuredGrid (`.vtu`): a
+  VTK_VOXEL cell per leaf voxel, a tile one cell of its region's size, in index space,
+  points shared and `Float64`, values as cell data (ADR-0018, B-012). A NaN is written as
+  `NaN`; an infinity is refused, since VTK reads `-inf` back as `+inf`. The same input
+  gives the same bytes. The files read back in VTK are written to `out/vtk/brodo/` by
+  `cargo test -p brodo --test vtk_reference -- --ignored`, and checked by
+  `out/vtk-venv/bin/python -I spikes/vtk/check.py out/vtk/brodo`. Binary data waits for
+  its header's documentation.
 
 ### 6.2 `piatto`
 

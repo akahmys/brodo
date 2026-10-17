@@ -59,3 +59,15 @@ tiles as larger cells, against per-leaf ImageData files, 4 to 6 times smaller an
 faster but one file per leaf and tile, 5631 for a sphere of radius 80, with nothing to tie
 them. VTK_VOXEL is 11, from VTK's public Python API, and its points are written x fastest,
 then y, then z, which reading the files back confirmed.
+
+## Amendment
+
+- **Date**: 2026-10-17
+
+Writing the `.vtu` in `brodo` settled three details, the human choosing each. Points are
+`Float64`, which holds every `i32` coordinate exactly where `Float32` loses them beyond
+2^24; connectivity and offsets are `Int64`. VTK 9.6.2's XML reader, given ASCII `Float32`
+and `Float64` arrays, read `NaN` and `inf` back as written but `-inf` as `+inf`, and
+refused the whole file on `Infinity` or `1e999`; so a NaN is written as `NaN`, and an
+infinity of either sign is refused before anything is written, keeping the rule
+symmetric.
