@@ -252,6 +252,13 @@ pub enum Probe {
     Background,
 }
 
+/// One step down a probe: a node to go on from, or the answer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Step {
+    Node(u32),
+    Done(Probe),
+}
+
 /// What activating a voxel did.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Activation {
@@ -361,16 +368,37 @@ impl Tree {
 
     /// What holds the voxel.
     pub fn probe(&self, v: Coord) -> Probe {
-        let u = match self.root.get(&align(v, UPPER_SPAN_LOG2)) {
-            None => return Probe::Background,
-            Some(RootEntry::Tile) => return Probe::Tile(TileLevel::Root),
-            Some(RootEntry::Node(u)) => *u,
+        let u = match self.root_step(v) {
+            Step::Node(u) => u,
+            Step::Done(p) => return p,
         };
-        let l = match self.upper[to_usize(u)].slot(v) {
-            Slot::Empty => return Probe::Background,
-            Slot::Tile => return Probe::Tile(TileLevel::Upper),
-            Slot::Child(l) => l,
-        };
+        match self.upper_step(u, v) {
+            Step::Node(l) => self.lower_step(l, v),
+            Step::Done(p) => p,
+        }
+    }
+
+    /// The first step of a probe: the upper node holding the voxel, or the answer.
+    pub(crate) fn root_step(&self, v: Coord) -> Step {
+        match self.root.get(&align(v, UPPER_SPAN_LOG2)) {
+            None => Step::Done(Probe::Background),
+            Some(RootEntry::Tile) => Step::Done(Probe::Tile(TileLevel::Root)),
+            Some(RootEntry::Node(u)) => Step::Node(*u),
+        }
+    }
+
+    /// The second step, from upper node `u`, which holds the voxel: the lower node holding
+    /// it, or the answer.
+    pub(crate) fn upper_step(&self, u: u32, v: Coord) -> Step {
+        match self.upper[to_usize(u)].slot(v) {
+            Slot::Empty => Step::Done(Probe::Background),
+            Slot::Tile => Step::Done(Probe::Tile(TileLevel::Upper)),
+            Slot::Child(l) => Step::Node(l),
+        }
+    }
+
+    /// The last step, from lower node `l`, which holds the voxel.
+    pub(crate) fn lower_step(&self, l: u32, v: Coord) -> Probe {
         match self.lower[to_usize(l)].slot(v) {
             Slot::Empty => Probe::Background,
             Slot::Tile => Probe::Tile(TileLevel::Lower),

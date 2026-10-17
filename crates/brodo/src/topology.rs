@@ -7,7 +7,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::error::TreeError;
 use crate::manifest::{DIRECTIONS, LeafManifest};
-use crate::tree::{Activation, Coord, LeafId, Probe, TileLevel, Tree};
+use crate::tree::{Activation, Coord, LeafId, Probe, Step, TileLevel, Tree};
 
 static NEXT_STAMP: AtomicU64 = AtomicU64::new(1);
 
@@ -188,7 +188,12 @@ impl Topology {
 
     /// What holds the voxel.
     pub fn locate(&self, v: Coord) -> Location {
-        match self.tree.probe(v) {
+        self.number(self.tree.probe(v), v)
+    }
+
+    /// A probe's answer for the voxel, numbered.
+    fn number(&self, p: Probe, v: Coord) -> Location {
+        match p {
             // Every leaf and tile of the tree was numbered by `from_tree`.
             Probe::Leaf(id) => Location::Leaf(LeafNumber(self.leaf_numbers[to_usize(id.get())])),
             Probe::Tile(level) => {
@@ -198,10 +203,87 @@ impl Topology {
         }
     }
 
+    /// What holds the voxel, starting from the deepest region of `path` that holds it, and
+    /// updating `path` (`ValueAccessor`). `path` must have been used with this topology
+    /// only, as an accessor ensures by borrowing it.
+    pub(crate) fn locate_on(&self, path: &mut Path, v: Coord) -> Location {
+        let (leaf_o, lower_o, upper_o) =
+            (TileLevel::Lower.origin(v), TileLevel::Upper.origin(v), TileLevel::Root.origin(v));
+        if let Cached::Warm(o, loc) = path.leaf
+            && o == leaf_o
+        {
+            path.hit(0);
+            return loc;
+        }
+        let probe = match (path.lower, path.upper) {
+            (Cached::Warm(o, l), _) if o == lower_o => {
+                path.hit(1);
+                self.tree.lower_step(l, v)
+            }
+            (_, Cached::Warm(o, u)) if o == upper_o => {
+                path.hit(2);
+                self.below_upper(path, u, v)
+            }
+            (Cached::Warm(..) | Cached::Cold, Cached::Warm(..) | Cached::Cold) => {
+                path.hit(3);
+                match self.tree.root_step(v) {
+                    Step::Node(u) => {
+                        path.upper = Cached::Warm(upper_o, u);
+                        self.below_upper(path, u, v)
+                    }
+                    Step::Done(p) => p,
+                }
+            }
+        };
+        let loc = self.number(probe, v);
+        path.leaf = Cached::Warm(leaf_o, loc);
+        loc
+    }
+
+    fn below_upper(&self, path: &mut Path, u: u32, v: Coord) -> Probe {
+        match self.tree.upper_step(u, v) {
+            Step::Node(l) => {
+                path.lower = Cached::Warm(TileLevel::Upper.origin(v), l);
+                self.tree.lower_step(l, v)
+            }
+            Step::Done(p) => p,
+        }
+    }
+
     /// An editor of a copy of this topology, which stays usable with its fields.
     pub fn edit(&self) -> TopologyEditor<'_> {
         TopologyEditor { old: self, tree: self.tree.clone() }
     }
+}
+
+/// What a path remembers of one level: nothing yet, or the region it last held, by origin.
+#[derive(Debug, Clone, Copy, Default)]
+enum Cached<T> {
+    #[default]
+    Cold,
+    Warm(Coord, T),
+}
+
+/// The regions last visited in a topology's tree, with their nodes and what held the last
+/// leaf-sized region (ARCHITECTURE.md §4.4).
+#[derive(Debug, Clone, Default)]
+pub(crate) struct Path {
+    upper: Cached<u32>,
+    lower: Cached<u32>,
+    leaf: Cached<Location>,
+    /// Lookups answered from the leaf, lower, upper level, and from the root.
+    #[cfg(test)]
+    pub(crate) hits: [u64; 4],
+}
+
+impl Path {
+    #[cfg(test)]
+    fn hit(&mut self, level: usize) {
+        self.hits[level] += 1;
+    }
+
+    #[cfg(not(test))]
+    fn hit(&mut self, _level: usize) {}
 }
 
 /// Edits a copy of a topology; `commit` makes it a new topology.

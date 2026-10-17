@@ -159,14 +159,27 @@ impl<T: Value> Field<T> {
     /// The value at a voxel: its leaf's, its tile's, or the background.
     pub fn value_at(&self, t: &Topology, v: Coord) -> Result<T, FieldError> {
         self.check(t)?;
-        match t.locate(v) {
-            Location::Leaf(n) => {
-                let leaf = self.leaf_slice(n)?;
-                leaf.get(local_index(v)).copied().ok_or(FieldError::UnknownLeaf(n.get()))
-            }
-            Location::Tile(n, _) => self.tile_value(n),
-            Location::Background => Ok(self.background),
+        Ok(self.at(t.locate(v), v))
+    }
+
+    /// The value at a voxel, given what holds it in this field's topology.
+    pub(crate) fn at(&self, loc: Location, v: Coord) -> T {
+        match loc {
+            // Numbers from this field's topology, checked by its stamp, index its values.
+            Location::Leaf(n) => self.leaf_values[n.get() as usize * LEAF_VOXELS + local_index(v)],
+            Location::Tile(n, _) => self.tile_values[n.get() as usize],
+            Location::Background => self.background,
         }
+    }
+
+    /// The value at a voxel of leaf `n` of this field's topology, to write.
+    pub(crate) fn at_mut(&mut self, n: LeafNumber, v: Coord) -> &mut T {
+        &mut self.leaf_values[n.get() as usize * LEAF_VOXELS + local_index(v)]
+    }
+
+    /// Whether the field belongs to `t`.
+    pub(crate) fn belongs_to(&self, t: &Topology) -> Result<(), FieldError> {
+        self.check(t)
     }
 
     /// The values a merged tile covers, each with its voxel count.

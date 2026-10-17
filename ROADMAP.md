@@ -8,12 +8,12 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: merging into lower- and upper-level tiles (ADR-0014 amendments of 2026-10-17),
-  with parts in `Remap`, a rule on values with voxel counts, and arenas rebuilt at each
-  commit; checked against the tree model, a model giving values by position, and a dense
-  grid. The spheres example prunes, down to a tile of 128³ voxels. The gate's tests take
-  about 45 s in a debug build (2026-10-17).
-- **Next**: `ValueAccessor` (§4.4).
+- **Done**: `ValueAccessor` and `ValueAccessorMut` (ADR-0015 amendment of 2026-10-17),
+  caching the upper node, lower node and leaf-sized region last visited; writes go to
+  leaves only. Along a 7-point stencil a read took 4.8 ns against 7.5 ns for
+  `Field::value_at` (fastest of 50, two runs, Apple M5, 2026-10-17; not by TESTING.md T5).
+- **Next**: `freeze` and `GridView` (§4.6), which need `zerocopy` approved and the measure
+  that its derives pass `unsafe_code = "deny"` (§2, §4).
 - **Unresolved problems**: none.
 
 ## 2. Milestones
@@ -65,7 +65,7 @@ kinds of user before the rest is built on them.
 
 - [x] Tiles in full: merging, and tiles in the examples (§4.1); B-010 answered by
       `spikes/merge/` (ADR-0014)
-- [ ] `ValueAccessor` (§4.4)
+- [x] `ValueAccessor` (§4.4)
 - [ ] `freeze` and `GridView` (§4.6); the cache profile (§4.7), its reader in
       `UNTRUSTED_INPUT` and fuzzed, its mapping module in `UNSAFE_MODULES`
 - [ ] Flood fill (§4.5); `Grid<T>` was built with the slice (ADR-0014)

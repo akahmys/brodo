@@ -17,6 +17,9 @@ are recorded here when they change (V6).
   `TileSource::Merged` with `Remap::parts`, `brodo::field::Value`, `MergeRule` and
   `uniform`; `Grid::with_rule`. Commits rebuild the tree's arenas.
 
+- `brodo::accessor`: `ValueAccessor` and `ValueAccessorMut`, reading and writing by voxel
+  from the regions last visited; writes go to leaves only (`FieldError::NotALeaf`).
+
 ### Breaking
 
 - `Field::remap` takes a merge rule: `remap(&remap, &uniform)` keeps the earlier behaviour.

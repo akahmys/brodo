@@ -127,7 +127,9 @@ fastest. A neighbour beyond the `i32` coordinate range is the background.
 
 - `ValueAccessor` borrows `&Topology` and `&Field<T>` (or `&mut`), caches the last node
   path for nearby access, and is held one per thread. It serves reads beyond the
-  neighbour table.
+  neighbour table. Its field's stamp is checked once, when it is made. It writes only
+  voxels of leaves; a write to a tile's or the background's voxel is a typed error naming
+  what holds it, since values change while the topology is read-only (§4.2).
 - The leaf-parallel update (`rayon`) reads the old field by `&` and writes the new field by
   `&mut`, one 512-value chunk per leaf. Its function may fail; the error returned is that of
   the lowest-numbered failing leaf.

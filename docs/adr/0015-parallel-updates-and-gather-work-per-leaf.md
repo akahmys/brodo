@@ -38,3 +38,11 @@ Three points were decided by the human before the update and the gather were bui
   check needs it: a partial result per leaf in parallel, folded in leaf order.
 - The gather takes tile values from the start, since the leaf manifest already names each
   neighbouring tile. Its width stayed one layer; B-002 was not answered.
+
+## Amendment
+
+- **Date**: 2026-10-17 (second)
+
+Before `ValueAccessor` was built, the human decided that it writes only voxels of
+leaves: a write to a tile's voxel would change up to 4096³ voxels at once, and a tile's
+value already has its own setter. A write anywhere else is a typed error.

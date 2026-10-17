@@ -16,6 +16,7 @@ papers, public documentation and permissively licensed code (S1, S2) may appear 
 
 | File | Draws on | For |
 | :--- | :--- | :--- |
+| `crates/brodo/src/accessor.rs` | ARCHITECTURE.md §4.4, ADR-0015 only | value accessors: reads and leaf-only writes from a cached path |
 | `crates/brodo/src/error.rs` | none | the crate's error types |
 | `crates/brodo/src/gather.rs` | ARCHITECTURE.md §4.4, ADR-0015 only | the gather of a leaf and one ghost layer |
 | `crates/brodo/src/field.rs` | ARCHITECTURE.md §4.2, ADR-0014 only | fields: the `Value` trait, values by leaf and tile number, the stamp check, the remap and merge rules |

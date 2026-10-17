@@ -1,5 +1,6 @@
 //! The errors of brodo's operations (CODING.md Rule 8).
 
+use crate::topology::Location;
 use crate::tree::{Coord, TileLevel};
 
 /// The kinds of node a tree keeps in arenas.
@@ -80,4 +81,12 @@ pub enum FieldError {
     /// The merge rule refused the values of the new tile with this number.
     #[error("the merge rule refused new tile {0}")]
     MergeRefused(u32),
+    /// A write to a voxel no leaf holds: values change only in leaves (ADR-0015).
+    #[error("voxel {voxel:?} is not in a leaf but in {location:?}")]
+    NotALeaf {
+        /// The voxel written.
+        voxel: Coord,
+        /// What holds it.
+        location: Location,
+    },
 }
