@@ -54,3 +54,19 @@ followed passed; pairs agreed within 3.4 % except the parallel update, within 10
 ten threads share four performance and six efficiency cores), whose change from its
 baseline ranged from −5.5 to +11.3 %, the other items' from −1 to +6 %. The parallel update therefore sits near the tolerance and may fail without
 cause; it passed each time because a failure needs both children slower.
+
+## Amendment
+
+- **Date**: 2026-10-17
+
+P1's retrospective asked for a check against a baseline recorded on a busy machine. A
+refusal by the spread within a pair would not have caught the first one: while other work
+ran, the parallel update's two children agreed within 3.2 % and 1.2 %, slow alike. The
+one-minute load average was read instead, on the Apple M5: 1.53 to 2.13 over five idle
+minutes, about 2.0 before and during benchmarks run back to back, 3.86 just after a build
+and the tests. So a run, comparison or `--record`, first reads it and, while it is above
+3.0, waits ten seconds and reads again, up to two minutes, then refuses. The load during
+the other work of the first incident was not measured, so whether 3.0 would have caught
+it is not known; nor was any machine but the M5 measured. A threshold of 0.5 refused a
+run after one wait.
+

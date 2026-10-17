@@ -8,12 +8,16 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: benchmarks on the harness of ADR-0019, in `crates/brodo/benches/brodo.rs`, with
-  their first baselines for the Apple M5, recorded at rest (2026-10-17).
-- **Next**: the retrospective and refactoring of P1 (PLANNING.md §7); the fuzz round
-  (TESTING.md T6) and the Miri run (T7).
+- **Done**: P1's retrospective (PLANNING.md §7): one list of output directories
+  (ADR-0003), T9 and T3's wording (ADR-0020), section references checked (ADR-0001), and
+  the benchmarks refusing a busy machine (ADR-0019). A time limit on the gate's tests
+  was held.
+- **Next**: refactoring: a leaf voxel's coordinate computed in one place, and a survey for
+  duplication, shown before it is changed; then the fuzz round (TESTING.md T6) and Miri
+  (T7).
 - **Unresolved problems**: the leaf-parallel update's benchmark disagrees within a pair by
-  up to 10.7 %, near the 10 % tolerance (ADR-0019).
+  up to 10.7 %, near the 10 % tolerance; the load average during other work is not
+  measured, so whether 3.0 catches it is unknown (ADR-0019).
 
 ## 2. Milestones
 

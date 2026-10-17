@@ -9,9 +9,10 @@
 //! baseline in both. With `--record` it instead replaces this model's rows of
 //! `benches/baseline.tsv` with the faster of the two times, dated.
 //!
-//! Run and record on a machine doing nothing else: with other work running, the
-//! leaf-parallel update failed its baseline at +21 to +27 % with no change to the code;
-//! at rest it stayed within 12 % (ADR-0019).
+//! Run and record on a machine doing nothing else; a run waits, then refuses, while the
+//! load average says otherwise. With other work running, the leaf-parallel update once
+//! failed its baseline at +21 to +27 % with no change to the code; at rest it stayed
+//! within 12 % (ADR-0019).
 //!
 //! Nothing here prints (CODING.md Rule 18): results go to files, and a failure is the error
 //! `main` returns. The file items read and write through the operating system's page
@@ -26,7 +27,7 @@ use std::fmt;
 use std::hint::black_box;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::time::{Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use brodo::accessor::ValueAccessor;
 use brodo::cache::{self, CacheEntry, CacheFile};
@@ -47,6 +48,13 @@ const EVICT_BYTES: usize = 256 << 20;
 /// How much slower than its baseline an item may be, in both children, before it fails
 /// (ADR-0019).
 const TOLERANCE: f64 = 0.10;
+/// The one-minute load average above which the machine is taken to be busy: at rest an
+/// Apple M5 read 1.53 to 2.13, and 3.86 just after a build and the tests (ADR-0019).
+const BUSY_LOAD: f64 = 3.0;
+/// While busy, the load average is read again after each wait, at most this many times,
+/// so that a build just before the run can settle: two minutes in all.
+const LOAD_WAIT: Duration = Duration::from_secs(10);
+const LOAD_RETRIES: u32 = 12;
 /// The sphere's radius, and the band its SDF is clamped to.
 const RADIUS: i32 = 80;
 const BAND: f32 = 3.0;
@@ -85,9 +93,40 @@ fn main() -> Result<(), Failure> {
     }
     let record = args.iter().any(|a| a == "--record");
     std::fs::create_dir_all(out_dir())?;
+    wait_for_rest()?;
     let runs = [run_child(0)?, run_child(1)?];
     let model = hardware_model()?;
     if record { record_baseline(&runs, &model) } else { compare(&runs, &model) }
+}
+
+/// The one-minute load average: `vm.loadavg` on macOS, `/proc/loadavg` on Linux.
+fn load_average() -> Result<f64, Failure> {
+    let text = match Command::new("sysctl").args(["-n", "vm.loadavg"]).output() {
+        Ok(out) if out.status.success() => String::from_utf8_lossy(&out.stdout).into_owned(),
+        _ => std::fs::read_to_string("/proc/loadavg")?,
+    };
+    let first = text.split_whitespace().find(|w| *w != "{");
+    Ok(first.ok_or(Failure(format!("no load average in {text:?}")))?.parse()?)
+}
+
+/// Waits until the load average is at most `BUSY_LOAD`, reading it again after each
+/// `LOAD_WAIT` up to `LOAD_RETRIES` times; refuses to run if it stays above.
+fn wait_for_rest() -> Result<(), Failure> {
+    let mut load = load_average()?;
+    for _ in 0..LOAD_RETRIES {
+        if load <= BUSY_LOAD {
+            return Ok(());
+        }
+        std::thread::sleep(LOAD_WAIT);
+        load = load_average()?;
+    }
+    if load <= BUSY_LOAD {
+        return Ok(());
+    }
+    Err(Failure(format!(
+        "the one-minute load average stayed at {load} > {BUSY_LOAD} for {} s; stop other work and run again",
+        LOAD_WAIT.as_secs() * u64::from(LOAD_RETRIES)
+    )))
 }
 
 /// Runs one child in a fresh process and reads its times: item name to fastest ns.
