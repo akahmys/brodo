@@ -13,7 +13,8 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   reader, `crates/brodo/src/cache.rs`, is in `UNTRUSTED_INPUT`, with the fuzz target
   `cache_file` (60 s, about 1.7 million runs, no finding; 2026-10-17). The bytes of
   version 1 are committed in `crates/brodo/tests/data/cache_v1.bin`.
-- **Next**: U3, memory mapping (§4.7), once a mapping crate is approved (§4).
+- **Next**: U3, memory mapping (§4.7): the human approved `memmap2` 0.9.11, MIT OR
+  Apache-2.0 (`cargo info`, 2026-10-17), added; the plan awaits the human.
 - **Unresolved problems**: none.
 
 ## 2. Milestones
@@ -128,7 +129,7 @@ No spike is running. `spikes/remap/` answered B-001 and B-008, and `spikes/merge
 ## 4. Administrative items still open
 
 - Dependencies for P1, each to be approved before it is added (CODING.md Rule 20): a
-  memory-mapping crate; a pure-Rust PNG encoder for the checking output (ADR-0018). After
+  pure-Rust PNG encoder for the checking output (ADR-0018). After
   P1, for `piatto`: a GPU, window and GUI stack (B-013).
 - Before any distribution: confirm the licence terms for that form of distribution
   (ADR-0007).
