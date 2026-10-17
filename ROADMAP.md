@@ -8,15 +8,14 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: P1's fuzz round: `cache_file` 17 284 165 runs and `grid_view` 22 397 870 runs in
-  901 s each, no finding (nightly of 2026-07-21, cargo-fuzz 0.13.2). P1's Miri run (T7):
-  the mapping tests are ignored under Miri, so it ran none of them (ADR-0008).
-- **Next**: the human decides B-014 from `spikes/threads/REPORT.md`, and which of the audit
-  review's proposals to adopt, before P1 closes.
-- **Unresolved problems**: Miri's Stacked Borrows reported undefined behaviour in
-  `crossbeam-epoch` 0.9.21, under `rayon`, in `frozen_format` (ADR-0008); not settled.
-  The leaf-parallel update's benchmark disagrees within a pair by up to 17 %; whether a
-  load average of 3.0 catches other work is unknown (ADR-0019).
+- **Done**: B-014 answered: rayon kept, the leaf-parallel work running in the caller's
+  pool, stated in ARCHITECTURE.md §4.4 (ADR-0015).
+- **Next**: the remaining items before P1 closes: T7's scope under Miri, and which of the
+  audit review's proposals to adopt.
+- **Unresolved problems**: Miri's Stacked Borrows reports undefined behaviour in
+  `crossbeam-epoch` under rayon; Tree Borrows does not (ADR-0015). The leaf-parallel
+  update's benchmark disagrees within a pair by up to 17 %; whether a load average of 3.0
+  catches other work is unknown (ADR-0019).
 
 ## 2. Milestones
 
@@ -121,11 +120,10 @@ implementation (PLANNING.md §2).
 | B-005 | What is the archive profile's default compressor, and is it pure Rust (CODING.md Rule 12)? | Zstd, LZ4 when decompression speed is asked for; whether a pure-Rust implementation suffices is to be measured |
 | B-006 | Does `vdb-rs` pass Rules 12 and 13 (no C, permissive licence) on every target? | To be checked before it is added |
 | B-013 | Which crates handle `piatto`'s window, input and GUI parts? | `winit` and `egui`, to be measured against Rules 12 and 13 (ADR-0018) |
-| B-014 | Can `std::thread::scope` replace rayon for the leaf-parallel update? | Measured by `spikes/threads/`: a dynamic split matched rayon alone on large grids, but lost 8 % to three times under a caller's own rayon loop; rayon's Miri report appears under Stacked Borrows only; for the human to decide |
 | B-011 | Do dilation and erosion (§4.5) need a per-voxel active mask in each leaf? | None yet; a leaf has no per-voxel state now, and labelling works on values without one (ADR-0013) |
 
-`spikes/threads/` has measured B-014 and waits for the human's decision. `spikes/remap/` answered B-001 and B-008, and `spikes/merge/` B-010
-(ADR-0014); `spikes/vtk/` answered B-012 (ADR-0018); `spikes/bench/` B-007 (ADR-0019).
+No spike is running. `spikes/remap/` answered B-001 and B-008, and `spikes/merge/` B-010
+(ADR-0014); `spikes/vtk/` answered B-012 (ADR-0018); `spikes/bench/` B-007 (ADR-0019); `spikes/threads/` B-014, rayon kept (ADR-0015).
 
 ## 4. Administrative items still open
 

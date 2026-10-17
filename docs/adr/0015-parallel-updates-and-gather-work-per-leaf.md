@@ -46,3 +46,20 @@ Three points were decided by the human before the update and the gather were bui
 Before `ValueAccessor` was built, the human decided that it writes only voxels of
 leaves: a write to a tile's voxel would change up to 4096³ voxels at once, and a tile's
 value already has its own setter. A write anywhere else is a typed error.
+
+## Amendment
+
+- **Date**: 2026-10-17 (B-014)
+
+Miri's Stacked Borrows reported undefined behaviour inside `crossbeam-epoch`, under
+rayon, so B-014 asked whether `std::thread::scope` could replace rayon; `spikes/threads/`
+measured it. A dynamic split of blocks of 16 leaves matched rayon on 10 469 leaves and
+gave the same bits, but cost 40 to 50 µs a call to spawn, and under a caller's own rayon
+loop of ten updates it was 8 % slower on 2606 leaves and about three times on 120, against
+12 to 30 % with one inner thread each; nested rayon was fastest. Rayon with four threads
+ran under Miri's Tree Borrows with no report. The human decided to keep rayon: the
+leaf-parallel work runs in the caller's rayon pool, which ARCHITECTURE.md §4.4 states as
+part of the design, so that a later change of backend is a breaking change and recorded
+as one; and the parallel code is checked under Tree Borrows. The change stays cheap:
+rayon is used in two functions of `parallel.rs`, and no rayon type is in brodo's API.
+

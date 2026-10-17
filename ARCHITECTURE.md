@@ -136,7 +136,10 @@ fastest. A neighbour beyond the `i32` coordinate range is the background.
   neighbour table. Its field's stamp is checked once, when it is made. It writes only
   voxels of leaves; a write to a tile's or the background's voxel is a typed error naming
   what holds it, since values change while the topology is read-only (§4.2).
-- The leaf-parallel update (`rayon`) reads the old field by `&` and writes the new field by
+- Leaf-parallel work runs on `rayon`, in the caller's pool: the global one, or the one a
+  caller's `ThreadPool::install` or `RAYON_NUM_THREADS` sets, so that it shares its threads
+  with a caller's own parallel loops (ADR-0015). No `rayon` type appears in brodo's API.
+- The leaf-parallel update reads the old field by `&` and writes the new field by
   `&mut`, one 512-value chunk per leaf. Its function may fail; the error returned is that of
   the lowest-numbered failing leaf.
 - A gather copies a leaf and one ghost layer from its 26 neighbours into a dense 10³
