@@ -1,0 +1,13 @@
+# Throwaway spike for B-007 (ROADMAP.md §3): whether a harness of brodo's own, std only,
+# meets TESTING.md T5. Never imported by `crates/` (PLANNING.md §3); its own workspace.
+[package]
+name = "bench-spike"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+brodo = { path = "../../crates/brodo" }
+
+[workspace]
+members = ["."]

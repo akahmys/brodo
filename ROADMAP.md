@@ -8,9 +8,10 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: checking output V2, `brodo::vtk`: a field as one ASCII `.vtu`, read back
-  exactly in VTK 9.6.2 (2026-10-17); ADR-0018 amended with the NaN and infinity rule.
-- **Next**: benchmarks and their first baselines; B-007 (the harness) first.
+- **Done**: `spikes/bench/` measured a std-only harness for B-007; its `REPORT.md` proposes
+  the answer.
+- **Next**: the human decides B-007 and the baseline tolerance; an ADR records them; then
+  the benchmarks and their first baselines.
 - **Unresolved problems**: none.
 
 ## 2. Milestones
@@ -115,12 +116,13 @@ implementation (PLANNING.md §2).
 | B-004 | Does a shared IR schema crate live in this repository? | Undecided; for brodo's users to agree, not for brodo to anticipate |
 | B-005 | What is the archive profile's default compressor, and is it pure Rust (CODING.md Rule 12)? | Zstd, LZ4 when decompression speed is asked for; whether a pure-Rust implementation suffices is to be measured |
 | B-006 | Does `vdb-rs` pass Rules 12 and 13 (no C, permissive licence) on every target? | To be checked before it is added |
-| B-007 | Which harness runs the benchmarks? | None chosen |
+| B-007 | Which harness runs the benchmarks? | A std-only harness of brodo's own, measured by `spikes/bench/`; for the human to decide |
 | B-013 | Which crates handle `piatto`'s window, input and GUI parts? | `winit` and `egui`, to be measured against Rules 12 and 13 (ADR-0018) |
 | B-011 | Do dilation and erosion (§4.5) need a per-voxel active mask in each leaf? | None yet; a leaf has no per-voxel state now, and labelling works on values without one (ADR-0013) |
 
-No spike is running. `spikes/remap/` answered B-001 and B-008, and `spikes/merge/` B-010
-(ADR-0014); `spikes/vtk/` answered B-012 (ADR-0018).
+`spikes/bench/` has measured B-007 and waits for the human's decision. `spikes/remap/`
+answered B-001 and B-008, and `spikes/merge/` B-010 (ADR-0014); `spikes/vtk/` answered
+B-012 (ADR-0018).
 
 ## 4. Administrative items still open
 
