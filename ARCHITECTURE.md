@@ -16,16 +16,21 @@ own and knows nothing of its users.
 | a shape kernel | building, combining and offsetting level sets | tiles, random access, dilation and pruning |
 | a process exchanging fields | passing grids between processes | a zero-copy, memory-mappable file |
 | `colino` | converting and checking outside shapes | flood fill, connected components, Euler characteristic |
+| a developer or agent checking a change | seeing a field | a slice as PNG, a field for ParaView (§6.1) |
+| a process inspecting grids | viewing a grid file as an external program | `piatto`'s program (§6.2) |
+| an application with its own interface | showing grids inside it | `piatto`'s drawing library (§6.2) |
 
 **Out of scope**: level-set operations (CSG, offset, redistancing) and SDF-to-mesh; solvers,
-discretisation and linear algebra; visualisation and GUI.
+discretisation and linear algebra; an application's own interface (choosing faces,
+labelling, showing provenance), which belongs to the application (ADR-0018).
 
 ## 2. Crates and layers
 
 | Crate | Contents |
 | :--- | :--- |
-| `brodo` | The sparse tree, `Topology`, `Field<T>`, `Grid<T>`, topology editing and `Remap`, `LeafManifest`, `ValueAccessor`, leaf-parallel updates and gather, topology analysis, `GridView`, the file profiles, OpenVDB files |
+| `brodo` | The sparse tree, `Topology`, `Field<T>`, `Grid<T>`, topology editing and `Remap`, `LeafManifest`, `ValueAccessor`, leaf-parallel updates and gather, topology analysis, `GridView`, the file profiles, OpenVDB files, checking output (slice PNG, VTK) |
 | `colino` | Meshes to narrow-band SDFs on brodo's tree, and the topology report |
+| `piatto` | A viewer of cache-profile files, as a library and a thin windowed program; built after P1 (ADR-0018) |
 
 The dependency order between crates is CODING.md Rule 11, listed in
 `scripts/audit/project.py`.
@@ -43,7 +48,7 @@ The dependency order between crates is CODING.md Rule 11, listed in
 ├── docs/adr/                    # decision records
 ├── scripts/audit/               # the audit, and project.py, its settings
 ├── scripts/hooks/               # git and Claude Code hooks
-├── crates/brodo/, crates/colino/
+├── crates/brodo/, crates/colino/, crates/piatto/ (after P1)
 ├── xtask/                       # project tooling, when there is any
 ├── spikes/                      # throwaway prototypes, never in the build
 ├── fuzz/                        # cargo-fuzz targets, outside the workspace (ADR-0006)
@@ -214,7 +219,33 @@ traits from `freeze` on (§4.6).
 - The report is a `serde`-serialisable structure: what may have changed, where, and by how
   much.
 
-## 6. Compatibility
+## 6. Visualisation (ADR-0018)
+
+### 6.1 Checking output
+
+In `brodo`, each behind a cargo feature:
+
+- **A slice as PNG**, along x, y or z at a given position. Signed distances take a
+  diverging colour map centred on zero, with the zero contour drawn; other scalars a
+  sequential one. The colour range is given by the caller, never inferred. Tiles, the
+  background and inactive regions are drawn apart from values. The same input gives the
+  same bytes. The encoder is a permissively licensed, pure-Rust crate.
+- **A field for ParaView**, in a VTK format chosen by B-012, written from the published
+  file-format documentation only.
+
+### 6.2 `piatto`
+
+- Reads a cache-profile file (§4.7) by memory mapping.
+- Its first version draws only: an isosurface by ray marching (zero by default); a slice,
+  with its position moved by the user; a choice among the file's grids.
+- Its drawing is a library that applications embed; its windowed program is a thin user
+  of it. Window, input and GUI parts are chosen by B-013.
+- It reads a `GridView` buffer on the GPU as it is (§4.6); what cannot be read there is
+  recorded as a question on the frozen layout.
+- Not in it: an application's own interface (§1), and fields' own kinds of drawing (stream
+  lines and the like), for now.
+
+## 7. Compatibility
 
 - Before 1.0 the API may break; every break is in CHANGELOG.md (TESTING.md V3), and users
   pin a git revision.

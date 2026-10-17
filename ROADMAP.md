@@ -8,16 +8,13 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: U1 of `freeze` (ADR-0016 amendment of 2026-10-17): layout version 1, `freeze`,
-  and `GridView`, which checks a buffer whole before reading; its reader,
-  `crates/brodo/src/view.rs`, is in `UNTRUSTED_INPUT`, with the fuzz target `grid_view`
-  (60 s, about 2 million runs, no finding; 2026-10-17). The bytes of version 1 are
-  committed in `crates/brodo/tests/data/frozen_v1_f32.bin`.
-- **Next**: U2, the cache file with its header and the grid's metadata (§4.7); then U3,
-  memory mapping, which needs a mapping crate approved (§4).
-- **Unresolved problems**: none. The human allowed `libfuzzer-sys` 0.4.13, licensed
-  (MIT OR Apache-2.0) AND NCSA, in `fuzz/` only, which is outside the workspace and ships
-  nothing (2026-10-17).
+- **Done**: the human accepted ADR-0018 (2026-10-17): checking output in `brodo` (a slice
+  as PNG, a field for ParaView) in P1, and a viewer crate, `piatto`, after P1.
+  ARCHITECTURE.md §1, §2, §3 and §6, TESTING.md (the Image and GPU tiers, T8), README and
+  this file follow it.
+- **Next**: U2 of `freeze`, the cache file, whose plan awaits its two decisions (metadata
+  in a separate `GridMeta`; the unit as an uninterpreted string).
+- **Unresolved problems**: none.
 
 ## 2. Milestones
 
@@ -72,10 +69,25 @@ kinds of user before the rest is built on them.
 - [ ] `freeze` and `GridView` (§4.6); the cache profile (§4.7), its reader in
       `UNTRUSTED_INPUT` and fuzzed, its mapping module in `UNSAFE_MODULES`
 - [ ] Flood fill (§4.5); `Grid<T>` was built with the slice (ADR-0014)
+- [ ] Checking output (ARCHITECTURE.md §6.1, ADR-0018): a slice as PNG and a field for
+      ParaView, behind cargo features; the PNG encoder approved first (§4), B-012 answered
+      first, by a spike; golden slice tests (TESTING.md §1)
 - [ ] Benchmarks and their first baselines (TESTING.md §1)
 - [ ] Retrospective and refactoring; fuzz round; Miri run
 - [ ] **Accepted when** flood fill, neighbour traversal and a double-buffered update work,
-      the Reference and Format tiers for these parts pass, and both examples still pass
+      the Reference and Format tiers for these parts pass, at least one golden slice test
+      passes, and both examples still pass
+
+### After P1 — `piatto`
+
+Not part of P1's acceptance, and not started while ParaView suffices (ADR-0018).
+
+- [ ] Its dependencies approved and measured against CODING.md Rules 12 and 13 on every
+      target (§4); B-013 answered first
+- [ ] The first version, and no more (ARCHITECTURE.md §6.2): an isosurface by ray marching,
+      a slice moved by the user, a choice of grid; a library and a thin windowed program
+- [ ] A `GridView` buffer read on the GPU as it is (TESTING.md §1); what cannot be read is
+      recorded as a question on the frozen layout
 
 ### P2 — `colino`
 
@@ -106,6 +118,8 @@ implementation (PLANNING.md §2).
 | B-005 | What is the archive profile's default compressor, and is it pure Rust (CODING.md Rule 12)? | Zstd, LZ4 when decompression speed is asked for; whether a pure-Rust implementation suffices is to be measured |
 | B-006 | Does `vdb-rs` pass Rules 12 and 13 (no C, permissive licence) on every target? | To be checked before it is added |
 | B-007 | Which harness runs the benchmarks? | None chosen |
+| B-012 | Which VTK format does the checking output write: a multiblock of rectilinear grids, one per leaf, or an unstructured grid? | None yet; the reason is recorded with the answer (ADR-0018) |
+| B-013 | Which crates handle `piatto`'s window, input and GUI parts? | `winit` and `egui`, to be measured against Rules 12 and 13 (ADR-0018) |
 | B-011 | Do dilation, erosion and flood fill (§4.5) need a per-voxel active mask in each leaf? | None yet; a leaf has no per-voxel state now (ADR-0013) |
 
 No spike is running. `spikes/remap/` answered B-001 and B-008, and `spikes/merge/` B-010
@@ -114,7 +128,8 @@ No spike is running. `spikes/remap/` answered B-001 and B-008, and `spikes/merge
 ## 4. Administrative items still open
 
 - Dependencies for P1, each to be approved before it is added (CODING.md Rule 20): a
-  memory-mapping crate.
+  memory-mapping crate; a pure-Rust PNG encoder for the checking output (ADR-0018). After
+  P1, for `piatto`: a GPU, window and GUI stack (B-013).
 - Before any distribution: confirm the licence terms for that form of distribution
   (ADR-0007).
 - Before registering on crates.io: `publish`, and each crate's description and keywords
