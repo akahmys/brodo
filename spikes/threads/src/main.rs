@@ -204,11 +204,53 @@ fn miri(which: &str) {
     let (t, f) = sphere(4);
     let mut out = vec![[0.0_f32; 512]; t.leaf_count()];
     match which {
-        "rayon" => with_rayon(&t, &f, &mut out, false),
+        "rayon" => {
+            with_rayon(&t, &f, &mut out, false);
+            println!("rayon pool: {} threads", rayon::current_num_threads());
+        }
         "static" => with_static(&t, &f, &mut out, false),
         _ => with_dynamic(&t, &f, &mut out, false),
     }
     println!("{which}: {} leaves done on {} threads", t.leaf_count(), threads());
+}
+
+/// Ten updates side by side under an outer rayon `par_iter`, as a caller already using rayon
+/// would run them, each with the inner variant named; fastest of `rounds`, in turn.
+fn nested(rounds: usize) {
+    use rayon::prelude::*;
+    let r = std::env::var("RADIUS").map_or(80, |v| v.parse().unwrap());
+    let (t, f) = sphere(r);
+    let mut outs = vec![vec![[0.0_f32; 512]; t.leaf_count()]; 10];
+    let inner: [(&str, fn(&Topology, &Field<f32>, &mut [Leaf], bool)); 4] = [
+        ("rayon", with_rayon),
+        ("dynamic", with_dynamic),
+        ("dynamic_1_thread", |t, f, o, s| {
+            let ns = numbers(t);
+            for (o, n) in o.iter_mut().zip(&ns) {
+                step(t, f, *n, o, s);
+            }
+        }),
+        ("sequential_outer", with_rayon),
+    ];
+    let mut best = [u128::MAX; 4];
+    for round in 0..rounds {
+        for k in 0..4 {
+            let j = (round + k) % 4;
+            let s = Instant::now();
+            if j == 3 {
+                for o in outs.iter_mut() {
+                    with_rayon(&t, &f, o, false);
+                }
+            } else {
+                outs.par_iter_mut().for_each(|o| (inner[j].1)(&t, &f, o, false));
+            }
+            best[j] = best[j].min(s.elapsed().as_nanos());
+        }
+    }
+    println!("{} leaves, 10 updates", t.leaf_count());
+    for ((n, _), b) in inner.iter().zip(best) {
+        println!("{n:<18} {:.3} ms", b as f64 / 1e6);
+    }
 }
 
 fn main() {
@@ -217,6 +259,7 @@ fn main() {
         Some("child") => child(a[1].parse().unwrap()),
         Some("bench") => bench(a[1].parse().unwrap(), a[2].parse().unwrap()),
         Some("miri") => miri(&a[1]),
+        Some("nested") => nested(a[1].parse().unwrap()),
         _ => check(),
     }
 }

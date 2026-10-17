@@ -121,7 +121,7 @@ implementation (PLANNING.md §2).
 | B-005 | What is the archive profile's default compressor, and is it pure Rust (CODING.md Rule 12)? | Zstd, LZ4 when decompression speed is asked for; whether a pure-Rust implementation suffices is to be measured |
 | B-006 | Does `vdb-rs` pass Rules 12 and 13 (no C, permissive licence) on every target? | To be checked before it is added |
 | B-013 | Which crates handle `piatto`'s window, input and GUI parts? | `winit` and `egui`, to be measured against Rules 12 and 13 (ADR-0018) |
-| B-014 | Can `std::thread::scope` replace rayon for the leaf-parallel update? | A dynamic split matched rayon on 10 469 leaves and ran under Miri without a report (`spikes/threads/`); for the human to decide |
+| B-014 | Can `std::thread::scope` replace rayon for the leaf-parallel update? | Measured by `spikes/threads/`: a dynamic split matched rayon alone on large grids, but lost 8 % to three times under a caller's own rayon loop; rayon's Miri report appears under Stacked Borrows only; for the human to decide |
 | B-011 | Do dilation and erosion (§4.5) need a per-voxel active mask in each leaf? | None yet; a leaf has no per-voxel state now, and labelling works on values without one (ADR-0013) |
 
 `spikes/threads/` has measured B-014 and waits for the human's decision. `spikes/remap/` answered B-001 and B-008, and `spikes/merge/` B-010

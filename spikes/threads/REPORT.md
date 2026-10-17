@@ -54,6 +54,33 @@ variant ran on one thread and tested no concurrency), on a sphere of radius 4 (1
 leaves): static and dynamic ran to the end with no report; rayon reproduced the Stacked
 Borrows report in `crossbeam-epoch` 0.9.21. Miri ran one interleaving of each.
 
+### Smaller grids, and callers already on rayon
+
+The fixed cost of spawning per call, uniform work: on 120 leaves rayon took 0.086–0.091 ms
+and the dynamic split 0.120–0.145 ms; on 434 leaves, 0.160–0.166 and 0.203–0.218 ms; about
+40 to 50 µs a call throughout.
+
+`nested <rounds>` runs ten updates under an outer rayon `par_iter`, as a caller already on
+rayon would, fastest of 20, two runs each:
+
+| Grid | inner rayon | inner dynamic, 10 threads each | inner on one thread | outer sequential, inner rayon |
+| :--- | ---: | ---: | ---: | ---: |
+| 2606 leaves | 6.18–6.22 ms | 6.67–6.68 ms | 6.93–6.94 ms | 6.52–6.55 ms |
+| 120 leaves | 0.297–0.298 ms | 0.81–0.90 ms | 0.39–0.41 ms | 0.46 ms |
+
+Nested rayon was fastest in both: its pool shares the work of inner and outer loops.
+Scoped threads inside it oversubscribe the cores (about a hundred threads), 8 % slower on
+the larger grid and about three times on the smaller; one inner thread each avoids that
+but leaves the ten outer tasks unbalanced across performance and efficiency cores, 12 to
+30 % slower than nested rayon.
+
+### Miri's two models
+
+Rayon with a pool of four threads (checked by `rayon::current_num_threads`) on the
+17-leaf grid: Stacked Borrows reported undefined behaviour in `crossbeam-epoch`, as above;
+Tree Borrows ran to the end with no report (`-Zmiri-tree-borrows`, about two minutes).
+The report depends on the model.
+
 ## Findings
 
 1. A dynamic split on scoped threads matched rayon on the larger grid, within 1 to 3 %
@@ -65,11 +92,12 @@ Borrows report in `crossbeam-epoch` 0.9.21. Miri ran one interleaving of each.
    from `crossbeam-epoch`, which the dynamic split does not use.
 4. Determinism holds: the update writes each leaf from its own inputs, so the split does
    not change the bits.
+5. A caller already on rayon is served best by rayon: scoped threads either oversubscribe
+   (8 % to three times slower here) or, with one inner thread, lose the balancing rayon
+   does across the two kinds of core (12 to 30 %).
+6. Rayon's Miri report appears under Stacked Borrows and not under Tree Borrows.
 
 ## Answer proposed for the ADR
 
-Replace rayon in `brodo::parallel` with a dynamic split on `std::thread::scope`, blocks of
-16 leaves; `rayon` and the `crossbeam` crates leave the dependencies, and Miri can check
-the parallel code. Left to the human: whether the 4 to 6 % on small grids is acceptable,
-and how the thread count is chosen, since rayon's pool and its `install` (used by the
-tests to vary the thread count) go with it.
+Open again: the measurements of finding 5 and 6 weigh for keeping rayon, and running
+Miri on the parallel code under Tree Borrows; the human decides.
