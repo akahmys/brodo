@@ -1,6 +1,6 @@
 # ADR-0019: Benchmarks run on a std-only harness of brodo's own, and fail 10 % behind their baseline
 
-- **Status**: Accepted
+- **Status**: Amended
 - **Date**: 2026-10-17
 
 ## Context
@@ -31,6 +31,26 @@ Absolute times drifted by up to 7.9 % within one session of about 40 minutes.
 The drift between days, between the performance and efficiency cores, and with the
 machine's temperature was not measured, so 10 % may fail a change that made nothing
 slower; such a failure is a reason to measure the drift again and amend this record. A
-slowdown under 10 % passes unseen
-by a baseline comparison; comparing variants in turn in one process remains the way to
+slowdown under 10 % passes unseen by a baseline comparison; comparing variants in turn in one process remains the way to
 see one. The eviction size was measured on one machine only.
+
+## Amendment
+
+- **Date**: 2026-10-17
+
+The first baseline was recorded while other work ran on the machine. Compared with it,
+with no change to the code, the leaf-parallel update failed twice in a row at +21 to
++27 % in both children, then passed four times. With the other work stopped, six
+comparisons passed, but items whose run took under 3 ms (the cache map at 0.06 ms, the
+parallel update at 0.2 ms) disagreed within a pair by up to 14 %. So:
+
+- An item that runs in under 3 ms is repeated until a run lasts 3 ms or more, and the
+  count is part of its name (`cache_map_x256`), so that a baseline taken at another count
+  is not compared.
+- Benchmarks are run and recorded on a machine doing nothing else; the benches say so.
+
+Recorded again at rest, every item took 3.0 to 5.5 ms per run. All six comparisons that
+followed passed; pairs agreed within 3.4 % except the parallel update, within 10.7 % (its
+ten threads share four performance and six efficiency cores), whose change from its
+baseline ranged from −5.5 to +11.3 %, the other items' from −1 to +6 %. The parallel update therefore sits near the tolerance and may fail without
+cause; it passed each time because a failure needs both children slower.

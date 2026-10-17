@@ -8,10 +8,12 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: the human answered B-007 (ADR-0019): a std-only harness of brodo's own, in
-  `crates/brodo/benches/`, failing 10 % behind a baseline.
-- **Next**: the benchmarks and their first baselines (TESTING.md §1).
-- **Unresolved problems**: none.
+- **Done**: benchmarks on the harness of ADR-0019, in `crates/brodo/benches/brodo.rs`, with
+  their first baselines for the Apple M5, recorded at rest (2026-10-17).
+- **Next**: the retrospective and refactoring of P1 (PLANNING.md §7); the fuzz round
+  (TESTING.md T6) and the Miri run (T7).
+- **Unresolved problems**: the leaf-parallel update's benchmark disagrees within a pair by
+  up to 10.7 %, near the 10 % tolerance (ADR-0019).
 
 ## 2. Milestones
 
@@ -70,7 +72,7 @@ kinds of user before the rest is built on them.
       `slice-png` on by default, `png` approved; golden slice tests (TESTING.md §1)
 - [x] Checking output, V2: a field for ParaView as one ASCII `.vtu` (B-012 answered by
       `spikes/vtk/`, ADR-0018)
-- [ ] Benchmarks and their first baselines (TESTING.md §1)
+- [x] Benchmarks and their first baselines (TESTING.md §1)
 - [ ] Retrospective and refactoring; fuzz round; Miri run
 - [ ] **Accepted when** flood fill, neighbour traversal and a double-buffered update work,
       the Reference and Format tiers for these parts pass, at least one golden slice test

@@ -37,3 +37,8 @@ test = true
 [[example]]
 name = "spheres"
 test = true
+
+# The Benchmark tier on brodo's own harness (TESTING.md §1, ADR-0019).
+[[bench]]
+name = "brodo"
+harness = false
