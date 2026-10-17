@@ -71,7 +71,7 @@ not even as a translation or a memory of how something was written (ADR-0007).
 7. **Concise.** Say the rule and its reason; leave out history and alternatives (they
    belong in an ADR).
 
-`scripts/audit/documents.py` checks rules 1 (links resolve), 2 (dated past tense in the two
+`scripts/audit/documents.py` checks rules 1 (links and `NAME.md §N` references resolve), 2 (dated past tense in the two
 present-tense documents) and 6, and the ADR index. The rest are held by review.
 
 ## The gate

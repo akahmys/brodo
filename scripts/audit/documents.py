@@ -9,7 +9,9 @@
 4. The ADR index: no duplicate or missing number, the index and the directory agree in
    both directions, and every record carries a Status and a Date.
 5. No CLAUDE.md: Claude Code reads AGENTS.md only while none of these exists.
-6. Provenance (AGENTS.md S3): every source file under `crates/*/src/` has a row in
+6. Sections: every `NAME.md §N` or `NAME.md §N.M` naming a document at the root, in the
+   documents and in source comments, names a heading numbered so in it (writing rule 1).
+7. Provenance (AGENTS.md S3): every source file under `crates/*/src/` has a row in
    PROVENANCE.md, and every row names a file that exists. Whether the row is true,
    nothing checks.
 """
@@ -29,6 +31,7 @@ PRESENT_TENSE = ["ARCHITECTURE.md", "AGENTS.md"]
 DATE = re.compile(r"\b20\d\d-\d\d-\d\d\b")
 PAST = re.compile(r"\b(was|were|had|used to|became|no longer|turned out)\b")
 JAPANESE = re.compile("[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uff66-\uff9f]")
+SECTION = re.compile(r"\b([A-Z][A-Z_]*\.md)\)? §(\d+(?:\.\d+)*)")
 LINK = re.compile(r"\]\(([^)#:\s][^)\s#]*)(#[^)]*)?\)")
 
 
@@ -72,6 +75,22 @@ def links(paths: list[Path]) -> list[str]:
                 continue
             if not (path.parent / match.group(1)).exists():
                 out.append(f"  {path.relative_to(ROOT)}: {match.group(1)} does not exist")
+    return out
+
+
+def sections(paths: list[Path]) -> list[str]:
+    headings = {}
+    for doc in ROOT.glob("*.md"):
+        found = re.findall(r"^#+ (\d+(?:\.\d+)*)\.? ", doc.read_text(), re.MULTILINE)
+        headings[doc.name] = set(found)
+    out = []
+    for path in paths:
+        if path.suffix not in {".md", ".rs"}:
+            continue
+        for number, line in enumerate(path.read_text(errors="replace").split("\n"), 1):
+            for name, section in SECTION.findall(line):
+                if name in headings and section not in headings[name]:
+                    out.append(f"  {path.relative_to(ROOT)}:{number}: {name} has no §{section}")
     return out
 
 
@@ -121,6 +140,7 @@ def main() -> int:
         ("language", lambda: language(paths)),
         ("tense", tense),
         ("links", lambda: links(paths)),
+        ("sections", lambda: sections(paths)),
         ("ADR index", adr_index),
         ("instruction files", instruction_files),
         ("provenance", provenance),
