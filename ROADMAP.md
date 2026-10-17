@@ -8,13 +8,10 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: the human accepted the ADR-0018 amendment answering B-012: one ASCII
-  UnstructuredGrid of VTK_VOXEL cells; ARCHITECTURE.md §6.1 follows it.
-- **Next**: the human decides on adding `out/` to `.betterleaks.toml` (below); then the VTK
-  output in `brodo`.
-- **Unresolved problems**: CODING.md L2 says the secret scan skips `target/` and `out/`,
-  but `.betterleaks.toml` skips only `target/`; a Python environment under `out/` failed the
-  gate, so it was moved to `target/`. Changing either is a change of rule, for the human.
+- **Done**: the human approved skipping `out/` in the secret scan, as CODING.md L2 says
+  (ADR-0003 amended); the VTK spike's Python environment is back under `out/`.
+- **Next**: the VTK output in `brodo` (V2, ARCHITECTURE.md §6.1).
+- **Unresolved problems**: none.
 
 ## 2. Milestones
 

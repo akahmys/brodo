@@ -89,6 +89,8 @@ that line the file's own rules are the only ones. The audit fails when fewer tha
 rules load. It adds one rule, `path-outside-project`, for absolute paths into a home or
 temporary directory. A relative path that leads outside the root is found by
 `scripts/audit/paths.py`, which resolves each relative path against the file holding it.
+The file's path allow-list skips `target/` and `out/`, the git-ignored directories of
+CODING.md L2, as `paths.py` and `documents.py` do.
 
 **Personal data** (the owner's name) is matched by rules kept outside the repository,
 because a committed rule naming a person leaks the name. The file is `$PERSONAL_LEAKS`,

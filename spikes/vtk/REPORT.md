@@ -1,13 +1,13 @@
 # Spike: vtk (B-012)
 
 Measured on 2026-10-17 with rustc 1.98.1 and VTK 9.6.2's Python package (in a virtual
-environment, as the human allowed, under `target/`: the secret scan skips `target/` but
-not `out/`, whatever CODING.md L2 says), on an Apple M5. Reproduce from the
+environment, as the human allowed, under `out/`; ADR-0003's amendment lets the secret
+scan skip it), on an Apple M5. Reproduce from the
 repository's root:
 
 ```bash
 cargo run --release --manifest-path spikes/vtk/Cargo.toml -- out/vtk
-target/vtk-venv/bin/python -I spikes/vtk/check.py out/vtk
+out/vtk-venv/bin/python -I spikes/vtk/check.py out/vtk
 ```
 
 ## Question

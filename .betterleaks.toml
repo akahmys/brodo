@@ -15,9 +15,10 @@ regex = '''(?:/Users/|/home/|[A-Za-z]:\\Users\\|/private/tmp/|/private/var/folde
 keywords = ["/users/", "/home/", ":\\users\\", "/private/", "/var/folders/"]
 
 [[allowlists]]
-description = "Build output, git internals, and git-ignored per-machine settings"
+description = "Build and run output, git internals, and git-ignored per-machine settings"
 paths = [
     '''(^|/)target/''',
+    '''(^|/)out/''',
     '''(^|/)\.git/''',
     '''^\.claude/settings\.local\.json$''',
 ]

@@ -1,6 +1,6 @@
 # ADR-0003: Commits are scanned for secrets, personal data and outside paths, and the hooks are guarded
 
-- **Status**: Accepted
+- **Status**: Amended
 - **Date**: 2026-10-16
 
 ## Context
@@ -26,3 +26,16 @@ readily when they fail.
 
 A command written to evade the Claude Code hook can pass it; the history scan in the
 audit is the backstop.
+
+## Amendment (2026-10-17)
+
+CODING.md L2 already said that output and tool environments go under `target/` or `out/`
+and that the audit's scans skip both, but `.betterleaks.toml` skipped only `target/`. A
+Python virtual environment under `out/`, which holds absolute paths into the home
+directory, failed the gate, and was moved to `target/` as a workaround. `out/` was added
+to the file's path allow-list, so the secret scan skips the same directories as
+`scripts/audit/documents.py` and `scripts/audit/paths.py`. The pattern matches a
+directory named `out/` at any depth, as the one for `target/` does, so a file committed
+under such a directory would be skipped too; nothing checks that none is. Measured with a
+file holding an absolute path into a home directory: before the change the working-tree scan found it under
+`out/t3/` and `t3probe/`; after, under `t3probe/` and `t3probe/layout/` only.

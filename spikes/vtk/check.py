@@ -1,6 +1,6 @@
 """Reads each candidate with VTK's Python package and compares cell values at the samples
 the spike wrote (cell centres and expected values); times each read. Run with the venv's
-interpreter: target/vtk-venv/bin/python -I spikes/vtk/check.py out/vtk."""
+interpreter: out/vtk-venv/bin/python -I spikes/vtk/check.py out/vtk."""
 
 import glob
 import os
