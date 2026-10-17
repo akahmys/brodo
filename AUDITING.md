@@ -29,14 +29,15 @@ grep -E '^echo "\[' scripts/audit/verify_compliance.sh
 | Toolchain: `rust-version`, `rust-toolchain.toml` and the running `rustc` agree | — |
 | `scripts/audit/workspace.py`: members, lint inheritance, layer order, version and licence inheritance, CHANGELOG.md's version, dependency inheritance, `rustflags`, the fuzzer's reach | 4, 11, 19, 20, L1, V1, V3, T6 |
 | `cargo clippy --workspace --all-targets -- -D warnings`, with the lints in `Cargo.toml` and the bans in `clippy.toml` | 1, 4, 6, 7, 9, 10, 16, 17, 18, 19 |
+| `cargo clippy --all-targets -D warnings` per member with no default features and with each feature alone | 10 |
 | clippy's panic lints over `--lib --bins`, filtered by `scripts/audit/lint_filter.py` | 2 |
-| `scripts/audit/source.py`: asserts, recursion and the lints an exception names, in production code; `unsafe` outside `UNSAFE_MODULES`, in every file | 2, 4, 15, 18, 19 |
+| `scripts/audit/source.py`: asserts and recursion in production code; the lints an exception names, in every target; `unsafe` outside `UNSAFE_MODULES`, in every file | 2, 4, 15, 18, 19 |
 | clippy's `indexing_slicing` over the crate of each module in `UNTRUSTED_INPUT`, its findings kept to that module by `scripts/audit/lint_filter.py --under` | 3 |
 | grep for `String` and `anyhow` errors | 8 |
 | grep for `filter_map(Result::ok)` and its forms | 9 |
 | `cargo fmt --all --check` | 10 |
 | `cargo tree … -i cc` per member and target | 12 |
-| test files in `src/` and `#[ignore]` reasons | T1 |
+| test files in `src/`, and `#[ignore]` reasons, direct or under `cfg_attr`, in every target | T1 |
 | `scripts/audit/documents.py`, and `cargo doc` with warnings denied | AGENTS.md writing rules 1, 2, 6, S3, and no `CLAUDE.md`; Rule 10 |
 | `cargo deny check` | 13 |
 | hooks installed; betterleaks over the tree and the history, personal rules, `scripts/audit/paths.py` (also: each of `OUTPUT_DIRS` git-ignored and in betterleaks' allow-list) | 14, L2 |

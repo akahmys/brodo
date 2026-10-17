@@ -49,6 +49,27 @@ elif [ $clippy_status -ne 0 ]; then
     errors_only <<<"$clippy_out"; fail "clippy"
 else echo "  PASS"; fi
 
+# Code behind a cargo feature is linted, and so built, with no default features and with each
+# feature alone, not only with the defaults the step above takes.
+echo "[Rule 10] cargo clippy with no default features and with each feature alone..."
+feature_sets=""; ERROR_BEFORE=$ERROR; ERROR=0
+for member in $MEMBERS; do
+    features=$(cargo metadata --no-deps --format-version 1 | python3 -c "
+import sys, json
+for p in json.load(sys.stdin)['packages']:
+    if p['name'] == '$member':
+        print(' '.join(f for f in p['features'] if f != 'default'))")
+    for set in "" $features; do
+        if ! out=$(cargo clippy -p "$member" --all-targets --no-default-features \
+                ${set:+--features "$set"} --quiet -- -D warnings 2>&1); then
+            errors_only <<<"$out"; fail "clippy -p $member --no-default-features ${set:+--features $set}"
+        fi
+        feature_sets+=" $member[${set:-none}]"
+    done
+done
+[ $ERROR -eq 0 ] && echo "  PASS ($feature_sets )"
+[ $ERROR_BEFORE -eq 0 ] || ERROR=1
+
 # Rules 2 and 3 apply to production code only, so they run apart from the clippy step above.
 # The workspace lints fire here too; lint_filter.py keeps each step to its own lints.
 # Both warn rather than deny their lints and fail if clippy does not finish: a finding
@@ -117,7 +138,9 @@ else echo "  PASS"; fi
 echo "[T1] Tests: no test file in src/, and #[ignore] only as needing what the repository lacks..."
 stray=$(find $SRC_DIRS \( -name '*_test.rs' -o -name '*_tests.rs' -o -name 'test_*.rs' \
     -o -name 'tests.rs' -o -name 'test.rs' \) 2>/dev/null)
-ignores=$(grep -rn --include='*.rs' '#\[ignore' $SRC_DIRS crates/*/tests 2>/dev/null | grep -v '#\[ignore = "needs ' || true)
+# An ignore written directly or under `cfg_attr`, in any target.
+ignores=$(grep -rnE --include='*.rs' '#\[ignore|#\[cfg_attr\(.*\bignore\b' $SRC_DIRS crates/*/tests \
+    crates/*/examples crates/*/benches 2>/dev/null | grep -v 'ignore = "needs ' || true)
 [ -z "$stray" ] || { echo "$stray"; fail "test files in src/"; }
 [ -z "$ignores" ] || { echo "$ignores"; fail "a test is switched off"; }
 [ -n "$stray$ignores" ] || echo "  PASS"

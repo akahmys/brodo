@@ -9,8 +9,8 @@ Production code is each `src/` file up to its `#[cfg(test)]` module, which clipp
    carries `// Bounded recursion: <the bound>` among the comments and attributes directly
    above its `fn`.
 
-3. Rule 19: an `#[expect]` names only a lint CODING.md lets an exception cover, the
-   print lints only in an application crate, and `unsafe_code` only in the file
+3. Rule 19: an `#[expect]`, in any target (tests, examples and benchmarks included), names
+   only a lint CODING.md lets an exception cover, the print lints only in an application crate, and `unsafe_code` only in the file
    `UNSAFE_MODULES` lists (`project.py`). clippy holds the rest of Rule 19 (`expect` rather
    than `allow`, and a reason).
 4. Rule 4: the word `unsafe` appears in code (comments aside) only in that file, in every
@@ -82,7 +82,8 @@ def exceptions(crate: Path, files: list[Path]) -> list[str]:
     out = []
     allowed = EXEMPTABLE | (PRINTING if crate.name in MAY_PRINT else set())
     for path in files:
-        text = "\n".join(production(path))
+        in_src = "src" in path.relative_to(crate).parts
+        text = "\n".join(production(path) if in_src else path.read_text().split("\n"))
         here = allowed | ({UNSAFE_LINT} if unsafe_allowed(path) else set())
         for match in LINT_ATTRIBUTE.finditer(text):
             number = text.count("\n", 0, match.start()) + 1
@@ -194,7 +195,9 @@ def main() -> int:
     for crate in crates():
         files = sorted(crate.rglob("src/**/*.rs"))
         failures += asserts(files)
-        failures += exceptions(crate, files)
+        # Rule 19 holds in every target: tests, examples and benchmarks too.
+        every = [p for p in sorted(crate.rglob("*.rs")) if "target" not in p.relative_to(crate).parts]
+        failures += exceptions(crate, every)
         failures += recursion(crate)
         failures += unsafe_code(crate)
     if failures:
