@@ -152,6 +152,18 @@ fastest. A neighbour beyond the `i32` coordinate range is the background.
   `GridView<'a>` without copying, through `zerocopy`.
 - Links between nodes are offsets from the start, in 32-byte units. Every structure is
   32-byte aligned, little-endian, and laid out in `u32` words.
+- Layout version 1, in order: a header (magic number, layout version, value type, the
+  count and offset of each section, the buffer's length, the background); the root table,
+  sorted by key; upper nodes, then lower nodes, each in the Morton order of its origin;
+  leaf values in leaf-number order; tile values, root tiles first, then each upper node's,
+  then each lower node's, in node order.
+- A node's masks number its children's places in Morton order, so that its children,
+  being consecutive in that order, are found as its first child's number plus the set bits
+  below the place; no list of child numbers is stored. Tile values follow the same rule.
+- A view is made only from a buffer it has checked whole: alignment, magic number,
+  version, value type, every section within the buffer, and every node's children and
+  tiles within their sections. It accepts its own layout version only; any other is a
+  typed error naming it.
 
 ### 4.7 Files (ADR-0016)
 

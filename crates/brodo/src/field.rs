@@ -4,6 +4,8 @@
 
 use std::iter::repeat_n;
 
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
+
 use crate::error::FieldError;
 use crate::topology::{
     LeafNumber, LeafSource, Location, Part, Remap, TileNumber, TileSource, Topology,
@@ -13,37 +15,53 @@ use crate::tree::Coord;
 /// Voxels in a leaf.
 pub const LEAF_VOXELS: usize = 512;
 
-/// A value a field holds (ARCHITECTURE.md §4.8).
-pub trait Value: Copy + Send + Sync + 'static {
+/// A value a field holds (ARCHITECTURE.md §4.8): plain bytes, so that `freeze` can lay
+/// it out and a view read it in place.
+pub trait Value:
+    Copy + Send + Sync + 'static + FromBytes + IntoBytes + Immutable + KnownLayout
+{
+    /// The number naming the type in a frozen grid's header.
+    const TYPE_CODE: u32;
+
     /// Whether two values have the same bits.
     fn same_bits(&self, other: &Self) -> bool;
 }
 
 impl Value for f32 {
+    const TYPE_CODE: u32 = 1;
+
     fn same_bits(&self, other: &Self) -> bool {
         self.to_bits() == other.to_bits()
     }
 }
 
 impl Value for f64 {
+    const TYPE_CODE: u32 = 2;
+
     fn same_bits(&self, other: &Self) -> bool {
         self.to_bits() == other.to_bits()
     }
 }
 
 impl Value for u8 {
+    const TYPE_CODE: u32 = 3;
+
     fn same_bits(&self, other: &Self) -> bool {
         self == other
     }
 }
 
 impl Value for u32 {
+    const TYPE_CODE: u32 = 4;
+
     fn same_bits(&self, other: &Self) -> bool {
         self == other
     }
 }
 
 impl Value for [f32; 3] {
+    const TYPE_CODE: u32 = 5;
+
     fn same_bits(&self, other: &Self) -> bool {
         self.iter().zip(other).all(|(a, b)| a.to_bits() == b.to_bits())
     }
@@ -175,6 +193,11 @@ impl<T: Value> Field<T> {
     /// The value at a voxel of leaf `n` of this field's topology, to write.
     pub(crate) fn at_mut(&mut self, n: LeafNumber, v: Coord) -> &mut T {
         &mut self.leaf_values[n.get() as usize * LEAF_VOXELS + local_index(v)]
+    }
+
+    /// A tile's value by its topology's tile number.
+    pub(crate) fn tile_value_at(&self, n: u32) -> Result<T, FieldError> {
+        self.tile_values.get(n as usize).copied().ok_or(FieldError::UnknownTile(n))
     }
 
     /// Whether the field belongs to `t`.

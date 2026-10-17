@@ -1,6 +1,6 @@
 # ADR-0016: A frozen grid is one aligned byte buffer, stored by two file profiles
 
-- **Status**: Accepted
+- **Status**: Amended
 - **Date**: 2026-10-16
 
 ## Context
@@ -31,3 +31,17 @@ limited 64-bit integers.
 
 The layout and formats are versioned apart from the API (TESTING.md V6). The archive's
 default compressor is open (ROADMAP.md §3, B-005).
+
+## Amendment
+
+- **Date**: 2026-10-17
+
+Before `freeze` was built, the human decided three points. B-009: a reader accepts only
+its own layout version; any other is a typed error naming the version, and the question
+is opened again when a second version exists. The work was split into the frozen view,
+then the cache file with its metadata, then memory mapping. And the layout of version 1
+was fixed in outline (ARCHITECTURE.md §4.6): sections in a set order, nodes in Morton
+order, and node masks numbering children's places in Morton order, so that a child is
+found from its node's first child and a count of set bits, with no list of child numbers.
+The view's reader parses untrusted bytes, so it was listed in `UNTRUSTED_INPUT` and fuzzed
+(ADR-0009).

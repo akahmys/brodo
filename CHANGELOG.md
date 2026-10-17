@@ -20,10 +20,15 @@ are recorded here when they change (V6).
 - `brodo::accessor`: `ValueAccessor` and `ValueAccessorMut`, reading and writing by voxel
   from the regions last visited; writes go to leaves only (`FieldError::NotALeaf`).
 
+- `brodo::frozen` and `brodo::view`: `freeze` packs a topology and a field into one 32-byte
+  aligned buffer, read in place by `GridView` after it checks the buffer whole.
+- Frozen layout version 1 (TESTING.md V6); readers accept version 1 only (ADR-0016).
+
 ### Breaking
 
 - `Field::remap` takes a merge rule: `remap(&remap, &uniform)` keeps the earlier behaviour.
-- Field values are bounded by `brodo::field::Value` instead of `Copy + Send + Sync`.
+- Field values are bounded by `brodo::field::Value` instead of `Copy + Send + Sync`; `Value`
+  now requires `zerocopy`'s `FromBytes`, `IntoBytes`, `Immutable` and `KnownLayout`.
 
 ## 0.1.0 (2026-10-16)
 

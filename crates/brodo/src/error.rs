@@ -90,3 +90,48 @@ pub enum FieldError {
         location: Location,
     },
 }
+
+/// Why a grid could not be frozen.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+pub enum FreezeError {
+    /// The field does not belong to the topology.
+    #[error(transparent)]
+    Field(#[from] FieldError),
+    /// The topology refused a lookup by number.
+    #[error(transparent)]
+    Tree(#[from] TreeError),
+    /// A count or offset does not fit the layout's `u32` words.
+    #[error("the grid is too large for the frozen layout")]
+    TooLarge,
+    /// The topology's lists and its tree disagree.
+    #[error("the topology's lists and its tree disagree")]
+    Inconsistent,
+}
+
+/// Why bytes were refused as a frozen grid (ARCHITECTURE.md §4.6).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+pub enum FormatError {
+    /// The bytes do not start on a 32-byte boundary, or are not whole blocks.
+    #[error("the bytes are not 32-byte aligned whole blocks")]
+    Misaligned,
+    /// Too few bytes for the header or a section.
+    #[error("the bytes end before the {0} section does")]
+    Truncated(&'static str),
+    /// Not a frozen grid.
+    #[error("magic number {0:#010x} is not a frozen grid's")]
+    BadMagic(u32),
+    /// A layout version this build does not read (ADR-0016).
+    #[error("layout version {0} is not read by this build")]
+    UnsupportedVersion(u32),
+    /// The values are of another type.
+    #[error("the values are of type {found}, not {expected}")]
+    WrongValueType {
+        /// The type code asked for.
+        expected: u32,
+        /// The type code found.
+        found: u32,
+    },
+    /// A count, offset or index points outside its section, or contradicts another.
+    #[error("the {0} section is inconsistent")]
+    Inconsistent(&'static str),
+}

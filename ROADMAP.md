@@ -8,13 +8,16 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: the human approved `zerocopy`; 0.8.63 was added with its `derive` feature,
-  BSD-2-Clause OR Apache-2.0 OR MIT (`cargo info`, 2026-10-17; 0.9.0-alpha.0 is a
-  pre-release). Measured: its derives on a `#[repr(C, align(32))]` struct build and pass
-  clippy under the workspace's lints, `unsafe_code = "deny"` among them, while a
-  hand-written `unsafe` block in the same crate is refused; ADR-0008 holds as written.
-- **Next**: the plan for `freeze` and `GridView` (§4.6), agreed with the human.
-- **Unresolved problems**: none.
+- **Done**: U1 of `freeze` (ADR-0016 amendment of 2026-10-17): layout version 1, `freeze`,
+  and `GridView`, which checks a buffer whole before reading; its reader,
+  `crates/brodo/src/view.rs`, is in `UNTRUSTED_INPUT`, with the fuzz target `grid_view`
+  (60 s, about 2 million runs, no finding; 2026-10-17). The bytes of version 1 are
+  committed in `crates/brodo/tests/data/frozen_v1_f32.bin`.
+- **Next**: U2, the cache file with its header and the grid's metadata (§4.7); then U3,
+  memory mapping, which needs a mapping crate approved (§4).
+- **Unresolved problems**: `fuzz/` depends on `libfuzzer-sys` 0.4.13, licensed
+  (MIT OR Apache-2.0) AND NCSA; NCSA is not on `deny.toml`'s allow-list, which checks the
+  workspace only. For the human to confirm.
 
 ## 2. Milestones
 
@@ -103,7 +106,6 @@ implementation (PLANNING.md §2).
 | B-005 | What is the archive profile's default compressor, and is it pure Rust (CODING.md Rule 12)? | Zstd, LZ4 when decompression speed is asked for; whether a pure-Rust implementation suffices is to be measured |
 | B-006 | Does `vdb-rs` pass Rules 12 and 13 (no C, permissive licence) on every target? | To be checked before it is added |
 | B-007 | Which harness runs the benchmarks? | None chosen |
-| B-009 | Which older format versions does each reader accept (TESTING.md V6)? | To be decided before `freeze` |
 | B-011 | Do dilation, erosion and flood fill (§4.5) need a per-voxel active mask in each leaf? | None yet; a leaf has no per-voxel state now (ADR-0013) |
 
 No spike is running. `spikes/remap/` answered B-001 and B-008, and `spikes/merge/` B-010

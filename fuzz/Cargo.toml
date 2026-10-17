@@ -1,0 +1,26 @@
+# The fuzz targets (TESTING.md T6), built by cargo-fuzz on nightly, outside the workspace
+# and the gate (ADR-0006).
+[package]
+name = "fuzz"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4.13"
+brodo = { path = "../crates/brodo" }
+zerocopy = { version = "0.8.63", features = ["derive"] }
+
+# Its own workspace, so cargo does not look for it in the one above.
+[workspace]
+members = ["."]
+
+[[bin]]
+name = "grid_view"
+path = "fuzz_targets/grid_view.rs"
+test = false
+doc = false
+bench = false

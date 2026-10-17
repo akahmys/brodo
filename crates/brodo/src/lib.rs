@@ -5,9 +5,11 @@
 pub mod accessor;
 pub mod error;
 pub mod field;
+pub mod frozen;
 pub mod gather;
 pub mod grid;
 pub mod manifest;
 pub mod parallel;
 pub mod topology;
 pub mod tree;
+pub mod view;
