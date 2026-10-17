@@ -49,3 +49,4 @@ A record is `Proposed` until the human accepts it.
 | [0019](0019-benchmarks-run-on-a-std-only-harness-of-brodos-own.md) | Benchmarks run on a std-only harness of brodo's own, and fail 10 % behind their baseline |
 | [0020](0020-tests-are-shown-to-reach-and-catch-what-they-guard.md) | Tests are shown to reach the cases they are meant for, and to fail where they guard |
 | [0021](0021-the-gate-covers-every-target-feature-set-and-way-to-ignore-a-test.md) | The gate covers every target, every feature set, and every way to ignore a test |
+| [0022](0022-every-test-is-listed-so-a-deleted-test-needs-an-adr.md) | Every test is listed, so that a deleted test needs an ADR |

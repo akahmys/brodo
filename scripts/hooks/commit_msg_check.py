@@ -4,6 +4,8 @@
 1. The message is in English (AGENTS.md writing rule 6).
 2. A change to a rule carries its record (AGENTS.md, "Changing the rules"): when a staged
    file states or enforces a rule, the message names an ADR and an ADR is staged too.
+3. A test deleted or renamed carries its record (TESTING.md T2): when a line leaves a
+   crate's `test-list.txt`, the message names an ADR and an ADR is staged too.
 """
 
 import re
@@ -17,6 +19,8 @@ RULE_FILES = re.compile(
     r"|^(clippy|rustfmt|rust-toolchain|deny)\.toml$|^\.betterleaks\.toml$"
     r"|^scripts/(audit|hooks)/|^\.claude/settings\.json$"
 )
+TEST_LIST = re.compile(r"^crates/[^/]+/test-list\.txt$")
+REMOVED = re.compile(r"^-(?!--)", re.MULTILINE)
 # A lint level in Cargo.toml is a rule too.
 LINT_LEVEL = re.compile(r'^[+-]\s*[\w:]+\s*=\s*"(allow|warn|deny|forbid)"', re.MULTILINE)
 
@@ -35,6 +39,9 @@ def main() -> int:
     rules = [f for f in staged if RULE_FILES.search(f)]
     if LINT_LEVEL.search(git("diff", "--cached", "-U0", "--", "Cargo.toml")):
         rules.append("Cargo.toml (a lint level)")
+    lists = [f for f in staged if TEST_LIST.search(f)]
+    if lists and REMOVED.search(git("diff", "--cached", "-U0", "--", *lists)):
+        rules.append("a test removed from a test-list.txt (TESTING.md T2)")
     if not rules:
         return 0
     adr_staged = any(f.startswith("docs/adr/0") for f in staged)

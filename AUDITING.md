@@ -42,6 +42,7 @@ grep -E '^echo "\[' scripts/audit/verify_compliance.sh
 | `cargo deny check` | 13 |
 | hooks installed; betterleaks over the tree and the history, personal rules, `scripts/audit/paths.py` (also: each of `OUTPUT_DIRS` git-ignored and in betterleaks' allow-list) | 14, L2 |
 | `cargo test --workspace` | TESTING.md §4 |
+| `scripts/audit/tests.py`: every test of each member's library, binaries, tests and examples is in its `test-list.txt`, and every listed test exists | T2 |
 
 **Two traps the script guards against.** A path in `clippy.toml` that resolves to nothing
 is a warning `-D warnings` does not promote, so the ban silently does nothing; the script
@@ -62,7 +63,7 @@ break the rule once and watch the step fail (TESTING.md T3).
 | Where | Reads |
 | :--- | :--- |
 | `scripts/hooks/pre-commit` | the staged change; also runs `paths.py` |
-| `scripts/hooks/commit-msg` | the commit message; `commit_msg_check.py` also requires English, and an ADR for a rule change (AGENTS.md) |
+| `scripts/hooks/commit-msg` | the commit message; `commit_msg_check.py` also requires English, and an ADR for a rule change (AGENTS.md) or a test removed from a `test-list.txt` (TESTING.md T2) |
 | the audit | the working tree and the whole history; with the personal rules also every commit message and author |
 
 **Getting round the hooks.** The audit fails while `core.hooksPath` is not `scripts/hooks`.

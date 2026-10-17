@@ -190,5 +190,8 @@ if out=$(cargo test --workspace --quiet 2>&1); then
         | awk '{s += $4} END {print s + 0}') tests)"
 else echo "$out" | grep -E "^test .* FAILED|^error|panicked" | head -20; fail "cargo test"; fi
 
+echo "[T2] Every test is in its crate's test-list.txt, and every listed test exists..."
+python3 scripts/audit/tests.py || ERROR=1
+
 if [ $ERROR -ne 0 ]; then echo "=== AUDIT FAILED ==="; exit 1; fi
 echo "=== AUDIT PASSED ==="
