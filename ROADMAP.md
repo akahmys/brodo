@@ -8,11 +8,9 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: the audit review's proposals A, B and E (ADR-0021, -0022, -0019); T7
-  redefined as the `miri_*` tests and run under Miri with no report, 56 s and 25 s
-  (ADR-0008).
-- **Next**: P1's acceptance and version (TESTING.md V2); then a spike on mutation testing
-  (the audit review's proposal C), for which a tool needs the human's approval.
+- **Done**: P1 accepted by the human and closed as 0.2.0 (2026-10-17).
+- **Next**: a spike on mutation testing (the audit review's proposal C), for which a tool
+  needs the human's approval; then P2, `colino`.
 - **Unresolved problems**: Miri's Stacked Borrows reports undefined behaviour in
   `crossbeam-epoch` under rayon; Tree Borrows does not (ADR-0015). The leaf-parallel
   update's benchmark disagrees within a pair by up to 17 %; whether a load average of 3.0
@@ -54,7 +52,7 @@ kinds of user before the rest is built on them.
 - [x] `LeafManifest`: Morton order and 26 neighbours (§4.3)
 - [x] The leaf-parallel update and gather (§4.4)
 - [x] Reference tier: property tests against a dense grid (TESTING.md §1)
-- [ ] Two examples in `crates/brodo/examples/`, run by tests, written from textbook
+- [x] Two examples in `crates/brodo/examples/`, run by tests, written from textbook
       material (AGENTS.md S1):
   - [x] Diffusion over several fields, double-buffered, with the leaf-parallel update and
         gather; checked against the analytic solution for a Gaussian, and for conservation
@@ -76,8 +74,8 @@ kinds of user before the rest is built on them.
 - [x] Checking output, V2: a field for ParaView as one ASCII `.vtu` (B-012 answered by
       `spikes/vtk/`, ADR-0018)
 - [x] Benchmarks and their first baselines (TESTING.md §1)
-- [ ] Retrospective and refactoring (done); fuzz round (done); Miri run (done; see §1)
-- [ ] **Accepted when** flood fill, neighbour traversal and a double-buffered update work,
+- [x] Retrospective and refactoring; fuzz round; Miri run (ADR-0008)
+- [x] **Accepted when** flood fill, neighbour traversal and a double-buffered update work,
       the Reference and Format tiers for these parts pass, at least one golden slice test
       passes, and both examples still pass
 

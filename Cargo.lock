@@ -65,7 +65,7 @@ dependencies = [
 
 [[package]]
 name = "brodo"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "memmap2",
  "png",
@@ -106,7 +106,7 @@ dependencies = [
 
 [[package]]
 name = "colino"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "brodo",
 ]
