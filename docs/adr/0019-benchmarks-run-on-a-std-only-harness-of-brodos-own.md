@@ -70,3 +70,13 @@ the other work of the first incident was not measured, so whether 3.0 would have
 it is not known; nor was any machine but the M5 measured. A threshold of 0.5 refused a
 run after one wait.
 
+## Amendment
+
+- **Date**: 2026-10-17 (when benchmarks run)
+
+The benchmarks ran only when someone chose to. A refactoring that moved the leaf index into
+another module made gather 50 % slower, caught only because the benchmarks were run by
+hand. The audit review asked for a rule: TESTING.md T10, a change to `src/` on a path a
+benchmark times is benchmarked before it lands and does not land while an item fails. It
+is held by review: nothing checks that a commit was benchmarked.
+
