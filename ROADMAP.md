@@ -8,15 +8,10 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: `spikes/bench/` measured a std-only harness for B-007 (its `REPORT.md`): T5 is
-  met, but absolute times drifted 7.9 % within one session, so no baseline tolerance
-  rests on it yet.
-- **Next**: two measurements on another day, together, before B-007 is decided: (a) the
-  same runs again, for the drift between days; (b) one code run as two variants in turn,
-  for the spread of their ratio, the floor of a tolerance if the baseline's code is run
-  beside the current one. Then the human decides B-007 and the tolerance, and an ADR
-  records them.
-- **Unresolved problems**: B-007 stays open until (a) and (b) are measured.
+- **Done**: the human answered B-007 (ADR-0019): a std-only harness of brodo's own, in
+  `crates/brodo/benches/`, failing 10 % behind a baseline.
+- **Next**: the benchmarks and their first baselines (TESTING.md §1).
+- **Unresolved problems**: none.
 
 ## 2. Milestones
 
@@ -120,13 +115,11 @@ implementation (PLANNING.md §2).
 | B-004 | Does a shared IR schema crate live in this repository? | Undecided; for brodo's users to agree, not for brodo to anticipate |
 | B-005 | What is the archive profile's default compressor, and is it pure Rust (CODING.md Rule 12)? | Zstd, LZ4 when decompression speed is asked for; whether a pure-Rust implementation suffices is to be measured |
 | B-006 | Does `vdb-rs` pass Rules 12 and 13 (no C, permissive licence) on every target? | To be checked before it is added |
-| B-007 | Which harness runs the benchmarks, and at what tolerance does a baseline comparison fail? | A std-only harness of brodo's own (`spikes/bench/`); the tolerance waits for (a) and (b) in §1 |
 | B-013 | Which crates handle `piatto`'s window, input and GUI parts? | `winit` and `egui`, to be measured against Rules 12 and 13 (ADR-0018) |
 | B-011 | Do dilation and erosion (§4.5) need a per-voxel active mask in each leaf? | None yet; a leaf has no per-voxel state now, and labelling works on values without one (ADR-0013) |
 
-`spikes/bench/` has measured B-007 in part; (a) and (b) in §1 remain. `spikes/remap/`
-answered B-001 and B-008, and `spikes/merge/` B-010 (ADR-0014); `spikes/vtk/` answered
-B-012 (ADR-0018).
+No spike is running. `spikes/remap/` answered B-001 and B-008, and `spikes/merge/` B-010
+(ADR-0014); `spikes/vtk/` answered B-012 (ADR-0018); `spikes/bench/` B-007 (ADR-0019).
 
 ## 4. Administrative items still open
 

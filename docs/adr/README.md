@@ -46,3 +46,4 @@ A record is `Proposed` until the human accepts it.
 | [0016](0016-a-frozen-view-and-two-file-profiles.md) | A frozen grid is one aligned byte buffer, stored by two file profiles |
 | [0017](0017-colino-reports-topology-changes-and-does-not-repair.md) | colino converts meshes to narrow-band SDFs and reports topology changes without repairing them |
 | [0018](0018-visualisation-is-checking-output-in-brodo-and-a-viewer-in-piatto.md) | Visualisation is checking output in brodo and a viewer in a third crate, `piatto` |
+| [0019](0019-benchmarks-run-on-a-std-only-harness-of-brodos-own.md) | Benchmarks run on a std-only harness of brodo's own, and fail 10 % behind their baseline |
