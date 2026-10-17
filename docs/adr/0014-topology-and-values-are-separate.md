@@ -121,3 +121,18 @@ rule, chosen when it is made, since a single-field user keeps one rule.
 Unreachable arena entries left by merges were reclaimed by rebuilding the arenas at each
 commit, rather than by free lists: a free list makes every access to an arena fallible or
 panicking, which CODING.md Rule 2 forbids.
+
+## Amendment
+
+- **Date**: 2026-10-17
+
+P1's retrospective found that examples, benchmarks and tests each computed a leaf
+voxel's coordinate from its index in the leaf's 512 values, as
+`[o[0] + i % 8, o[1] + i / 8 % 8, o[2] + i / 64]`, in six files, and a tile's edge as
+`1 << level.edge_log2()`: a workaround of the API, which the slice's acceptance sends
+back through an ADR. So `Topology::leaf_voxels(n)` gives the coordinates of leaf `n`'s
+voxels in the order of its values, to be zipped with `Field::leaf` or `Field::leaf_mut`,
+and `TileLevel::edge()` was made public. The examples, the benchmarks and the `.vtu`
+writer use them; tests, and the examples' checks, keep their own formulas, so that a
+reference stays independent of the code it checks.
+

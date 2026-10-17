@@ -191,6 +191,16 @@ impl Topology {
         self.leaves.get(to_usize(n.0)).copied().ok_or(TreeError::UnknownLeaf(n.0))
     }
 
+    /// The coordinates of a leaf's 512 voxels in the order of its values, x fastest, then
+    /// y, then z: to zip with `Field::leaf` or `Field::leaf_mut`.
+    pub fn leaf_voxels(
+        &self,
+        n: LeafNumber,
+    ) -> Result<impl ExactSizeIterator<Item = Coord> + use<>, TreeError> {
+        let o = self.leaf_origin(n)?;
+        Ok((0..512_i32).map(move |i| [o[0] + (i & 7), o[1] + (i >> 3 & 7), o[2] + (i >> 6)]))
+    }
+
     /// A tile's level and origin.
     pub fn tile(&self, n: TileNumber) -> Result<(TileLevel, Coord), TreeError> {
         self.tiles.get(to_usize(n.0)).copied().ok_or(TreeError::UnknownTile(n.0))
@@ -499,6 +509,26 @@ mod tests {
         let mut e = t.edit();
         f(&mut e);
         e.commit().unwrap()
+    }
+
+    #[test]
+    fn leaf_voxels_follow_the_order_of_a_leafs_values() {
+        let (t, _) = commit_with(&Topology::new(), |e| {
+            e.activate([8, -16, 24]).unwrap();
+        });
+        let n = t.leaf_numbers().next().unwrap();
+        let voxels: Vec<Coord> = t.leaf_voxels(n).unwrap().collect();
+        assert_eq!(voxels.len(), 512);
+        assert_eq!(voxels[0], [8, -16, 24]);
+        assert_eq!(voxels[1], [9, -16, 24]);
+        assert_eq!(voxels[8], [8, -15, 24]);
+        assert_eq!(voxels[64], [8, -16, 25]);
+        assert_eq!(voxels[511], [15, -9, 31]);
+        for (i, v) in voxels.iter().enumerate() {
+            assert_eq!(crate::field::local_index(*v), i);
+            assert_eq!(t.locate(*v), Location::Leaf(n));
+        }
+        assert_eq!(t.leaf_voxels(LeafNumber(1)).err(), Some(TreeError::UnknownLeaf(1)));
     }
 
     #[test]

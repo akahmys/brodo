@@ -37,6 +37,8 @@ are recorded here when they change (V6).
 - `brodo::slice` (feature `slice-png`, on by default): a slice of a scalar field drawn as an
   image, with a diverging or sequential colour map over a range the caller gives, and
   encoded as PNG.
+- `Topology::leaf_voxels`: a leaf's voxel coordinates in the order of its values;
+  `TileLevel::edge`: the edge, in voxels, of a tile's region.
 - `brodo::vtk` (feature `vtk`, on by default): `write_vtu` writes a scalar field as one
   ASCII VTK UnstructuredGrid of voxel cells, for ParaView; infinities and names needing
   XML escapes are refused (`VtkError`).

@@ -241,7 +241,7 @@ impl TileLevel {
     }
 
     /// The edge, in voxels, of the region a tile at this level stands for.
-    pub(crate) fn edge(self) -> i32 {
+    pub fn edge(self) -> i32 {
         1 << self.edge_log2()
     }
 

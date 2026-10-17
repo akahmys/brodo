@@ -83,9 +83,8 @@ impl Solver {
             let mut now = Field::new(&s.topology, 0.0);
             let t = &s.topology;
             par_update(t, &mut now, |n, out| -> Result<(), BoxError> {
-                let o = t.leaf_origin(n)?;
-                for (i, u) in out.iter_mut().enumerate() {
-                    *u = gaussian(voxel(o, i), r.sigma0, r.sigma0 * r.sigma0);
+                for (voxel, u) in t.leaf_voxels(n)?.zip(out.iter_mut()) {
+                    *u = gaussian(voxel, r.sigma0, r.sigma0 * r.sigma0);
                 }
                 Ok(())
             })?;
@@ -151,21 +150,12 @@ impl Solver {
             &self.species[k].now,
             Ok(0.0_f32),
             |n, values| -> Result<f32, BoxError> {
-                let o = topology.leaf_origin(n)?;
-                let diff =
-                    |(i, u): (usize, &f32)| (u - gaussian(voxel(o, i), r.sigma0, sigma_sq)).abs();
-                Ok(values.iter().enumerate().map(diff).fold(0.0, f32::max))
+                let diff = |(v, u): (Coord, &f32)| (u - gaussian(v, r.sigma0, sigma_sq)).abs();
+                Ok(topology.leaf_voxels(n)?.zip(values).map(diff).fold(0.0, f32::max))
             },
             |a, b| Ok(a?.max(b?)),
         )?
     }
-}
-
-/// The voxel at index `i` of the leaf at `o`, x fastest.
-#[expect(clippy::cast_possible_truncation, clippy::cast_possible_wrap, reason = "below 8")]
-fn voxel(o: Coord, i: usize) -> Coord {
-    let l = [i % 8, i / 8 % 8, i / 64].map(|c| c as i32);
-    [o[0] + l[0], o[1] + l[1], o[2] + l[2]]
 }
 
 /// Runs a problem for its steps.

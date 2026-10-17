@@ -164,17 +164,8 @@ fn check_name(name: &str) -> Result<(), VtkError> {
 fn cells<T: VtkScalar>(t: &Topology, f: &Field<T>) -> Result<Vec<Cell<T>>, VtkError> {
     let mut out = Vec::new();
     for n in t.leaf_numbers() {
-        let o = t.leaf_origin(n)?;
-        for (z, plane) in (0..).zip(f.leaf(t, n)?.as_chunks::<64>().0) {
-            for (y, row) in (0..).zip(plane.as_chunks::<8>().0) {
-                for (x, value) in (0..).zip(row) {
-                    out.push(Cell {
-                        origin: [o[0] + x, o[1] + y, o[2] + z],
-                        edge: 1,
-                        value: *value,
-                    });
-                }
-            }
+        for (origin, value) in t.leaf_voxels(n)?.zip(f.leaf(t, n)?) {
+            out.push(Cell { origin, edge: 1, value: *value });
         }
     }
     for n in t.tile_numbers() {

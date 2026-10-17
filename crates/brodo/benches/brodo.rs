@@ -300,9 +300,8 @@ fn sphere_topology(leaves: &[Coord], tiles: &[Coord]) -> Result<Topology, Failur
 fn sphere_field(t: &Topology) -> Result<Field<f32>, Failure> {
     let mut f = Field::new(t, BAND);
     par_update(t, &mut f, |n, values| -> Result<(), Failure> {
-        let o = t.leaf_origin(n)?;
-        for (i, v) in (0..).zip(values.iter_mut()) {
-            *v = distance([o[0] + i % 8, o[1] + i / 8 % 8, o[2] + i / 64]).clamp(-BAND, BAND);
+        for (voxel, v) in t.leaf_voxels(n)?.zip(values.iter_mut()) {
+            *v = distance(voxel).clamp(-BAND, BAND);
         }
         Ok(())
     })?;

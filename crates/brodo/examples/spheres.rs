@@ -139,9 +139,8 @@ fn apply(e: &mut TopologyEditor<'_>, edits: &[Edit]) -> Result<(), TreeError> {
 fn union(g: &mut Grid<f32>, s: Sphere) -> Result<(), BoxError> {
     let (t, f) = g.parts_mut();
     par_update(t, f, |n, out| -> Result<(), BoxError> {
-        let o = t.leaf_origin(n)?;
-        for (i, v) in out.iter_mut().enumerate() {
-            *v = v.min(clamped(distance(s, voxel(o, i))));
+        for (voxel, v) in t.leaf_voxels(n)?.zip(out.iter_mut()) {
+            *v = v.min(clamped(distance(s, voxel)));
         }
         Ok(())
     })?;
@@ -151,7 +150,8 @@ fn union(g: &mut Grid<f32>, s: Sphere) -> Result<(), BoxError> {
     Ok(())
 }
 
-/// The voxel at index `i` of the leaf at `o`, x fastest.
+/// The voxel at index `i` of the region at `o`, x fastest: the checks' own, so that they
+/// do not rely on `Topology::leaf_voxels`, which the build uses.
 #[expect(clippy::cast_possible_truncation, clippy::cast_possible_wrap, reason = "below 8")]
 fn voxel(o: Coord, i: usize) -> Coord {
     let l = [i % 8, i / 8 % 8, i / 64].map(|c| c as i32);
