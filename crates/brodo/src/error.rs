@@ -205,6 +205,10 @@ pub enum SliceError {
     /// The range drawn holds no pixel.
     #[error("the slice's range holds no pixel")]
     EmptyRange,
+    /// The colour map's range is not finite, or is empty (ARCHITECTURE.md §6.1).
+    #[cfg(feature = "slice-png")]
+    #[error("the colour map {0:?} has no finite, non-empty range")]
+    BadColorMap(crate::slice::ColorMap),
     /// The PNG encoder refused the image.
     #[cfg(feature = "slice-png")]
     #[error(transparent)]

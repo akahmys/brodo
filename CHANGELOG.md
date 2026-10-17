@@ -6,6 +6,10 @@ are recorded here when they change (V6).
 
 ## Unreleased
 
+- `brodo::slice::render` refuses a colour map whose range is not finite or is empty, with
+  the new `SliceError::BadColorMap`; it drew such a range in no colour of its own. A
+  `match` over `SliceError` needs the new arm.
+
 ## 0.2.0 (2026-10-17)
 
 Closes P1: `brodo`, a sparse volume with fields sharing a topology, leaf-parallel work,

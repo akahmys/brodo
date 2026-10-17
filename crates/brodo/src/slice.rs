@@ -66,6 +66,19 @@ pub enum ColorMap {
     },
 }
 
+impl ColorMap {
+    /// Whether the range draws anything: a finite positive `limit`, or finite `min` and
+    /// `max` with `min` below `max`. Any other range divides by zero or by a NaN and paints
+    /// in no colour of its own.
+    fn check(self) -> Result<(), SliceError> {
+        let usable = match self {
+            ColorMap::Diverging { limit } => limit.is_finite() && limit > 0.0,
+            ColorMap::Sequential { min, max } => min.is_finite() && max.is_finite() && min < max,
+        };
+        if usable { Ok(()) } else { Err(SliceError::BadColorMap(self)) }
+    }
+}
+
 /// An image: rows from the top, four bytes per pixel (red, green, blue, alpha).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Image {
@@ -128,6 +141,7 @@ pub fn render<T: Value + Into<f64>>(
     slice: Slice,
     map: ColorMap,
 ) -> Result<Image, SliceError> {
+    map.check()?;
     let width = u32::try_from(i64::from(slice.max[0]) - i64::from(slice.min[0]) + 1)
         .map_err(|_| SliceError::EmptyRange)?;
     let height = u32::try_from(i64::from(slice.max[1]) - i64::from(slice.min[1]) + 1)
@@ -194,4 +208,48 @@ pub fn encode_png(image: &Image) -> Result<Vec<u8>, SliceError> {
     writer.write_image_data(&image.rgba)?;
     writer.finish()?;
     Ok(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn draw(map: ColorMap) -> Result<Image, SliceError> {
+        let empty = Topology::new();
+        let mut e = empty.edit();
+        e.activate([0, 0, 0]).unwrap();
+        let t = e.commit().unwrap().0;
+        let f = Field::new(&t, 1.0_f32);
+        render(&t, &f, Slice { axis: Axis::Z, position: 0, min: [0, 0], max: [7, 7] }, map)
+    }
+
+    #[test]
+    fn a_colour_map_with_no_usable_range_is_refused() {
+        for map in [
+            ColorMap::Diverging { limit: 0.0 },
+            ColorMap::Diverging { limit: -1.0 },
+            ColorMap::Diverging { limit: f64::NAN },
+            ColorMap::Diverging { limit: f64::INFINITY },
+            ColorMap::Sequential { min: 1.0, max: 1.0 },
+            ColorMap::Sequential { min: 2.0, max: 1.0 },
+            ColorMap::Sequential { min: f64::NAN, max: 1.0 },
+            ColorMap::Sequential { min: 0.0, max: f64::INFINITY },
+        ] {
+            // By text, since a NaN is not equal to itself.
+            let refused = match draw(map) {
+                Err(SliceError::BadColorMap(m)) => format!("{m:?}"),
+                other => format!("{other:?}"),
+            };
+            assert_eq!(refused, format!("{map:?}"));
+        }
+    }
+
+    #[test]
+    fn a_colour_map_with_a_range_draws() {
+        for map in
+            [ColorMap::Diverging { limit: 3.0 }, ColorMap::Sequential { min: -1.0, max: 1.0 }]
+        {
+            assert_eq!(draw(map).unwrap().rgba.len(), 8 * 8 * 4, "{map:?}");
+        }
+    }
 }

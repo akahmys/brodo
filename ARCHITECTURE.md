@@ -259,7 +259,8 @@ In `brodo`, each behind a cargo feature:
 - **A slice as PNG** (`brodo::slice`, feature `slice-png`, on by default), along x, y or z
   at a given position, one voxel to a pixel. Signed distances take a diverging colour map
   centred on zero, with the zero contour drawn one pixel wide; other scalars a sequential
-  one. The colour range is given by the caller, never inferred. A tile's voxels take its
+  one. The colour range is given by the caller, never inferred, and refused unless it is
+  finite and not empty. A tile's voxels take its
   value's colour, hatched; the background is a flat grey; a value that is not a number is
   magenta; with no per-voxel mask (B-011), nothing else is inactive. The same input gives
   the same bytes. The encoder is `png`, pure Rust. The slices kept as golden images are

@@ -20,6 +20,8 @@ lib brodo parallel::tests::a_stale_field_is_refused
 lib brodo parallel::tests::one_diffusion_step_matches_the_step_by_hand
 lib brodo parallel::tests::same_bits_at_any_thread_count
 lib brodo parallel::tests::the_lowest_failing_leaf_is_reported
+lib brodo slice::tests::a_colour_map_with_a_range_draws
+lib brodo slice::tests::a_colour_map_with_no_usable_range_is_refused
 lib brodo topology::tests::a_commit_keeps_no_arena_entry_a_merge_left
 lib brodo topology::tests::a_commit_leaves_the_old_topology_as_it_was
 lib brodo topology::tests::a_split_records_the_tile_each_new_part_came_from
