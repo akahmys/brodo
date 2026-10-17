@@ -260,8 +260,10 @@ In `brodo`, each behind a cargo feature:
   the same bytes. The encoder is `png`, pure Rust. The slices kept as golden images are
   written to `out/slices/` for a look by
   `cargo test -p brodo --test slice_images -- --ignored`.
-- **A field for ParaView**, in a VTK format chosen by B-012, written from the published
-  file-format documentation only.
+- **A field for ParaView**, written from the published file-format documentation only, as
+  one ASCII UnstructuredGrid (`.vtu`): a VTK_VOXEL cell per leaf voxel, a tile one cell of
+  its region's size, points shared, values as cell data (ADR-0018, B-012). Binary data
+  waits for its header's documentation.
 
 ### 6.2 `piatto`
 

@@ -8,10 +8,10 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: the spike `spikes/vtk/` measured the documented VTK formats for B-012 (its
-  `REPORT.md`); the answer is drafted as a proposed amendment to ADR-0018: one ASCII
-  UnstructuredGrid of VTK_VOXEL cells.
-- **Next**: the human accepts or changes the amendment; then the VTK output in `brodo`.
+- **Done**: the human accepted the ADR-0018 amendment answering B-012: one ASCII
+  UnstructuredGrid of VTK_VOXEL cells; ARCHITECTURE.md §6.1 follows it.
+- **Next**: the human decides on adding `out/` to `.betterleaks.toml` (below); then the VTK
+  output in `brodo`.
 - **Unresolved problems**: CODING.md L2 says the secret scan skips `target/` and `out/`,
   but `.betterleaks.toml` skips only `target/`; a Python environment under `out/` failed the
   gate, so it was moved to `target/`. Changing either is a change of rule, for the human.
@@ -71,7 +71,8 @@ kinds of user before the rest is built on them.
 - [x] Flood fill (§4.5); `Grid<T>` was built with the slice (ADR-0014)
 - [x] Checking output, V1 (ARCHITECTURE.md §6.1, ADR-0018): a slice as PNG, feature
       `slice-png` on by default, `png` approved; golden slice tests (TESTING.md §1)
-- [ ] Checking output, V2: a field for ParaView, B-012 answered first, by a spike
+- [ ] Checking output, V2: a field for ParaView as one ASCII `.vtu` (B-012 answered by
+      `spikes/vtk/`, ADR-0018)
 - [ ] Benchmarks and their first baselines (TESTING.md §1)
 - [ ] Retrospective and refactoring; fuzz round; Miri run
 - [ ] **Accepted when** flood fill, neighbour traversal and a double-buffered update work,
@@ -118,12 +119,11 @@ implementation (PLANNING.md §2).
 | B-005 | What is the archive profile's default compressor, and is it pure Rust (CODING.md Rule 12)? | Zstd, LZ4 when decompression speed is asked for; whether a pure-Rust implementation suffices is to be measured |
 | B-006 | Does `vdb-rs` pass Rules 12 and 13 (no C, permissive licence) on every target? | To be checked before it is added |
 | B-007 | Which harness runs the benchmarks? | None chosen |
-| B-012 | Which VTK format does the checking output write: a multiblock of rectilinear grids, one per leaf, or an unstructured grid? | Measured by `spikes/vtk/`: one ASCII UnstructuredGrid of VTK_VOXEL cells (ADR-0018 amendment, proposed) |
 | B-013 | Which crates handle `piatto`'s window, input and GUI parts? | `winit` and `egui`, to be measured against Rules 12 and 13 (ADR-0018) |
 | B-011 | Do dilation and erosion (§4.5) need a per-voxel active mask in each leaf? | None yet; a leaf has no per-voxel state now, and labelling works on values without one (ADR-0013) |
 
 No spike is running. `spikes/remap/` answered B-001 and B-008, and `spikes/merge/` B-010
-(ADR-0014).
+(ADR-0014); `spikes/vtk/` answered B-012 (ADR-0018).
 
 ## 4. Administrative items still open
 

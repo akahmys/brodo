@@ -1,6 +1,6 @@
 # ADR-0018: Visualisation is checking output in brodo and a viewer in a third crate, `piatto`
 
-- **Status**: Accepted
+- **Status**: Amended
 - **Date**: 2026-10-17
 
 ## Context
@@ -49,7 +49,6 @@ The crate list (ARCHITECTURE.md §2) and README name `piatto` before it exists; 
 ## Amendment
 
 - **Date**: 2026-10-17
-- **Status**: Proposed
 
 The spike `spikes/vtk/` answered B-012 (its `REPORT.md`). The published documentation
 read gave ImageData and UnstructuredGrid with ASCII data, but neither the multiblock nor the
