@@ -195,3 +195,18 @@ pub enum CacheError {
     #[error("the file is too large for its u32 fields")]
     TooLarge,
 }
+
+/// Why a slice could not be drawn or encoded (ARCHITECTURE.md §6.1).
+#[derive(Debug, thiserror::Error)]
+pub enum SliceError {
+    /// The field does not belong to the topology.
+    #[error(transparent)]
+    Field(#[from] FieldError),
+    /// The range drawn holds no pixel.
+    #[error("the slice's range holds no pixel")]
+    EmptyRange,
+    /// The PNG encoder refused the image.
+    #[cfg(feature = "slice-png")]
+    #[error(transparent)]
+    Encode(#[from] png::EncodingError),
+}

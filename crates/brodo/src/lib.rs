@@ -14,6 +14,8 @@ pub mod manifest;
 mod mapping;
 pub mod meta;
 pub mod parallel;
+#[cfg(feature = "slice-png")]
+pub mod slice;
 pub mod topology;
 pub mod tree;
 pub mod view;

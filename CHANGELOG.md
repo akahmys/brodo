@@ -34,6 +34,10 @@ are recorded here when they change (V6).
   on a condition on values, with 6- or 26-connectivity, tiles and the background
   included, each component saying whether it reaches the outside.
 
+- `brodo::slice` (feature `slice-png`, on by default): a slice of a scalar field drawn as an
+  image, with a diverging or sequential colour map over a range the caller gives, and
+  encoded as PNG.
+
 ### Breaking
 
 - `Field::remap` takes a merge rule: `remap(&remap, &uniform)` keeps the earlier behaviour.

@@ -31,5 +31,6 @@ papers, public documentation and permissively licensed code (S1, S2) may appear 
 | `crates/brodo/src/parallel.rs` | ARCHITECTURE.md §4.4, ADR-0015 only | the leaf-parallel update and the fixed-order reduction |
 | `crates/brodo/src/topology.rs` | ARCHITECTURE.md §4.2, ADR-0014 only; Morton order as bit interleaving | topologies: stamps, Morton numbering, the editor, `Remap` |
 | `crates/brodo/src/view.rs` | ARCHITECTURE.md §4.6, ADR-0016 only; `zerocopy`'s public API documentation (0.8.63) | `GridView`: checking a frozen grid whole and reading it in place |
+| `crates/brodo/src/slice.rs` | ARCHITECTURE.md §6.1, ADR-0018 only; `png`'s public API documentation (0.18.1) | a slice of a scalar field drawn and encoded as PNG |
 | `crates/brodo/src/tree.rs` | ARCHITECTURE.md §4.1, ADR-0013 only | the sparse tree: levels, masks, arenas, activation, tiles, their split and merge, iteration, compaction |
 | `crates/colino/src/lib.rs` | none | crate root |

@@ -9,9 +9,16 @@ publish.workspace = true
 
 [dependencies]
 memmap2.workspace = true
+png = { workspace = true, optional = true }
 rayon.workspace = true
 thiserror.workspace = true
 zerocopy.workspace = true
+
+[features]
+default = ["slice-png"]
+# The checking output's slices as PNG (ARCHITECTURE.md §6.1, ADR-0018); on by default, so
+# that the gate's tests cover it.
+slice-png = ["dep:png"]
 
 [dev-dependencies]
 proptest.workspace = true

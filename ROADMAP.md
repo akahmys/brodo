@@ -8,14 +8,13 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: connected-component labelling and flood fill (ADR-0013 amendment of
-  2026-10-17), on a condition on values, tiles and the background included, enclosed
-  background apart from the outside; checked against a breadth-first search on a dense
-  grid. Classifying each node's places once, and numbering empty places per node, took
-  the reference test's 24 cases from 4.9 s to 0.54 s in a release build (2026-10-17; not
-  by TESTING.md T5); labelling's own cost waits for the benchmarks.
-- **Next**: the checking output (§6.1), starting with the PNG encoder's approval and
-  B-012's spike.
+- **Done**: V1 of the checking output: `brodo::slice`, a slice drawn and encoded as PNG,
+  with golden images of a sphere's SDF, a torus's SDF and a field with tiles, compared as
+  decoded pixels. Looking at the first images (TESTING.md T8) showed the zero contour
+  broken into dashes; it now checks all four neighbours, and the old rule fails the golden
+  test.
+- **Next**: V2, B-012's spike in `spikes/vtk/`, with VTK's Python package in a virtual
+  environment under `out/`, which the human allowed.
 - **Unresolved problems**: none.
 
 ## 2. Milestones
@@ -71,9 +70,9 @@ kinds of user before the rest is built on them.
 - [x] `freeze` and `GridView` (§4.6); the cache profile (§4.7), its reader in
       `UNTRUSTED_INPUT` and fuzzed, its mapping module in `UNSAFE_MODULES`
 - [x] Flood fill (§4.5); `Grid<T>` was built with the slice (ADR-0014)
-- [ ] Checking output (ARCHITECTURE.md §6.1, ADR-0018): a slice as PNG and a field for
-      ParaView, behind cargo features; the PNG encoder approved first (§4), B-012 answered
-      first, by a spike; golden slice tests (TESTING.md §1)
+- [x] Checking output, V1 (ARCHITECTURE.md §6.1, ADR-0018): a slice as PNG, feature
+      `slice-png` on by default, `png` approved; golden slice tests (TESTING.md §1)
+- [ ] Checking output, V2: a field for ParaView, B-012 answered first, by a spike
 - [ ] Benchmarks and their first baselines (TESTING.md §1)
 - [ ] Retrospective and refactoring; fuzz round; Miri run
 - [ ] **Accepted when** flood fill, neighbour traversal and a double-buffered update work,
@@ -129,8 +128,7 @@ No spike is running. `spikes/remap/` answered B-001 and B-008, and `spikes/merge
 
 ## 4. Administrative items still open
 
-- Dependencies for P1, each to be approved before it is added (CODING.md Rule 20): a
-  pure-Rust PNG encoder for the checking output (ADR-0018). After
+- Dependencies, each to be approved before it is added (CODING.md Rule 20): after
   P1, for `piatto`: a GPU, window and GUI stack (B-013).
 - Before any distribution: confirm the licence terms for that form of distribution
   (ADR-0007).
