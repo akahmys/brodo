@@ -8,12 +8,12 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: `ValueAccessor` and `ValueAccessorMut` (ADR-0015 amendment of 2026-10-17),
-  caching the upper node, lower node and leaf-sized region last visited; writes go to
-  leaves only. Along a 7-point stencil a read took 4.8 ns against 7.5 ns for
-  `Field::value_at` (fastest of 50, two runs, Apple M5, 2026-10-17; not by TESTING.md T5).
-- **Next**: `freeze` and `GridView` (§4.6), which need `zerocopy` approved and the measure
-  that its derives pass `unsafe_code = "deny"` (§2, §4).
+- **Done**: the human approved `zerocopy`; 0.8.63 was added with its `derive` feature,
+  BSD-2-Clause OR Apache-2.0 OR MIT (`cargo info`, 2026-10-17; 0.9.0-alpha.0 is a
+  pre-release). Measured: its derives on a `#[repr(C, align(32))]` struct build and pass
+  clippy under the workspace's lints, `unsafe_code = "deny"` among them, while a
+  hand-written `unsafe` block in the same crate is refused; ADR-0008 holds as written.
+- **Next**: the plan for `freeze` and `GridView` (§4.6), agreed with the human.
 - **Unresolved problems**: none.
 
 ## 2. Milestones
@@ -41,7 +41,7 @@ kinds of user before the rest is built on them.
 **First: the spike and the slice**
 
 - [x] Dependencies for the slice approved by the human (CODING.md Rule 20): see §4
-- [ ] Measure that `zerocopy`'s derives pass `unsafe_code = "deny"`, which ADR-0008
+- [x] Measure that `zerocopy`'s derives pass `unsafe_code = "deny"`, which ADR-0008
       assumes; if not, amend ADR-0008 before `freeze`
 - [x] Spike `spikes/remap/` answers B-001 and B-008 by comparing designs; an ADR records
       the answer
@@ -111,8 +111,8 @@ No spike is running. `spikes/remap/` answered B-001 and B-008, and `spikes/merge
 
 ## 4. Administrative items still open
 
-- Dependencies for P1, each to be approved before it is added (CODING.md Rule 20):
-  `zerocopy`, a memory-mapping crate.
+- Dependencies for P1, each to be approved before it is added (CODING.md Rule 20): a
+  memory-mapping crate.
 - Before any distribution: confirm the licence terms for that form of distribution
   (ADR-0007).
 - Before registering on crates.io: `publish`, and each crate's description and keywords
