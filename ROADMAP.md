@@ -8,12 +8,12 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: the human accepted ADR-0018 (2026-10-17): checking output in `brodo` (a slice
-  as PNG, a field for ParaView) in P1, and a viewer crate, `piatto`, after P1.
-  ARCHITECTURE.md §1, §2, §3 and §6, TESTING.md (the Image and GPU tiers, T8), README and
-  this file follow it.
-- **Next**: U2 of `freeze`, the cache file, whose plan awaits its two decisions (metadata
-  in a separate `GridMeta`; the unit as an uninterpreted string).
+- **Done**: U2 of `freeze` (ADR-0016 amendment of 2026-10-17): `GridMeta` and `Bounds`,
+  and the cache file, format version 1, read into an aligned buffer and checked whole; its
+  reader, `crates/brodo/src/cache.rs`, is in `UNTRUSTED_INPUT`, with the fuzz target
+  `cache_file` (60 s, about 1.7 million runs, no finding; 2026-10-17). The bytes of
+  version 1 are committed in `crates/brodo/tests/data/cache_v1.bin`.
+- **Next**: U3, memory mapping (§4.7), once a mapping crate is approved (§4).
 - **Unresolved problems**: none.
 
 ## 2. Milestones

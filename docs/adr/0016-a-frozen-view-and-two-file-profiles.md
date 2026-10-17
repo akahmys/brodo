@@ -45,3 +45,15 @@ order, and node masks numbering children's places in Morton order, so that a chi
 found from its node's first child and a count of set bits, with no list of child numbers.
 The view's reader parses untrusted bytes, so it was listed in `UNTRUSTED_INPUT` and fuzzed
 (ADR-0009).
+
+## Amendment
+
+- **Date**: 2026-10-17 (second)
+
+Before the cache file was built, the human decided that a grid's metadata is a separate
+`GridMeta`, so that a solver writing `Topology` and `Field<T>` directly can write files as
+a single-field user can, and that the unit is a string brodo does not interpret, since
+units belong to its users (AGENTS.md S4). The cache profile's format version 1 was laid
+out in blocks, directory first, each grid's frozen buffer on a block boundary, and a
+reader accepts its own format version only, as for the frozen layout. The file reader
+parses untrusted bytes, so it was listed in `UNTRUSTED_INPUT` and fuzzed (ADR-0009).

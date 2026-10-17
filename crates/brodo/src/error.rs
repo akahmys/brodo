@@ -135,3 +135,63 @@ pub enum FormatError {
     #[error("the {0} section is inconsistent")]
     Inconsistent(&'static str),
 }
+
+/// Why a grid's metadata was refused.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+pub enum MetaError {
+    /// The unit is empty: a file always stores its physical size (ADR-0016).
+    #[error("the unit is empty")]
+    EmptyUnit,
+    /// A voxel size is not finite and positive.
+    #[error("a voxel size is not finite and positive")]
+    BadVoxelSize,
+    /// A transform entry is not finite.
+    #[error("a transform entry is not finite")]
+    BadTransform,
+}
+
+/// Why a cache file could not be written or read (ARCHITECTURE.md §4.7).
+#[derive(Debug, thiserror::Error)]
+pub enum CacheError {
+    /// Reading or writing the file failed.
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+    /// A grid could not be frozen.
+    #[error(transparent)]
+    Freeze(#[from] FreezeError),
+    /// A grid's metadata was refused.
+    #[error(transparent)]
+    Meta(#[from] MetaError),
+    /// The topology refused a lookup by number.
+    #[error(transparent)]
+    Tree(#[from] TreeError),
+    /// Not a cache file.
+    #[error("magic number {0:#010x} is not a cache file's")]
+    BadMagic(u32),
+    /// A format version this build does not read (ADR-0016).
+    #[error("cache format version {0} is not read by this build")]
+    UnsupportedVersion(u32),
+    /// The file ends before a part of it does.
+    #[error("the file ends before its {0} does")]
+    Truncated(&'static str),
+    /// A part of the file contradicts another, or overlaps one.
+    #[error("the file's {0} is inconsistent")]
+    Inconsistent(&'static str),
+    /// A string is not UTF-8.
+    #[error("a string in the {0} is not UTF-8")]
+    BadText(&'static str),
+    /// A grid's frozen buffer was refused.
+    #[error("grid {index}: {error}")]
+    Grid {
+        /// The grid's place in the file.
+        index: usize,
+        /// Why its buffer was refused.
+        error: FormatError,
+    },
+    /// No grid has this place in the file.
+    #[error("no grid numbered {0}")]
+    NoGrid(usize),
+    /// A length does not fit the format's `u32` fields.
+    #[error("the file is too large for its u32 fields")]
+    TooLarge,
+}

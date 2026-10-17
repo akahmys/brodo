@@ -3,12 +3,14 @@
 //! and fields are in place; the rest follows (ROADMAP.md, P1).
 
 pub mod accessor;
+pub mod cache;
 pub mod error;
 pub mod field;
 pub mod frozen;
 pub mod gather;
 pub mod grid;
 pub mod manifest;
+pub mod meta;
 pub mod parallel;
 pub mod topology;
 pub mod tree;

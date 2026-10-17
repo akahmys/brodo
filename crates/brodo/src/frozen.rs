@@ -92,7 +92,14 @@ pub(crate) struct LowerNode {
 /// A block of the buffer, so that the buffer is 32-byte aligned.
 #[derive(FromBytes, IntoBytes, Immutable, KnownLayout, Debug, Clone, Copy)]
 #[repr(C, align(32))]
-struct Block([u8; BLOCK]);
+pub(crate) struct Block([u8; BLOCK]);
+
+/// A 32-byte aligned copy of `bytes`, zero-padded to whole blocks.
+pub(crate) fn aligned(bytes: &[u8]) -> Vec<Block> {
+    let mut out = vec![Block([0; BLOCK]); bytes.len().div_ceil(BLOCK)];
+    out.as_mut_bytes()[..bytes.len()].copy_from_slice(bytes);
+    out
+}
 
 /// A frozen grid: the bytes of layout version 1, 32-byte aligned.
 #[derive(Debug, Clone)]

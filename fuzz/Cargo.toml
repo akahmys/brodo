@@ -24,3 +24,10 @@ path = "fuzz_targets/grid_view.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "cache_file"
+path = "fuzz_targets/cache_file.rs"
+test = false
+doc = false
+bench = false

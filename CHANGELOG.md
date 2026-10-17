@@ -23,6 +23,10 @@ are recorded here when they change (V6).
 - `brodo::frozen` and `brodo::view`: `freeze` packs a topology and a field into one 32-byte
   aligned buffer, read in place by `GridView` after it checks the buffer whole.
 - Frozen layout version 1 (TESTING.md V6); readers accept version 1 only (ADR-0016).
+- `brodo::meta` and `brodo::cache`: `GridMeta` and `Bounds`, and the cache profile's files
+  of grids with their metadata, written by `cache::write` and read and checked whole by
+  `CacheFile`.
+- Cache format version 1 (TESTING.md V6); readers accept version 1 only (ADR-0016).
 
 ### Breaking
 

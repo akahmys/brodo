@@ -180,6 +180,18 @@ fastest. A neighbour beyond the `i32` coordinate range is the background.
 - Common content: a header (magic number, format version, grid count); per grid, its
   name, value type, voxel size and unit, affine transform, bounding box and free
   key-value metadata; the topology; the values.
+- A grid's metadata is a `GridMeta`, apart from `Grid<T>`, so that any topology and field
+  can be written: a name, a voxel size per axis, a unit, a 3×4 affine transform from voxel
+  to world coordinates, and free string pairs. The unit is a non-empty UTF-8 string brodo
+  does not interpret; the voxel size and unit are always present. The bounding box is
+  worked out from the topology when a file is written; a grid with no leaf or tile has an
+  empty one, a variant of its own.
+- The cache profile, format version 1, in 32-byte blocks: a file header (magic number,
+  format version, grid count); a directory with each grid's metadata and frozen buffer
+  (offset and length) and value type; each grid's metadata, little-endian, strings as a
+  length and UTF-8 bytes padded to four; each grid's frozen buffer (§4.6) on a block
+  boundary. A reader checks the whole file, every grid's buffer included, before it
+  answers, and accepts its own format version only (ADR-0016).
 - The archive can decompress only the chunks a region needs, and can quantise values
   (16-bit float, 8-bit range), byte-shuffled before compression.
 - OpenVDB files (`.vdb`) are read through the `vdb-rs` crate into brodo's tree and written
