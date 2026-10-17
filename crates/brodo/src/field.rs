@@ -80,11 +80,18 @@ pub fn uniform<T: Value>(values: &[(T, u32)]) -> Option<T> {
 /// Voxels in a leaf, as a count.
 const LEAF_COUNT: u32 = 512;
 
-/// A voxel's index within its leaf, x fastest.
-fn local_index(v: Coord) -> usize {
+/// A voxel's place within its leaf, x fastest: below 512.
+#[inline]
+pub(crate) fn leaf_place(v: Coord) -> u32 {
     let [x, y, z] = v.map(|c| c.cast_unsigned() & 7);
+    x + 8 * y + 64 * z
+}
+
+/// A voxel's index within its leaf, x fastest.
+#[inline]
+pub(crate) fn local_index(v: Coord) -> usize {
     // Lossless: below 512.
-    (x + 8 * y + 64 * z) as usize
+    leaf_place(v) as usize
 }
 
 /// One value per voxel of a topology's leaves, one per tile, and a background.

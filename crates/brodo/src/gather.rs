@@ -3,7 +3,7 @@
 //! tile's value or the background. The width is one layer; B-002 is open.
 
 use crate::error::FieldError;
-use crate::field::{Field, LEAF_VOXELS, Value};
+use crate::field::{Field, LEAF_VOXELS, Value, local_index};
 use crate::manifest::Offset;
 use crate::topology::{LeafNumber, Location, Topology};
 
@@ -58,9 +58,8 @@ pub fn gather<T: Value>(
     let cells =
         (-1..=8_i32).flat_map(|z| (-1..=8).flat_map(move |y| (-1..=8).map(move |x| [x, y, z])));
     for (o, g) in out.iter_mut().zip(cells) {
-        let local = g.map(|c| c.rem_euclid(8).cast_unsigned() as usize);
         *o = match sources[block(g.map(|c| c.div_euclid(8)))] {
-            Source::Leaf(values) => values[local[0] + 8 * local[1] + 64 * local[2]],
+            Source::Leaf(values) => values[local_index(g)],
             Source::Value(v) => v,
         };
     }

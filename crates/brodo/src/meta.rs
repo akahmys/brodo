@@ -76,7 +76,7 @@ impl Bounds {
         }
         for n in t.tile_numbers() {
             let (level, o) = t.tile(n)?;
-            cubes.push((o, (1 << level.edge_log2()) - 1));
+            cubes.push((o, level.edge() - 1));
         }
         Ok(cubes.into_iter().fold(Bounds::Empty, |b, (o, e)| {
             let far = o.map(|c| c + e);

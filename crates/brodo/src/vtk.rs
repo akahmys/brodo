@@ -179,7 +179,7 @@ fn cells<T: VtkScalar>(t: &Topology, f: &Field<T>) -> Result<Vec<Cell<T>>, VtkEr
     }
     for n in t.tile_numbers() {
         let (level, origin) = t.tile(n)?;
-        out.push(Cell { origin, edge: 1 << level.edge_log2(), value: f.tile(t, n)? });
+        out.push(Cell { origin, edge: i64::from(level.edge()), value: f.tile(t, n)? });
     }
     match out.iter().find(|c| !c.value.readable()) {
         Some(c) => Err(VtkError::Infinite { origin: c.origin }),

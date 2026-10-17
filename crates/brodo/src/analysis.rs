@@ -11,9 +11,9 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::error::{FieldError, TreeError};
-use crate::field::{Field, Value};
+use crate::field::{Field, Value, leaf_place};
 use crate::topology::{Location, Topology};
-use crate::tree::{Coord, Place, TileLevel};
+use crate::tree::{Coord, Place, TileLevel, align, child_place};
 
 /// Which neighbours touch.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -212,15 +212,9 @@ enum Work {
     Mixed(Coord, usize, u32, [i32; 3]),
 }
 
-fn align(v: Coord, log2: u32) -> Coord {
-    v.map(|c| (c >> log2) << log2)
-}
-
 /// The place of the region at `o`, of the size at `level`, in its node, x fastest.
 fn place(o: Coord, level: usize) -> u32 {
-    let n = per_axis(level - 1).cast_unsigned();
-    let [x, y, z] = o.map(|c| (c >> LOG[level]).cast_unsigned() & (n - 1));
-    x + n * (y + n * z)
+    child_place(o, LOG[level], LOG[level - 1] - LOG[level])
 }
 
 /// The children per axis of a region at `level`.
@@ -285,10 +279,7 @@ impl Walk<'_> {
     fn classify(&mut self, r: Coord, level: usize) -> Kind {
         match (level, self.t.locate(r)) {
             (3, Location::Leaf(n)) => {
-                let local = r.map(|c| c.rem_euclid(8).cast_unsigned());
-                Kind::Uniform(
-                    self.voxel_base + n.get() * 512 + local[0] + 8 * local[1] + 64 * local[2],
-                )
+                Kind::Uniform(self.voxel_base + n.get() * 512 + leaf_place(r))
             }
             (2, Location::Leaf(_)) => Kind::Split,
             (_, Location::Tile(n, l)) if l.edge_log2() >= LOG[level] => {
@@ -543,10 +534,7 @@ impl Labels {
 
     fn unit_at(&self, t: &Topology, v: Coord) -> Option<u32> {
         match t.locate(v) {
-            Location::Leaf(n) => {
-                let local = v.map(|c| c.rem_euclid(8).cast_unsigned());
-                Some(self.voxel_base + n.get() * 512 + local[0] + 8 * local[1] + 64 * local[2])
-            }
+            Location::Leaf(n) => Some(self.voxel_base + n.get() * 512 + leaf_place(v)),
             Location::Tile(n, _) => Some(self.tile_base + n.get()),
             Location::Background if t.has_lower_node(v) => self
                 .empty

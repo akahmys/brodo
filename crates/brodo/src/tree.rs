@@ -22,16 +22,21 @@ const UPPER_SPAN_LOG2: u32 = LOWER_SPAN_LOG2 + UPPER_DIM_LOG2;
 
 /// The corner of the aligned cube of edge `2^log2` holding `v`, rounding toward negative
 /// infinity.
-fn align(v: Coord, log2: u32) -> Coord {
+pub(crate) fn align(v: Coord, log2: u32) -> Coord {
     v.map(|c| (c >> log2) << log2)
 }
 
 /// The index of the child holding `v` in a node of `2^dim_log2` children per edge whose
 /// children span `2^child_log2` voxels per edge, x fastest.
 fn child_index(v: Coord, child_log2: u32, dim_log2: u32) -> usize {
+    to_usize(child_place(v, child_log2, dim_log2))
+}
+
+/// `child_index` as a `u32`.
+pub(crate) fn child_place(v: Coord, child_log2: u32, dim_log2: u32) -> u32 {
     let mask = (1_u32 << dim_log2) - 1;
     let [x, y, z] = v.map(|c| (c.cast_unsigned() >> child_log2) & mask);
-    to_usize(x | (y << dim_log2) | (z << (2 * dim_log2)))
+    x | (y << dim_log2) | (z << (2 * dim_log2))
 }
 
 /// The origin of child `i` of a node at `origin`, inverting `child_index`.
@@ -233,6 +238,11 @@ impl TileLevel {
             TileLevel::Upper => LOWER_SPAN_LOG2,
             TileLevel::Lower => LEAF_LOG2,
         }
+    }
+
+    /// The edge, in voxels, of the region a tile at this level stands for.
+    pub(crate) fn edge(self) -> i32 {
+        1 << self.edge_log2()
     }
 
     /// The origin of the region at this level holding the voxel.
