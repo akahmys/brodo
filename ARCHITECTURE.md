@@ -206,7 +206,8 @@ fastest. A neighbour beyond the `i32` coordinate range is the background.
   (offset and length) and value type; each grid's metadata, little-endian, strings as a
   length and UTF-8 bytes padded to four; each grid's frozen buffer (§4.6) on a block
   boundary. A reader checks the whole file, every grid's buffer included, before it
-  answers, and accepts its own format version only (ADR-0016).
+  answers, and accepts its own format version only and only the bytes its writer puts:
+  no gap, zero padding and unused words, nothing after the last grid (ADR-0016).
 - A cache file is read by copying it into an aligned buffer (`CacheFile::read`) or by
   mapping it into memory without a copy (`CacheFile::map`); both go through one parser.
   Mapping is brodo's only unsafe code, in one module (ADR-0008); while a file is mapped,

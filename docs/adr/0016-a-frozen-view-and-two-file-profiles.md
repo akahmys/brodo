@@ -57,3 +57,18 @@ units belong to its users (AGENTS.md S4). The cache profile's format version 1 w
 out in blocks, directory first, each grid's frozen buffer on a block boundary, and a
 reader accepts its own format version only, as for the frozen layout. The file reader
 parses untrusted bytes, so it was listed in `UNTRUSTED_INPUT` and fuzzed (ADR-0009).
+
+## Amendment
+
+- **Date**: 2026-10-18
+
+A review found that the cache reader, though it "checks the whole file", accepted bytes
+the writer never puts: 64 bytes appended after the last grid, a gap before a part, a key
+twice in a grid's free metadata (the second value kept) and non-zero padding. The human
+decided that a reader accepts only the bytes the writer puts for what it read: each part
+at the block after the one before, nothing after the last grid, the header's and the
+directory's unused words zero, padding zero, and a grid's metadata equal to its
+re-encoding, which also refuses a key twice or out of order and an empty box's non-zero
+corners. Any other file is `CacheError::Inconsistent`, naming the part. The bytes written
+did not change, so the format version stayed 1 (TESTING.md V6); only files brodo did not
+write are refused.

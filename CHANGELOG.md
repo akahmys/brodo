@@ -9,6 +9,9 @@ are recorded here when they change (V6).
 - `brodo::slice::render` refuses a colour map whose range is not finite or is empty, with
   the new `SliceError::BadColorMap`; it drew such a range in no colour of its own. A
   `match` over `SliceError` needs the new arm.
+- The cache reader refuses a file with bytes its writer never puts: a gap, non-zero
+  padding or unused words, anything after the last grid, a metadata key twice or out of
+  order. Files brodo wrote still read; cache format version stays 1.
 
 ## 0.2.0 (2026-10-17)
 

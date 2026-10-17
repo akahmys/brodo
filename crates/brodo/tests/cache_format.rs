@@ -190,6 +190,58 @@ fn each_check_refuses_its_damage() {
     assert!(matches!(read(&zero), Err(CacheError::Meta(MetaError::BadVoxelSize))));
 }
 
+/// One grid's file, its metadata from block 2.
+fn one(name: &str, extra: &[(&str, &str)], leaves: &[Coord]) -> Vec<u8> {
+    let t = build(leaves, &[]);
+    let f = numbered(&t, 0.0_f32, |k| k as f32);
+    to_bytes(&[CacheEntry::new(&meta(name, extra), &t, &f).unwrap()]).unwrap()
+}
+
+#[test]
+fn only_the_bytes_the_writer_puts_are_read() {
+    let g = golden();
+    let read = |b: &[u8]| CacheFile::from_bytes(b).map(|_| ());
+    let meta_at = usize::try_from(word(&g, 8)).unwrap() * 32;
+    // Nothing after the last grid.
+    let mut longer = g.clone();
+    longer.extend_from_slice(&[0; 32]);
+    assert!(matches!(read(&longer), Err(CacheError::Inconsistent("end"))));
+    // The header's and the directory's unused words are zero.
+    assert!(matches!(read(&with_word(&g, 3, 1)), Err(CacheError::Inconsistent("header"))));
+    assert!(matches!(read(&with_word(&g, 13, 1)), Err(CacheError::Inconsistent("directory"))));
+    // No gap: the first metadata one block later, after the directory.
+    assert!(matches!(
+        read(&with_word(&g, 8, word(&g, 8) + 1)),
+        Err(CacheError::Inconsistent("metadata"))
+    ));
+    // The padding after the metadata is zero.
+    let small = one("g", &[], &[[0, 0, 0]]);
+    let small_end = 2 * 32 + usize::try_from(word(&small, 9)).unwrap();
+    assert!(!small_end.is_multiple_of(32), "the metadata needs padding");
+    let mut padded = small.clone();
+    padded[small_end] = 1;
+    assert!(matches!(read(&padded), Err(CacheError::Inconsistent("padding"))));
+    // A string's padding: "density" is 7 bytes, padded with one.
+    let mut text = g.clone();
+    text[meta_at + 4 + 7] = 1;
+    assert!(matches!(read(&text), Err(CacheError::Inconsistent("metadata"))));
+    // A key twice, or keys out of order.
+    let two = one("g", &[("ka", "1"), ("kb", "2")], &[[0, 0, 0]]);
+    let at = two.windows(2).position(|w| w == b"kb").unwrap();
+    let (mut twice, mut unordered) = (two.clone(), two.clone());
+    twice[at + 1] = b'a';
+    unordered[at + 1] = b'0';
+    assert!(read(&two).is_ok());
+    assert!(matches!(read(&twice), Err(CacheError::Inconsistent("metadata's keys"))));
+    assert!(matches!(read(&unordered), Err(CacheError::Inconsistent("metadata"))));
+    // An empty box's corners are zero: "e" and "mm" take 16 bytes, the floats 120, the
+    // box's kind 4; the corners follow.
+    let mut empty = one("e", &[], &[]);
+    assert!(read(&empty).is_ok());
+    empty[2 * 32 + 140] = 1;
+    assert!(matches!(read(&empty), Err(CacheError::Inconsistent("metadata"))));
+}
+
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(512))]
 

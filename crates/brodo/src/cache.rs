@@ -191,7 +191,9 @@ fn decode_meta(bytes: &[u8]) -> Result<(GridMeta, Bounds), CacheError> {
     let mut extra = std::collections::BTreeMap::new();
     for _ in 0..c.u32()? {
         let (k, v) = (c.string()?, c.string()?);
-        extra.insert(k, v);
+        if extra.insert(k, v).is_some() {
+            return Err(CacheError::Inconsistent("metadata's keys"));
+        }
     }
     if !c.rest.is_empty() {
         return Err(CacheError::Inconsistent("metadata"));
@@ -203,6 +205,11 @@ fn decode_meta(bytes: &[u8]) -> Result<(GridMeta, Bounds), CacheError> {
         transform: [[a0, a1, a2, a3], [b0, b1, b2, b3], [d0, d1, d2, d3]],
         extra,
     };
+    // Only the bytes brodo writes for what was read: string padding and an empty box's
+    // corners zero, keys in order.
+    if encode_meta(&meta, bounds)? != bytes {
+        return Err(CacheError::Inconsistent("metadata"));
+    }
     meta.check()?;
     Ok((meta, bounds))
 }
@@ -255,11 +262,12 @@ fn check_grid(bytes: &[u8], value_type: u32) -> Result<(), FormatError> {
     }
 }
 
-/// A range of `len` bytes from block `at`, after `after`, within `total`.
+/// A range of `len` bytes from block `at`, which must be byte `expected`, where the writer
+/// puts it, and end within `total`.
 fn range(
     at: u32,
     len: usize,
-    after: usize,
+    expected: usize,
     total: usize,
     what: &'static str,
 ) -> Result<std::ops::Range<usize>, CacheError> {
@@ -268,7 +276,7 @@ fn range(
         .and_then(|a| a.checked_mul(BLOCK))
         .ok_or(CacheError::Inconsistent(what))?;
     let end = start.checked_add(len).ok_or(CacheError::Inconsistent(what))?;
-    if start < after {
+    if start != expected {
         return Err(CacheError::Inconsistent(what));
     }
     if end > total {
@@ -277,14 +285,9 @@ fn range(
     Ok(start..end)
 }
 
-/// Checks a cache file's bytes whole: header, directory, every grid's metadata and frozen
-/// buffer, in order and without overlap. The bytes start on a 32-byte boundary.
-fn index(all: &[u8]) -> Result<Vec<Entry>, CacheError> {
-    if all.as_ptr().align_offset(BLOCK) != 0 {
-        return Err(CacheError::Inconsistent("alignment"));
-    }
-    let mut c = Cursor { rest: all, what: "header" };
-
+/// Reads the header block: the magic number, this build's format version, and unused
+/// words of zero. Returns the grid count.
+fn header(c: &mut Cursor<'_>) -> Result<u32, CacheError> {
     let magic = c.u32()?;
     if magic != MAGIC {
         return Err(CacheError::BadMagic(magic));
@@ -294,7 +297,21 @@ fn index(all: &[u8]) -> Result<Vec<Entry>, CacheError> {
         return Err(CacheError::UnsupportedVersion(version));
     }
     let count = c.u32()?;
-    c.take(BLOCK - 12)?;
+    if !zero(c.take(BLOCK - 12)?) {
+        return Err(CacheError::Inconsistent("header"));
+    }
+    Ok(count)
+}
+
+/// Checks a cache file's bytes whole: header, directory, every grid's metadata and frozen
+/// buffer, each where the writer puts it, with no gap, padding of zeros, and nothing after
+/// the last grid (ADR-0016). The bytes start on a 32-byte boundary.
+fn index(all: &[u8]) -> Result<Vec<Entry>, CacheError> {
+    if all.as_ptr().align_offset(BLOCK) != 0 {
+        return Err(CacheError::Inconsistent("alignment"));
+    }
+    let mut c = Cursor { rest: all, what: "header" };
+    let count = header(&mut c)?;
     c.what = "directory";
     let mut after = usize::try_from(count)
         .ok()
@@ -303,7 +320,11 @@ fn index(all: &[u8]) -> Result<Vec<Entry>, CacheError> {
         .ok_or(CacheError::Truncated("directory"))?;
     let mut grids = Vec::new();
     for index in 0..count {
-        let [meta_at, meta_len, grid_at, grid_blocks, value_type, ..] = [(); 8].map(|()| c.u32());
+        let [meta_at, meta_len, grid_at, grid_blocks, value_type, r0, r1, r2] =
+            [(); 8].map(|()| c.u32());
+        if [r0?, r1?, r2?] != [0; 3] {
+            return Err(CacheError::Inconsistent("directory"));
+        }
         let meta_len =
             usize::try_from(meta_len?).map_err(|_| CacheError::Inconsistent("directory"))?;
         let meta = range(meta_at?, meta_len, after, all.len(), "metadata")?;
@@ -311,7 +332,10 @@ fn index(all: &[u8]) -> Result<Vec<Entry>, CacheError> {
             .ok()
             .and_then(|b| b.checked_mul(BLOCK))
             .ok_or(CacheError::Inconsistent("directory"))?;
-        let grid = range(grid_at?, grid_len, meta.end, all.len(), "grid")?;
+        let grid = range(grid_at?, grid_len, meta.end.next_multiple_of(BLOCK), all.len(), "grid")?;
+        if !zero(all.get(meta.end..grid.start).ok_or(CacheError::Truncated("metadata"))?) {
+            return Err(CacheError::Inconsistent("padding"));
+        }
         let (meta, bounds) =
             decode_meta(all.get(meta.clone()).ok_or(CacheError::Truncated("metadata"))?)?;
         let value_type = value_type?;
@@ -321,7 +345,14 @@ fn index(all: &[u8]) -> Result<Vec<Entry>, CacheError> {
         after = grid.end;
         grids.push(Entry { meta, bounds, value_type, grid });
     }
+    if after != all.len() {
+        return Err(CacheError::Inconsistent("end"));
+    }
     Ok(grids)
+}
+
+fn zero(bytes: &[u8]) -> bool {
+    bytes.iter().all(|b| *b == 0)
 }
 
 impl CacheFile {
