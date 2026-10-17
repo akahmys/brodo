@@ -45,3 +45,18 @@ untrusted input.
 Measured the same day with Miri 0.1.0 (nightly of 2026-07-21), isolation disabled: the
 mapping tests, run with their `ignore` removed, stopped in `memmap2`'s call to `mmap` with
 "unsupported operation: Miri does not support file-backed memory mappings".
+
+## Amendment
+
+- **Date**: 2026-10-17 (P1's Miri run)
+
+T7 was run before P1 closed, with Miri 0.1.0 (nightly of 2026-07-21): the module's two
+tests, in `tests/cache_format.rs`, were ignored under Miri as decided above, so the run
+executed none of the module's unsafe code. Beyond T7, with isolation disabled, the rest of
+`cache_format` passed under Miri (six tests, 37 minutes). In `frozen_format`, Miri's
+Stacked Borrows model reported undefined behaviour in `crossbeam-epoch` 0.9.21
+(`internal.rs:567`), reached through `rayon-core` 1.13.0's work stealing when the test ran
+`freeze` in a pool of eight threads; no brodo code was on the stack. A run under Tree
+Borrows, to tell a fault of the model from one of the crate, was stopped unfinished after
+an hour, by the human's choice.
+

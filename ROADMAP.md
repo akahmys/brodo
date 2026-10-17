@@ -8,15 +8,15 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: P1's retrospective and refactoring (PLANNING.md §7): the rules and checks of
-  ADR-0001, -0003, -0019 and -0020; leaf places, alignment and tile edges computed once;
-  `Topology::leaf_voxels` and `TileLevel::edge` public (ADR-0014). A time limit on the
-  gate's tests was held.
-- **Next**: the fuzz round, 900 s per target (TESTING.md T6), and the Miri run (T7); then
-  P1's acceptance.
-- **Unresolved problems**: the leaf-parallel update's benchmark disagrees within a pair by
-  up to 17 %, near the 10 % tolerance; the load average during other work is not
-  measured, so whether 3.0 catches it is unknown (ADR-0019).
+- **Done**: P1's fuzz round: `cache_file` 17 284 165 runs and `grid_view` 22 397 870 runs in
+  901 s each, no finding (nightly of 2026-07-21, cargo-fuzz 0.13.2). P1's Miri run (T7):
+  the mapping tests are ignored under Miri, so it ran none of them (ADR-0008).
+- **Next**: a review of whether the audit checks what it claims to, asked for by the human
+  before P1 closes.
+- **Unresolved problems**: Miri's Stacked Borrows reported undefined behaviour in
+  `crossbeam-epoch` 0.9.21, under `rayon`, in `frozen_format` (ADR-0008); not settled.
+  The leaf-parallel update's benchmark disagrees within a pair by up to 17 %; whether a
+  load average of 3.0 catches other work is unknown (ADR-0019).
 
 ## 2. Milestones
 
@@ -76,7 +76,7 @@ kinds of user before the rest is built on them.
 - [x] Checking output, V2: a field for ParaView as one ASCII `.vtu` (B-012 answered by
       `spikes/vtk/`, ADR-0018)
 - [x] Benchmarks and their first baselines (TESTING.md §1)
-- [ ] Retrospective and refactoring (done); fuzz round; Miri run
+- [ ] Retrospective and refactoring (done); fuzz round (done); Miri run (done; see §1)
 - [ ] **Accepted when** flood fill, neighbour traversal and a double-buffered update work,
       the Reference and Format tiers for these parts pass, at least one golden slice test
       passes, and both examples still pass
