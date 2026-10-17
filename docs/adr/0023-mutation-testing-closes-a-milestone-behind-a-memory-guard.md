@@ -49,3 +49,27 @@ Closing a milestone takes hours more, run at rest. A mutant that only exhausts m
 counts as caught, since the guard's kill fails the test binary. Doctests run through
 rustdoc, outside the guard; brodo has none. Nothing checks that the run happened; the
 milestone's checklist lists it.
+
+## Amendment
+
+- **Date**: 2026-10-18
+
+A review found two gaps, and the human decided both.
+
+- `.cargo/mutants.toml` held the run's settings (`timeout_multiplier`, `output`) beside
+  the exclusions, so a setting of a rule could change with no ADR, since the file is not
+  a rule file. The settings moved into `mutants.py`, which passes them on the command
+  line; the file holds the exclusions only, and the gate fails on any other key or table.
+  Shown to fire: a `timeout_multiplier` line and a `[profile]` table each failed it.
+- `rss_guard.py` measured and killed the test binary alone, so a process it started
+  could grow unwatched and outlive it. The guard now sums and kills the binary with
+  every process descended from it, followed by parent pid, and kills those left when the
+  binary ends. It does not give the binary a session of its own: cargo-mutants puts cargo
+  in a process group and ends a timed-out test by `killpg(SIGTERM)` on that group
+  (`process/unix.rs` in 27.1.0), which a new session would escape. Shown to fire: a
+  grandchild allocating 3 GiB was killed with its parent at 1292 MiB, where the previous
+  guard let it reach 3084048 KiB; a `sleep` left by a parent that exited was killed, where
+  the previous guard left it running. No test of brodo starts a process: `cargo test` runs
+  13 binaries, none of them the benchmark, which does. `--run` on `manifest.rs` passed
+  again: 42 mutants in 7 minutes, the timeout 162 s from the command line's multiplier,
+  every binary logged by the guard.

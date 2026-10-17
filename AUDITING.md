@@ -39,7 +39,7 @@ grep -E '^echo "\[' scripts/audit/verify_compliance.sh
 | `cargo tree … -i cc` per member and target | 12 |
 | test files in `src/`, and `#[ignore]` reasons, direct or under `cfg_attr`, in every target | T1 |
 | `scripts/audit/documents.py`, and `cargo doc` with warnings denied | AGENTS.md writing rules 1, 2, 6, S3, and no `CLAUDE.md`; Rule 10 |
-| `scripts/audit/mutants.py`: each pattern in `.cargo/mutants.toml`'s `exclude_re` has a comment above it and excludes a mutant | T11 |
+| `scripts/audit/mutants.py`: `.cargo/mutants.toml` holds no setting, and each pattern in its `exclude_re` has a comment above it and excludes a mutant | T11 |
 | `cargo deny check` | 13 |
 | hooks installed; betterleaks over the tree and the history, personal rules, `scripts/audit/paths.py` (also: each of `OUTPUT_DIRS` git-ignored and in betterleaks' allow-list) | 14, L2 |
 | `cargo test --workspace` | TESTING.md §4 |

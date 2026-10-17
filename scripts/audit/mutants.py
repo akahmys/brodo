@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Mutation testing at a milestone's close (TESTING.md T11, ADR-0023).
 
-With no argument, the gate's check of `.cargo/mutants.toml`: every pattern in
+With no argument, the gate's check of `.cargo/mutants.toml`, which holds the exceptions
+and nothing else: every pattern in
 `exclude_re` is a single-quoted string on a line of its own, under a comment saying why
 the mutants it matches are equivalent, and excludes at least one mutant, by cargo-mutants'
 own regex engine. A pattern that matches nothing is stale, like an unfulfilled
@@ -16,6 +17,7 @@ that the timeout was the mutant's doing. ARGS go to cargo-mutants (`-f <file>`,
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -25,15 +27,26 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 CONFIG = ROOT / ".cargo" / "mutants.toml"
 OUT = ROOT / "out" / "mutants"
 GUARD = ROOT / "scripts" / "audit" / "rss_guard.py"
+# A key at the start of a line: the file holds the exceptions only, so that a setting of
+# the run, which is a rule, is changed here with an ADR (AGENTS.md, "Changing the rules").
+SETTING = re.compile(r"^\s*[\w.\-\[]+\s*(=|\])")
 # Thirty times the unmutated suite's largest peak, 32 MiB (2026-10-18, ADR-0023).
 GUARD_MIB = 1024
 # Two jobs: four, with no guard, took the machine down (ADR-0023).
 JOBS = 2
+# Twice the unmutated suite's time: each mutant still running then had already failed a
+# test (ADR-0023).
+TIMEOUT_MULTIPLIER = "2.0"
 
 
 def patterns() -> tuple[list[str], list[str]]:
     """The `exclude_re` patterns, and what is wrong with how they are written."""
     lines = CONFIG.read_text().splitlines()
+    settings = [n for n, l in enumerate(lines, start=1)
+                if SETTING.match(l) and not l.strip().startswith("exclude_re")]
+    if settings:
+        return [], [f"  .cargo/mutants.toml:{n}: a setting; only 'exclude_re' belongs here, "
+                    "the run's settings are in mutants.py" for n in settings]
     starts = [i for i, l in enumerate(lines) if l.strip().startswith("exclude_re")]
     if len(starts) != 1 or not lines[starts[0]].rstrip().endswith("["):
         return [], ["  .cargo/mutants.toml: no 'exclude_re = [' line"]
@@ -94,8 +107,11 @@ def run(args: list[str]) -> int:
     env["RSS_GUARD_MIB"] = str(GUARD_MIB)
     env["RSS_GUARD_LOG"] = str(log)
     env["TMPDIR"] = str(tmp)
-    subprocess.run(["cargo", "mutants", "--workspace", "-j", str(JOBS), *args], cwd=ROOT, env=env,
-                   check=False)
+    subprocess.run(
+        ["cargo", "mutants", "--workspace", "-j", str(JOBS), "--timeout-multiplier",
+         TIMEOUT_MULTIPLIER, "-o", str(OUT), *args],
+        cwd=ROOT, env=env, check=False,
+    )
     failures = verdict(OUT / "mutants.out")
     if not (log.exists() and log.read_text().strip()):
         failures.append("  rss_guard.py logged nothing: the test binaries ran unguarded")

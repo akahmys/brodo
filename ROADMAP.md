@@ -8,14 +8,20 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: the mutation-testing spike (`spikes/mutants/`) and TESTING.md T11: a mutation
-  run behind a memory guard closes each milestone (ADR-0023). Three of brodo's modules
-  were run, none missed but 3 equivalent mutants; the whole crate has not been run yet.
+- **Done**: a review's findings, checked by measurement, fixed in three units:
+  `slice::render` refuses a colour map with no finite, non-empty range (Rule 21); the
+  cache reader accepts only the bytes its writer puts (ADR-0016); the mutation run's
+  settings moved into `mutants.py` and its guard covers a test's descendants (ADR-0023).
+  The mutation-testing spike and TESTING.md T11 came before; the whole crate has not been
+  run yet.
 - **Next**: P2, `colino`.
 - **Unresolved problems**: Miri's Stacked Borrows reports undefined behaviour in
   `crossbeam-epoch` under rayon; Tree Borrows does not (ADR-0015). The leaf-parallel
   update's benchmark disagrees within a pair by up to 17 %; whether a load average of 3.0
-  catches other work is unknown (ADR-0019).
+  catches other work is unknown (ADR-0019). Allocating and dropping its output field
+  takes about a third of that item (1.04 of 3.3 ms, 2026-10-18, load 3.3), but the
+  update alone varied as much, so it is not shown to cause the spread. For P2: labelling
+  holds about 13 bytes per leaf voxel at its peak, to be measured at colino's sizes.
 
 ## 2. Milestones
 
