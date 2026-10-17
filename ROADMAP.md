@@ -8,8 +8,7 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: B-014 answered: rayon kept, the leaf-parallel work running in the caller's
-  pool, stated in ARCHITECTURE.md §4.4 (ADR-0015).
+- **Done**: the human kept the memory mapping after weighing its removal (ADR-0008).
 - **Next**: the remaining items before P1 closes: T7's scope under Miri, and which of the
   audit review's proposals to adopt.
 - **Unresolved problems**: Miri's Stacked Borrows reports undefined behaviour in

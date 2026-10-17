@@ -60,3 +60,18 @@ Stacked Borrows model reported undefined behaviour in `crossbeam-epoch` 0.9.21
 Borrows, to tell a fault of the model from one of the crate, was stopped unfinished after
 an hour, by the human's choice.
 
+## Amendment
+
+- **Date**: 2026-10-17 (the mapping kept)
+
+Since T7 runs none of the module's code under Miri, the human weighed removing the mapping,
+which would leave brodo with no unsafe code. Measured on an Apple M5 with a 5.4 MB cache
+file, reading it by copy took about 249 µs and mapping it about 15 µs; the mapping checks
+the file's structure and leaves the values unread until used. Estimated from the bytes per
+leaf (about 2.1 KB for one `f32` field) and the leaves of narrow-band spheres (about
+0.41 r²), a rocket engine of LEAP 71's published scale at print resolution (0.3 to 0.5 mm),
+or a 3000 mm mixed-flow pump with its near-wall region at 0.3 mm, reaches tens to hundreds
+of GB across its fields, beyond a workstation's memory, where a copy cannot open the file
+and a mapping reads only what is used. These are estimates on assumed surface areas and
+volumes, not measurements. The human decided to keep the mapping.
+
