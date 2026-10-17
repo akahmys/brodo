@@ -14,10 +14,8 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   argument. Opening a 40 MB file and reading a value took 3.7 ms by copy and 0.05 ms by
   mapping (fastest of 15, two runs, Apple M5, 2026-10-17; not by TESTING.md T5).
 - **Next**: flood fill (§4.5).
-- **Unresolved problems**: `cargo-miri` is not installed for nightly on this machine, so
-  whether Miri can run a file mapping was not measured; the mapping tests carry
-  `ignore` under Miri as ADR-0008 decided. Installing it downloads a toolchain component,
-  for the human to allow before the P1 Miri run (T7).
+- **Unresolved problems**: none. Miri was installed on nightly with the human's leave; it
+  cannot run a file mapping, as ADR-0008 assumed (measured 2026-10-17).
 
 ## 2. Milestones
 

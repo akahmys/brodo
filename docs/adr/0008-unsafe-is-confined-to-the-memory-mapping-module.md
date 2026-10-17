@@ -41,3 +41,7 @@ that another process changes or truncates a mapped file was accepted rather than
 since a lock would not hold across platforms: `CacheFile::map` states that the caller keeps
 the file unchanged while it is mapped, and the mapped bytes are still checked whole as
 untrusted input.
+
+Measured the same day with Miri 0.1.0 (nightly of 2026-07-21), isolation disabled: the
+mapping tests, run with their `ignore` removed, stopped in `memmap2`'s call to `mmap` with
+"unsupported operation: Miri does not support file-backed memory mappings".
