@@ -1,6 +1,6 @@
 # ADR-0008: Unsafe code is confined to one module, brodo's memory mapping, and run under Miri
 
-- **Status**: Accepted
+- **Status**: Amended
 - **Date**: 2026-10-16
 
 ## Context
@@ -27,3 +27,17 @@ itself is done by `zerocopy`, which needs no unsafe code in brodo.
 
 A second unsafe site needs this record amended. Until the module exists the list is empty
 and the rule is as strict as before.
+
+## Amendment
+
+- **Date**: 2026-10-17
+
+The module was created as `crates/brodo/src/mapping.rs`, listed in `UNSAFE_MODULES`; its
+one unsafe operation is `memmap2::Mmap::map`. Before it was written the human decided two
+points. Miri cannot map a real file, and the module has no other unsafe code to reach
+through a buffer, so its mapping tests are ignored under Miri with that reason; T7 still
+runs, and the module's soundness rests on its `SAFETY` argument, not on Miri. And the risk
+that another process changes or truncates a mapped file was accepted rather than guarded,
+since a lock would not hold across platforms: `CacheFile::map` states that the caller keeps
+the file unchanged while it is mapped, and the mapped bytes are still checked whole as
+untrusted input.

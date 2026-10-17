@@ -192,6 +192,10 @@ fastest. A neighbour beyond the `i32` coordinate range is the background.
   length and UTF-8 bytes padded to four; each grid's frozen buffer (§4.6) on a block
   boundary. A reader checks the whole file, every grid's buffer included, before it
   answers, and accepts its own format version only (ADR-0016).
+- A cache file is read by copying it into an aligned buffer (`CacheFile::read`) or by
+  mapping it into memory without a copy (`CacheFile::map`); both go through one parser.
+  Mapping is brodo's only unsafe code, in one module (ADR-0008); while a file is mapped,
+  the caller keeps it unchanged.
 - The archive can decompress only the chunks a region needs, and can quantise values
   (16-bit float, 8-bit range), byte-shuffled before compression.
 - OpenVDB files (`.vdb`) are read through the `vdb-rs` crate into brodo's tree and written

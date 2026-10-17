@@ -25,6 +25,7 @@ papers, public documentation and permissively licensed code (S1, S2) may appear 
 | `crates/brodo/src/grid.rs` | ARCHITECTURE.md §4.2, ADR-0014 only | a grid: one topology and one field, edited in one step |
 | `crates/brodo/src/lib.rs` | none | crate root |
 | `crates/brodo/src/manifest.rs` | ARCHITECTURE.md §4.3, ADR-0014 only | the leaf manifest: 26 directions and each leaf's neighbours |
+| `crates/brodo/src/mapping.rs` | ARCHITECTURE.md §4.7, ADR-0008 only; `memmap2`'s public API documentation (0.9.11) | mapping a file read-only: brodo's one unsafe operation |
 | `crates/brodo/src/meta.rs` | ARCHITECTURE.md §4.7, ADR-0016 only | a grid's metadata and bounding box |
 | `crates/brodo/src/parallel.rs` | ARCHITECTURE.md §4.4, ADR-0015 only | the leaf-parallel update and the fixed-order reduction |
 | `crates/brodo/src/topology.rs` | ARCHITECTURE.md §4.2, ADR-0014 only; Morton order as bit interleaving | topologies: stamps, Morton numbering, the editor, `Remap` |

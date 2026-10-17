@@ -220,3 +220,48 @@ proptest! {
         }
     }
 }
+
+fn tmp(name: &str) -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join(name)
+}
+
+#[test]
+#[cfg_attr(miri, ignore = "needs a real file mapping, which Miri cannot run")]
+fn a_mapped_file_reads_as_a_copied_one() {
+    let bytes = golden();
+    let path = tmp("golden_mapped.brdc");
+    std::fs::write(&path, &bytes).unwrap();
+    let (mapped, copied) = (CacheFile::map(&path).unwrap(), CacheFile::from_bytes(&bytes).unwrap());
+    assert_eq!(mapped.grid_count(), copied.grid_count());
+    for i in 0..copied.grid_count() {
+        assert_eq!(mapped.meta(i).unwrap(), copied.meta(i).unwrap());
+        assert_eq!(mapped.bounds(i).unwrap(), copied.bounds(i).unwrap());
+        assert_eq!(mapped.value_type(i).unwrap(), copied.value_type(i).unwrap());
+    }
+    let voxels = [[-1, 0, 0], [4096, 7, 9], [9, 9, 9], [0, 8200, 3], [50, 50, 50], [4100, 3, 15]];
+    let (a, b) = (mapped.view::<f32>(0).unwrap(), copied.view::<f32>(0).unwrap());
+    let (c, d) = (mapped.view::<[f32; 3]>(1).unwrap(), copied.view::<[f32; 3]>(1).unwrap());
+    for v in voxels {
+        assert_eq!(a.get(v).unwrap().to_bits(), b.get(v).unwrap().to_bits(), "at {v:?}");
+        assert_eq!(
+            c.get(v).unwrap().map(f32::to_bits),
+            d.get(v).unwrap().map(f32::to_bits),
+            "at {v:?}"
+        );
+    }
+}
+
+#[test]
+#[cfg_attr(miri, ignore = "needs a real file mapping, which Miri cannot run")]
+fn a_file_unfit_to_map_is_refused() {
+    let empty = tmp("empty.brdc");
+    std::fs::write(&empty, []).unwrap();
+    assert!(matches!(CacheFile::map(&empty), Err(CacheError::Inconsistent("length"))));
+    let odd = tmp("odd.brdc");
+    std::fs::write(&odd, [0_u8; 33]).unwrap();
+    assert!(matches!(CacheFile::map(&odd), Err(CacheError::Inconsistent("length"))));
+    let damaged = tmp("damaged.brdc");
+    std::fs::write(&damaged, with_word(&golden(), 0, 9)).unwrap();
+    assert!(matches!(CacheFile::map(&damaged), Err(CacheError::BadMagic(9))));
+    assert!(matches!(CacheFile::map(&tmp("missing.brdc")), Err(CacheError::Io(_))));
+}

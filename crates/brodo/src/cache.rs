@@ -218,10 +218,26 @@ struct Entry {
 }
 
 /// A cache file read into a 32-byte aligned buffer and checked whole.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct CacheFile {
-    blocks: Vec<Block>,
+    storage: Storage,
     grids: Vec<Entry>,
+}
+
+/// Where a read file's bytes are: copied into an aligned buffer, or mapped.
+#[derive(Debug)]
+enum Storage {
+    Copied(Vec<Block>),
+    Mapped(memmap2::Mmap),
+}
+
+impl Storage {
+    fn bytes(&self) -> &[u8] {
+        match self {
+            Storage::Copied(blocks) => blocks.as_bytes(),
+            Storage::Mapped(map) => map,
+        }
+    }
 }
 
 /// Checks a grid's frozen buffer with the type its directory names.
@@ -261,6 +277,53 @@ fn range(
     Ok(start..end)
 }
 
+/// Checks a cache file's bytes whole: header, directory, every grid's metadata and frozen
+/// buffer, in order and without overlap. The bytes start on a 32-byte boundary.
+fn index(all: &[u8]) -> Result<Vec<Entry>, CacheError> {
+    if all.as_ptr().align_offset(BLOCK) != 0 {
+        return Err(CacheError::Inconsistent("alignment"));
+    }
+    let mut c = Cursor { rest: all, what: "header" };
+
+    let magic = c.u32()?;
+    if magic != MAGIC {
+        return Err(CacheError::BadMagic(magic));
+    }
+    let version = c.u32()?;
+    if version != VERSION {
+        return Err(CacheError::UnsupportedVersion(version));
+    }
+    let count = c.u32()?;
+    c.take(BLOCK - 12)?;
+    c.what = "directory";
+    let mut after = usize::try_from(count)
+        .ok()
+        .and_then(|n| n.checked_add(1))
+        .and_then(|n| n.checked_mul(BLOCK))
+        .ok_or(CacheError::Truncated("directory"))?;
+    let mut grids = Vec::new();
+    for index in 0..count {
+        let [meta_at, meta_len, grid_at, grid_blocks, value_type, ..] = [(); 8].map(|()| c.u32());
+        let meta_len =
+            usize::try_from(meta_len?).map_err(|_| CacheError::Inconsistent("directory"))?;
+        let meta = range(meta_at?, meta_len, after, all.len(), "metadata")?;
+        let grid_len = usize::try_from(grid_blocks?)
+            .ok()
+            .and_then(|b| b.checked_mul(BLOCK))
+            .ok_or(CacheError::Inconsistent("directory"))?;
+        let grid = range(grid_at?, grid_len, meta.end, all.len(), "grid")?;
+        let (meta, bounds) =
+            decode_meta(all.get(meta.clone()).ok_or(CacheError::Truncated("metadata"))?)?;
+        let value_type = value_type?;
+        let index = usize::try_from(index).map_err(|_| CacheError::TooLarge)?;
+        check_grid(all.get(grid.clone()).ok_or(CacheError::Truncated("grid"))?, value_type)
+            .map_err(|error| CacheError::Grid { index, error })?;
+        after = grid.end;
+        grids.push(Entry { meta, bounds, value_type, grid });
+    }
+    Ok(grids)
+}
+
 impl CacheFile {
     /// Reads and checks a cache file.
     pub fn read(path: &Path) -> Result<Self, CacheError> {
@@ -273,46 +336,22 @@ impl CacheFile {
             return Err(CacheError::Inconsistent("length"));
         }
         let blocks = aligned(bytes);
-        let all = blocks.as_bytes();
-        let mut c = Cursor { rest: all, what: "header" };
-        let magic = c.u32()?;
-        if magic != MAGIC {
-            return Err(CacheError::BadMagic(magic));
+        let grids = index(blocks.as_bytes())?;
+        Ok(Self { storage: Storage::Copied(blocks), grids })
+    }
+
+    /// Maps a cache file into memory and checks it whole, without a copy. While the
+    /// returned value lives, the caller keeps the file unchanged: changing or truncating a
+    /// mapped file is undefined behaviour (ADR-0008).
+    pub fn map(path: &Path) -> Result<Self, CacheError> {
+        let file = std::fs::File::open(path)?;
+        let len = file.metadata()?.len();
+        if len == 0 || !len.is_multiple_of(BLOCK as u64) {
+            return Err(CacheError::Inconsistent("length"));
         }
-        let version = c.u32()?;
-        if version != VERSION {
-            return Err(CacheError::UnsupportedVersion(version));
-        }
-        let count = c.u32()?;
-        c.take(BLOCK - 12)?;
-        c.what = "directory";
-        let mut after = usize::try_from(count)
-            .ok()
-            .and_then(|n| n.checked_add(1))
-            .and_then(|n| n.checked_mul(BLOCK))
-            .ok_or(CacheError::Truncated("directory"))?;
-        let mut grids = Vec::new();
-        for index in 0..count {
-            let [meta_at, meta_len, grid_at, grid_blocks, value_type, ..] =
-                [(); 8].map(|()| c.u32());
-            let meta_len =
-                usize::try_from(meta_len?).map_err(|_| CacheError::Inconsistent("directory"))?;
-            let meta = range(meta_at?, meta_len, after, all.len(), "metadata")?;
-            let grid_len = usize::try_from(grid_blocks?)
-                .ok()
-                .and_then(|b| b.checked_mul(BLOCK))
-                .ok_or(CacheError::Inconsistent("directory"))?;
-            let grid = range(grid_at?, grid_len, meta.end, all.len(), "grid")?;
-            let (meta, bounds) =
-                decode_meta(all.get(meta.clone()).ok_or(CacheError::Truncated("metadata"))?)?;
-            let value_type = value_type?;
-            let index = usize::try_from(index).map_err(|_| CacheError::TooLarge)?;
-            check_grid(all.get(grid.clone()).ok_or(CacheError::Truncated("grid"))?, value_type)
-                .map_err(|error| CacheError::Grid { index, error })?;
-            after = grid.end;
-            grids.push(Entry { meta, bounds, value_type, grid });
-        }
-        Ok(Self { blocks, grids })
+        let map = crate::mapping::map(&file)?;
+        let grids = index(&map)?;
+        Ok(Self { storage: Storage::Mapped(map), grids })
     }
 
     fn entry(&self, i: usize) -> Result<&Entry, CacheError> {
@@ -343,7 +382,7 @@ impl CacheFile {
     pub fn view<T: Value>(&self, i: usize) -> Result<GridView<'_, T>, CacheError> {
         let e = self.entry(i)?;
         let bytes =
-            self.blocks.as_bytes().get(e.grid.clone()).ok_or(CacheError::Truncated("grid"))?;
+            self.storage.bytes().get(e.grid.clone()).ok_or(CacheError::Truncated("grid"))?;
         GridView::new(bytes).map_err(|error| CacheError::Grid { index: i, error })
     }
 }

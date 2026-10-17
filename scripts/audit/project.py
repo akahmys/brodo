@@ -24,7 +24,7 @@ UNTRUSTED_INPUT = ["crates/brodo/src/cache.rs", "crates/brodo/src/view.rs"]
 
 # The one file allowed to contain `unsafe` (Rule 4, ADR-0008): brodo's memory-mapping
 # module, once it exists. At most one entry.
-UNSAFE_MODULES = []
+UNSAFE_MODULES = ["crates/brodo/src/mapping.rs"]
 
 # The targets the project is built for (Rule 12). Adding one is a claim that it is.
 TARGETS = ["aarch64-apple-darwin", "x86_64-unknown-linux-gnu"]

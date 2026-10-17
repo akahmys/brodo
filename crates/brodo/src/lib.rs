@@ -10,6 +10,7 @@ pub mod frozen;
 pub mod gather;
 pub mod grid;
 pub mod manifest;
+mod mapping;
 pub mod meta;
 pub mod parallel;
 pub mod topology;

@@ -8,14 +8,16 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: U2 of `freeze` (ADR-0016 amendment of 2026-10-17): `GridMeta` and `Bounds`,
-  and the cache file, format version 1, read into an aligned buffer and checked whole; its
-  reader, `crates/brodo/src/cache.rs`, is in `UNTRUSTED_INPUT`, with the fuzz target
-  `cache_file` (60 s, about 1.7 million runs, no finding; 2026-10-17). The bytes of
-  version 1 are committed in `crates/brodo/tests/data/cache_v1.bin`.
-- **Next**: U3, memory mapping (§4.7): the human approved `memmap2` 0.9.11, MIT OR
-  Apache-2.0 (`cargo info`, 2026-10-17), added; the plan awaits the human.
-- **Unresolved problems**: none.
+- **Done**: U3 of `freeze` (ADR-0008 amendment of 2026-10-17): `CacheFile::map` reads a
+  cache file by memory mapping through the same parser as `CacheFile::read`; the mapping
+  is `crates/brodo/src/mapping.rs`, in `UNSAFE_MODULES`, one unsafe call under a `SAFETY`
+  argument. Opening a 40 MB file and reading a value took 3.7 ms by copy and 0.05 ms by
+  mapping (fastest of 15, two runs, Apple M5, 2026-10-17; not by TESTING.md T5).
+- **Next**: flood fill (§4.5).
+- **Unresolved problems**: `cargo-miri` is not installed for nightly on this machine, so
+  whether Miri can run a file mapping was not measured; the mapping tests carry
+  `ignore` under Miri as ADR-0008 decided. Installing it downloads a toolchain component,
+  for the human to allow before the P1 Miri run (T7).
 
 ## 2. Milestones
 
@@ -67,7 +69,7 @@ kinds of user before the rest is built on them.
 - [x] Tiles in full: merging, and tiles in the examples (§4.1); B-010 answered by
       `spikes/merge/` (ADR-0014)
 - [x] `ValueAccessor` (§4.4)
-- [ ] `freeze` and `GridView` (§4.6); the cache profile (§4.7), its reader in
+- [x] `freeze` and `GridView` (§4.6); the cache profile (§4.7), its reader in
       `UNTRUSTED_INPUT` and fuzzed, its mapping module in `UNSAFE_MODULES`
 - [ ] Flood fill (§4.5); `Grid<T>` was built with the slice (ADR-0014)
 - [ ] Checking output (ARCHITECTURE.md §6.1, ADR-0018): a slice as PNG and a field for

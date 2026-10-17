@@ -27,6 +27,8 @@ are recorded here when they change (V6).
   of grids with their metadata, written by `cache::write` and read and checked whole by
   `CacheFile`.
 - Cache format version 1 (TESTING.md V6); readers accept version 1 only (ADR-0016).
+- `CacheFile::map`: a cache file read by memory mapping, without a copy; the caller keeps
+  the file unchanged while it is mapped (ADR-0008).
 
 ### Breaking
 
