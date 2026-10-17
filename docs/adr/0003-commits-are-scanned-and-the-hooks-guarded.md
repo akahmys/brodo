@@ -27,7 +27,7 @@ readily when they fail.
 A command written to evade the Claude Code hook can pass it; the history scan in the
 audit is the backstop.
 
-## Amendment (2026-10-17)
+## Amendment (2026-10-17): `out/`
 
 CODING.md L2 already said that output and tool environments go under `target/` or `out/`
 and that the audit's scans skip both, but `.betterleaks.toml` skipped only `target/`. A
@@ -39,3 +39,13 @@ directory named `out/` at any depth, as the one for `target/` does, so a file co
 under such a directory would be skipped too; nothing checks that none is. Measured with a
 file holding an absolute path into a home directory: before the change the working-tree scan found it under
 `out/t3/` and `t3probe/`; after, under `t3probe/` and `t3probe/layout/` only.
+
+## Amendment (2026-10-17): one list of output directories
+
+P1's retrospective found that the mismatch above had stood unnoticed because each of the
+three places, `.gitignore`, `.betterleaks.toml` and the scans' skip lists, named the
+directories on its own. They were listed once, as `OUTPUT_DIRS` in
+`scripts/audit/project.py`, which `paths.py` and `documents.py` skip, and `paths.py` fails
+when one of them is missing from `.gitignore` or from `.betterleaks.toml`'s allow-list.
+Removing `out/` from the allow-list, and `/target/` from `.gitignore`, each failed it.
+

@@ -39,7 +39,7 @@ grep -E '^echo "\[' scripts/audit/verify_compliance.sh
 | test files in `src/` and `#[ignore]` reasons | T1 |
 | `scripts/audit/documents.py`, and `cargo doc` with warnings denied | AGENTS.md writing rules 1, 2, 6, S3, and no `CLAUDE.md`; Rule 10 |
 | `cargo deny check` | 13 |
-| hooks installed; betterleaks over the tree and the history, personal rules, `scripts/audit/paths.py` | 14 |
+| hooks installed; betterleaks over the tree and the history, personal rules, `scripts/audit/paths.py` (also: each of `OUTPUT_DIRS` git-ignored and in betterleaks' allow-list) | 14, L2 |
 | `cargo test --workspace` | TESTING.md §4 |
 
 **Two traps the script guards against.** A path in `clippy.toml` that resolves to nothing

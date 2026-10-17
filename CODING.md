@@ -42,6 +42,6 @@ The directories are listed in ARCHITECTURE.md §3.
 | Rule | Requirement | Enforced by |
 | :--- | :--- | :--- |
 | **L1** | Every workspace member is in `crates/`, or is `xtask/`. `spikes/` and `fuzz/` are never members (ADR-0006) | `scripts/audit/workspace.py` |
-| **L2** | Output, and the environments tools build (a Python virtual environment and the like), go under `target/` or `out/`, both git-ignored | nothing; the audit's document and secret scans skip only those directories, and fail on files elsewhere |
+| **L2** | Output, and the environments tools build (a Python virtual environment and the like), go under `target/` or `out/`, both git-ignored | `scripts/audit/paths.py`: the directories are listed once, as `OUTPUT_DIRS` in `scripts/audit/project.py`, and each is git-ignored and in `.betterleaks.toml`'s allow-list; the document, path and secret scans skip only those, and fail on files elsewhere. That output goes there, **nothing** |
 | **L3** | The root holds the documents AGENTS.md lists, the licence files, workspace and tool configuration, and `.claude/settings.json`. A new root directory is added to ARCHITECTURE.md §3 | nothing |
 | **L4** | A script lives in `scripts/audit/` (checks), `scripts/hooks/` (git and Claude Code hooks), or is an `xtask` subcommand | nothing |

@@ -19,8 +19,10 @@ import re
 import sys
 from pathlib import Path
 
+from project import OUTPUT_DIRS
+
 ROOT = Path(__file__).resolve().parent.parent.parent
-SKIP_DIRS = {".git", "target", "out"}
+SKIP_DIRS = {".git", *OUTPUT_DIRS}
 TEXT = {".md", ".rs", ".toml", ".py", ".sh", ".txt", ".json", ".yml", ".yaml"}
 
 PRESENT_TENSE = ["ARCHITECTURE.md", "AGENTS.md"]

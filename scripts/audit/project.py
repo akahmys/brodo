@@ -26,6 +26,11 @@ UNTRUSTED_INPUT = ["crates/brodo/src/cache.rs", "crates/brodo/src/view.rs"]
 # module, once it exists. At most one entry.
 UNSAFE_MODULES = ["crates/brodo/src/mapping.rs"]
 
+# Directories for output and the environments tools build (CODING.md L2): git-ignored,
+# skipped by the document and path scans and by betterleaks; `paths.py` holds the three
+# to this list.
+OUTPUT_DIRS = ["target", "out"]
+
 # The targets the project is built for (Rule 12). Adding one is a claim that it is.
 TARGETS = ["aarch64-apple-darwin", "x86_64-unknown-linux-gnu"]
 
