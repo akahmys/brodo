@@ -276,6 +276,10 @@ fn tile_source(
             return Ok(TileSource::Tile(t));
         }
         (TileLevel::Lower, Location::Leaf(n)) => parts.push(Part::Leaf(n)),
+        // No lower node there, and no tile (above): the whole region was the background.
+        (TileLevel::Upper, _) if !old.tree.has_lower_node(origin) => {
+            return Ok(TileSource::Background);
+        }
         (TileLevel::Upper, _) => upper_parts(old, origin, parts),
         (TileLevel::Lower | TileLevel::Root, Location::Background) => {
             return Ok(TileSource::Background);

@@ -378,6 +378,15 @@ impl Tree {
         }
     }
 
+    /// Whether a lower node holds the region of 128³ voxels holding the voxel: if not, and no
+    /// tile does, every voxel of that region is the background.
+    pub(crate) fn has_lower_node(&self, v: Coord) -> bool {
+        match self.root.get(&align(v, UPPER_SPAN_LOG2)) {
+            Some(RootEntry::Node(u)) => matches!(self.upper[to_usize(*u)].slot(v), Slot::Child(_)),
+            Some(RootEntry::Tile) | None => false,
+        }
+    }
+
     /// Makes the voxel's region a leaf, creating the nodes above it that are missing.
     /// Inside a tile it changes nothing (ADR-0013).
     pub fn activate(&mut self, v: Coord) -> Result<Activation, TreeError> {
