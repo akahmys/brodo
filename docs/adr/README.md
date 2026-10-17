@@ -51,3 +51,4 @@ A record is `Proposed` until the human accepts it.
 | [0021](0021-the-gate-covers-every-target-feature-set-and-way-to-ignore-a-test.md) | The gate covers every target, every feature set, and every way to ignore a test |
 | [0022](0022-every-test-is-listed-so-a-deleted-test-needs-an-adr.md) | Every test is listed, so that a deleted test needs an ADR |
 | [0023](0023-mutation-testing-closes-a-milestone-behind-a-memory-guard.md) | Mutation testing closes a milestone, behind a memory guard |
+| [0024](0024-the-euler-characteristic-counts-the-cells-each-lattice-vertex-owns.md) | The Euler characteristic counts the cells each lattice vertex owns |

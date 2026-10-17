@@ -162,8 +162,11 @@ fastest. A neighbour beyond the `i32` coordinate range is the background.
   is found by descending the levels with an explicit stack, never voxel by voxel over a
   large region. Components are numbered in the order of their first unit, so labels do
   not depend on anything but the input.
-- The Euler characteristic, summed from a table of 2×2×2 local patterns, computable per
-  leaf in parallel.
+- The Euler characteristic χ of the voxels meeting a condition (ADR-0024): of the closed
+  unit cubes under 26-connectivity, of the open ones under 6. Each lattice vertex owns
+  the cells on its positive side, so χ sums a table of its 2×2×2 pattern; vertices
+  touching a leaf are summed per leaf in parallel, the rest by descending the levels as
+  labelling does. A set holding the background is unbounded and refused.
 - Dilation and erosion, of topology and values.
 
 ### 4.6 Frozen view (ADR-0016)
