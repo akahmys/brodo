@@ -40,6 +40,28 @@ pub enum TreeError {
     /// More tiles than a `u32` numbers.
     #[error("more tiles than a u32 numbers")]
     TooManyTiles,
+    /// More merged parts in one commit than a `u32` numbers.
+    #[error("more merged parts than a u32 numbers")]
+    TooManyParts,
+    /// No child holds the voxel where a merge into a tile at this level was asked for.
+    #[error("nothing to merge into a {level:?} tile at voxel {voxel:?}")]
+    NotMergeable {
+        /// The level of the tile asked for.
+        level: TileLevel,
+        /// The voxel given.
+        voxel: Coord,
+    },
+    /// The node to merge holds a place with nothing in it (ADR-0014).
+    #[error("the node merging into a {level:?} tile at voxel {voxel:?} holds an empty place")]
+    HoldsEmpty {
+        /// The level of the tile asked for.
+        level: TileLevel,
+        /// The voxel given.
+        voxel: Coord,
+    },
+    /// Merging into a tile at this level is not built (ADR-0014).
+    #[error("merging into a {0:?} tile is not built")]
+    MergeUnsupported(TileLevel),
 }
 
 /// Why a field refused an access or a remap.
@@ -55,4 +77,7 @@ pub enum FieldError {
     /// A tile number its topology did not give.
     #[error("no tile numbered {0}")]
     UnknownTile(u32),
+    /// The merge rule refused the values of the new tile with this number.
+    #[error("the merge rule refused new tile {0}")]
+    MergeRefused(u32),
 }

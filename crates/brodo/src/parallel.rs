@@ -5,7 +5,7 @@
 use rayon::prelude::*;
 
 use crate::error::FieldError;
-use crate::field::{Field, LEAF_VOXELS};
+use crate::field::{Field, LEAF_VOXELS, Value};
 use crate::topology::{LeafNumber, Topology};
 
 /// Writes every leaf of `out` in parallel, calling `f` with the leaf's number and its 512
@@ -14,7 +14,7 @@ use crate::topology::{LeafNumber, Topology};
 /// failed, whatever the thread count.
 pub fn par_update<U, E, F>(t: &Topology, out: &mut Field<U>, f: F) -> Result<(), E>
 where
-    U: Copy + Send + Sync + 'static,
+    U: Value,
     E: Send + From<FieldError>,
     F: Fn(LeafNumber, &mut [U; LEAF_VOXELS]) -> Result<(), E> + Sync,
 {
@@ -36,7 +36,7 @@ pub fn par_reduce<T, A, M, C>(
     combine: C,
 ) -> Result<A, FieldError>
 where
-    T: Copy + Send + Sync + 'static,
+    T: Value,
     A: Send,
     M: Fn(LeafNumber, &[T; LEAF_VOXELS]) -> A + Sync,
     C: Fn(A, A) -> A,

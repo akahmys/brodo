@@ -2,8 +2,10 @@
 //! Editing a grid commits its topology and remaps its field in one step, so its field is
 //! never stale.
 
+use std::sync::Arc;
+
 use crate::error::{FieldError, TreeError};
-use crate::field::Field;
+use crate::field::{Field, MergeRule, Value, uniform};
 use crate::topology::{Topology, TopologyEditor};
 use crate::tree::Coord;
 
@@ -18,19 +20,34 @@ pub enum GridError {
     Field(#[from] FieldError),
 }
 
-/// One topology and one field on it.
-#[derive(Debug, Clone)]
+/// One topology and one field on it, with the rule its merges use.
+#[derive(Clone)]
 pub struct Grid<T> {
     topology: Topology,
     field: Field<T>,
+    rule: Arc<MergeRule<T>>,
 }
 
-impl<T: Copy + Send + Sync + 'static> Grid<T> {
-    /// An empty grid: every voxel the background.
+impl<T: std::fmt::Debug> std::fmt::Debug for Grid<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Grid")
+            .field("topology", &self.topology)
+            .field("field", &self.field)
+            .finish_non_exhaustive()
+    }
+}
+
+impl<T: Value> Grid<T> {
+    /// An empty grid: every voxel the background. Its merges use the same-bits rule.
     pub fn new(background: T) -> Self {
+        Self::with_rule(background, Arc::new(uniform::<T>))
+    }
+
+    /// An empty grid whose merges use `rule`.
+    pub fn with_rule(background: T, rule: Arc<MergeRule<T>>) -> Self {
         let topology = Topology::new();
         let field = Field::new(&topology, background);
-        Self { topology, field }
+        Self { topology, field, rule }
     }
 
     /// Its topology.
@@ -62,7 +79,7 @@ impl<T: Copy + Send + Sync + 'static> Grid<T> {
         let mut editor = self.topology.edit();
         let out = f(&mut editor)?;
         let (topology, remap) = editor.commit()?;
-        let field = self.field.remap(&remap)?;
+        let field = self.field.remap(&remap, &*self.rule)?;
         self.topology = topology;
         self.field = field;
         Ok(out)

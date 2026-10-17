@@ -227,11 +227,17 @@ impl TopologyEditor<'_> {
         self.tree.split_tile(v).map(|_| ())
     }
 
+    /// Merges the child holding the voxel into a tile at `level` (`Tree::merge`).
+    pub fn merge(&mut self, level: TileLevel, v: Coord) -> Result<(), TreeError> {
+        self.tree.merge(level, v)
+    }
+
     /// The edited topology, with a new stamp, and the remap to it from the old one. Where
     /// each new value comes from is found by locating each new leaf's and tile's origin in
-    /// the old topology.
+    /// the old topology, and each region a merged tile covers. The tree's arenas are
+    /// rebuilt, so nothing a merge left unreachable outlives the commit.
     pub fn commit(self) -> Result<(Topology, Remap), TreeError> {
-        let new = Topology::from_tree(self.tree)?;
+        let new = Topology::from_tree(self.tree.compacted()?)?;
         let leaves = new
             .leaves
             .iter()
@@ -241,21 +247,72 @@ impl TopologyEditor<'_> {
                 Location::Background => LeafSource::Background,
             })
             .collect();
-        let tiles = new.tiles.iter().map(|(_, o)| tile_source(self.old.locate(*o))).collect();
-        let remap = Remap { from: self.old.stamp, to: new.stamp, leaves, tiles };
+        let mut parts = Vec::new();
+        let tiles = new
+            .tiles
+            .iter()
+            .map(|(l, o)| tile_source(self.old, *l, *o, &mut parts))
+            .collect::<Result<_, _>>()?;
+        let remap = Remap { from: self.old.stamp, to: new.stamp, leaves, tiles, parts };
         Ok((new, remap))
     }
 }
 
-/// Where a new tile's value comes from, given what held its origin before.
-fn tile_source(old: Location) -> TileSource {
-    debug_assert!(
-        !matches!(old, Location::Leaf(_)),
-        "no edit turns a leaf into a tile until merges exist (B-010)"
-    );
-    match old {
-        Location::Tile(t, _) => TileSource::Tile(t),
-        Location::Leaf(_) | Location::Background => TileSource::Background,
+/// Leaf-sized regions in a lower node's region.
+const LOWER_REGIONS: u32 = 4096;
+
+/// Where a new tile at `level` and `origin` comes from, pushing a merged tile's parts.
+fn tile_source(
+    old: &Topology,
+    level: TileLevel,
+    origin: Coord,
+    parts: &mut Vec<Part>,
+) -> Result<TileSource, TreeError> {
+    let start = parts.len();
+    let was = old.locate(origin);
+    match (level, was) {
+        // The same tile, or a larger one it was split from.
+        (_, Location::Tile(t, l)) if l.edge_log2() >= level.edge_log2() => {
+            return Ok(TileSource::Tile(t));
+        }
+        (TileLevel::Lower, Location::Leaf(n)) => parts.push(Part::Leaf(n)),
+        (TileLevel::Upper, _) => upper_parts(old, origin, parts),
+        (TileLevel::Lower | TileLevel::Root, Location::Background) => {
+            return Ok(TileSource::Background);
+        }
+        (TileLevel::Lower | TileLevel::Root, Location::Tile(..))
+        | (TileLevel::Root, Location::Leaf(_)) => {
+            // A lower tile has no smaller tile, and nothing merges into a root tile.
+            debug_assert!(
+                matches!(was, Location::Background),
+                "no edit makes {level:?} from {was:?}"
+            );
+            return Ok(TileSource::Background);
+        }
+    }
+    // Only regions that were the background: an added tile, not a merge.
+    if parts.get(start..).unwrap_or(&[]).iter().all(|p| matches!(p, Part::Background(_))) {
+        parts.truncate(start);
+        return Ok(TileSource::Background);
+    }
+    let at = |i: usize| u32::try_from(i).map_err(|_| TreeError::TooManyParts);
+    Ok(TileSource::Merged(PartRange { start: at(start)?, end: at(parts.len())? }))
+}
+
+/// The parts of a new upper-level tile: what held each leaf-sized region of its lower
+/// node's region, the empty ones counted together.
+fn upper_parts(old: &Topology, origin: Coord, parts: &mut Vec<Part>) {
+    let mut empty = 0;
+    for i in 0..LOWER_REGIONS {
+        let at = [i % 16, i / 16 % 16, i / 256].map(|c| c.cast_signed() * 8);
+        match old.locate([origin[0] + at[0], origin[1] + at[1], origin[2] + at[2]]) {
+            Location::Leaf(n) => parts.push(Part::Leaf(n)),
+            Location::Tile(t, _) => parts.push(Part::Tile(t)),
+            Location::Background => empty += 1,
+        }
+    }
+    if empty > 0 {
+        parts.push(Part::Background(empty));
     }
 }
 
@@ -275,8 +332,29 @@ pub enum LeafSource {
 pub enum TileSource {
     /// An old tile: the same one, or a larger one it was split from.
     Tile(TileNumber),
+    /// The parts it merges, a range of `Remap::parts`.
+    Merged(PartRange),
     /// The background: it was added where nothing was.
     Background,
+}
+
+/// A range of a remap's parts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PartRange {
+    start: u32,
+    end: u32,
+}
+
+/// One source of a merged tile (ADR-0014).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Part {
+    /// An old leaf: 512 voxels.
+    Leaf(LeafNumber),
+    /// An old leaf-sized tile: 512 voxels of one value.
+    Tile(TileNumber),
+    /// This many leaf-sized regions that were the background: activated in the same commit
+    /// as the merge.
+    Background(u32),
 }
 
 /// From one topology's leaves and tiles to the next one's, made by a commit.
@@ -286,9 +364,16 @@ pub struct Remap {
     pub(crate) to: u64,
     leaves: Vec<LeafSource>,
     tiles: Vec<TileSource>,
+    parts: Vec<Part>,
 }
 
 impl Remap {
+    /// The parts of a merged tile's source; none for any other source or another remap's
+    /// range.
+    pub fn parts(&self, r: PartRange) -> &[Part] {
+        self.parts.get(r.start as usize..r.end as usize).unwrap_or(&[])
+    }
+
     /// Each new leaf's source, by new leaf number.
     pub fn leaf_sources(&self) -> &[LeafSource] {
         &self.leaves
@@ -396,6 +481,23 @@ mod tests {
         assert_eq!(neighbour(&t, at, [1, 0, 0]), Location::Background);
         assert_eq!(neighbour(&t, at, [0, -1, 0]), Location::Background);
         assert_eq!(neighbour(&t, at, [-1, 0, 0]), t.locate([i32::MAX - 8, i32::MIN, 0]));
+    }
+
+    #[test]
+    fn a_commit_keeps_no_arena_entry_a_merge_left() {
+        let (t1, _) = commit_with(&Topology::new(), |e| {
+            for x in 0..32 {
+                e.activate([x * 8, 0, 0]).unwrap();
+            }
+        });
+        let (t2, _) = commit_with(&t1, |e| {
+            for x in 0..16 {
+                e.merge(TileLevel::Lower, [x * 8, 0, 0]).unwrap();
+            }
+        });
+        assert_eq!(t1.tree.arena_lens(), [1, 2, 32]);
+        assert_eq!(t2.tree.arena_lens(), [1, 2, 16]);
+        assert_eq!((t2.leaf_count(), t2.tile_count()), (16, 16));
     }
 
     #[test]

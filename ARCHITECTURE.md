@@ -85,9 +85,10 @@ pub struct Field<T> {
   at each `commit`; tiles never share an origin, so the order is total. Leaf numbers, and
   so the order of field values, follow it. A voxel is located through the tree, then
   numbered.
-- `Grid<T>` binds one `Topology` and one `Field<T>` for single-field use. Its `edit` takes
-  the edits as a closure, commits them and remaps the field in one step; if any part fails,
-  the grid is unchanged.
+- `Grid<T>` binds one `Topology` and one `Field<T>` for single-field use, with the merge
+  rule chosen when it is made (the same-bits rule unless another is given). Its `edit`
+  takes the edits as a closure, commits them and remaps the field in one step; if any part
+  fails, the grid is unchanged.
 - Topology changes (activation, dilation, pruning, splitting and merging tiles) go
   through an editor (`TopologyEditor`) and take effect at `commit`, which returns a new
   topology and a `Remap` to it, and leaves the old topology usable. Every field on the old
@@ -99,8 +100,12 @@ pub struct Field<T> {
   was split from, or the background. For each new tile it records an old tile, the
   background, or the parts it merges: old leaves and old tiles, in one list for all merged
   tiles, each tile holding its range in it. A split leaf takes each field's own tile value.
-- A merge takes leaves and tiles at once; a region that holds nothing refuses it, so a
-  merge changes values, not which voxels are active.
+- A merge takes leaves and tiles at once, into a tile in a lower node (from a leaf) or in
+  an upper node (from a lower node); a region that holds nothing refuses it, so a merge
+  changes values, not which voxels are active. Merging into a root tile is not built.
+- An edit that removes a leaf or a node leaves its arena entry unreachable; `commit`
+  rebuilds the tree's arenas from what the root reaches, so nothing unreachable outlives
+  a commit.
 - A merged tile's value comes from a merge rule given to each field's remap, which sees
   each value with the number of voxels holding it, `Fn(&[(T, u32)]) -> Option<T>`; `None`
   refuses the merge, and so the commit's remap, with a typed error. brodo provides the
@@ -163,8 +168,9 @@ fastest. A neighbour beyond the `i32` coordinate range is the background.
 
 ### 4.8 Value types
 
-`f32`, `f64`, `u8`, `u32` and `[f32; 3]`, bounded by `zerocopy`'s traits, `Copy`, `Send`
-and `Sync`.
+`f32`, `f64`, `u8`, `u32` and `[f32; 3]`, the types implementing brodo's `Value` trait:
+`Copy`, `Send` and `Sync`, with a comparison by bits for merge rules, and `zerocopy`'s
+traits from `freeze` on (§4.6).
 
 ## 5. `colino` (ADR-0017)
 

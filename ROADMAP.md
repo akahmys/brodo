@@ -8,9 +8,11 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: the human accepted the ADR-0014 amendment answering B-010 from `spikes/merge/`;
-  ARCHITECTURE.md §4.2 follows it.
-- **Next**: merging in brodo (tiles in full, §2), once its plan is agreed.
+- **Done**: merging into lower- and upper-level tiles (ADR-0014 amendments of 2026-10-17),
+  with parts in `Remap`, a rule on values with voxel counts, and arenas rebuilt at each
+  commit; checked against the tree model, a model giving values by position, and a dense
+  grid. The spheres example prunes, down to a tile of 128³ voxels.
+- **Next**: `ValueAccessor` (§4.4).
 - **Unresolved problems**: none.
 
 ## 2. Milestones
@@ -60,7 +62,7 @@ kinds of user before the rest is built on them.
 
 **Then, in this order**
 
-- [ ] Tiles in full: merging, and tiles in the examples (§4.1); B-010 answered by
+- [x] Tiles in full: merging, and tiles in the examples (§4.1); B-010 answered by
       `spikes/merge/` (ADR-0014)
 - [ ] `ValueAccessor` (§4.4)
 - [ ] `freeze` and `GridView` (§4.6); the cache profile (§4.7), its reader in
@@ -115,4 +117,4 @@ No spike is running. `spikes/remap/` answered B-001 and B-008, and `spikes/merge
 - Before registering on crates.io: `publish`, and each crate's description and keywords
   naming its function (sparse volume, VDB, SDF, level set, voxel). Both names were found
   unregistered on 2026-10-16, per the design.
-- Requests from users: none yet.
+- Requests from users: none yet. Held until one asks: merging into a root tile (ADR-0014).

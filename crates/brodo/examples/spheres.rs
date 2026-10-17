@@ -7,8 +7,10 @@
 //! at +3 outside. The union is written here, in the example (ADR-0012).
 //!
 //! The second sphere's band crosses the first one's inside, so its tiles are split into
-//! leaves that start from the tile's value. The check: every voxel of a box holding both
-//! spheres has the bits of the clamped exact distance.
+//! leaves that start from the tile's value. The union then leaves some leaves at one value
+//! throughout, and pruning merges them into tiles. A larger sphere is pruned further: the
+//! lower nodes wholly inside merge into tiles of 128³ voxels. The check: every voxel of the
+//! union, and a sample of the larger sphere's, has the bits of the clamped exact distance.
 
 use std::error::Error;
 
@@ -32,9 +34,13 @@ struct Sphere {
 
 const FIRST: Sphere = Sphere { c: [0.0, 0.0, 0.0], r: 20.0 };
 const SECOND: Sphere = Sphere { c: [16.0, 4.0, 0.0], r: 14.0 };
+/// Large enough that the lower node's region [0, 128)³ lies wholly inside.
+const LARGE: Sphere = Sphere { c: [64.0, 64.0, 64.0], r: 120.0 };
 
 /// The leaf-sized regions to consider, by origin: they hold both spheres and their bands.
 const REGIONS: std::ops::Range<i32> = -4..6;
+/// The same for the large sphere.
+const LARGE_REGIONS: std::ops::Range<i32> = -8..24;
 
 fn distance(s: Sphere, v: Coord) -> f32 {
     let d = [0, 1, 2].map(|k| v[k] as f32 - s.c[k]);
@@ -72,9 +78,16 @@ fn classify(s: Sphere, o: Coord) -> Class {
     }
 }
 
-/// Every leaf-sized region's origin.
+/// Every leaf-sized region's origin in a range of region numbers.
+fn regions_in(r: std::ops::Range<i32>) -> impl Iterator<Item = Coord> {
+    r.clone().flat_map(move |z| {
+        let r = r.clone();
+        r.clone().flat_map(move |y| r.clone().map(move |x| [x * 8, y * 8, z * 8]))
+    })
+}
+
 fn regions() -> impl Iterator<Item = Coord> {
-    REGIONS.flat_map(|z| REGIONS.flat_map(move |y| REGIONS.map(move |x| [x * 8, y * 8, z * 8])))
+    regions_in(REGIONS)
 }
 
 /// One edit of the topology.
@@ -89,7 +102,15 @@ enum Edit {
 /// its band as leaves, splitting the tiles it meets, and its inside as tiles where nothing
 /// is.
 fn sphere_edits(s: Sphere, now: impl Fn(Coord) -> Location) -> Vec<Edit> {
-    regions()
+    sphere_edits_in(s, REGIONS, now)
+}
+
+fn sphere_edits_in(
+    s: Sphere,
+    range: std::ops::Range<i32>,
+    now: impl Fn(Coord) -> Location,
+) -> Vec<Edit> {
+    regions_in(range)
         .filter_map(|o| match (classify(s, o), now(o)) {
             (Class::Band, Location::Tile(..)) => Some(Edit::Split(o)),
             (Class::Band, Location::Background) => Some(Edit::Activate(o)),
@@ -149,19 +170,58 @@ fn build() -> Result<Grid<f32>, BoxError> {
     Ok(g)
 }
 
-/// Checks every voxel of the regions against the clamped exact distance of the union, and
-/// that the second sphere split some of the first one's tiles.
-fn check(g: &Grid<f32>) -> Result<(), BoxError> {
-    for o in regions() {
-        for i in 0..512 {
+/// Merges every leaf holding one value throughout into a tile; how many merged. The
+/// grid's same-bits rule checks each again at the commit.
+fn prune_leaves(g: &mut Grid<f32>) -> Result<usize, BoxError> {
+    let (t, f) = (g.topology(), g.field());
+    let mut uniform = Vec::new();
+    for n in t.leaf_numbers() {
+        let v = f.leaf(t, n)?;
+        if v.iter().all(|x| x.to_bits() == v[0].to_bits()) {
+            uniform.push(t.leaf_origin(n)?);
+        }
+    }
+    g.edit(|e| uniform.iter().try_for_each(|o| e.merge(TileLevel::Lower, *o)))?;
+    Ok(uniform.len())
+}
+
+/// The large sphere, its lower nodes wholly inside merged into tiles; how many merged.
+fn build_large() -> Result<(Grid<f32>, usize), BoxError> {
+    let mut g = Grid::new(BAND);
+    let edits = sphere_edits_in(LARGE, LARGE_REGIONS, |o| g.topology().locate(o));
+    g.edit(|e| apply(e, &edits))?;
+    union(&mut g, LARGE)?;
+    let t = g.topology();
+    let wholly_inside = |o: Coord| {
+        (0..4096).all(|i| {
+            let r = [o[0] + i % 16 * 8, o[1] + i / 16 % 16 * 8, o[2] + i / 256 * 8];
+            matches!(t.locate(r), Location::Tile(..))
+        })
+    };
+    let lowers: Vec<Coord> =
+        regions_in(-1..2).map(|o| o.map(|c| c * 16)).filter(|o| wholly_inside(*o)).collect();
+    g.edit(|e| lowers.iter().try_for_each(|o| e.merge(TileLevel::Upper, *o)))?;
+    Ok((g, lowers.len()))
+}
+
+/// Checks a sample of the large sphere's voxels against the clamped exact distance.
+fn check_large(g: &Grid<f32>) -> Result<(), BoxError> {
+    for o in regions_in(LARGE_REGIONS) {
+        for i in (0..512).step_by(37) {
             let v = voxel(o, i);
-            let want = clamped(distance(FIRST, v).min(distance(SECOND, v)));
-            let got = g.value_at(v)?;
+            let (want, got) = (clamped(distance(LARGE, v)), g.value_at(v)?);
             if got.to_bits() != want.to_bits() {
                 return Err(format!("{v:?}: {got} instead of {want}").into());
             }
         }
     }
+    Ok(())
+}
+
+/// Checks every voxel of the regions against the clamped exact distance of the union, and
+/// that the second sphere split some of the first one's tiles.
+fn check(g: &Grid<f32>) -> Result<(), BoxError> {
+    check_values(g)?;
     let split = regions()
         .filter(|o| classify(FIRST, *o) == Class::Inside)
         .filter(|o| matches!(g.topology().locate(*o), Location::Leaf(_)))
@@ -172,8 +232,33 @@ fn check(g: &Grid<f32>) -> Result<(), BoxError> {
     Ok(())
 }
 
+fn check_values(g: &Grid<f32>) -> Result<(), BoxError> {
+    for o in regions() {
+        for i in 0..512 {
+            let v = voxel(o, i);
+            let want = clamped(distance(FIRST, v).min(distance(SECOND, v)));
+            let got = g.value_at(v)?;
+            if got.to_bits() != want.to_bits() {
+                return Err(format!("{v:?}: {got} instead of {want}").into());
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Builds the union, checks it, prunes it and checks it again; then the large sphere.
+fn run() -> Result<[usize; 2], BoxError> {
+    let mut g = build()?;
+    check(&g)?;
+    let leaves = prune_leaves(&mut g)?;
+    check_values(&g)?;
+    let (large, lowers) = build_large()?;
+    check_large(&large)?;
+    Ok([leaves, lowers])
+}
+
 fn main() -> Result<(), BoxError> {
-    check(&build()?)
+    run().map(|_| ())
 }
 
 #[cfg(test)]
@@ -181,7 +266,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_union_matches_exact_distances() {
-        check(&build().unwrap()).unwrap();
+    fn exact_distances_before_and_after_pruning() {
+        let [leaves, lowers] = run().unwrap();
+        assert!(leaves > 0, "some leaves of the union merged");
+        assert!(lowers > 0, "some lower nodes of the large sphere merged");
     }
 }

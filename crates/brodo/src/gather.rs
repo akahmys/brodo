@@ -3,7 +3,7 @@
 //! tile's value or the background. The width is one layer; B-002 is open.
 
 use crate::error::FieldError;
-use crate::field::{Field, LEAF_VOXELS};
+use crate::field::{Field, LEAF_VOXELS, Value};
 use crate::manifest::Offset;
 use crate::topology::{LeafNumber, Location, Topology};
 
@@ -27,7 +27,7 @@ fn block(d: [i32; 3]) -> usize {
 }
 
 /// The sources of the leaf `n` and its 26 neighbours, by block.
-fn sources<'a, T: Copy + Send + Sync + 'static>(
+fn sources<'a, T: Value>(
     t: &Topology,
     f: &'a Field<T>,
     n: LeafNumber,
@@ -48,7 +48,7 @@ fn sources<'a, T: Copy + Send + Sync + 'static>(
 /// Copies leaf `n` of `f` and one layer around it into `out`, x fastest: the element for
 /// the voxel at (x, y, z) from the leaf's origin, each from -1 to 8, is at
 /// (x + 1) + 10 (y + 1) + 100 (z + 1).
-pub fn gather<T: Copy + Send + Sync + 'static>(
+pub fn gather<T: Value>(
     t: &Topology,
     f: &Field<T>,
     n: LeafNumber,

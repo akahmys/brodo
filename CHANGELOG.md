@@ -13,6 +13,14 @@ are recorded here when they change (V6).
 - `brodo::parallel` and `brodo::gather`: the leaf-parallel update, the fixed-order reduction,
   and the gather of a leaf with one ghost layer.
 - `brodo::grid`: `Grid<T>`, one topology and one field, edited and remapped in one step.
+- Merging: `Tree::merge` and `TopologyEditor::merge` into lower- and upper-level tiles,
+  `TileSource::Merged` with `Remap::parts`, `brodo::field::Value`, `MergeRule` and
+  `uniform`; `Grid::with_rule`. Commits rebuild the tree's arenas.
+
+### Breaking
+
+- `Field::remap` takes a merge rule: `remap(&remap, &uniform)` keeps the earlier behaviour.
+- Field values are bounded by `brodo::field::Value` instead of `Copy + Send + Sync`.
 
 ## 0.1.0 (2026-10-16)
 

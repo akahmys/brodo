@@ -106,3 +106,18 @@ leaves.
 
 A rule that refuses one tile refuses the whole commit, so code that prunes decides what
 is uniform before it commits. Merges into the upper nodes and the root were not measured.
+
+## Amendment
+
+- **Date**: 2026-10-17 (fourth)
+
+Before merging was built, the human decided three points. Merging into a root tile was
+left out: the spike measured one level above leaves, and listing a root tile's parts by
+leaf-sized region would visit about 1.3 × 10⁸ regions; it waits for a request. A `Value`
+trait, implemented for the value types of ARCHITECTURE.md §4.8, gives the same-bits rule
+its comparison, and is where `zerocopy`'s bounds go at `freeze`. `Grid<T>` holds its merge
+rule, chosen when it is made, since a single-field user keeps one rule.
+
+Unreachable arena entries left by merges were reclaimed by rebuilding the arenas at each
+commit, rather than by free lists: a free list makes every access to an arena fallible or
+panicking, which CODING.md Rule 2 forbids.

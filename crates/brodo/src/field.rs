@@ -5,11 +5,62 @@
 use std::iter::repeat_n;
 
 use crate::error::FieldError;
-use crate::topology::{LeafNumber, LeafSource, Location, Remap, TileNumber, TileSource, Topology};
+use crate::topology::{
+    LeafNumber, LeafSource, Location, Part, Remap, TileNumber, TileSource, Topology,
+};
 use crate::tree::Coord;
 
 /// Voxels in a leaf.
 pub const LEAF_VOXELS: usize = 512;
+
+/// A value a field holds (ARCHITECTURE.md §4.8).
+pub trait Value: Copy + Send + Sync + 'static {
+    /// Whether two values have the same bits.
+    fn same_bits(&self, other: &Self) -> bool;
+}
+
+impl Value for f32 {
+    fn same_bits(&self, other: &Self) -> bool {
+        self.to_bits() == other.to_bits()
+    }
+}
+
+impl Value for f64 {
+    fn same_bits(&self, other: &Self) -> bool {
+        self.to_bits() == other.to_bits()
+    }
+}
+
+impl Value for u8 {
+    fn same_bits(&self, other: &Self) -> bool {
+        self == other
+    }
+}
+
+impl Value for u32 {
+    fn same_bits(&self, other: &Self) -> bool {
+        self == other
+    }
+}
+
+impl Value for [f32; 3] {
+    fn same_bits(&self, other: &Self) -> bool {
+        self.iter().zip(other).all(|(a, b)| a.to_bits() == b.to_bits())
+    }
+}
+
+/// How a merged tile's value comes from the values it covers, each with the number of
+/// voxels holding it (ADR-0014); `None` refuses the merge.
+pub type MergeRule<T> = dyn Fn(&[(T, u32)]) -> Option<T> + Send + Sync;
+
+/// The merge rule that accepts only values with the same bits.
+pub fn uniform<T: Value>(values: &[(T, u32)]) -> Option<T> {
+    let (first, _) = *values.first()?;
+    values.iter().all(|(v, _)| v.same_bits(&first)).then_some(first)
+}
+
+/// Voxels in a leaf, as a count.
+const LEAF_COUNT: u32 = 512;
 
 /// A voxel's index within its leaf, x fastest.
 fn local_index(v: Coord) -> usize {
@@ -29,7 +80,7 @@ pub struct Field<T> {
     stamp: u64,
 }
 
-impl<T: Copy + Send + Sync + 'static> Field<T> {
+impl<T: Value> Field<T> {
     /// A field on `t` with every value the background.
     pub fn new(t: &Topology, background: T) -> Self {
         Self {
@@ -118,9 +169,24 @@ impl<T: Copy + Send + Sync + 'static> Field<T> {
         }
     }
 
+    /// The values a merged tile covers, each with its voxel count.
+    fn merged(&self, parts: &[Part]) -> Result<Vec<(T, u32)>, FieldError> {
+        let mut out = Vec::new();
+        for p in parts {
+            match *p {
+                Part::Leaf(n) => out.extend(self.leaf_slice(n)?.iter().map(|v| (*v, 1))),
+                Part::Tile(t) => out.push((self.tile_value(t)?, LEAF_COUNT)),
+                Part::Background(k) => out.push((self.background, LEAF_COUNT.saturating_mul(k))),
+            }
+        }
+        Ok(out)
+    }
+
     /// This field on the remap's new topology: each new leaf from its old leaf, from the
-    /// tile it was split from, or the background; each new tile likewise.
-    pub fn remap(&self, r: &Remap) -> Result<Field<T>, FieldError> {
+    /// tile it was split from, or the background; each new tile from its old tile, the
+    /// background, or `rule` applied to what it merges. Merged tiles are worked out in tile
+    /// order, so the error does not depend on the thread count.
+    pub fn remap(&self, r: &Remap, rule: &MergeRule<T>) -> Result<Field<T>, FieldError> {
         if self.stamp != r.from {
             return Err(FieldError::StaleField);
         }
@@ -139,9 +205,13 @@ impl<T: Copy + Send + Sync + 'static> Field<T> {
         let tile_values = r
             .tile_sources()
             .iter()
-            .map(|s| match *s {
+            .zip(0_u32..)
+            .map(|(s, i)| match *s {
                 TileSource::Tile(t) => self.tile_value(t),
                 TileSource::Background => Ok(self.background),
+                TileSource::Merged(range) => {
+                    rule(&self.merged(r.parts(range))?).ok_or(FieldError::MergeRefused(i))
+                }
             })
             .collect::<Result<Vec<T>, FieldError>>()?;
         Ok(Field { leaf_values, tile_values, background: self.background, stamp: r.to })
@@ -164,7 +234,7 @@ mod tests {
         let mut e = t1.edit();
         e.split_tile([300, 4000, 17]).unwrap();
         let (t2, r) = e.commit().unwrap();
-        let g = f.remap(&r).unwrap();
+        let g = f.remap(&r, &uniform).unwrap();
         assert_eq!(t2.tile_count(), 32767 + 4095);
         for n in t2.tile_numbers() {
             assert_eq!(g.tile(&t2, n).unwrap().to_bits(), 5.0_f32.to_bits());
@@ -172,6 +242,64 @@ mod tests {
         let leaf = g.leaf(&t2, LeafNumber(0)).unwrap();
         assert!(leaf.iter().all(|v| v.to_bits() == 5.0_f32.to_bits()));
         assert_eq!(g.value_at(&t2, [-1, 0, 0]).map(f32::to_bits), Ok(0.0_f32.to_bits()));
+    }
+
+    /// The voxel-weighted mean, exact here: values and counts are small integers.
+    fn mean(values: &[(f64, u32)]) -> Option<f64> {
+        let n: f64 = values.iter().map(|(_, c)| f64::from(*c)).sum();
+        Some(values.iter().map(|(v, c)| v * f64::from(*c)).sum::<f64>() / n)
+    }
+
+    #[test]
+    fn a_merge_weighs_each_value_by_its_voxels() {
+        let t0 = Topology::new();
+        let mut e = t0.edit();
+        for i in 0..4096 {
+            let r = [i % 16 * 8, i / 16 % 16 * 8, i / 256 * 8];
+            if i == 0 { e.activate(r).map(|_| ()) } else { e.add_tile(TileLevel::Lower, r) }
+                .unwrap();
+        }
+        let (t1, _) = e.commit().unwrap();
+        let mut f = Field::new(&t1, 0.0_f64);
+        for n in t1.tile_numbers().collect::<Vec<_>>() {
+            f.set_tile(&t1, n, 2.0).unwrap();
+        }
+        let leaf = t1.leaf_numbers().next().unwrap();
+        f.leaf_mut(&t1, leaf).unwrap().fill(4.0);
+        let mut e = t1.edit();
+        e.merge(TileLevel::Upper, [0, 0, 0]).unwrap();
+        let (t2, r) = e.commit().unwrap();
+        let g = f.remap(&r, &mean).unwrap();
+        // 4095 tiles of 512 voxels at 2 and one leaf of 512 at 4: 2 + 2 / 4096. Weighing
+        // each tile as one value would give 10 238 / 4607 instead.
+        let n = t2.tile_numbers().next().unwrap();
+        assert_eq!(g.tile(&t2, n).map(f64::to_bits), Ok((2.0 + 2.0 / 4096.0_f64).to_bits()));
+        let refused = f.remap(&r, &uniform);
+        assert_eq!(refused.map(|_| ()), Err(FieldError::MergeRefused(0)));
+    }
+
+    #[test]
+    fn regions_activated_in_the_merging_commit_count_as_the_background() {
+        let t0 = Topology::new();
+        let mut e = t0.edit();
+        for i in 0..2048 {
+            e.add_tile(TileLevel::Lower, [i % 16 * 8, i / 16 % 16 * 8, i / 256 * 8]).unwrap();
+        }
+        let (t1, _) = e.commit().unwrap();
+        let mut f = Field::new(&t1, 3.0_f32);
+        let mut e = t1.edit();
+        for i in 2048..4096 {
+            e.activate([i % 16 * 8, i / 16 % 16 * 8, i / 256 * 8]).unwrap();
+        }
+        e.merge(TileLevel::Upper, [0, 0, 0]).unwrap();
+        let (t2, r) = e.commit().unwrap();
+        let TileSource::Merged(range) = r.tile_sources()[0] else { panic!("merged") };
+        assert_eq!(r.parts(range).last(), Some(&Part::Background(2048)));
+        let g = f.remap(&r, &uniform).unwrap();
+        assert_eq!(g.value_at(&t2, [100, 100, 100]).map(f32::to_bits), Ok(3.0_f32.to_bits()));
+        let n = t1.tile_numbers().next().unwrap();
+        f.set_tile(&t1, n, 1.0).unwrap();
+        assert_eq!(f.remap(&r, &uniform).map(|_| ()), Err(FieldError::MergeRefused(0)));
     }
 
     #[test]
@@ -189,8 +317,8 @@ mod tests {
         assert_eq!(f.value_at(&t2, [0, 0, 0]).map(|_| ()), stale);
         assert_eq!(f.set_tile(&t2, TileNumber(0), 2), stale);
         assert_eq!(f.leaf_mut(&t2, LeafNumber(0)).map(|_| ()), stale);
-        let g = f.remap(&r).unwrap();
-        assert_eq!(g.remap(&r).map(|_| ()), stale, "a remap applies once");
+        let g = f.remap(&r, &uniform).unwrap();
+        assert_eq!(g.remap(&r, &uniform).map(|_| ()), stale, "a remap applies once");
         assert_eq!(g.value_at(&t2, [0, 0, 0]), Ok(1));
         assert_eq!(f.value_at(&t1, [0, 0, 0]), Ok(1), "the old pair still works");
     }

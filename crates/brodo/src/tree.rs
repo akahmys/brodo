@@ -152,6 +152,30 @@ macro_rules! internal_node {
             fn set_tile(&mut self, v: Coord) {
                 self.tiles.set(Self::index(v));
             }
+
+            /// Makes the place holding `v` a tile in place of its child, giving the child's
+            /// number, or nothing where there was no child.
+            fn child_to_tile(&mut self, v: Coord) -> Option<u32> {
+                let i = Self::index(v);
+                if !self.children.get(i) {
+                    return None;
+                }
+                let id = self.child_ids.remove(self.children.count_before(i));
+                self.children.clear(i);
+                self.tiles.set(i);
+                Some(id)
+            }
+
+            /// Each child's place and number, in place order.
+            fn children(&self) -> impl Iterator<Item = (usize, u32)> + '_ {
+                self.children.ones().zip(self.child_ids.iter().copied())
+            }
+
+            /// The same node with its children numbered `ids`, in place order.
+            fn with_ids(&self, ids: Vec<u32>) -> Self {
+                debug_assert_eq!(ids.len(), self.child_ids.len(), "one number per child");
+                Self { children: self.children.clone(), tiles: self.tiles.clone(), child_ids: ids }
+            }
         }
     };
 }
@@ -164,6 +188,13 @@ internal_node!(
     /// An internal node of 16³ children, each a leaf or a tile of 8³ voxels.
     Lower, LOWER_DIM_LOG2, LEAF_LOG2, 64
 );
+
+impl Lower {
+    /// Whether every place holds a leaf or a tile.
+    fn is_full(&self) -> bool {
+        self.children.count() + self.tiles.count() == 16 * 16 * 16
+    }
+}
 
 /// What the root holds for one upper node's region.
 #[derive(Debug, Clone, Copy)]
@@ -233,6 +264,8 @@ pub enum Activation {
 }
 
 /// The sparse tree: which regions are leaves, which are tiles, the rest the background.
+/// A merge leaves arena entries the root no longer reaches; queries walk from the root, and
+/// `compacted` drops them.
 #[derive(Debug, Clone, Default)]
 pub struct Tree {
     root: BTreeMap<Coord, RootEntry>,
@@ -254,17 +287,34 @@ impl Tree {
         Self { root: BTreeMap::new(), upper: Vec::new(), lower: Vec::new(), leaves: Vec::new() }
     }
 
+    /// The upper nodes the root reaches, with their origins, by root key.
+    fn reached_upper(&self) -> impl Iterator<Item = (Coord, &Upper)> + '_ {
+        self.root.iter().filter_map(|(key, entry)| match entry {
+            RootEntry::Node(u) => Some((*key, &self.upper[to_usize(*u)])),
+            RootEntry::Tile => None,
+        })
+    }
+
+    /// The lower nodes the root reaches, with their origins, in walking order.
+    fn reached_lower(&self) -> impl Iterator<Item = (Coord, &Lower)> + '_ {
+        self.reached_upper().flat_map(move |(o, node)| {
+            node.children().map(move |(i, l)| {
+                (child_origin(o, i, LOWER_SPAN_LOG2, UPPER_DIM_LOG2), &self.lower[to_usize(l)])
+            })
+        })
+    }
+
     /// The number of leaves.
     pub fn leaf_count(&self) -> usize {
-        self.leaves.len()
+        self.reached_lower().map(|(_, n)| n.children.count()).sum()
     }
 
     /// The number of tiles at a level.
     pub fn tile_count(&self, level: TileLevel) -> usize {
         match level {
             TileLevel::Root => self.root.values().filter(|e| matches!(e, RootEntry::Tile)).count(),
-            TileLevel::Upper => self.upper.iter().map(|n| n.tiles.count()).sum(),
-            TileLevel::Lower => self.lower.iter().map(|n| n.tiles.count()).sum(),
+            TileLevel::Upper => self.reached_upper().map(|(_, n)| n.tiles.count()).sum(),
+            TileLevel::Lower => self.reached_lower().map(|(_, n)| n.tiles.count()).sum(),
         }
     }
 
@@ -273,9 +323,12 @@ impl Tree {
         self.leaves.get(to_usize(leaf.0)).copied().ok_or(TreeError::UnknownLeaf(leaf.0))
     }
 
-    /// Every leaf with its origin, in the order the leaves were made.
+    /// Every leaf with its origin, by root key, then by place in each node.
     pub fn leaves(&self) -> impl Iterator<Item = (LeafId, Coord)> + '_ {
-        self.leaves.iter().zip(0_u32..).map(|(o, i)| (LeafId(i), *o))
+        self.reached_lower().flat_map(move |(o, node)| {
+            node.children()
+                .map(move |(j, id)| (LeafId(id), child_origin(o, j, LEAF_LOG2, LOWER_DIM_LOG2)))
+        })
     }
 
     /// Every tile with its level and origin, by root key, then by place in each node.
@@ -294,8 +347,8 @@ impl Tree {
         let node = &self.upper[to_usize(u)];
         let at = |i| child_origin(origin, i, LOWER_SPAN_LOG2, UPPER_DIM_LOG2);
         out.extend(node.tiles.ones().map(|i| (TileLevel::Upper, at(i))));
-        for (i, l) in node.children.ones().zip(&node.child_ids) {
-            let lower = &self.lower[to_usize(*l)];
+        for (i, l) in node.children() {
+            let lower = &self.lower[to_usize(l)];
             let o = at(i);
             out.extend(
                 lower
@@ -400,6 +453,67 @@ impl Tree {
             Slot::Tile => self.new_leaf(l, v),
             Slot::Empty | Slot::Child(_) => Err(TreeError::NotATile(v)),
         }
+    }
+
+    /// Merges the child holding the voxel into a tile at `level`: a leaf into a tile in its
+    /// lower node (`Lower`), or a lower node into a tile in its upper node (`Upper`), which
+    /// every place of the lower node must fill, with leaves or tiles (ADR-0014). Merging into
+    /// a root tile is not built. The merged child's arena entries become unreachable.
+    pub fn merge(&mut self, level: TileLevel, v: Coord) -> Result<(), TreeError> {
+        if level == TileLevel::Root {
+            return Err(TreeError::MergeUnsupported(level));
+        }
+        let none = TreeError::NotMergeable { level, voxel: v };
+        let u = match self.root.get(&align(v, UPPER_SPAN_LOG2)) {
+            Some(RootEntry::Node(u)) => *u,
+            Some(RootEntry::Tile) | None => return Err(none),
+        };
+        let l = match self.upper[to_usize(u)].slot(v) {
+            Slot::Child(l) => l,
+            Slot::Tile | Slot::Empty => return Err(none),
+        };
+        match level {
+            TileLevel::Root => Err(none),
+            TileLevel::Upper if !self.lower[to_usize(l)].is_full() => {
+                Err(TreeError::HoldsEmpty { level, voxel: v })
+            }
+            TileLevel::Upper => {
+                self.upper[to_usize(u)].child_to_tile(v);
+                Ok(())
+            }
+            TileLevel::Lower => self.lower[to_usize(l)].child_to_tile(v).map(|_| ()).ok_or(none),
+        }
+    }
+
+    /// The same tree with arenas holding only what the root reaches, numbered in walking
+    /// order.
+    pub fn compacted(&self) -> Result<Tree, TreeError> {
+        let mut out = Tree::new();
+        for (key, entry) in &self.root {
+            let RootEntry::Node(u) = entry else {
+                out.root.insert(*key, RootEntry::Tile);
+                continue;
+            };
+            let mut lowers = Vec::new();
+            for (_, l) in self.upper[to_usize(*u)].children() {
+                let lower = &self.lower[to_usize(l)];
+                let mut ids = Vec::new();
+                for (_, leaf) in lower.children() {
+                    ids.push(push(&mut out.leaves, self.leaves[to_usize(leaf)], NodeKind::Leaf)?);
+                }
+                lowers.push(push(&mut out.lower, lower.with_ids(ids), NodeKind::Lower)?);
+            }
+            let node = self.upper[to_usize(*u)].with_ids(lowers);
+            let id = push(&mut out.upper, node, NodeKind::Upper)?;
+            out.root.insert(*key, RootEntry::Node(id));
+        }
+        Ok(out)
+    }
+
+    /// The arena lengths: upper nodes, lower nodes, leaves.
+    #[cfg(test)]
+    pub(crate) fn arena_lens(&self) -> [usize; 3] {
+        [self.upper.len(), self.lower.len(), self.leaves.len()]
     }
 
     /// The place holding `v` in upper node `u` is a tile: it becomes a lower node of tiles,
@@ -518,6 +632,61 @@ mod tests {
     }
 
     #[test]
+    fn merges_take_leaves_and_tiles_and_refuse_an_empty_place() {
+        let mut t = Tree::new();
+        t.activate([0, 0, 0]).unwrap();
+        t.merge(TileLevel::Lower, [3, 3, 3]).unwrap();
+        assert_eq!(t.probe([0, 0, 0]), Probe::Tile(TileLevel::Lower));
+        assert_eq!(t.leaf_count(), 0);
+        let none = TreeError::NotMergeable { level: TileLevel::Lower, voxel: [0, 0, 0] };
+        assert_eq!(t.merge(TileLevel::Lower, [0, 0, 0]), Err(none));
+        let empty = TreeError::HoldsEmpty { level: TileLevel::Upper, voxel: [0, 0, 0] };
+        assert_eq!(t.merge(TileLevel::Upper, [0, 0, 0]), Err(empty));
+        for i in 1..4096 {
+            let v = [i % 16 * 8, i / 16 % 16 * 8, i / 256 * 8];
+            if i % 2 == 0 { t.activate(v).map(|_| ()) } else { t.add_tile(TileLevel::Lower, v) }
+                .unwrap();
+        }
+        t.merge(TileLevel::Upper, [127, 0, 64]).unwrap();
+        assert_eq!(t.probe([5, 120, 9]), Probe::Tile(TileLevel::Upper));
+        assert_eq!(
+            (t.leaf_count(), t.tile_count(TileLevel::Lower), t.tile_count(TileLevel::Upper)),
+            (0, 0, 1)
+        );
+        assert_eq!(
+            t.merge(TileLevel::Root, [0, 0, 0]),
+            Err(TreeError::MergeUnsupported(TileLevel::Root))
+        );
+    }
+
+    #[test]
+    fn compaction_drops_what_the_root_no_longer_reaches() {
+        let mut t = Tree::new();
+        for x in 0..40 {
+            t.activate([x * 8, 0, 0]).unwrap();
+        }
+        // 40 leaves over three lower nodes; the first node's 16 merge into tiles.
+        for x in 0..16 {
+            t.merge(TileLevel::Lower, [x * 8, 0, 0]).unwrap();
+        }
+        assert_eq!(t.arena_lens(), [1, 3, 40]);
+        let c = t.compacted().unwrap();
+        assert_eq!(c.arena_lens(), [1, 3, 24]);
+        let walk = |t: &Tree| -> Vec<Coord> { t.leaves().map(|(_, o)| o).collect() };
+        assert_eq!(walk(&c), walk(&t));
+        assert_eq!(c.tiles(), t.tiles());
+        for x in -1..60 {
+            let v = [x * 4, 1, 2];
+            let kind = |p: Probe| match p {
+                Probe::Leaf(_) => None,
+                Probe::Tile(l) => Some(Some(l)),
+                Probe::Background => Some(None),
+            };
+            assert_eq!(kind(c.probe(v)), kind(t.probe(v)), "at {v:?}");
+        }
+    }
+
+    #[test]
     fn only_a_tile_splits() {
         let mut t = Tree::new();
         assert_eq!(t.split_tile([0, 0, 0]), Err(TreeError::NotATile([0, 0, 0])));
@@ -628,6 +797,42 @@ mod tests {
             self.leaves.insert(leaf);
             Some(leaf)
         }
+
+        /// The leaf-sized regions of the lower node's region holding `v`.
+        fn regions(v: Coord) -> impl Iterator<Item = Coord> {
+            let o = align(v, LOWER_SPAN_LOG2);
+            (0..4096).map(move |i| [o[0] + i % 16 * 8, o[1] + i / 16 % 16 * 8, o[2] + i / 256 * 8])
+        }
+
+        fn merge(&mut self, level: TileLevel, v: Coord) -> bool {
+            match level {
+                TileLevel::Root => false,
+                TileLevel::Lower => {
+                    let o = align(v, LEAF_LOG2);
+                    let ok = self.tile_at(v).is_none() && self.leaves.remove(&o);
+                    if ok {
+                        self.tiles.insert((TileLevel::Lower, o));
+                    }
+                    ok
+                }
+                TileLevel::Upper => {
+                    let covered =
+                        matches!(self.tile_at(v), Some(TileLevel::Root | TileLevel::Upper));
+                    let full = Self::regions(v).all(|r| {
+                        self.leaves.contains(&r) || self.tiles.contains(&(TileLevel::Lower, r))
+                    });
+                    if covered || !full {
+                        return false;
+                    }
+                    for r in Self::regions(v) {
+                        self.leaves.remove(&r);
+                        self.tiles.remove(&(TileLevel::Lower, r));
+                    }
+                    self.tiles.insert((TileLevel::Upper, align(v, LOWER_SPAN_LOG2)));
+                    true
+                }
+            }
+        }
     }
 
     #[derive(Debug, Clone)]
@@ -635,6 +840,11 @@ mod tests {
         Activate(Coord),
         AddTile(TileLevel, Coord),
         Split(Coord),
+        Merge(TileLevel, Coord),
+        /// Every leaf-sized region of a lower node's region made a leaf, or a tile.
+        Fill(Coord, bool),
+        /// The tree replaced by its compacted copy.
+        Compact,
     }
 
     /// Coordinates near the boundaries of every level, negative ones included, so that
@@ -654,21 +864,39 @@ mod tests {
     /// Edits on a few shared coordinates, each moved by a voxel or two, so that most
     /// splits find a tile and most activations meet a leaf or a tile.
     fn ops() -> impl Strategy<Value = Vec<Op>> {
+        #[derive(Debug, Clone, Copy)]
+        enum Kind {
+            Activate,
+            AddTile(TileLevel),
+            Split,
+            Merge(TileLevel),
+            Fill(bool),
+            Compact,
+        }
         let kind = prop_oneof![
-            3 => Just(None),
-            2 => level().prop_map(Some),
+            6 => Just(Kind::Activate),
+            4 => level().prop_map(Kind::AddTile),
+            4 => Just(Kind::Split),
+            2 => Just(Kind::Merge(TileLevel::Lower)),
+            2 => Just(Kind::Merge(TileLevel::Upper)),
+            1 => Just(Kind::Merge(TileLevel::Root)),
+            1 => any::<bool>().prop_map(Kind::Fill),
+            1 => Just(Kind::Compact),
         ];
-        let edit = (kind, any::<bool>(), 0..6_usize, [0..2_i32, 0..2, 0..2]);
+        let edit = (kind, 0..6_usize, [0..2_i32, 0..2, 0..2]);
         (prop::collection::vec(coord(), 6), prop::collection::vec(edit, 1..40)).prop_map(
             |(pool, edits)| {
                 edits
                     .into_iter()
-                    .map(|(kind, split, i, d)| {
+                    .map(|(kind, i, d)| {
                         let v = [0, 1, 2].map(|k| pool[i][k] + d[k]);
-                        match (kind, split) {
-                            (Some(l), _) => Op::AddTile(l, v),
-                            (None, true) => Op::Split(v),
-                            (None, false) => Op::Activate(v),
+                        match kind {
+                            Kind::Activate => Op::Activate(v),
+                            Kind::AddTile(l) => Op::AddTile(l, v),
+                            Kind::Split => Op::Split(v),
+                            Kind::Merge(l) => Op::Merge(l, v),
+                            Kind::Fill(leaves) => Op::Fill(v, leaves),
+                            Kind::Compact => Op::Compact,
                         }
                     })
                     .collect()
@@ -718,6 +946,28 @@ mod tests {
                 prop_assert_eq!(got, m.split(v));
                 v
             }
+            Op::Merge(l, v) => {
+                prop_assert_eq!(t.merge(l, v).is_ok(), m.merge(l, v), "merge {:?} at {:?}", l, v);
+                v
+            }
+            Op::Fill(v, leaves) => {
+                for r in Model::regions(v) {
+                    if leaves {
+                        let got = matches!(t.activate(r).unwrap(), Activation::InTile(_));
+                        prop_assert_eq!(got, m.activate(r).0 == 2);
+                    } else {
+                        prop_assert_eq!(
+                            t.add_tile(TileLevel::Lower, r).is_ok(),
+                            m.add_tile(TileLevel::Lower, r)
+                        );
+                    }
+                }
+                v
+            }
+            Op::Compact => {
+                *t = t.compacted().unwrap();
+                [0, 0, 0]
+            }
         };
         Ok(v)
     }
@@ -744,6 +994,11 @@ mod tests {
             prop_assert_eq!(&leaves, &m.leaves);
             let tiles: BTreeSet<(TileLevel, Coord)> = t.tiles().into_iter().collect();
             prop_assert_eq!(&tiles, &m.tiles);
+            // A compacted copy holds the same, with no unreachable arena entry.
+            let c = t.compacted().unwrap();
+            let lens = c.arena_lens();
+            prop_assert_eq!(lens[2], m.leaves.len());
+            prop_assert_eq!(c.tiles(), t.tiles());
         }
     }
 }

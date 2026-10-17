@@ -14,7 +14,7 @@
 use std::error::Error;
 
 use brodo::error::FieldError;
-use brodo::field::Field;
+use brodo::field::{Field, uniform};
 use brodo::gather::{GATHER_VOXELS, gather};
 use brodo::parallel::{par_reduce, par_update};
 use brodo::topology::Topology;
@@ -110,8 +110,8 @@ impl Solver {
         }
         let (topology, remap) = e.commit()?;
         for s in &mut self.species {
-            s.now = s.now.remap(&remap)?;
-            s.next = s.next.remap(&remap)?;
+            s.now = s.now.remap(&remap, &uniform)?;
+            s.next = s.next.remap(&remap, &uniform)?;
         }
         self.topology = topology;
         self.radius = radius;

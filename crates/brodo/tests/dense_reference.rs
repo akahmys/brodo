@@ -49,6 +49,10 @@ enum Op {
     Activate(Coord),
     AddTile(TileLevel, Coord),
     Split(Coord),
+    /// A merge: values stay as they are, or the rule refuses and nothing changes.
+    Merge(TileLevel, Coord),
+    /// Every leaf-sized region of a lower node's region made a tile where it is empty.
+    FillTiles(Coord),
 }
 
 fn voxel() -> impl Strategy<Value = Coord> {
@@ -67,8 +71,8 @@ type Round = (Vec<Op>, Vec<(Coord, i16)>);
 /// a tile and most writes find a leaf or a tile.
 fn rounds() -> impl Strategy<Value = Vec<Round>> {
     let near = (0..6_usize, [0..3_i32, 0..3, 0..3]);
-    let kind = prop_oneof![5 => Just(None), 2 => level().prop_map(Some)];
-    let edit = (kind, any::<bool>(), near.clone());
+    let kind = prop_oneof![5 => Just(0_u8), 2 => Just(1), 2 => Just(2), 2 => Just(3), 1 => Just(4), 1 => Just(5)];
+    let edit = (kind, level(), near.clone());
     let round =
         (prop::collection::vec(edit, 1..8), prop::collection::vec((near, any::<i16>()), 0..30));
     (prop::collection::vec(voxel(), 6), prop::collection::vec(round, 1..5)).prop_map(
@@ -81,10 +85,13 @@ fn rounds() -> impl Strategy<Value = Vec<Round>> {
                 .map(|(edits, writes)| {
                     let ops = edits
                         .into_iter()
-                        .map(|(kind, split, n)| match (kind, split) {
-                            (Some(l), _) => Op::AddTile(l, at(n)),
-                            (None, true) => Op::Split(at(n)),
-                            (None, false) => Op::Activate(at(n)),
+                        .map(|(kind, l, n)| match kind {
+                            0 => Op::Activate(at(n)),
+                            1 => Op::AddTile(l, at(n)),
+                            2 => Op::Split(at(n)),
+                            3 => Op::Merge(TileLevel::Lower, at(n)),
+                            4 => Op::Merge(TileLevel::Upper, at(n)),
+                            _ => Op::FillTiles(at(n)),
                         })
                         .collect();
                     (ops, writes.into_iter().map(|(n, x)| (at(n), x)).collect())
@@ -116,6 +123,15 @@ proptest! {
                     Op::Activate(v) => e.activate(v).map(|_| ()),
                     Op::AddTile(l, v) => e.add_tile(l, v),
                     Op::Split(v) => e.split_tile(v),
+                    Op::Merge(l, v) => e.merge(l, v),
+                    Op::FillTiles(v) => {
+                        let o = v.map(|c| c.div_euclid(128) * 128);
+                        for i in 0..4096 {
+                            let r = [o[0] + i % 16 * 8, o[1] + i / 16 % 16 * 8, o[2] + i / 256 * 8];
+                            let _occupied = e.add_tile(TileLevel::Lower, r);
+                        }
+                        Ok(())
+                    }
                 });
             }
             check(&g, &d)?;
