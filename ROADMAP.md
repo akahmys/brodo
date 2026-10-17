@@ -15,9 +15,9 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   committed in `crates/brodo/tests/data/frozen_v1_f32.bin`.
 - **Next**: U2, the cache file with its header and the grid's metadata (§4.7); then U3,
   memory mapping, which needs a mapping crate approved (§4).
-- **Unresolved problems**: `fuzz/` depends on `libfuzzer-sys` 0.4.13, licensed
-  (MIT OR Apache-2.0) AND NCSA; NCSA is not on `deny.toml`'s allow-list, which checks the
-  workspace only. For the human to confirm.
+- **Unresolved problems**: none. The human allowed `libfuzzer-sys` 0.4.13, licensed
+  (MIT OR Apache-2.0) AND NCSA, in `fuzz/` only, which is outside the workspace and ships
+  nothing (2026-10-17).
 
 ## 2. Milestones
 
