@@ -75,3 +75,22 @@ of GB across its fields, beyond a workstation's memory, where a copy cannot open
 and a mapping reads only what is used. These are estimates on assumed surface areas and
 volumes, not measurements. The human decided to keep the mapping.
 
+## Amendment
+
+- **Date**: 2026-10-17 (T7's scope)
+
+T7 as written ran none of the mapping module's code, and the existing tests were too slow
+under Miri to stand in: with eight cases each, `cache_format` took 2 min 44 s under
+Stacked Borrows, `parallel::tests` 39 minutes under Tree Borrows, and `frozen_format`
+had not finished its first test after 82 minutes, the threaded tests being the slow ones.
+Miri's purpose being undefined behaviour, not coverage, T7 was redefined: three tests
+named `miri_*`, in `tests/miri_paths.rs`, take each path through unsafe code in brodo's
+dependencies on a grid of three leaves and two tiles, reading a frozen grid in place and a
+cache file's bytes (`zerocopy`, under Stacked Borrows) and running the leaf-parallel
+update and reduction on four threads (`rayon`, under Tree Borrows, since Stacked Borrows
+reports `crossbeam-epoch` (ADR-0015), and with the leak check off, since rayon's threads
+outlive the test). They ran in 56 s and 25 s with no report; three threads took part in
+the update, natively and under Miri. Each checks every value against the field it came
+from, so it also fails natively: reading a leaf's values with x and y swapped, and
+handing the update its leaves in reverse, each failed it.
+

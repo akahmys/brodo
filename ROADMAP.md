@@ -8,9 +8,11 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: the human kept the memory mapping after weighing its removal (ADR-0008).
-- **Next**: the remaining items before P1 closes: T7's scope under Miri, and which of the
-  audit review's proposals to adopt.
+- **Done**: the audit review's proposals A, B and E (ADR-0021, -0022, -0019); T7
+  redefined as the `miri_*` tests and run under Miri with no report, 56 s and 25 s
+  (ADR-0008).
+- **Next**: P1's acceptance and version (TESTING.md V2); then a spike on mutation testing
+  (the audit review's proposal C), for which a tool needs the human's approval.
 - **Unresolved problems**: Miri's Stacked Borrows reports undefined behaviour in
   `crossbeam-epoch` under rayon; Tree Borrows does not (ADR-0015). The leaf-parallel
   update's benchmark disagrees within a pair by up to 17 %; whether a load average of 3.0
