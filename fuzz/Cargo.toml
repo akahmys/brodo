@@ -12,6 +12,7 @@ cargo-fuzz = true
 [dependencies]
 libfuzzer-sys = "0.4.13"
 brodo = { path = "../crates/brodo" }
+colino = { path = "../crates/colino" }
 zerocopy = { version = "0.8.63", features = ["derive"] }
 
 # Its own workspace, so cargo does not look for it in the one above.
@@ -28,6 +29,13 @@ bench = false
 [[bin]]
 name = "cache_file"
 path = "fuzz_targets/cache_file.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "stl"
+path = "fuzz_targets/stl.rs"
 test = false
 doc = false
 bench = false

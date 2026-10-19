@@ -236,8 +236,10 @@ traits from `freeze` on (§4.6).
 
 ### 5.1 Conversion
 
-- Input: STL (binary and ASCII), OBJ, 3MF, in that order. Badly oriented and holed meshes
-  are accepted.
+- Input: STL (binary and ASCII), OBJ, 3MF, in that order, each read into a `Mesh` of `f64`
+  vertices, `u32` triangles and the file's unit, if any, under limits its caller sets
+  (ADR-0026). Badly oriented, holed and degenerate meshes are accepted as they are;
+  `Mesh::welded` joins vertices at equal positions, never within a tolerance.
 - Distance: exact, to the nearest triangle through a BVH.
 - Sign: generalised winding number with a hierarchical approximation; an
   orientation-independent method as an option.

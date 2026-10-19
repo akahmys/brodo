@@ -8,10 +8,11 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: P2's first item: χ (ADR-0024), dilation and erosion of topology and values
-  (ADR-0025), and a test that labelling and χ give §5.2's Betti numbers for a ball, a
-  shell, a torus and a double torus.
-- **Next**: P2's second item, the STL, OBJ and 3MF readers (§5.1).
+- **Done**: the mesh type and the STL reader, binary and ASCII (ADR-0026), in
+  `UNTRUSTED_INPUT` with fuzz target `stl` (60 s, 34591468 runs, no finding). P2's first
+  item before it: χ, dilation and erosion, and the Betti numbers.
+- **Next**: the OBJ reader with its fuzz target; then 3MF, whose ZIP and XML crates need
+  checking against Rules 12, 13 and 20 and the human's approval.
 - **Unresolved problems**: Miri's Stacked Borrows reports undefined behaviour in
   `crossbeam-epoch` under rayon; Tree Borrows does not (ADR-0015). The leaf-parallel
   update's benchmark disagrees within a pair by up to 17 %; whether a load average of 3.0

@@ -9,6 +9,10 @@ publish.workspace = true
 
 [dependencies]
 brodo.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
 
 [lints]
 workspace = true

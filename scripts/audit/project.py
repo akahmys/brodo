@@ -20,7 +20,11 @@ APPLICATIONS = []
 # Modules that parse untrusted bytes (a file, a mesh), as directories or files under
 # `crates/<crate>/src/`. Indexing and slicing are banned in them (Rule 3), and their crate
 # is fuzzed (TESTING.md T6). A module is listed in the commit that creates it (ADR-0009).
-UNTRUSTED_INPUT = ["crates/brodo/src/cache.rs", "crates/brodo/src/view.rs"]
+UNTRUSTED_INPUT = [
+    "crates/brodo/src/cache.rs",
+    "crates/brodo/src/view.rs",
+    "crates/colino/src/stl.rs",
+]
 
 # The one file allowed to contain `unsafe` (Rule 4, ADR-0008): brodo's memory-mapping
 # module, once it exists. At most one entry.

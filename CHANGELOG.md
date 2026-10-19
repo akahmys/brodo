@@ -23,6 +23,8 @@ are recorded here when they change (V6).
 - `brodo::morphology::{dilate_values, erode_values}`: a max or min over each leaf voxel's
   6 or 26 neighbours, k times, for the scalar types (`Ordered`), a NaN winning; tiles and
   the background unchanged.
+- `colino::mesh::{Mesh, Limits}` with `Mesh::welded`, and `colino::stl::read` for binary
+  and ASCII STL (ADR-0026); `colino::error::{ReadError, MeshError}`.
 
 ## 0.2.0 (2026-10-17)
 

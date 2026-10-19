@@ -50,6 +50,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4e7648175b45a9a48536d676f68d918270699102aa8dab5496df06904c914600"
 
 [[package]]
+name = "colino"
+version = "0.2.0"
+dependencies = [
+ "brodo",
+ "thiserror",
+]
+
+[[package]]
 name = "crc32fast"
 version = "1.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -120,6 +128,7 @@ name = "fuzz"
 version = "0.0.0"
 dependencies = [
  "brodo",
+ "colino",
  "libfuzzer-sys",
  "zerocopy",
 ]

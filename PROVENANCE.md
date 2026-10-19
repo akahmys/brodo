@@ -37,3 +37,6 @@ papers, public documentation and permissively licensed code (S1, S2) may appear 
 | `crates/brodo/src/vtk.rs` | ARCHITECTURE.md §6.1, ADR-0018 only; VTK's published XML file-format documentation; VTK_VOXEL's number from VTK's public Python API | a field written as one ASCII `.vtu` of voxel cells |
 | `crates/brodo/src/tree.rs` | ARCHITECTURE.md §4.1, ADR-0013 only | the sparse tree: levels, masks, arenas, activation, tiles, their split and merge, iteration, compaction |
 | `crates/colino/src/lib.rs` | none | crate root |
+| `crates/colino/src/error.rs` | none | the crate's error types |
+| `crates/colino/src/mesh.rs` | ARCHITECTURE.md §5.1, ADR-0026 only | the mesh type, reading limits, and welding by exact position |
+| `crates/colino/src/stl.rs` | ARCHITECTURE.md §5.1, ADR-0026; the Library of Congress's format descriptions fdd000505 (STL binary) and fdd000506 (STL ASCII) | reading binary and ASCII STL |
