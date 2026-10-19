@@ -262,11 +262,15 @@ traits from `freeze` on (§4.6).
 | 2. Labelled connectivity | whether user-labelled regions lie in one complement component | flood fill |
 | 3. Local risk | places thinner, or gaps narrower, than two voxels | predicted from the input before conversion, as coordinates and extents |
 
-- Reference for layer 1: the genus from the input's V − E + F when the mesh is a closed
-  manifold; otherwise a local reconversion of the risky places at h/2, whose invariants
-  must agree.
-- The report is a `serde`-serialisable structure: what may have changed, where, and by how
-  much.
+- Connectivity: the solid 26, its complement 6; the complement's Betti numbers counted,
+  and held by tests to duality with the solid's (ADR-0028).
+- Reference for layer 1: the input's V − E + F when, welded, it is a closed 2-manifold,
+  the solid's χ being half the surface's; otherwise, in P2, none, the report saying why;
+  later, a local reconversion of the risky places at h/2, whose invariants must agree.
+- Layer 2's regions are named points in world coordinates, each answered with its
+  complement component, or the solid.
+- The report is a structure serialisable with `serde` behind the feature `serde`: what may
+  have changed, where (from layer 3), and by how much.
 
 ## 6. Visualisation (ADR-0018)
 
