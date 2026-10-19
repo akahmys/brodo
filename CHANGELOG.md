@@ -29,6 +29,8 @@ are recorded here when they change (V6).
 - `colino::threemf::read` for 3MF packages: every build item placed (ADR-0026).
   `Limits` gains `bytes`, which every reader checks: a `Limits` written field by field
   needs it.
+- `colino::distance` and `colino::bvh::Bvh`: the nearest point of a triangle, and the
+  nearest triangle of a mesh, the lowest-numbered of equals (ADR-0027).
 
 ## 0.2.0 (2026-10-17)
 

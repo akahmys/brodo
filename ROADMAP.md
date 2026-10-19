@@ -8,12 +8,10 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: P2's second item: the STL, OBJ and 3MF readers (ADR-0026), each in
-  `UNTRUSTED_INPUT` with a fuzz target (60 s each, no finding: `stl` 34591468 runs, `obj`
-  5475675, `threemf` 4869375 from a seed package); 3MF through `rawzip`, `miniz_oxide`
-  and `quick-xml`.
-- **Next**: P2's third item, the generalised winding number and the narrow-band output
-  (§5.1).
+- **Done**: the first unit of P2's third item (ADR-0027): the nearest point of a
+  triangle and a tree of boxes for the nearest triangle of a mesh.
+- **Next**: the winding number (Barill et al.'s approximation and the exact sum), then the
+  band.
 - **Unresolved problems**: Miri's Stacked Borrows reports undefined behaviour in
   `crossbeam-epoch` under rayon; Tree Borrows does not (ADR-0015). The leaf-parallel
   update's benchmark disagrees within a pair by up to 17 %; whether a load average of 3.0

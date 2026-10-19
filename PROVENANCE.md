@@ -36,6 +36,8 @@ papers, public documentation and permissively licensed code (S1, S2) may appear 
 | `crates/brodo/src/slice.rs` | ARCHITECTURE.md §6.1, ADR-0018 only; `png`'s public API documentation (0.18.1) | a slice of a scalar field drawn and encoded as PNG |
 | `crates/brodo/src/vtk.rs` | ARCHITECTURE.md §6.1, ADR-0018 only; VTK's published XML file-format documentation; VTK_VOXEL's number from VTK's public Python API | a field written as one ASCII `.vtu` of voxel cells |
 | `crates/brodo/src/tree.rs` | ARCHITECTURE.md §4.1, ADR-0013 only | the sparse tree: levels, masks, arenas, activation, tiles, their split and merge, iteration, compaction |
+| `crates/colino/src/bvh.rs` | ARCHITECTURE.md §5.1, ADR-0027; a bounding volume hierarchy split at the median, as textbook material | a tree of axis-aligned boxes over a mesh's triangles, and the nearest triangle to a point |
+| `crates/colino/src/distance.rs` | ARCHITECTURE.md §5.1, ADR-0027; the nearest point of a triangle by its Voronoi regions, as textbook material | the nearest point of a segment and of a triangle |
 | `crates/colino/src/lib.rs` | none | crate root |
 | `crates/colino/src/error.rs` | none | the crate's error types |
 | `crates/colino/src/mesh.rs` | ARCHITECTURE.md §5.1, ADR-0026 only | the mesh type, reading limits, and welding by exact position |
