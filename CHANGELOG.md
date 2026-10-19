@@ -18,6 +18,8 @@ are recorded here when they change (V6).
 - `Tree::deactivate` and `TopologyEditor::deactivate` remove a leaf, and the nodes it
   leaves empty, returning a `Deactivation`; inside a tile they refuse with the new
   `TreeError::InTile` (ADR-0025). A `match` over `TreeError` needs the new arm.
+- `brodo::morphology::{dilate, erode}`: a topology dilated or eroded by k steps, 6- or
+  26-connected, on whole leaves, with its `Remap` (ADR-0025).
 
 ## 0.2.0 (2026-10-17)
 

@@ -8,11 +8,11 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: B-011 answered by `spikes/dilate/`: dilation and erosion work on whole
-  leaves, without a per-voxel mask (ADR-0025). Before it, `brodo::euler::euler`
-  (ADR-0024).
-- **Next**: dilation and erosion of topology, then of values; then checking that
-  labelling meets §5.2's needs, which closes P2's first item.
+- **Done**: dilation and erosion of a topology, `brodo::morphology::{dilate, erode}`, on
+  whole leaves (ADR-0025), and removing a leaf, `deactivate`. Dilating a root tile by one
+  step adds 1582088 leaves (26-connected), so its cost follows the tile's surface.
+- **Next**: dilation and erosion of values; then checking that labelling meets §5.2's
+  needs, which closes P2's first item.
 - **Unresolved problems**: Miri's Stacked Borrows reports undefined behaviour in
   `crossbeam-epoch` under rayon; Tree Borrows does not (ADR-0015). The leaf-parallel
   update's benchmark disagrees within a pair by up to 17 %; whether a load average of 3.0
@@ -20,7 +20,8 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   raised it to 14.76 (2026-10-19). Allocating and dropping its output field
   takes about a third of that item (1.04 of 3.3 ms, 2026-10-18, load 3.3), but the
   update alone varied as much, so it is not shown to cause the spread. For P2: labelling
-  holds about 13 bytes per leaf voxel at its peak, to be measured at colino's sizes.
+  holds about 13 bytes per leaf voxel at its peak, to be measured at colino's sizes. The
+  gate's debug tests grew: `morphology_reference` takes 27 s at a load of 5 (2026-10-19).
 
 ## 2. Milestones
 

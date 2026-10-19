@@ -14,6 +14,7 @@ pub mod grid;
 pub mod manifest;
 mod mapping;
 pub mod meta;
+pub mod morphology;
 pub mod parallel;
 #[cfg(feature = "slice-png")]
 pub mod slice;

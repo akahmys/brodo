@@ -29,6 +29,7 @@ papers, public documentation and permissively licensed code (S1, S2) may appear 
 | `crates/brodo/src/manifest.rs` | ARCHITECTURE.md §4.3, ADR-0014 only | the leaf manifest: 26 directions and each leaf's neighbours |
 | `crates/brodo/src/mapping.rs` | ARCHITECTURE.md §4.7, ADR-0008 only; `memmap2`'s public API documentation (0.9.11) | mapping a file read-only: brodo's one unsafe operation |
 | `crates/brodo/src/meta.rs` | ARCHITECTURE.md §4.7, ADR-0016 only | a grid's metadata and bounding box |
+| `crates/brodo/src/morphology.rs` | ARCHITECTURE.md §4.5, ADR-0025 only; dilation and erosion by a structuring element as textbook material | dilation and erosion of a topology on whole leaves |
 | `crates/brodo/src/parallel.rs` | ARCHITECTURE.md §4.4, ADR-0015 only | the leaf-parallel update and the fixed-order reduction |
 | `crates/brodo/src/topology.rs` | ARCHITECTURE.md §4.2, ADR-0014 only; Morton order as bit interleaving | topologies: stamps, Morton numbering, the editor, `Remap` |
 | `crates/brodo/src/view.rs` | ARCHITECTURE.md §4.6, ADR-0016 only; `zerocopy`'s public API documentation (0.8.63) | `GridView`: checking a frozen grid whole and reading it in place |

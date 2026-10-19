@@ -16,6 +16,7 @@ lib brodo grid::tests::an_edit_keeps_the_values_and_a_refused_one_changes_nothin
 lib brodo manifest::tests::a_location_is_eight_bytes
 lib brodo manifest::tests::a_step_beyond_the_coordinate_range_is_nothing
 lib brodo manifest::tests::directions_cover_the_block_but_its_centre
+lib brodo morphology::tests::a_root_tile_grows_and_shrinks_by_its_shell
 lib brodo parallel::tests::a_stale_field_is_refused
 lib brodo parallel::tests::one_diffusion_step_matches_the_step_by_hand
 lib brodo parallel::tests::same_bits_at_any_thread_count
@@ -71,6 +72,8 @@ test manifest_reference neighbours_match_coordinates_and_are_symmetric
 test miri_paths miri_a_cache_files_bytes_read_in_place
 test miri_paths miri_a_frozen_grid_reads_in_place
 test miri_paths miri_the_leaf_parallel_update_and_reduction_run_on_four_threads
+test morphology_reference an_upper_tile_is_split_where_it_must_go
+test morphology_reference cells_change_as_a_dense_search_says
 test remap_reference remap_keeps_every_fields_values
 test slice_images slices_keep_their_golden_pixels
 test slice_images the_same_image_encodes_to_the_same_bytes_and_decodes_back
