@@ -10,5 +10,6 @@ pub mod error;
 pub mod mesh;
 pub mod obj;
 pub mod stl;
+pub mod surface;
 pub mod threemf;
 pub mod winding;

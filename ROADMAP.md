@@ -8,13 +8,10 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: conversion measured at scale and put under the Benchmark tier (ADR-0019):
-  the harness shared from `crates/brodo/benches/harness/`, colino's items recorded. At
-  a sphere radius of 400 voxels (524288 triangles) conversion took 33 s on 10 cores,
-  773 MB, the winding number 77 % of it; at 1500, assuming surface-proportional growth and
-  the tree's depth adding half again, about 11 minutes and 11 GB, labelling 2 more minutes
-  and 6 GB (2026-10-20). Not changed for now.
-- **Next**: P2's fourth item, the topology report, layers 1 and 2 (§5.2).
+- **Done**: the first unit of P2's fourth item (ADR-0028): a mesh's surface counted,
+  V − E + F and why it is not a closed 2-manifold if it is not.
+- **Next**: the topology report, layers 1 and 2; then `serde`, after its check and the
+  human's approval.
 - **Unresolved problems**: Miri's Stacked Borrows reports undefined behaviour in
   `crossbeam-epoch` under rayon; Tree Borrows does not (ADR-0015). The leaf-parallel
   update's benchmark disagrees within a pair by up to 17 %; whether a load average of 3.0

@@ -36,6 +36,8 @@ are recorded here when they change (V6).
 - `colino::convert::{convert, Options, Converted}` and `colino::error::ConvertError`: a
   mesh into a narrow-band signed distance field with inside tiles and its metadata
   (ADR-0027).
+- `colino::surface::Surface`: a mesh's vertices, edges and faces, and why it is not a
+  closed 2-manifold if it is not (ADR-0028).
 
 ## 0.2.0 (2026-10-17)
 
