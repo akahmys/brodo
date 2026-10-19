@@ -9,6 +9,9 @@ publish.workspace = true
 
 [dependencies]
 brodo.workspace = true
+miniz_oxide.workspace = true
+quick-xml.workspace = true
+rawzip.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]

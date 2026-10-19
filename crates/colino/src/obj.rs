@@ -146,6 +146,7 @@ fn face<'a>(
 
 /// Reads an OBJ file's bytes.
 pub fn read(bytes: &[u8], limits: Limits) -> Result<Mesh, ReadError> {
+    limits.check_bytes(u64::try_from(bytes.len()).unwrap_or(u64::MAX))?;
     let text = std::str::from_utf8(bytes).map_err(|_| ReadError::NotText)?;
     let mut mesh = Mesh::default();
     let mut furthest: Option<(usize, i64)> = None;

@@ -8,7 +8,7 @@ use colino::mesh::{Limits, Mesh};
 use colino::obj::read;
 use proptest::prelude::*;
 
-const ROOMY: Limits = Limits { triangles: 1 << 20, vertices: 1 << 20 };
+const ROOMY: Limits = Limits { triangles: 1 << 20, vertices: 1 << 20, bytes: 1 << 30 };
 
 fn read_str(s: &str) -> Result<Mesh, ReadError> {
     read(s.as_bytes(), ROOMY)
@@ -69,7 +69,7 @@ fn each_damage_is_its_own_error() {
     }
     // A number may name a vertex further on in the file.
     assert!(read_str("f 1 2 3\nv 0 0 0\nv 1 0 0\nv 0 1 0\n").is_ok());
-    let limits = |triangles, vertices| Limits { triangles, vertices };
+    let limits = |triangles, vertices| Limits { triangles, vertices, bytes: 1 << 30 };
     let quad = "v 0 0 0\nv 1 0 0\nv 1 1 0\nv 0 1 0\nf 1 2 3 4\n";
     assert_eq!(
         read(quad.as_bytes(), limits(1, 10)),
@@ -80,6 +80,8 @@ fn each_damage_is_its_own_error() {
         Err(ReadError::TooLarge { what: "vertices", limit: 3 })
     );
     assert_eq!(read(&[b'v', b' ', 0xff], ROOMY), Err(ReadError::NotText));
+    let tiny = Limits { bytes: 10, ..ROOMY };
+    assert_eq!(read(quad.as_bytes(), tiny), Err(ReadError::TooLarge { what: "bytes", limit: 10 }));
 }
 
 fn coordinate() -> impl Strategy<Value = f64> {

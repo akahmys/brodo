@@ -24,6 +24,18 @@ pub struct Limits {
     pub triangles: u64,
     /// The most vertices.
     pub vertices: u64,
+    /// The most bytes read: a file's own, or each part a package holds, once expanded.
+    pub bytes: u64,
+}
+
+impl Limits {
+    /// Refuses `len` bytes beyond the limit.
+    pub(crate) fn check_bytes(&self, len: u64) -> Result<(), crate::error::ReadError> {
+        if len > self.bytes {
+            return Err(crate::error::ReadError::TooLarge { what: "bytes", limit: self.bytes });
+        }
+        Ok(())
+    }
 }
 
 impl Mesh {

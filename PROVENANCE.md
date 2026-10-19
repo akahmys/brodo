@@ -41,3 +41,4 @@ papers, public documentation and permissively licensed code (S1, S2) may appear 
 | `crates/colino/src/mesh.rs` | ARCHITECTURE.md §5.1, ADR-0026 only | the mesh type, reading limits, and welding by exact position |
 | `crates/colino/src/obj.rs` | ARCHITECTURE.md §5.1, ADR-0026; the Wavefront OBJ specification as published at paulbourke.net/dataformats/obj/ | reading Wavefront OBJ |
 | `crates/colino/src/stl.rs` | ARCHITECTURE.md §5.1, ADR-0026; the Library of Congress's format descriptions fdd000505 (STL binary) and fdd000506 (STL ASCII) | reading binary and ASCII STL |
+| `crates/colino/src/threemf.rs` | ARCHITECTURE.md §5.1, ADR-0026; the 3MF Core Specification 1.4.0 (3MF Consortium, 2025), its matrix figure included; `rawzip` 0.5.2's, `miniz_oxide` 0.9.1's and `quick-xml` 0.42.0's public API documentation | reading 3MF packages |

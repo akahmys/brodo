@@ -85,6 +85,48 @@ pub enum ReadError {
         /// The number as written.
         index: i64,
     },
+    /// A 3MF package is not a ZIP archive, lacks a part it needs, or holds a part that does
+    /// not expand to what its directory says.
+    #[error("3MF package: {0}")]
+    Package(&'static str),
+    /// A 3MF part is compressed by a method other than storing or deflate.
+    #[error("3MF part compressed by {0}, not stored or deflated")]
+    Compression(String),
+    /// A 3MF part is not well-formed XML.
+    #[error("XML at byte {at}: {reason}")]
+    Xml {
+        /// The byte in the part.
+        at: u64,
+        /// What the parser found.
+        reason: String,
+    },
+    /// A 3MF part breaks the format, or uses what this reader refuses.
+    #[error("3MF at byte {at}: {reason}")]
+    Model {
+        /// The byte in the part.
+        at: u64,
+        /// What is wrong.
+        reason: &'static str,
+    },
+    /// An element in the 3MF core namespace the format does not define.
+    #[error("3MF at byte {at}: unknown element {name:?}")]
+    UnknownElement {
+        /// The byte in the part.
+        at: u64,
+        /// The element's name.
+        name: String,
+    },
+    /// The model requires extensions this reader does not support.
+    #[error("3MF requires extensions {0:?}, which are not read")]
+    RequiredExtension(String),
+    /// A component or build item names an object not defined before it.
+    #[error("3MF at byte {at}: no object {id} defined before")]
+    NoObject {
+        /// The byte in the part.
+        at: u64,
+        /// The id named.
+        id: u64,
+    },
     /// The mesh holds more than the limits allow.
     #[error("more {what} than the limit of {limit}")]
     TooLarge {

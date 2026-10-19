@@ -26,6 +26,7 @@ const RECORD: usize = 50;
 
 /// Reads a binary or ASCII STL file's bytes.
 pub fn read(bytes: &[u8], limits: Limits) -> Result<Mesh, ReadError> {
+    limits.check_bytes(u64::try_from(bytes.len()).unwrap_or(u64::MAX))?;
     match binary_count(bytes) {
         Some(n) => read_binary(bytes, n, limits),
         None => read_ascii(bytes, limits),

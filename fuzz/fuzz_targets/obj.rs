@@ -8,7 +8,7 @@ use colino::mesh::Limits;
 use colino::obj::read;
 use libfuzzer_sys::fuzz_target;
 
-const LIMITS: Limits = Limits { triangles: 1 << 16, vertices: 1 << 18 };
+const LIMITS: Limits = Limits { triangles: 1 << 16, vertices: 1 << 18, bytes: 1 << 30 };
 
 fuzz_target!(|data: &[u8]| {
     if let Ok(mesh) = read(data, LIMITS) {

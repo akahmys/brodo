@@ -25,6 +25,7 @@ UNTRUSTED_INPUT = [
     "crates/brodo/src/view.rs",
     "crates/colino/src/obj.rs",
     "crates/colino/src/stl.rs",
+    "crates/colino/src/threemf.rs",
 ]
 
 # The one file allowed to contain `unsafe` (Rule 4, ADR-0008): brodo's memory-mapping

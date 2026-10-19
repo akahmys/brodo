@@ -239,7 +239,9 @@ traits from `freeze` on (§4.6).
 - Input: STL (binary and ASCII), OBJ, 3MF, in that order, each read into a `Mesh` of `f64`
   vertices, `u32` triangles and the file's unit, if any, under limits its caller sets
   (ADR-0026). Badly oriented, holed and degenerate meshes are accepted as they are;
-  `Mesh::welded` joins vertices at equal positions, never within a tolerance.
+  `Mesh::welded` joins vertices at equal positions, never within a tolerance. A 3MF
+  package is read through `rawzip`, `miniz_oxide` and `quick-xml`, its model as a stream;
+  the mesh holds every build item placed by its transforms.
 - Distance: exact, to the nearest triangle through a BVH.
 - Sign: generalised winding number with a hierarchical approximation; an
   orientation-independent method as an option.

@@ -53,3 +53,37 @@ and normal vertices, grouping, display and rendering attributes, points and line
 add no triangle. Refused: free-form geometry, which defines shape this reader does not
 triangulate, and `call` and `csh`, which would read another file or run a command. A
 positive number may name a vertex later in the file, checked once it is all read.
+
+## Amendment
+
+- **Date**: 2026-10-19 (second)
+
+Before 3MF was read, the human approved its dependencies and decided how it is read.
+
+- Dependencies, measured in a scratch crate: `zip` 8.6.0 failed Rule 13 on two advisories
+  (RUSTSEC-2026-0368 and -0369, links followed on extraction). `zip` 9.0.5, deflate only,
+  passed with 16 crates, nix and libc among them on macOS. `rawzip` 0.5.2, which reads
+  the ZIP structure and leaves expansion to its caller, with `miniz_oxide` 0.9.1 for
+  deflate and `quick-xml` 0.42.0, passed with 5 crates, `memchr` already present, the
+  other four `#![forbid(unsafe_code)]`; the human chose them. `lo_zip` was not taken: it
+  pulls an office suite's core, image and font crates, and states nothing of hostile
+  input. Of XML readers fed eight hostile or broken inputs, `roxmltree` refused all, `xml`
+  dropped an external entity silently, and `quick-xml` refused malformed tags and
+  attributes but left the rest to its caller; on a 136 MB model `roxmltree` peaked at
+  1004 MB and `quick-xml` at 140 MB. `quick-xml` was chosen, the reader refusing what it
+  leaves: a document type, an undeclared prefix, an entity beyond XML's predefined ones
+  and character references, a second root, an element left open, and text outside the
+  root.
+- `Limits` gains `bytes`, the most a file holds or a package's part expands to; a
+  deflated part is expanded under it.
+- The StartPart relationship names the model part, which must be a plain path. Part
+  names are compared without case.
+- Every build item is returned, its object placed by the item's transform after its
+  components', the vertex a row vector on the left; a transform with a negative
+  determinant turns triangles over. Support objects are skipped; a surface or `other`
+  object in the build is refused; objects no item reaches are not returned. Placements
+  count against the triangle limit, counted before expansion, so that components of
+  empty meshes cannot make it endless.
+- A model requiring an extension is refused; elements of other namespaces are skipped
+  whole, attributes with a prefix ignored; an element of the core namespace the format
+  does not define, or out of its place, is an error. The unit defaults to millimetres.

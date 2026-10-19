@@ -26,6 +26,9 @@ are recorded here when they change (V6).
 - `colino::mesh::{Mesh, Limits}` with `Mesh::welded`, and `colino::stl::read` for binary
   and ASCII STL (ADR-0026); `colino::error::{ReadError, MeshError}`.
 - `colino::obj::read` for Wavefront OBJ: vertices and faces, polygons as fans (ADR-0026).
+- `colino::threemf::read` for 3MF packages: every build item placed (ADR-0026).
+  `Limits` gains `bytes`, which every reader checks: a `Limits` written field by field
+  needs it.
 
 ## 0.2.0 (2026-10-17)
 

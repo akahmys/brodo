@@ -7,7 +7,7 @@ use colino::mesh::{Limits, Mesh};
 use colino::stl::read;
 use proptest::prelude::*;
 
-const ROOMY: Limits = Limits { triangles: 1 << 20, vertices: 1 << 22 };
+const ROOMY: Limits = Limits { triangles: 1 << 20, vertices: 1 << 22, bytes: 1 << 30 };
 
 /// A binary STL of triangles, with a header and, unused by readers, normals of zero.
 fn binary(header: &[u8; 80], triangles: &[[[f32; 3]; 3]]) -> Vec<u8> {
@@ -96,12 +96,17 @@ fn each_damage_is_its_own_error() {
     not_finite[2][1][0] = f32::NAN;
     assert_eq!(read(&binary(&[b' '; 80], &not_finite), ROOMY), Err(ReadError::NotFinite(2)));
     assert_eq!(
-        read(&binary(&[b' '; 80], &t), Limits { triangles: 3, vertices: 100 }),
+        read(&binary(&[b' '; 80], &t), Limits { triangles: 3, vertices: 100, bytes: 1 << 30 }),
         Err(ReadError::TooLarge { what: "triangles", limit: 3 })
     );
     assert_eq!(
-        read(&binary(&[b' '; 80], &t), Limits { triangles: 100, vertices: 11 }),
+        read(&binary(&[b' '; 80], &t), Limits { triangles: 100, vertices: 11, bytes: 1 << 30 }),
         Err(ReadError::TooLarge { what: "vertices", limit: 11 })
+    );
+    let tiny = Limits { bytes: 83, ..ROOMY };
+    assert_eq!(
+        read(&binary(&[b' '; 80], &t), tiny),
+        Err(ReadError::TooLarge { what: "bytes", limit: 83 })
     );
     let quad = "solid\nfacet outer loop vertex 0 0 0 vertex 1 0 0 vertex 1 1 0 vertex 0 1 0 endloop endfacet endsolid";
     assert_eq!(read(quad.as_bytes(), ROOMY), Err(ReadError::NotATriangle { at: 3, vertices: 4 }));

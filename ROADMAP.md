@@ -8,11 +8,12 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: the mesh type and the STL and OBJ readers (ADR-0026), each in
-  `UNTRUSTED_INPUT` with a fuzz target (60 s each: `stl` 34591468 runs, `obj` 5475675,
-  no finding).
-- **Next**: 3MF, whose ZIP and XML crates need checking against Rules 12, 13 and 20 and
-  the human's approval.
+- **Done**: P2's second item: the STL, OBJ and 3MF readers (ADR-0026), each in
+  `UNTRUSTED_INPUT` with a fuzz target (60 s each, no finding: `stl` 34591468 runs, `obj`
+  5475675, `threemf` 4869375 from a seed package); 3MF through `rawzip`, `miniz_oxide`
+  and `quick-xml`.
+- **Next**: P2's third item, the generalised winding number and the narrow-band output
+  (§5.1).
 - **Unresolved problems**: Miri's Stacked Borrows reports undefined behaviour in
   `crossbeam-epoch` under rayon; Tree Borrows does not (ADR-0015). The leaf-parallel
   update's benchmark disagrees within a pair by up to 17 %; whether a load average of 3.0
@@ -103,7 +104,7 @@ Not part of P1's acceptance, and not started while ParaView suffices (ADR-0018).
 ### P2 — `colino`
 
 - [x] Euler characteristic, connected components, dilation and erosion (§4.5)
-- [ ] STL, OBJ and 3MF readers, each in `UNTRUSTED_INPUT` and fuzzed (§5.1)
+- [x] STL, OBJ and 3MF readers, each in `UNTRUSTED_INPUT` and fuzzed (§5.1)
 - [ ] Generalised winding number and the narrow-band output (§5.1)
 - [ ] Topology report, layers 1 and 2 (§5.2)
 - [ ] README and examples for publishing on its own
