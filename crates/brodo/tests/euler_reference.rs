@@ -3,7 +3,7 @@
 //! their known values. The dense box covers every leaf and tile with a margin; the
 //! background never meets the condition, so nothing beyond the box is counted.
 
-use brodo::analysis::{AnalysisError, Connectivity};
+use brodo::analysis::{AnalysisError, Connectivity, Label, label};
 use brodo::euler::euler;
 use brodo::field::Field;
 use brodo::topology::Topology;
@@ -125,9 +125,14 @@ fn an_unbounded_set_is_refused() {
 /// A grid whose leaves hold the voxels of a box of side 48 around the origin that `shape`
 /// says are inside.
 fn voxels(shape: impl Fn(Coord) -> bool) -> (Topology, Field<f32>) {
+    voxels_within(24, shape)
+}
+
+/// The same, in a box of side `2 * half`.
+fn voxels_within(half: i32, shape: impl Fn(Coord) -> bool) -> (Topology, Field<f32>) {
     let empty = Topology::new();
     let mut e = empty.edit();
-    let side = -24..24;
+    let side = -half..half;
     for z in side.clone().step_by(8) {
         for y in side.clone().step_by(8) {
             for x in side.clone().step_by(8) {
@@ -174,6 +179,33 @@ fn known_shapes_give_their_characteristic() {
         for conn in [Connectivity::Six, Connectivity::TwentySix] {
             assert_eq!(euler(&t, &f, inside, conn).unwrap(), chi, "{name} under {conn:?}");
         }
+    }
+}
+
+/// The invariants of ARCHITECTURE.md §5.2 for known shapes, from labelling and χ: β₀ the
+/// solid's components, β₂ the complement's components that do not reach the outside (each
+/// a cavity), β₁ = β₀ + β₂ − χ. The solid is 26-connected and its complement 6-connected,
+/// as colino counts them; labelling is slow in a debug build, so each shape is labelled
+/// in the smallest box that holds it.
+#[test]
+fn labelling_and_chi_give_the_betti_numbers() {
+    let double = |v: Coord| torus([v[0] + 8, v[1], v[2]]) || torus([v[0] - 8, v[1], v[2]]);
+    let shapes: [(&str, i32, Shape, [i64; 3]); 4] = [
+        ("ball", 16, Box::new(|v| squared(v) < 100.0), [1, 0, 0]),
+        ("shell", 16, Box::new(|v| (36.0..100.0).contains(&squared(v))), [1, 0, 1]),
+        ("torus", 16, Box::new(torus), [1, 1, 0]),
+        ("double torus", 24, Box::new(double), [1, 2, 0]),
+    ];
+    for (name, half, shape, betti) in shapes {
+        let (t, f) = voxels_within(half, &shape);
+        let (solid, complement) = (Connectivity::TwentySix, Connectivity::Six);
+        let b0 = i64::from(label(&t, &f, inside, solid).unwrap().count());
+        let outside = label(&t, &f, |v| !inside(v), complement).unwrap();
+        let cavities =
+            (0..outside.count()).filter(|c| !outside.reaches_outside(Label::Component(*c))).count();
+        let b2 = i64::try_from(cavities).unwrap();
+        let b1 = b0 + b2 - euler(&t, &f, inside, solid).unwrap();
+        assert_eq!([b0, b1, b2], betti, "{name}");
     }
 }
 

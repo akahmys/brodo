@@ -8,12 +8,10 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: dilation and erosion of a topology (`dilate`, `erode`, on whole leaves) and of
-  values (`dilate_values`, `erode_values`, a max or min filter on leaf voxels), ADR-0025;
-  removing a leaf, `deactivate`. Dilating a root tile by one step adds 1582088 leaves
-  (26-connected), so its cost follows the tile's surface.
-- **Next**: checking that labelling and χ give §5.2's invariants for known shapes, which
-  closes P2's first item.
+- **Done**: P2's first item: χ (ADR-0024), dilation and erosion of topology and values
+  (ADR-0025), and a test that labelling and χ give §5.2's Betti numbers for a ball, a
+  shell, a torus and a double torus.
+- **Next**: P2's second item, the STL, OBJ and 3MF readers (§5.1).
 - **Unresolved problems**: Miri's Stacked Borrows reports undefined behaviour in
   `crossbeam-epoch` under rayon; Tree Borrows does not (ADR-0015). The leaf-parallel
   update's benchmark disagrees within a pair by up to 17 %; whether a load average of 3.0
@@ -23,6 +21,9 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   update alone varied as much, so it is not shown to cause the spread. For P2: labelling
   holds about 13 bytes per leaf voxel at its peak, to be measured at colino's sizes. The
   gate's debug tests grew: `morphology_reference` takes 27 s at a load of 5 (2026-10-19).
+  Labelling is slow in a debug build: the Betti test's 8 labellings of up to 216 leaves
+  took 10 s in debug and 0.6 s in release for 16 (both under other work, 2026-10-19); at
+  colino's sizes it is to be benchmarked.
 
 ## 2. Milestones
 
@@ -100,7 +101,7 @@ Not part of P1's acceptance, and not started while ParaView suffices (ADR-0018).
 
 ### P2 — `colino`
 
-- [ ] Euler characteristic, connected components, dilation and erosion (§4.5)
+- [x] Euler characteristic, connected components, dilation and erosion (§4.5)
 - [ ] STL, OBJ and 3MF readers, each in `UNTRUSTED_INPUT` and fuzzed (§5.1)
 - [ ] Generalised winding number and the narrow-band output (§5.1)
 - [ ] Topology report, layers 1 and 2 (§5.2)
