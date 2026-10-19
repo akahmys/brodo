@@ -178,3 +178,17 @@ pub enum ConvertError {
     #[error("the mesh reaches beyond the grid's i32 voxel coordinates")]
     OutOfRange,
 }
+
+/// Why a topology report could not be made.
+#[derive(Debug, Clone, PartialEq, thiserror::Error)]
+pub enum ReportError {
+    /// The mesh names a vertex it lacks.
+    #[error(transparent)]
+    Mesh(#[from] MeshError),
+    /// Labelling or the Euler characteristic was refused.
+    #[error(transparent)]
+    Analysis(#[from] brodo::analysis::AnalysisError),
+    /// The grid's transform is not the axis-aligned one conversion writes.
+    #[error("the grid's transform is not axis-aligned with positive voxel sizes")]
+    Transform,
+}

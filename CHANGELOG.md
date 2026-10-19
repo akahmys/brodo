@@ -38,6 +38,10 @@ are recorded here when they change (V6).
   (ADR-0027).
 - `colino::surface::Surface`: a mesh's vertices, edges and faces, and why it is not a
   closed 2-manifold if it is not (ADR-0028).
+- `colino::report::{report, Report, Betti, Reference, Region, Place, Pair}` and
+  `colino::error::ReportError`: the topology report's first two layers, the solid's and
+  the complement's Betti numbers, χ against the input's when it is a closed 2-manifold,
+  and the components of named points (ADR-0028).
 
 ## 0.2.0 (2026-10-17)
 

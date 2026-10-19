@@ -1,6 +1,6 @@
 # ADR-0028: The topology report counts Betti numbers and region connectivity
 
-- **Status**: Accepted
+- **Status**: Amended
 - **Date**: 2026-10-20
 
 ## Context
@@ -46,3 +46,19 @@ The human decided, on 2026-10-20:
 
 Two units, the input's reference and the report, then `serde`. A grid that closes a gap or
 opens a wall shows only as a different χ or a different count until the third layer.
+
+## Amendment
+
+- **Date**: 2026-10-20
+
+Writing the report showed that only the complement's β₀ can be counted on its own. Under
+the 26/6 pairing, a lattice vertex adds to the 6-connected complement's χ exactly what it
+adds to the 26-connected solid's, for all 256 patterns of its 8 voxels (the tables in
+`brodo::euler`, compared pattern by pattern), so a counted χ of the complement is the
+solid's χ again, and with it β₁. Its β₂ would be the solid's components, already counted.
+The human decided:
+
+- The complement's β₀ is counted, by 6-connected labelling, and tests hold it to 1 + the
+  solid's β₂, which fails unless exactly one complement component reaches the outside.
+  Its β₁ and β₂ are given by duality in the 3-sphere: β₁ the solid's, β₂ the solid's
+  components less one, or 1 when there is no solid.

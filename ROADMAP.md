@@ -8,10 +8,9 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: the first unit of P2's fourth item (ADR-0028): a mesh's surface counted,
-  V − E + F and why it is not a closed 2-manifold if it is not.
-- **Next**: the topology report, layers 1 and 2; then `serde`, after its check and the
-  human's approval.
+- **Done**: the second unit of P2's fourth item (ADR-0028): the topology report's first
+  two layers, Betti numbers, χ against the input's, and named points' components.
+- **Next**: `serde` for the report, after its check and the human's approval.
 - **Unresolved problems**: Miri's Stacked Borrows reports undefined behaviour in
   `crossbeam-epoch` under rayon; Tree Borrows does not (ADR-0015). The leaf-parallel
   update's benchmark disagrees within a pair by up to 17 %; whether a load average of 3.0

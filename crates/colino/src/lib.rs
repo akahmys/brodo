@@ -9,6 +9,7 @@ pub mod distance;
 pub mod error;
 pub mod mesh;
 pub mod obj;
+pub mod report;
 pub mod stl;
 pub mod surface;
 pub mod threemf;

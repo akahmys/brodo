@@ -258,17 +258,20 @@ traits from `freeze` on (§4.6).
 
 | Layer | Content | Method |
 | :--- | :--- | :--- |
-| 1. Global invariants | β₀, β₁, β₂ of the solid (φ < 0) and of its complement (φ > 0) | β₀: components; β₂: complement components not reaching the outside; β₁ = β₀ + β₂ − χ |
+| 1. Global invariants | β₀, β₁, β₂ of the solid (φ < 0) and of its complement (φ ≥ 0) in the 3-sphere | β₀: components; β₂: complement components not reaching the outside; β₁ = β₀ + β₂ − χ |
 | 2. Labelled connectivity | whether user-labelled regions lie in one complement component | flood fill |
 | 3. Local risk | places thinner, or gaps narrower, than two voxels | predicted from the input before conversion, as coordinates and extents |
 
-- Connectivity: the solid 26, its complement 6; the complement's Betti numbers counted,
-  and held by tests to duality with the solid's (ADR-0028).
+- Connectivity: the solid 26, its complement 6. The complement's β₀ is counted and held
+  by tests to duality with the solid's β₂; its β₁ and β₂ are the solid's by duality, since
+  under this pairing each lattice vertex adds as much to the complement's χ as to the
+  solid's (ADR-0028).
 - Reference for layer 1: the input's V − E + F when, welded, it is a closed 2-manifold,
   the solid's χ being half the surface's; otherwise, in P2, none, the report saying why;
   later, a local reconversion of the risky places at h/2, whose invariants must agree.
 - Layer 2's regions are named points in world coordinates, each answered with its
-  complement component, or the solid.
+  complement component, whether that reaches the outside, or the solid. Where a change
+  lies is not reported until layer 3, and the report says so.
 - The report is a structure serialisable with `serde` behind the feature `serde`: what may
   have changed, where (from layer 3), and by how much.
 
