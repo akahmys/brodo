@@ -32,7 +32,8 @@ the kernel panicked. macOS enforces neither `ulimit -v`, `-d` nor `-m`.
 - The timeout is twice the unmutated suite's time (`timeout_multiplier`). In the spike,
   each of the 7 mutants still running then had already failed 18 to 29 tests; libtest runs
   a binary's remaining tests after a failure, and a labelling test on a broken topology
-  outran the 431 s timeout each time. Stopping a binary at its first failure needs a nightly harness flag.
+  outran the 431 s timeout each time. Stopping a binary at its first failure needs a
+  nightly harness flag.
 
 Shown to fire: the gate's check failed on a pattern with its comment removed, on a
 pattern matching no mutant, and on a double-quoted pattern; `--report` failed on the

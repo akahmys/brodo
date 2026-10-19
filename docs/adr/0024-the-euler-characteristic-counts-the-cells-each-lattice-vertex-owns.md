@@ -1,6 +1,6 @@
 # ADR-0024: The Euler characteristic counts the cells each lattice vertex owns
 
-- **Status**: Accepted
+- **Status**: Amended
 - **Date**: 2026-10-18
 
 ## Context
@@ -42,3 +42,25 @@ The human decided, on 2026-10-18:
 χ comes in two units: over leaves, then across regions with no leaf. Its Reference test
 counts n₀ − n₁ + n₂ − n₃ on a dense grid directly. B-011 still holds back dilation and
 erosion.
+
+## Amendment
+
+- **Date**: 2026-10-19
+
+Before χ was built, a brute-force count found three points of the decision wrong or
+costlier than needed, and the human decided them:
+
+- Under 6-connectivity the cells counted form the dual complex: a lattice vertex, an
+  edge, a face and a cube stand for a cube, a face, an edge and a voxel, so each counts
+  with the sign of dimension 3 − d. With the sign of d, a box came out −1.
+- "Each leaf owning the vertices at its own voxels' lower corners" missed a vertex whose
+  own voxel is in a tile and another of its 8 voxels in a leaf. A vertex whose 8 voxels
+  hold a leaf voxel is counted by the leaf holding the first of them, x fastest, from
+  that leaf's gather.
+- Away from leaves, the voxels meeting the condition are disjoint aligned boxes, the
+  tiles that meet it. A vertex inside one or within a face of one sees a flat pattern and
+  contributes nothing, so only the vertices on the edges of those tiles are summed,
+  12 × the edge per tile, instead of descending the levels. On 300 random unions of boxes
+  the edge sum equalled the sum over every vertex, under both tables, χ ≠ 0 in 599 of the
+  600 counts. The shapes counted: one voxel 1; two meeting at a corner or an edge 1 under
+  26 and 2 under 6; at a face 1; a 5³ shell 2; a ring 0.
