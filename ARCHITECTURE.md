@@ -66,7 +66,7 @@ The dependency order between crates is CODING.md Rule 11, listed in
   `trailing_zeros`.
 - A **tile** stands for a uniform region in a child's place, without a leaf. The
   **background** is the value outside the tree.
-- A leaf holds no per-voxel active state: all 512 voxels are active (B-011 is open).
+- A leaf holds no per-voxel active state: all 512 voxels are active (ADR-0025).
 - Activating a voxel creates its leaf, and the nodes above it, where none is; inside a
   tile it changes nothing. Splitting a tile turns each level on the path to the voxel into
   a node whose other children are tiles, down to one leaf.
@@ -168,7 +168,11 @@ fastest. A neighbour beyond the `i32` coordinate range is the background.
   touching a leaf is summed by the leaf holding the first of its voxels, per leaf in
   parallel; elsewhere only the edges of the tiles meeting the condition are walked. A set
   holding the background is unbounded and refused.
-- Dilation and erosion, of topology and values.
+- Dilation and erosion (ADR-0025), by k steps, 6- or 26-connected. Of a topology, on
+  whole leaves: dilating adds a leaf at every background cell within reach of a leaf or
+  tile, eroding removes every leaf within reach of the background, splitting a larger
+  tile where it must; each returns its `Remap`. Of values on a fixed topology: a max or a
+  min over the neighbourhood, k times, written to leaf voxels only.
 
 ### 4.6 Frozen view (ADR-0016)
 
@@ -267,7 +271,7 @@ In `brodo`, each behind a cargo feature:
   one. The colour range is given by the caller, never inferred, and refused unless it is
   finite and not empty. A tile's voxels take its
   value's colour, hatched; the background is a flat grey; a value that is not a number is
-  magenta; with no per-voxel mask (B-011), nothing else is inactive. The same input gives
+  magenta; with no per-voxel mask (ADR-0025), nothing else is inactive. The same input gives
   the same bytes. The encoder is `png`, pure Rust. The slices kept as golden images are
   written to `out/slices/` for a look by
   `cargo test -p brodo --test slice_images -- --ignored`.

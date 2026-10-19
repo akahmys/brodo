@@ -52,3 +52,4 @@ A record is `Proposed` until the human accepts it.
 | [0022](0022-every-test-is-listed-so-a-deleted-test-needs-an-adr.md) | Every test is listed, so that a deleted test needs an ADR |
 | [0023](0023-mutation-testing-closes-a-milestone-behind-a-memory-guard.md) | Mutation testing closes a milestone, behind a memory guard |
 | [0024](0024-the-euler-characteristic-counts-the-cells-each-lattice-vertex-owns.md) | The Euler characteristic counts the cells each lattice vertex owns |
+| [0025](0025-dilation-and-erosion-work-on-whole-leaves-without-a-mask.md) | Dilation and erosion work on whole leaves, without a per-voxel mask |

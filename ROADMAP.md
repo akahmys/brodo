@@ -8,15 +8,16 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: P2's first item, in part: `brodo::euler::euler`, the Euler characteristic
-  under 6- or 26-connectivity (ADR-0024), checked against a dense cell-by-cell count and
-  known shapes (ball 1, shell 2, torus 0, double torus −1).
-- **Next**: dilation and erosion, starting with what they mean and B-011's spike; then
-  checking that labelling meets §5.2's needs, which closes the item.
+- **Done**: B-011 answered by `spikes/dilate/`: dilation and erosion work on whole
+  leaves, without a per-voxel mask (ADR-0025). Before it, `brodo::euler::euler`
+  (ADR-0024).
+- **Next**: dilation and erosion of topology, then of values; then checking that
+  labelling meets §5.2's needs, which closes P2's first item.
 - **Unresolved problems**: Miri's Stacked Borrows reports undefined behaviour in
   `crossbeam-epoch` under rayon; Tree Borrows does not (ADR-0015). The leaf-parallel
   update's benchmark disagrees within a pair by up to 17 %; whether a load average of 3.0
-  catches other work is unknown (ADR-0019). Allocating and dropping its output field
+  catches other work is unknown (ADR-0019); one reading: other work in another project
+  raised it to 14.76 (2026-10-19). Allocating and dropping its output field
   takes about a third of that item (1.04 of 3.3 ms, 2026-10-18, load 3.3), but the
   update alone varied as much, so it is not shown to cause the spread. For P2: labelling
   holds about 13 bytes per leaf voxel at its peak, to be measured at colino's sizes.
@@ -124,10 +125,9 @@ implementation (PLANNING.md §2).
 | B-005 | What is the archive profile's default compressor, and is it pure Rust (CODING.md Rule 12)? | Zstd, LZ4 when decompression speed is asked for; whether a pure-Rust implementation suffices is to be measured |
 | B-006 | Does `vdb-rs` pass Rules 12 and 13 (no C, permissive licence) on every target? | To be checked before it is added |
 | B-013 | Which crates handle `piatto`'s window, input and GUI parts? | `winit` and `egui`, to be measured against Rules 12 and 13 (ADR-0018) |
-| B-011 | Do dilation and erosion (§4.5) need a per-voxel active mask in each leaf? | None yet; a leaf has no per-voxel state now, and labelling works on values without one (ADR-0013) |
 
 No spike is running. `spikes/remap/` answered B-001 and B-008, and `spikes/merge/` B-010
-(ADR-0014); `spikes/vtk/` answered B-012 (ADR-0018); `spikes/bench/` B-007 (ADR-0019); `spikes/threads/` B-014, rayon kept (ADR-0015); `spikes/mutants/` the audit review's proposal C (ADR-0023).
+(ADR-0014); `spikes/vtk/` answered B-012 (ADR-0018); `spikes/bench/` B-007 (ADR-0019); `spikes/threads/` B-014, rayon kept (ADR-0015); `spikes/dilate/` B-011, no mask (ADR-0025); `spikes/mutants/` the audit review's proposal C (ADR-0023).
 
 ## 4. Administrative items still open
 
