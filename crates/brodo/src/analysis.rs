@@ -55,6 +55,10 @@ pub enum AnalysisError {
     /// A voxel no unit stands for: the labels and topology disagree.
     #[error("voxel {0:?} has no unit")]
     Unlabelled(Coord),
+    /// The voxels meeting the condition include the background, so are unbounded and have
+    /// no Euler characteristic (ADR-0024).
+    #[error("the background meets the condition: the set is unbounded")]
+    Unbounded,
 }
 
 /// A voxel's label.

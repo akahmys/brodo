@@ -6,6 +6,7 @@ pub mod accessor;
 pub mod analysis;
 pub mod cache;
 pub mod error;
+pub mod euler;
 pub mod field;
 pub mod frozen;
 pub mod gather;

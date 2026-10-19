@@ -8,13 +8,11 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: a review's findings, checked by measurement, fixed in three units:
-  `slice::render` refuses a colour map with no finite, non-empty range (Rule 21); the
-  cache reader accepts only the bytes its writer puts (ADR-0016); the mutation run's
-  settings moved into `mutants.py` and its guard covers a test's descendants (ADR-0023).
-  The mutation-testing spike and TESTING.md T11 came before; the whole crate has not been
-  run yet.
-- **Next**: P2, `colino`.
+- **Done**: P2's first item, in part: `brodo::euler::euler`, the Euler characteristic
+  under 6- or 26-connectivity (ADR-0024), checked against a dense cell-by-cell count and
+  known shapes (ball 1, shell 2, torus 0, double torus −1).
+- **Next**: dilation and erosion, starting with what they mean and B-011's spike; then
+  checking that labelling meets §5.2's needs, which closes the item.
 - **Unresolved problems**: Miri's Stacked Borrows reports undefined behaviour in
   `crossbeam-epoch` under rayon; Tree Borrows does not (ADR-0015). The leaf-parallel
   update's benchmark disagrees within a pair by up to 17 %; whether a load average of 3.0

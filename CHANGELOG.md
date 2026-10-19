@@ -12,6 +12,9 @@ are recorded here when they change (V6).
 - The cache reader refuses a file with bytes its writer never puts: a gap, non-zero
   padding or unused words, anything after the last grid, a metadata key twice or out of
   order. Files brodo wrote still read; cache format version stays 1.
+- `brodo::euler::euler`: the Euler characteristic of the voxels meeting a condition, under
+  6- or 26-connectivity (ADR-0024), with the new `AnalysisError::Unbounded`. A `match`
+  over `AnalysisError` needs the new arm.
 
 ## 0.2.0 (2026-10-17)
 
