@@ -7,7 +7,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::error::TreeError;
 use crate::manifest::{DIRECTIONS, LeafManifest};
-use crate::tree::{Activation, Coord, LeafId, Probe, Step, TileLevel, Tree};
+use crate::tree::{Activation, Coord, Deactivation, LeafId, Probe, Step, TileLevel, Tree};
 
 static NEXT_STAMP: AtomicU64 = AtomicU64::new(1);
 
@@ -327,6 +327,12 @@ impl TopologyEditor<'_> {
     /// Makes the voxel's region a leaf; inside a tile it changes nothing (`Tree::activate`).
     pub fn activate(&mut self, v: Coord) -> Result<Activation, TreeError> {
         self.tree.activate(v)
+    }
+
+    /// Removes the leaf holding the voxel, and the nodes it leaves empty
+    /// (`Tree::deactivate`); in a tile it is refused.
+    pub fn deactivate(&mut self, v: Coord) -> Result<Deactivation, TreeError> {
+        self.tree.deactivate(v)
     }
 
     /// Makes the region of the given level holding the voxel a tile (`Tree::add_tile`).

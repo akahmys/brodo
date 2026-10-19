@@ -96,10 +96,11 @@ pub struct Field<T> {
   rule chosen when it is made (the same-bits rule unless another is given). Its `edit`
   takes the edits as a closure, commits them and remaps the field in one step; if any part
   fails, the grid is unchanged.
-- Topology changes (activation, dilation, pruning, splitting and merging tiles) go
-  through an editor (`TopologyEditor`) and take effect at `commit`, which returns a new
-  topology and a `Remap` to it, and leaves the old topology usable. Every field on the old
-  topology is remapped by it.
+- Topology changes (activation, removing a leaf, dilation, pruning, splitting and merging
+  tiles) go through an editor (`TopologyEditor`) and take effect at `commit`, which
+  returns a new topology and a `Remap` to it, and leaves the old topology usable. Every
+  field on the old topology is remapped by it. Removing a leaf removes the nodes it leaves
+  empty; in a tile it is refused (ADR-0025).
 - Every topology carries a stamp unique in the process. A field records the stamp of the
   topology it was made or remapped for; using it with another topology, a remap included,
   is the typed error `StaleField`.

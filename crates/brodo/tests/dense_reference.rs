@@ -1,12 +1,13 @@
 //! Reference tier (TESTING.md §1): random activation and writes give the same values as a
 //! dense grid. The dense grid is a plain array over a box of 24³ voxels around the origin.
 //! A write to a leaf voxel sets one element; a write to a tile sets every element its region
-//! covers; a topology edit changes no value at all. After every commit and every round of
+//! covers; a topology edit changes no value, but removing a leaf returns its region to the
+//! background. After every commit and every round of
 //! writes, every voxel of the box must read the same bits from the grid.
 
 use brodo::grid::Grid;
 use brodo::topology::Location;
-use brodo::tree::{Coord, TileLevel};
+use brodo::tree::{Coord, Deactivation, TileLevel};
 use proptest::prelude::*;
 
 /// The box: voxels from LO to HI - 1 on each axis.
@@ -47,6 +48,8 @@ impl Dense {
 #[derive(Debug, Clone)]
 enum Op {
     Activate(Coord),
+    /// A leaf removed: its region reads the background again; in a tile it is refused.
+    Deactivate(Coord),
     AddTile(TileLevel, Coord),
     Split(Coord),
     /// A merge: values stay as they are, or the rule refuses and nothing changes.
@@ -71,7 +74,7 @@ type Round = (Vec<Op>, Vec<(Coord, i16)>);
 /// a tile and most writes find a leaf or a tile.
 fn rounds() -> impl Strategy<Value = Vec<Round>> {
     let near = (0..6_usize, [0..3_i32, 0..3, 0..3]);
-    let kind = prop_oneof![5 => Just(0_u8), 2 => Just(1), 2 => Just(2), 2 => Just(3), 1 => Just(4), 1 => Just(5)];
+    let kind = prop_oneof![5 => Just(0_u8), 2 => Just(1), 2 => Just(2), 2 => Just(3), 1 => Just(4), 1 => Just(5), 3 => Just(6)];
     let edit = (kind, level(), near.clone());
     let round =
         (prop::collection::vec(edit, 1..8), prop::collection::vec((near, any::<i16>()), 0..30));
@@ -91,7 +94,8 @@ fn rounds() -> impl Strategy<Value = Vec<Round>> {
                             2 => Op::Split(at(n)),
                             3 => Op::Merge(TileLevel::Lower, at(n)),
                             4 => Op::Merge(TileLevel::Upper, at(n)),
-                            _ => Op::FillTiles(at(n)),
+                            5 => Op::FillTiles(at(n)),
+                            _ => Op::Deactivate(at(n)),
                         })
                         .collect();
                     (ops, writes.into_iter().map(|(n, x)| (at(n), x)).collect())
@@ -119,8 +123,12 @@ proptest! {
         for (ops, writes) in rounds {
             for op in ops {
                 // Each edit is committed alone, so a refused one leaves the rest in.
+                let mut removed = None;
                 let _refused = g.edit(|e| match op {
                     Op::Activate(v) => e.activate(v).map(|_| ()),
+                    Op::Deactivate(v) => e.deactivate(v).map(|d| {
+                        removed = matches!(d, Deactivation::Removed(_)).then_some(v);
+                    }),
                     Op::AddTile(l, v) => e.add_tile(l, v),
                     Op::Split(v) => e.split_tile(v),
                     Op::Merge(l, v) => e.merge(l, v),
@@ -133,6 +141,9 @@ proptest! {
                         Ok(())
                     }
                 });
+                if let Some(v) = removed {
+                    d.fill(TileLevel::Lower, v, BACKGROUND);
+                }
             }
             check(&g, &d)?;
             for (v, x) in writes {

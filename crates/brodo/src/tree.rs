@@ -171,6 +171,23 @@ macro_rules! internal_node {
                 Some(id)
             }
 
+            /// Empties the place holding `v`, giving its child's number, or nothing where
+            /// there was no child.
+            fn remove_child(&mut self, v: Coord) -> Option<u32> {
+                let i = Self::index(v);
+                if !self.children.get(i) {
+                    return None;
+                }
+                let id = self.child_ids.remove(self.children.count_before(i));
+                self.children.clear(i);
+                Some(id)
+            }
+
+            /// Whether no place holds a child or a tile.
+            fn is_empty(&self) -> bool {
+                self.children.count() + self.tiles.count() == 0
+            }
+
             /// Each child's place and number, in place order.
             fn children(&self) -> impl Iterator<Item = (usize, u32)> + '_ {
                 self.children.ones().zip(self.child_ids.iter().copied())
@@ -275,6 +292,15 @@ pub(crate) enum Place {
     Child,
     Tile,
     Empty,
+}
+
+/// What deactivating a voxel did.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Deactivation {
+    /// The voxel's leaf was removed, with the nodes above it it left empty.
+    Removed(LeafId),
+    /// The voxel was in the background already; nothing changed.
+    Background,
 }
 
 /// What activating a voxel did.
@@ -479,6 +505,41 @@ impl Tree {
             Slot::Child(id) => Ok(Activation::Existing(LeafId(id))),
             Slot::Empty => self.new_leaf(l, v).map(Activation::Created),
         }
+    }
+
+    /// Removes the leaf holding the voxel, and each node above it that is left with nothing
+    /// in it, so that its region is the background again. A tile is not split: removing a
+    /// voxel in one is refused (ADR-0025). The removed entries become unreachable.
+    pub fn deactivate(&mut self, v: Coord) -> Result<Deactivation, TreeError> {
+        let key = align(v, UPPER_SPAN_LOG2);
+        let in_tile = |level| Err(TreeError::InTile { level, voxel: v });
+        let u = match self.root.get(&key) {
+            None => return Ok(Deactivation::Background),
+            Some(RootEntry::Tile) => return in_tile(TileLevel::Root),
+            Some(RootEntry::Node(u)) => *u,
+        };
+        let l = match self.upper[to_usize(u)].slot(v) {
+            Slot::Empty => return Ok(Deactivation::Background),
+            Slot::Tile => return in_tile(TileLevel::Upper),
+            Slot::Child(l) => l,
+        };
+        let lower = &mut self.lower[to_usize(l)];
+        let leaf = match lower.slot(v) {
+            Slot::Empty => return Ok(Deactivation::Background),
+            Slot::Tile => return in_tile(TileLevel::Lower),
+            Slot::Child(id) => {
+                lower.remove_child(v);
+                id
+            }
+        };
+        if lower.is_empty() {
+            let upper = &mut self.upper[to_usize(u)];
+            upper.remove_child(v);
+            if upper.is_empty() {
+                self.root.remove(&key);
+            }
+        }
+        Ok(Deactivation::Removed(LeafId(leaf)))
     }
 
     /// Makes the region of the given level holding the voxel a tile, creating the nodes
@@ -816,6 +877,35 @@ mod tests {
             }
         }
 
+        /// What deactivating gives: the removed leaf's origin, the background, or the
+        /// level of the tile refusing it.
+        fn deactivate(&mut self, v: Coord) -> Result<Option<Coord>, TileLevel> {
+            if let Some(l) = self.tile_at(v) {
+                return Err(l);
+            }
+            let o = align(v, LEAF_LOG2);
+            Ok(self.leaves.remove(&o).then_some(o))
+        }
+
+        /// The nodes a tree holding exactly these leaves and tiles needs: upper, lower.
+        fn nodes(&self) -> [usize; 2] {
+            let below_root = self.tiles.iter().filter(|(l, _)| *l != TileLevel::Root);
+            let lower: BTreeSet<Coord> = self
+                .leaves
+                .iter()
+                .copied()
+                .chain(below_root.clone().filter(|(l, _)| *l == TileLevel::Lower).map(|(_, o)| *o))
+                .map(|o| align(o, LOWER_SPAN_LOG2))
+                .collect();
+            let upper: BTreeSet<Coord> = lower
+                .iter()
+                .copied()
+                .chain(below_root.map(|(_, o)| *o))
+                .map(|o| align(o, UPPER_SPAN_LOG2))
+                .collect();
+            [upper.len(), lower.len()]
+        }
+
         /// The result's kind, and the leaf origin where there is one.
         fn activate(&mut self, v: Coord) -> (u8, Option<Coord>) {
             if self.tile_at(v).is_some() {
@@ -921,6 +1011,7 @@ mod tests {
     #[derive(Debug, Clone)]
     enum Op {
         Activate(Coord),
+        Deactivate(Coord),
         AddTile(TileLevel, Coord),
         Split(Coord),
         Merge(TileLevel, Coord),
@@ -950,6 +1041,7 @@ mod tests {
         #[derive(Debug, Clone, Copy)]
         enum Kind {
             Activate,
+            Deactivate,
             AddTile(TileLevel),
             Split,
             Merge(TileLevel),
@@ -958,6 +1050,7 @@ mod tests {
         }
         let kind = prop_oneof![
             6 => Just(Kind::Activate),
+            4 => Just(Kind::Deactivate),
             4 => level().prop_map(Kind::AddTile),
             4 => Just(Kind::Split),
             2 => Just(Kind::Merge(TileLevel::Lower)),
@@ -975,6 +1068,7 @@ mod tests {
                         let v = [0, 1, 2].map(|k| pool[i][k] + d[k]);
                         match kind {
                             Kind::Activate => Op::Activate(v),
+                            Kind::Deactivate => Op::Deactivate(v),
                             Kind::AddTile(l) => Op::AddTile(l, v),
                             Kind::Split => Op::Split(v),
                             Kind::Merge(l) => Op::Merge(l, v),
@@ -1009,6 +1103,18 @@ mod tests {
         out
     }
 
+    fn deactivate(t: &mut Tree, m: &mut Model, v: Coord) -> Result<(), TestCaseError> {
+        // The removed leaf's origin is read before a later edit could reuse its entry.
+        let got = match t.deactivate(v) {
+            Ok(Deactivation::Removed(id)) => Ok(Some(t.leaves[to_usize(id.0)])),
+            Ok(Deactivation::Background) => Ok(None),
+            Err(TreeError::InTile { level, voxel }) if voxel == v => Err(level),
+            Err(e) => return Err(TestCaseError::fail(format!("{e}"))),
+        };
+        prop_assert_eq!(got, m.deactivate(v));
+        Ok(())
+    }
+
     fn step(t: &mut Tree, m: &mut Model, op: &Op) -> Result<Coord, TestCaseError> {
         let v = match *op {
             Op::Activate(v) => {
@@ -1018,6 +1124,10 @@ mod tests {
                     Activation::InTile(_) => (2, None),
                 };
                 prop_assert_eq!(got, m.activate(v));
+                v
+            }
+            Op::Deactivate(v) => {
+                deactivate(t, m, v)?;
                 v
             }
             Op::AddTile(l, v) => {
@@ -1081,6 +1191,8 @@ mod tests {
             let c = t.compacted().unwrap();
             let lens = c.arena_lens();
             prop_assert_eq!(lens[2], m.leaves.len());
+            // No node is left empty: exactly those the leaves and tiles need.
+            prop_assert_eq!([lens[0], lens[1]], m.nodes());
             prop_assert_eq!(c.tiles(), t.tiles());
         }
     }

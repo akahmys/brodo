@@ -20,6 +20,14 @@ pub enum TreeError {
     /// No tile contains the voxel to split at.
     #[error("no tile contains voxel {0:?}")]
     NotATile(Coord),
+    /// A tile holds the voxel to deactivate; it must be split first (ADR-0025).
+    #[error("a {level:?} tile holds voxel {voxel:?}; split it before deactivating")]
+    InTile {
+        /// The tile's level.
+        level: TileLevel,
+        /// The voxel given.
+        voxel: Coord,
+    },
     /// The region a tile was to fill already holds a tile, a node or a leaf, or lies in a
     /// tile.
     #[error("the {level:?} region containing voxel {voxel:?} is not empty")]

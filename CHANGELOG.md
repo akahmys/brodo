@@ -15,6 +15,9 @@ are recorded here when they change (V6).
 - `brodo::euler::euler`: the Euler characteristic of the voxels meeting a condition, under
   6- or 26-connectivity (ADR-0024), with the new `AnalysisError::Unbounded`. A `match`
   over `AnalysisError` needs the new arm.
+- `Tree::deactivate` and `TopologyEditor::deactivate` remove a leaf, and the nodes it
+  leaves empty, returning a `Deactivation`; inside a tile they refuse with the new
+  `TreeError::InTile` (ADR-0025). A `match` over `TreeError` needs the new arm.
 
 ## 0.2.0 (2026-10-17)
 
