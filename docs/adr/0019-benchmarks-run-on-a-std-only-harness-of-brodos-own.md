@@ -80,3 +80,28 @@ hand. The audit review asked for a rule: TESTING.md T10, a change to `src/` on a
 benchmark times is benchmarked before it lands and does not land while an item fails. It
 is held by review: nothing checks that a commit was benchmarked.
 
+
+## Amendment
+
+- **Date**: 2026-10-20
+
+colino's conversion needed watching after it was measured at scale: at a sphere radius
+of 400 voxels it took 33 s and labelling 9.5 s, at 200 voxels 6.9 s and 2.4 s, the
+winding number 77 % of the conversion's values (ADR-0027). The human chose to measure
+before changing it, and to share the harness rather than write a second (PLANNING.md §2).
+
+- The harness moved, unchanged in what it does, to `crates/brodo/benches/harness/mod.rs`;
+  each member's benchmark includes it, colino's by `#[path]`, and calls `run` with its
+  data and items. Each writes to `out/bench/<crate>/`, so that two members' children do
+  not overwrite each other's files.
+- colino's items: a sphere of radius 50 voxels, 8192 triangles, converted with a band of 3
+  (325 ms), and labelled (165 ms), recorded on 2026-10-20 at rest.
+- brodo's items gave the same verdicts through the shared harness: all within their
+  baselines at rest, the leaf-parallel update at +2.7 and +9.9 %. A first run, with
+  another program using more than one core, failed that item at +16 % in both children
+  though the load average let it start: one more reading for the open question on the
+  load average (ROADMAP.md §1).
+
+Including a file outside the crate means colino's benchmark cannot be packaged as it
+stands; before colino is published, its benchmark is excluded or the harness becomes a
+crate of its own.

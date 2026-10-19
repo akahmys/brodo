@@ -8,26 +8,25 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: P2's third item (ADR-0027): the nearest triangle through a tree of boxes,
-  the winding number exact and approximate, and the conversion into a band with inside
-  tiles, checked against dense references, a sphere's and a torus's Betti numbers, and
-  slices looked at (T8).
+- **Done**: conversion measured at scale and put under the Benchmark tier (ADR-0019):
+  the harness shared from `crates/brodo/benches/harness/`, colino's items recorded. At
+  a sphere radius of 400 voxels (524288 triangles) conversion took 33 s on 10 cores,
+  773 MB, the winding number 77 % of it; at 1500, assuming surface-proportional growth and
+  the tree's depth adding half again, about 11 minutes and 11 GB, labelling 2 more minutes
+  and 6 GB (2026-10-20). Not changed for now.
 - **Next**: P2's fourth item, the topology report, layers 1 and 2 (§5.2).
 - **Unresolved problems**: Miri's Stacked Borrows reports undefined behaviour in
   `crossbeam-epoch` under rayon; Tree Borrows does not (ADR-0015). The leaf-parallel
   update's benchmark disagrees within a pair by up to 17 %; whether a load average of 3.0
-  catches other work is unknown (ADR-0019); one reading: other work in another project
-  raised it to 14.76 (2026-10-19). Allocating and dropping its output field
-  takes about a third of that item (1.04 of 3.3 ms, 2026-10-18, load 3.3), but the
-  update alone varied as much, so it is not shown to cause the spread. For P2: labelling
-  holds about 13 bytes per leaf voxel at its peak, to be measured at colino's sizes. The
-  gate's debug tests grew: `morphology_reference` takes 27 s at a load of 5 (2026-10-19).
-  Labelling is slow in a debug build: the Betti test's 8 labellings of up to 216 leaves
-  took 10 s in debug and 0.6 s in release for 16 (both under other work, 2026-10-19); at
-  colino's sizes it is to be benchmarked. Conversion is unmeasured at scale: candidate
-  cells are enumerated over each triangle's box, which for a long diagonal triangle grows
-  with its volume, and inside regions take one winding number each, on one thread; a
-  benchmark at colino's sizes is to come before either is changed.
+  catches other work is unknown (ADR-0019); readings: other work in another project
+  raised it to 14.76 (2026-10-19); a program using more than one core let the run start
+  and failed the leaf-parallel update at +16 % (2026-10-20). Allocating and dropping its
+  output field takes about a third of that item (1.04 of 3.3 ms, 2026-10-18, load 3.3),
+  but the update alone varied as much, so it is not shown to cause the spread.
+  Labelling held about 440 MB for the 33 million leaf voxels of a sphere of radius 400,
+  near the 13 bytes a voxel estimated, and took 9.5 s on one thread (2026-10-20); it has
+  a benchmark item. The gate's debug tests grew: `morphology_reference` takes 27 s at a
+  load of 5 (2026-10-19).
 
 ## 2. Milestones
 

@@ -20,3 +20,8 @@ rayon.workspace = true
 
 [lints]
 workspace = true
+
+# The Benchmark tier on brodo's harness (TESTING.md §1, ADR-0019).
+[[bench]]
+name = "colino"
+harness = false
