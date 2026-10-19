@@ -113,6 +113,7 @@ dependencies = [
  "proptest",
  "quick-xml",
  "rawzip",
+ "rayon",
  "thiserror",
 ]
 

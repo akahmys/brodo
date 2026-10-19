@@ -4,6 +4,7 @@
 //! far (ROADMAP.md, P2).
 
 pub mod bvh;
+pub mod convert;
 pub mod distance;
 pub mod error;
 pub mod mesh;

@@ -33,6 +33,9 @@ are recorded here when they change (V6).
   nearest triangle of a mesh, the lowest-numbered of equals (ADR-0027).
 - `colino::winding::{Winding, Accuracy, solid_angle}`: the generalised winding number,
   exact or by Barill et al.'s approximation (ADR-0027).
+- `colino::convert::{convert, Options, Converted}` and `colino::error::ConvertError`: a
+  mesh into a narrow-band signed distance field with inside tiles and its metadata
+  (ADR-0027).
 
 ## 0.2.0 (2026-10-17)
 

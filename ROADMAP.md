@@ -8,10 +8,11 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: the first two units of P2's third item (ADR-0027): the nearest triangle
-  through a tree of boxes, and the winding number, exact and approximate.
-- **Next**: the band: leaves, values and inside tiles, checked against a dense reference
-  and known shapes, with slices looked at (T8).
+- **Done**: P2's third item (ADR-0027): the nearest triangle through a tree of boxes,
+  the winding number exact and approximate, and the conversion into a band with inside
+  tiles, checked against dense references, a sphere's and a torus's Betti numbers, and
+  slices looked at (T8).
+- **Next**: P2's fourth item, the topology report, layers 1 and 2 (§5.2).
 - **Unresolved problems**: Miri's Stacked Borrows reports undefined behaviour in
   `crossbeam-epoch` under rayon; Tree Borrows does not (ADR-0015). The leaf-parallel
   update's benchmark disagrees within a pair by up to 17 %; whether a load average of 3.0
@@ -23,7 +24,10 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   gate's debug tests grew: `morphology_reference` takes 27 s at a load of 5 (2026-10-19).
   Labelling is slow in a debug build: the Betti test's 8 labellings of up to 216 leaves
   took 10 s in debug and 0.6 s in release for 16 (both under other work, 2026-10-19); at
-  colino's sizes it is to be benchmarked.
+  colino's sizes it is to be benchmarked. Conversion is unmeasured at scale: candidate
+  cells are enumerated over each triangle's box, which for a long diagonal triangle grows
+  with its volume, and inside regions take one winding number each, on one thread; a
+  benchmark at colino's sizes is to come before either is changed.
 
 ## 2. Milestones
 
@@ -103,7 +107,7 @@ Not part of P1's acceptance, and not started while ParaView suffices (ADR-0018).
 
 - [x] Euler characteristic, connected components, dilation and erosion (§4.5)
 - [x] STL, OBJ and 3MF readers, each in `UNTRUSTED_INPUT` and fuzzed (§5.1)
-- [ ] Generalised winding number and the narrow-band output (§5.1)
+- [x] Generalised winding number and the narrow-band output (§5.1)
 - [ ] Topology report, layers 1 and 2 (§5.2)
 - [ ] README and examples for publishing on its own
 - [ ] Retrospective and refactoring; fuzz round; Miri run; mutation run (ADR-0023)

@@ -179,6 +179,23 @@ impl Winding {
         Ok(Winding { bvh, expansions })
     }
 
+    /// The mesh's triangles, by their corners.
+    pub(crate) fn triangles(&self) -> &[[Point; 3]] {
+        &self.bvh.corners
+    }
+
+    /// The distance from `q` to the nearest triangle; nothing for a mesh with none.
+    pub(crate) fn nearest(&self, q: Point) -> Option<f64> {
+        self.bvh.nearest(q).map(|(d, _)| d)
+    }
+
+    /// The box holding every triangle, its least and greatest corner; nothing for a mesh
+    /// with none.
+    pub(crate) fn bounds(&self) -> Option<(Point, Point)> {
+        let root = self.bvh.nodes.first().filter(|n| n.count > 0)?;
+        Some((root.bounds.lo, root.bounds.hi))
+    }
+
     /// The winding number at `q`.
     pub fn number(&self, q: Point, accuracy: Accuracy) -> f64 {
         match accuracy {

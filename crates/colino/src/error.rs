@@ -152,3 +152,29 @@ pub enum MeshError {
     #[error("more vertices than a u32 numbers")]
     TooManyVertices,
 }
+
+/// Why a mesh could not be converted.
+#[derive(Debug, Clone, PartialEq, thiserror::Error)]
+pub enum ConvertError {
+    /// The mesh names a vertex it lacks.
+    #[error(transparent)]
+    Mesh(#[from] MeshError),
+    /// The tree refused an edit.
+    #[error(transparent)]
+    Tree(#[from] brodo::error::TreeError),
+    /// A field refused a read or write.
+    #[error(transparent)]
+    Field(#[from] brodo::error::FieldError),
+    /// The grid's metadata was refused.
+    #[error(transparent)]
+    Meta(#[from] brodo::error::MetaError),
+    /// An option outside what conversion takes.
+    #[error("bad option: {0}")]
+    BadOption(&'static str),
+    /// Neither the mesh nor the options give a unit.
+    #[error("no unit: the mesh states none and the options give none")]
+    NoUnit,
+    /// The mesh reaches beyond the voxel coordinates brodo holds.
+    #[error("the mesh reaches beyond the grid's i32 voxel coordinates")]
+    OutOfRange,
+}
