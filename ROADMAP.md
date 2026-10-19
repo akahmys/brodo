@@ -8,11 +8,12 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: dilation and erosion of a topology, `brodo::morphology::{dilate, erode}`, on
-  whole leaves (ADR-0025), and removing a leaf, `deactivate`. Dilating a root tile by one
-  step adds 1582088 leaves (26-connected), so its cost follows the tile's surface.
-- **Next**: dilation and erosion of values; then checking that labelling meets §5.2's
-  needs, which closes P2's first item.
+- **Done**: dilation and erosion of a topology (`dilate`, `erode`, on whole leaves) and of
+  values (`dilate_values`, `erode_values`, a max or min filter on leaf voxels), ADR-0025;
+  removing a leaf, `deactivate`. Dilating a root tile by one step adds 1582088 leaves
+  (26-connected), so its cost follows the tile's surface.
+- **Next**: checking that labelling and χ give §5.2's invariants for known shapes, which
+  closes P2's first item.
 - **Unresolved problems**: Miri's Stacked Borrows reports undefined behaviour in
   `crossbeam-epoch` under rayon; Tree Borrows does not (ADR-0015). The leaf-parallel
   update's benchmark disagrees within a pair by up to 17 %; whether a load average of 3.0

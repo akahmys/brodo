@@ -8,11 +8,20 @@
 //! every background cell within k steps of an active one; eroding by k removes every leaf
 //! within k steps of a background cell, splitting a larger tile where its cells must go.
 //! Both decide on the topology given, and return the edited one with its `Remap`.
+//!
+//! Values are dilated and eroded on a fixed topology: each leaf voxel takes the largest,
+//! or smallest, value of itself and its 6 or 26 neighbours, k times over. Tiles and the
+//! background are read, never written. A NaN among them wins, so it is not lost.
 
 use std::collections::BTreeSet;
 
+use std::cmp::Ordering;
+
 use crate::analysis::Connectivity;
-use crate::error::TreeError;
+use crate::error::{FieldError, TreeError};
+use crate::field::{Field, Value};
+use crate::gather::{GATHER_EDGE, GATHER_VOXELS, gather};
+use crate::parallel::par_update;
 use crate::topology::{Location, Remap, Topology};
 use crate::tree::Coord;
 
@@ -189,6 +198,93 @@ fn removed(
         }
     }
     Ok((leaves, split))
+}
+
+/// A value with an order to take the largest or smallest by: the scalar value types. A
+/// vector has no such order, so `[f32; 3]` has none here (ADR-0025).
+pub trait Ordered: Value + PartialOrd {}
+
+impl Ordered for f32 {}
+impl Ordered for f64 {}
+impl Ordered for u8 {}
+impl Ordered for u32 {}
+
+/// The value kept of two: the larger (`keep` is `Greater`) or the smaller (`Less`), or a
+/// NaN, which compares with nothing.
+fn pick<T: Ordered>(a: T, b: T, keep: Ordering) -> T {
+    match a.partial_cmp(&b) {
+        None if a.partial_cmp(&a).is_none() => a,
+        None => b,
+        Some(o) if o == keep.reverse() => b,
+        Some(_) => a,
+    }
+}
+
+/// The places in a gathered array of a voxel's neighbours, as offsets from it.
+fn neighbourhood(conn: Connectivity) -> Vec<isize> {
+    let edge = isize::try_from(GATHER_EDGE).unwrap_or(10);
+    let mut out = Vec::new();
+    for z in -1..=1_isize {
+        for y in -1..=1_isize {
+            for x in -1..=1_isize {
+                let n = x.abs() + y.abs() + z.abs();
+                if n > 0 && (conn == Connectivity::TwentySix || n == 1) {
+                    out.push(x + edge * (y + edge * z));
+                }
+            }
+        }
+    }
+    out
+}
+
+fn filter<T: Ordered>(
+    t: &Topology,
+    f: &Field<T>,
+    conn: Connectivity,
+    k: u32,
+    keep: Ordering,
+) -> Result<Field<T>, FieldError> {
+    let near = neighbourhood(conn);
+    let mut current = f.clone();
+    for _ in 0..k {
+        let mut next = current.clone();
+        par_update(t, &mut next, |n, out| {
+            let mut g = [current.background(); GATHER_VOXELS];
+            gather(t, &current, n, &mut g)?;
+            for (i, o) in out.iter_mut().enumerate() {
+                let c = (i % 8 + 1)
+                    + GATHER_EDGE * (i / 8 % 8 + 1)
+                    + GATHER_EDGE * GATHER_EDGE * (i / 64 + 1);
+                *o = near.iter().fold(g[c], |v, d| {
+                    // The gather holds one layer around the leaf, so every neighbour is in it.
+                    g.get(c.wrapping_add_signed(*d)).map_or(v, |w| pick(v, *w, keep))
+                });
+            }
+            Ok::<(), FieldError>(())
+        })?;
+        current = next;
+    }
+    Ok(current)
+}
+
+/// The field with each leaf voxel the largest of itself and its neighbours, k times over.
+pub fn dilate_values<T: Ordered>(
+    t: &Topology,
+    f: &Field<T>,
+    conn: Connectivity,
+    k: u32,
+) -> Result<Field<T>, FieldError> {
+    filter(t, f, conn, k, Ordering::Greater)
+}
+
+/// The field with each leaf voxel the smallest of itself and its neighbours, k times over.
+pub fn erode_values<T: Ordered>(
+    t: &Topology,
+    f: &Field<T>,
+    conn: Connectivity,
+    k: u32,
+) -> Result<Field<T>, FieldError> {
+    filter(t, f, conn, k, Ordering::Less)
 }
 
 #[cfg(test)]

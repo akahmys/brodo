@@ -20,6 +20,9 @@ are recorded here when they change (V6).
   `TreeError::InTile` (ADR-0025). A `match` over `TreeError` needs the new arm.
 - `brodo::morphology::{dilate, erode}`: a topology dilated or eroded by k steps, 6- or
   26-connected, on whole leaves, with its `Remap` (ADR-0025).
+- `brodo::morphology::{dilate_values, erode_values}`: a max or min over each leaf voxel's
+  6 or 26 neighbours, k times, for the scalar types (`Ordered`), a NaN winning; tiles and
+  the background unchanged.
 
 ## 0.2.0 (2026-10-17)
 
