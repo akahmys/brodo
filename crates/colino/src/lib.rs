@@ -4,4 +4,5 @@
 
 pub mod error;
 pub mod mesh;
+pub mod obj;
 pub mod stl;

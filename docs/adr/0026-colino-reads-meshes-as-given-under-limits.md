@@ -1,6 +1,6 @@
 # ADR-0026: colino reads meshes as given, under limits, and welds by exact position
 
-- **Status**: Accepted
+- **Status**: Amended
 - **Date**: 2026-10-19
 
 ## Context
@@ -39,3 +39,17 @@ The human decided, on 2026-10-19:
 
 Each reader comes in a unit of its own, with its fuzz target. A mesh read from STL has
 three vertices a triangle until it is welded.
+
+## Amendment
+
+- **Date**: 2026-10-19
+
+Reading the Wavefront specification as published at paulbourke.net/dataformats/obj/, the
+OBJ reader was settled so. A vertex has 3 numbers, 4 with the specification's weight, or
+6 with three colour numbers, an extension exporters write that the specification does
+not name; the weight and colour are not used, and any other count is an error. Of a face
+only each reference's vertex number is read, whatever its form. Skipped by name: texture
+and normal vertices, grouping, display and rendering attributes, points and lines, which
+add no triangle. Refused: free-form geometry, which defines shape this reader does not
+triangulate, and `call` and `csh`, which would read another file or run a command. A
+positive number may name a vertex later in the file, checked once it is all read.

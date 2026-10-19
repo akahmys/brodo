@@ -39,4 +39,5 @@ papers, public documentation and permissively licensed code (S1, S2) may appear 
 | `crates/colino/src/lib.rs` | none | crate root |
 | `crates/colino/src/error.rs` | none | the crate's error types |
 | `crates/colino/src/mesh.rs` | ARCHITECTURE.md §5.1, ADR-0026 only | the mesh type, reading limits, and welding by exact position |
+| `crates/colino/src/obj.rs` | ARCHITECTURE.md §5.1, ADR-0026; the Wavefront OBJ specification as published at paulbourke.net/dataformats/obj/ | reading Wavefront OBJ |
 | `crates/colino/src/stl.rs` | ARCHITECTURE.md §5.1, ADR-0026; the Library of Congress's format descriptions fdd000505 (STL binary) and fdd000506 (STL ASCII) | reading binary and ASCII STL |

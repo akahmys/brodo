@@ -25,6 +25,7 @@ are recorded here when they change (V6).
   the background unchanged.
 - `colino::mesh::{Mesh, Limits}` with `Mesh::welded`, and `colino::stl::read` for binary
   and ASCII STL (ADR-0026); `colino::error::{ReadError, MeshError}`.
+- `colino::obj::read` for Wavefront OBJ: vertices and faces, polygons as fans (ADR-0026).
 
 ## 0.2.0 (2026-10-17)
 

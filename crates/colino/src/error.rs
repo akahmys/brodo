@@ -38,6 +38,53 @@ pub enum ReadError {
     /// A binary file's coordinate is not finite.
     #[error("triangle {0} has a coordinate that is not finite")]
     NotFinite(u64),
+    /// An OBJ statement colino does not read and cannot skip: free-form geometry, which
+    /// defines shape it does not triangulate, or `call` and `csh`, which it never runs.
+    #[error("line {line}: the {word:?} statement is not read")]
+    Unsupported {
+        /// The line, from 1.
+        line: usize,
+        /// The statement's keyword.
+        word: String,
+    },
+    /// An OBJ statement unknown to the format.
+    #[error("line {line}: unknown statement {word:?}")]
+    UnknownStatement {
+        /// The line, from 1.
+        line: usize,
+        /// The word.
+        word: String,
+    },
+    /// A number on an OBJ line did not parse, or is not finite.
+    #[error("line {line}: not a finite number: {found:?}")]
+    BadNumberOnLine {
+        /// The line, from 1.
+        line: usize,
+        /// The word.
+        found: String,
+    },
+    /// A vertex with other than 3, 4 or 6 numbers.
+    #[error("line {line}: a vertex has {numbers} numbers")]
+    BadVertex {
+        /// The line, from 1.
+        line: usize,
+        /// The numbers it has.
+        numbers: usize,
+    },
+    /// A face with fewer than three vertices, or a vertex reference that is not a number.
+    #[error("line {line}: a face needs three or more vertex numbers")]
+    BadFace {
+        /// The line, from 1.
+        line: usize,
+    },
+    /// A face names vertex 0, or one the file does not hold.
+    #[error("line {line}: no vertex {index}")]
+    NoVertex {
+        /// The line, from 1.
+        line: usize,
+        /// The number as written.
+        index: i64,
+    },
     /// The mesh holds more than the limits allow.
     #[error("more {what} than the limit of {limit}")]
     TooLarge {

@@ -8,11 +8,11 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: the mesh type and the STL reader, binary and ASCII (ADR-0026), in
-  `UNTRUSTED_INPUT` with fuzz target `stl` (60 s, 34591468 runs, no finding). P2's first
-  item before it: χ, dilation and erosion, and the Betti numbers.
-- **Next**: the OBJ reader with its fuzz target; then 3MF, whose ZIP and XML crates need
-  checking against Rules 12, 13 and 20 and the human's approval.
+- **Done**: the mesh type and the STL and OBJ readers (ADR-0026), each in
+  `UNTRUSTED_INPUT` with a fuzz target (60 s each: `stl` 34591468 runs, `obj` 5475675,
+  no finding).
+- **Next**: 3MF, whose ZIP and XML crates need checking against Rules 12, 13 and 20 and
+  the human's approval.
 - **Unresolved problems**: Miri's Stacked Borrows reports undefined behaviour in
   `crossbeam-epoch` under rayon; Tree Borrows does not (ADR-0015). The leaf-parallel
   update's benchmark disagrees within a pair by up to 17 %; whether a load average of 3.0

@@ -23,6 +23,7 @@ APPLICATIONS = []
 UNTRUSTED_INPUT = [
     "crates/brodo/src/cache.rs",
     "crates/brodo/src/view.rs",
+    "crates/colino/src/obj.rs",
     "crates/colino/src/stl.rs",
 ]
 
