@@ -242,11 +242,15 @@ traits from `freeze` on (§4.6).
   `Mesh::welded` joins vertices at equal positions, never within a tolerance. A 3MF
   package is read through `rawzip`, `miniz_oxide` and `quick-xml`, its model as a stream;
   the mesh holds every build item placed by its transforms.
-- Distance: exact, to the nearest triangle through a BVH.
-- Sign: generalised winding number with a hierarchical approximation; an
-  orientation-independent method as an option.
-- Output: leaves only in a band of ±N voxels around the surface (N = 3 by default),
-  negative tiles inside, the positive background outside. No dense grid: memory follows
+- Grid: the caller's voxel size, on the world's lattice unless given another origin; each
+  voxel sampled at its centre (ADR-0027).
+- Distance: exact, to the nearest triangle through a BVH of axis-aligned boxes.
+- Sign: inside where the generalised winding number is 1/2 or more, by Barill et al.'s
+  far-field approximation (β = 2, second order) or the exact sum; an orientation-independent
+  method as an option, open (B-016).
+- Output: leaves only in a band of ±N voxels around the surface (N = 3 by default), values
+  signed distances clamped to ±N·h; negative tiles inside, each region classified once,
+  from the root region down; the positive background outside. No dense grid: memory follows
   the band's volume, at 3000³ resolution as well.
 - It reports changes; it does not repair a shape or refine a grid.
 
