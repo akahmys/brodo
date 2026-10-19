@@ -42,8 +42,8 @@ impl Aabb {
     }
 }
 
-/// A node: its box, and either its children, numbered `children` and `children + 1`, or
-/// the `count` triangles of `order` from `first`.
+/// A node: its box, the `count` triangles of `order` from `first` it holds, and its
+/// children, numbered `children` and `children + 1`, or 0 for a leaf.
 #[derive(Debug, Clone)]
 pub(crate) struct Node {
     pub(crate) bounds: Aabb,
@@ -123,12 +123,7 @@ impl Bvh {
             let leaf = count <= LEAF;
             let children = nodes.len();
             if let Some(node) = nodes.get_mut(id) {
-                *node = Node {
-                    bounds,
-                    first,
-                    count: if leaf { count } else { 0 },
-                    children: if leaf { 0 } else { children },
-                };
+                *node = Node { bounds, first, count, children: if leaf { 0 } else { children } };
             }
             if leaf {
                 continue;

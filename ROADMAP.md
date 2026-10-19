@@ -8,10 +8,10 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: the first unit of P2's third item (ADR-0027): the nearest point of a
-  triangle and a tree of boxes for the nearest triangle of a mesh.
-- **Next**: the winding number (Barill et al.'s approximation and the exact sum), then the
-  band.
+- **Done**: the first two units of P2's third item (ADR-0027): the nearest triangle
+  through a tree of boxes, and the winding number, exact and approximate.
+- **Next**: the band: leaves, values and inside tiles, checked against a dense reference
+  and known shapes, with slices looked at (T8).
 - **Unresolved problems**: Miri's Stacked Borrows reports undefined behaviour in
   `crossbeam-epoch` under rayon; Tree Borrows does not (ADR-0015). The leaf-parallel
   update's benchmark disagrees within a pair by up to 17 %; whether a load average of 3.0

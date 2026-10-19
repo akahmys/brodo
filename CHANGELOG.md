@@ -31,6 +31,8 @@ are recorded here when they change (V6).
   needs it.
 - `colino::distance` and `colino::bvh::Bvh`: the nearest point of a triangle, and the
   nearest triangle of a mesh, the lowest-numbered of equals (ADR-0027).
+- `colino::winding::{Winding, Accuracy, solid_angle}`: the generalised winding number,
+  exact or by Barill et al.'s approximation (ADR-0027).
 
 ## 0.2.0 (2026-10-17)
 
