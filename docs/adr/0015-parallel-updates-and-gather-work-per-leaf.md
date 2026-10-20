@@ -63,3 +63,22 @@ part of the design, so that a later change of backend is a breaking change and r
 as one; and the parallel code is checked under Tree Borrows. The change stays cheap:
 rayon is used in two functions of `parallel.rs`, and no rayon type is in brodo's API.
 
+
+## Amendment
+
+- **Date**: 2026-10-20
+
+A user's stencil read up to three voxels away (ROADMAP.md §4, R9), and the spike
+`spikes/ghost/` answered B-002 (its `REPORT.md`). On a sphere's band, a block of leaves and
+a slab one leaf thick, each leaf voxel reading itself and ±1 to ±3 along each axis, a
+gather three layers wide took 25.6 to 44.7 % less time than one layer with an accessor
+beyond it, and 3.3 to 16.4 % less than two; reading beyond one layer through
+`Field::value_at` cost up to 2.8 times an accessor. Looking up a leaf's neighbours took
+1.2 to 2.9 % of a gather, and sharing it among several fields gained nothing beyond the
+pairs' spread (R10). The human decided:
+
+- `gather_wide` copies a leaf and `GhostWidth::{One, Two, Three}` layers around it into a
+  caller's `Vec`, (8 + 2w)³ values x fastest; `GhostWidth` is `#[non_exhaustive]`. `gather`
+  and its 10³ array stay.
+- A read beyond the window goes through `ValueAccessor`, not `Field::value_at`.
+- Several fields of a leaf are gathered one call each; a shared lookup is not added (R10).

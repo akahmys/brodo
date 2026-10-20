@@ -8,9 +8,9 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: a user's requests R2 and R7 (§4): `[f64; 3]` as a value type (ADR-0029), and
-  vector fields in VTK output (ADR-0018).
-- **Next**: B-002's spike for R9 and R10, unless the human takes up P2's fifth item,
+- **Done**: B-002 answered by `spikes/ghost/` (ADR-0015): a gather one to three layers wide
+  for R9, and R10 declined; before it, R2 and R7 (§4).
+- **Next**: `gather_wide` (R9, ADR-0015), unless the human takes up P2's fifth item,
   colino's README and examples, first.
 - **Unresolved problems**: Miri's Stacked Borrows reports undefined behaviour in
   `crossbeam-epoch` under rayon; Tree Borrows does not (ADR-0015). The leaf-parallel
@@ -122,7 +122,6 @@ implementation (PLANNING.md §2).
 
 | # | Question | Proposal so far |
 | :--- | :--- | :--- |
-| B-002 | How wide is the ghost layer? | One layer; a macro makes two possible. A user asks for three (§4, R9): a leaf of 8³ reaches only its 26 neighbours up to seven layers |
 | B-017 | Is `Value` sealed, so that only brodo assigns type codes? | Not yet: a type outside brodo is refused by every other build's reader, and sealing would forbid types used in memory only (ADR-0029) |
 | B-016 | What is colino's orientation-independent sign (ADR-0017)? | None yet; candidates: flooding from the outside through cells the surface does not cross, or the winding number's magnitude |
 | B-003 | Do level-set operations (CSG, redistancing) belong in brodo? | No, until shown to be general |
@@ -132,7 +131,7 @@ implementation (PLANNING.md §2).
 | B-013 | Which crates handle `piatto`'s window, input and GUI parts? | `winit` and `egui`, to be measured against Rules 12 and 13 (ADR-0018) |
 
 No spike is running. `spikes/remap/` answered B-001 and B-008, and `spikes/merge/` B-010
-(ADR-0014); `spikes/vtk/` answered B-012 (ADR-0018); `spikes/bench/` B-007 (ADR-0019); `spikes/threads/` B-014, rayon kept (ADR-0015); `spikes/dilate/` B-011, no mask (ADR-0025); `spikes/mutants/` the audit review's proposal C (ADR-0023).
+(ADR-0014); `spikes/vtk/` answered B-012 (ADR-0018); `spikes/bench/` B-007 (ADR-0019); `spikes/threads/` B-014, rayon kept (ADR-0015); `spikes/dilate/` B-011, no mask (ADR-0025); `spikes/ghost/` B-002, one to three layers (ADR-0015); `spikes/mutants/` the audit review's proposal C (ADR-0023).
 
 ## 4. Administrative items still open
 
@@ -147,8 +146,8 @@ No spike is running. `spikes/remap/` answered B-001 and B-008, and `spikes/merge
   user keeping time-stepped fields on brodo's tree, received 2026-10-20 against v0.2.0,
   highest priority first, each with its proposed answer:
   - R2, `[f64; 3]` as a value type, frozen files included: done (ADR-0029).
-  - R9, ghost data up to three voxels away: B-002's spike, a gather up to three layers
-    wide against `ValueAccessor` on near reads, measured; then an amendment to ADR-0015.
+  - R9, ghost data up to three voxels away: `gather_wide`, one to three layers, decided by
+    B-002's spike (ADR-0015); to be implemented.
   - R4, two dimensions: not taken; ARCHITECTURE.md §1 to state that a grid one leaf thick
     is the supported way, not expected to change, by an amendment to ADR-0012.
   - R8, splitting every tile in a region in one edit: met by `split_tile` per leaf origin
@@ -156,8 +155,9 @@ No spike is running. `spikes/remap/` answered B-001 and B-008, and `spikes/merge
     documented. An operation of its own only if a benchmark shows the calls cost.
   - R7, vector fields in VTK output: done, `[f32; 3]` and `[f64; 3]` as three-component
     `Vectors` (ADR-0018).
-  - R10, several fields of one leaf gathered at once: only if B-002's spike measures the
-    neighbour resolution worth sharing.
+  - R10, several fields of one leaf gathered at once: declined. Looking up the neighbours
+    took 1.2 to 2.9 % of a gather, and sharing it gained nothing beyond the pairs' spread
+    (`spikes/ghost/REPORT.md`, ADR-0015).
   - Asked, not requested: grids of several resolutions with a defined relation between
     coarse and fine voxels. The design does not decide it: a cache file holds several
     grids, each with its own affine transform, and nothing relates their voxels.

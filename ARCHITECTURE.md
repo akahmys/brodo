@@ -145,7 +145,10 @@ fastest. A neighbour beyond the `i32` coordinate range is the background.
   `&mut`, one 512-value chunk per leaf. Its function may fail; the error returned is that of
   the lowest-numbered failing leaf.
 - A gather copies a leaf and one ghost layer from its 26 neighbours into a dense 10³
-  array, filling missing neighbours with tile or background values.
+  array, filling missing neighbours with tile or background values; `gather_wide` copies
+  one, two or three layers (`GhostWidth`) into a caller's `Vec` of (8 + 2w)³ values. A
+  read beyond the window goes through `ValueAccessor`, faster than `Field::value_at`
+  there (ADR-0015). Several fields of a leaf are gathered one call each.
 - Reductions have a fixed-order mode whose result does not depend on the thread count: a
   partial result per leaf, in parallel, folded in leaf order.
 

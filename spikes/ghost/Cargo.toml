@@ -1,0 +1,17 @@
+# Throwaway spike for B-002 (ROADMAP.md §3, requests R9 and R10 in §4). Never imported by
+# `crates/` (PLANNING.md §3); its own workspace, so cargo does not look for it in the one
+# above.
+[package]
+name = "ghost-spike"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+brodo = { path = "../../crates/brodo", default-features = false }
+
+[profile.release]
+debug = false
+
+[workspace]
+members = ["."]
