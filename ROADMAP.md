@@ -13,7 +13,8 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   benchmarks and examples kept; a test that a holed mesh leaks no sign; Miri, widened to
   colino (ADR-0008), with no error; the fuzz round, each of the five targets 901 s with no
   finding (2026-10-20).
-- **Next**: the mutation run (TESTING.md T11, ADR-0023), then P2's acceptance.
+- **Next**: the mutation run (TESTING.md T11, ADR-0023), then P2's acceptance; then R11
+  (ADR-0030).
 - **Unresolved problems**: Miri's Stacked Borrows reports undefined behaviour in
   `crossbeam-epoch` under rayon; Tree Borrows does not (ADR-0015), but Miri's nightly of
   2026-07-21 warns there of integer-to-pointer casts in `crossbeam-epoch` 0.9.21, which
@@ -120,7 +121,7 @@ Not part of P1's acceptance, and not started while ParaView suffices (ADR-0018).
 
 ### After P2
 
-Ordered by users' requests (§4): the archive profile, value quantisation, colino's layer 3,
+Ordered by users' requests (§4): R11 (ADR-0030), the archive profile, value quantisation, colino's layer 3,
 writing `.vdb`, STEP input. brodo's own README, in the form colino's took (AGENTS.md), is
 not started.
 
@@ -171,3 +172,11 @@ No spike is running. `spikes/remap/` answered B-001 and B-008, and `spikes/merge
   - Asked, not requested: grids of several resolutions with a defined relation between
     coarse and fine voxels. The design does not decide it: a cache file holds several
     grids, each with its own affine transform, and nothing relates their voxels.
+  From a user building cut cells on brodo's grid, received 2026-10-20, answered the same
+  day:
+  - R11, a group per triangle read from OBJ, STL and 3MF, and Hermite data on the corners
+    of an SDF's voxels (signs, and per crossed edge a fraction, normal and group):
+    accepted, ADR-0030, stored as `f32`, `[f32; 3]`, `u32` and `u8` fields.
+  - Held until asked: a per-triangle table in the cache file, for exact `f64` crossings;
+    every crossing along an edge, which the user measured at 0.3 to 1.2 % of crossed
+    edges on a turned box (2026-10-20).
