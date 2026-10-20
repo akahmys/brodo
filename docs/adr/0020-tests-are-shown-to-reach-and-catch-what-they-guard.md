@@ -1,6 +1,6 @@
 # ADR-0020: Tests are shown to reach the cases they are meant for, and to fail where they guard
 
-- **Status**: Accepted
+- **Status**: Amended
 - **Date**: 2026-10-17
 
 ## Context
@@ -25,3 +25,19 @@ failed, but not because it caught the defect.
 Both are held by review alone: nothing checks a commit message's counts or where a T3
 break failed. A check that counted cases inside every property test was not adopted,
 being heavier than the defect it guards.
+
+## Amendment
+
+- **Date**: 2026-10-20
+
+P2's retrospective found two T3 breaks that showed less than they seemed to. One rewrote
+an expression into another that computed the same value, `chi - solid_euler` as
+`solid_euler - chi + 2 * (chi - solid_euler)`: nothing was broken, and nothing failed.
+Another made `cache_format` fail, and `cargo test` stopped there, so whether
+`frozen_format` caught the same break was not seen until it was run alone. The human
+decided:
+
+- TESTING.md T3: the break is checked to change what the code computes, and each test
+  target it may affect is run on its own.
+
+Held by review alone, as the rest of T3 is.
