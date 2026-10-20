@@ -340,7 +340,10 @@ impl TopologyEditor<'_> {
         self.tree.add_tile(level, v)
     }
 
-    /// Splits the tile holding the voxel down to its leaf (`Tree::split_tile`).
+    /// Splits the tile holding the voxel down to its leaf (`Tree::split_tile`). Every tile in
+    /// a region becomes leaves by one call per leaf origin in it that a tile holds, found by
+    /// `Topology::locate`, in one editor: its `commit` gives one `Remap`, and each new leaf
+    /// takes each field's tile value. A root tile alone splits into 512³ leaves.
     pub fn split_tile(&mut self, v: Coord) -> Result<(), TreeError> {
         self.tree.split_tile(v).map(|_| ())
     }

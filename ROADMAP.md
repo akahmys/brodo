@@ -8,10 +8,9 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: `gather_wide`, one to three ghost layers (R9, ADR-0015); before it, B-002
-  answered, R10 declined, and R2 and R7 (§4).
-- **Next**: the remaining requests, R4 and R8, as documentation (§4), or P2's fifth item,
-  colino's README and examples, as the human chooses.
+- **Done**: every request of the user's (§4) answered: R2, R7 and R9 built, R10 declined,
+  R4 and R8 answered in the design.
+- **Next**: P2's fifth item, colino's README and examples for publishing on its own.
 - **Unresolved problems**: Miri's Stacked Borrows reports undefined behaviour in
   `crossbeam-epoch` under rayon; Tree Borrows does not (ADR-0015). The leaf-parallel
   update's benchmark disagrees within a pair by up to 17 %; whether a load average of 3.0
@@ -150,9 +149,10 @@ No spike is running. `spikes/remap/` answered B-001 and B-008, and `spikes/merge
     decided by B-002's spike (ADR-0015); reads beyond the window through `ValueAccessor`.
   - R4, two dimensions: answered, no mode of its own; a grid one leaf thick is the
     supported way and is not expected to change (ARCHITECTURE.md §1, ADR-0012).
-  - R8, splitting every tile in a region in one edit: met by `split_tile` per leaf origin
-    within one `TopologyEditor`, one `Remap` at `commit`; to be shown by a test and
-    documented. An operation of its own only if a benchmark shows the calls cost.
+  - R8, splitting every tile in a region in one edit: answered, met by `split_tile` per leaf
+    origin within one `TopologyEditor`, one `Remap` at `commit`; shown by a test and
+    documented (ARCHITECTURE.md §4.2). An operation of its own only if a benchmark shows
+    the calls cost.
   - R7, vector fields in VTK output: done, `[f32; 3]` and `[f64; 3]` as three-component
     `Vectors` (ADR-0018).
   - R10, several fields of one leaf gathered at once: declined. Looking up the neighbours

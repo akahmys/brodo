@@ -105,7 +105,9 @@ pub struct Field<T> {
   tiles) go through an editor (`TopologyEditor`) and take effect at `commit`, which
   returns a new topology and a `Remap` to it, and leaves the old topology usable. Every
   field on the old topology is remapped by it. Removing a leaf removes the nodes it leaves
-  empty; in a tile it is refused (ADR-0025).
+  empty; in a tile it is refused (ADR-0025). Every tile in a region becomes leaves by one
+  `split_tile` per leaf origin in it that a tile holds, in one editor, so one `Remap`; there
+  is no operation of its own until a benchmark shows the calls cost (ROADMAP.md §4, R8).
 - Every topology carries a stamp unique in the process. A field records the stamp of the
   topology it was made or remapped for; using it with another topology, a remap included,
   is the typed error `StaleField`.

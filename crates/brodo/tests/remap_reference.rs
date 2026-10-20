@@ -459,3 +459,77 @@ proptest! {
         }
     }
 }
+
+/// Leaves at the origin and at x = 512; lower tiles beside the first and beside the second;
+/// an upper tile at x = 128; two fields, each tile its own value.
+fn region_grid() -> (Topology, [Field<f32>; 2]) {
+    let empty = Topology::new();
+    let mut e = empty.edit();
+    for v in [[0, 0, 0], [512, 0, 0]] {
+        e.activate(v).unwrap();
+    }
+    e.add_tile(TileLevel::Lower, [8, 0, 0]).unwrap();
+    e.add_tile(TileLevel::Lower, [16, 8, 0]).unwrap();
+    e.add_tile(TileLevel::Upper, [128, 0, 0]).unwrap();
+    e.add_tile(TileLevel::Lower, [520, 0, 0]).unwrap();
+    let (t, _) = e.commit().unwrap();
+    let fields = [0.5_f32, -2.0].map(|salt| {
+        let mut f = Field::new(&t, 9.0);
+        for n in t.leaf_numbers().collect::<Vec<_>>() {
+            for (k, x) in (0..).zip(f.leaf_mut(&t, n).unwrap()) {
+                *x = f32::from(u16::try_from(k).unwrap()) * salt;
+            }
+        }
+        for n in t.tile_numbers().collect::<Vec<_>>() {
+            let (_, o) = t.tile(n).unwrap();
+            f.set_tile(&t, n, salt * f32::from(u16::try_from(o[0] + o[1]).unwrap())).unwrap();
+        }
+        f
+    });
+    (t, fields)
+}
+
+/// Every tile in a region split into leaves in one edit, one `split_tile` per leaf origin
+/// that a tile holds (ROADMAP.md §4, R8): one `Remap` takes every field over, each new leaf
+/// holding its tile's value in every voxel, and what lies outside the region unchanged.
+#[test]
+fn every_tile_in_a_region_splits_in_one_edit() {
+    let (t, fields) = region_grid();
+
+    // The region: x from 0 to 256, y and z from 0 to 128, which holds the leaf at the origin,
+    // two lower tiles, background, and the upper tile whole.
+    let inside =
+        |v: Coord| (0..256).contains(&v[0]) && (0..128).contains(&v[1]) && (0..128).contains(&v[2]);
+    let mut e = t.edit();
+    let mut splits = 0;
+    for z in (0..128).step_by(8) {
+        for y in (0..128).step_by(8) {
+            for x in (0..256).step_by(8) {
+                if matches!(t.locate([x, y, z]), brodo::topology::Location::Tile(..)) {
+                    e.split_tile([x, y, z]).unwrap();
+                    splits += 1;
+                }
+            }
+        }
+    }
+    let (after, r) = e.commit().unwrap();
+    assert_eq!(splits, 2 + 16 * 16 * 16);
+    assert_eq!(after.leaf_count(), 2 + splits);
+    // Of the tiles, only the one outside the region is left.
+    assert_eq!(after.tile_count(), 1);
+    for f in &fields {
+        let g = f.remap(&r, &uniform).unwrap();
+        for n in after.leaf_numbers() {
+            let o = after.leaf_origin(n).unwrap();
+            for (v, x) in after.leaf_voxels(n).unwrap().zip(g.leaf(&after, n).unwrap()) {
+                assert_eq!(x.to_bits(), f.value_at(&t, v).unwrap().to_bits(), "at {v:?}");
+            }
+            assert!(inside(o) || o == [512, 0, 0], "a leaf at {o:?}");
+        }
+        assert_eq!(
+            g.value_at(&after, [520, 0, 0]).unwrap().to_bits(),
+            f.value_at(&t, [520, 0, 0]).unwrap().to_bits()
+        );
+        assert_eq!(g.value_at(&after, [64, 64, 64]).unwrap().to_bits(), 9.0_f32.to_bits());
+    }
+}
