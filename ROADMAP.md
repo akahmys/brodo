@@ -11,8 +11,10 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
 - **Done**: P2's fifth item: colino's README, its code a doctest (ADR-0001), and the
   examples `torus` and `vent`.
 - **Next**: P2's close: the retrospective's last proposal (a benchmark item recorded on
-  its own, ADR-0019), refactoring, the fuzz round, Miri, and the mutation run (ADR-0023).
-  A test that a holed mesh leaks no sign, for P2's acceptance, is in place.
+  its own, ADR-0019), the fuzz round and the mutation run (ADR-0023). Refactoring is done:
+  a survey found one duplicate in library code, now gone; the duplicates among tests,
+  benchmarks and examples are kept. Miri ran with no error; a test that a holed mesh
+  leaks no sign, for P2's acceptance, is in place.
 - **Unresolved problems**: Miri's Stacked Borrows reports undefined behaviour in
   `crossbeam-epoch` under rayon; Tree Borrows does not (ADR-0015). The leaf-parallel
   update's benchmark disagrees within a pair by up to 17 %; whether a load average of 3.0

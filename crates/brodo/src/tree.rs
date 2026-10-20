@@ -161,13 +161,8 @@ macro_rules! internal_node {
             /// Makes the place holding `v` a tile in place of its child, giving the child's
             /// number, or nothing where there was no child.
             fn child_to_tile(&mut self, v: Coord) -> Option<u32> {
-                let i = Self::index(v);
-                if !self.children.get(i) {
-                    return None;
-                }
-                let id = self.child_ids.remove(self.children.count_before(i));
-                self.children.clear(i);
-                self.tiles.set(i);
+                let id = self.remove_child(v)?;
+                self.tiles.set(Self::index(v));
                 Some(id)
             }
 
