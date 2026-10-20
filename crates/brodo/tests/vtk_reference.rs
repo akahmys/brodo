@@ -158,7 +158,8 @@ proptest! {
     }
 }
 
-/// Writes a sphere's SDF and a grid with NaNs and tiles of both levels to `out/vtk/brodo/`,
+/// Writes a sphere's SDF, a vector field on its grid, and a grid with NaNs and tiles of both
+/// levels to `out/vtk/brodo/`,
 /// with samples (cell centres and values) in the form `spikes/vtk/check.py` reads, for
 /// reading back in VTK:
 /// `out/vtk-venv/bin/python -I spikes/vtk/check.py out/vtk/brodo`.
@@ -201,6 +202,7 @@ fn files_for_vtk() {
         f.set_tile(&t, n, -3.0).unwrap();
     }
     write_for_vtk("r40", &t, &f);
+    write_vectors_for_vtk("r40", &t);
     let leaves: Vec<Coord> = (0..40).map(|k| [k * 8 - 160, (k % 5) * 8, (k % 3) * 8]).collect();
     let (t, f) = grid(&leaves, &[[0, 64, 0], [8, 64, 0]], &[[512, 0, 0], [-640, -256, 128]]);
     write_for_vtk("rmix", &t, &f);
@@ -230,4 +232,89 @@ fn write_for_vtk(tag: &str, t: &Topology, f: &Field<f32>) {
         samples.push_str(&format!("{} {} {} {}\n", c[0], c[1], c[2], f.tile(t, n).unwrap()));
     }
     std::fs::write(dir.join("samples.txt"), samples).unwrap();
+}
+
+/// A vector each of whose components says something different about its cell: the scalar
+/// test's value, its y, and its z scaled down.
+fn vector(v: Coord) -> [f64; 3] {
+    [f64::from(value(v)), f64::from(v[1]) + 0.25, -f64::from(v[2]) * 1e-3]
+}
+
+#[test]
+fn vectors_read_back_component_by_component() {
+    let (t, f) = grid(&[[0, 0, 0], [-8, 16, 24]], &[[8, 0, 0]], &[[128, -128, 0]]);
+    let mut g = Field::new(&t, [0.0_f64; 3]);
+    for n in t.leaf_numbers().collect::<Vec<_>>() {
+        let o = t.leaf_origin(n).unwrap();
+        for (i, x) in (0..).zip(g.leaf_mut(&t, n).unwrap().iter_mut()) {
+            *x = vector([o[0] + i % 8, o[1] + i / 8 % 8, o[2] + i / 64]);
+        }
+    }
+    for n in t.tile_numbers().collect::<Vec<_>>() {
+        let (_, o) = t.tile(n).unwrap();
+        g.set_tile(&t, n, vector(o)).unwrap();
+    }
+    assert!(f.leaf(&t, t.leaf_numbers().next().unwrap()).unwrap().iter().any(|x| x.is_nan()));
+    let mut bytes = Vec::new();
+    write_vtu(&t, &g, "velocity", &mut bytes).unwrap();
+    let text = std::str::from_utf8(&bytes).unwrap();
+    assert!(text.contains("<CellData Vectors=\"velocity\">\n"), "{text}");
+    assert!(
+        text.contains(
+            r#"<DataArray type="Float64" Name="velocity" NumberOfComponents="3" format="ascii">"#
+        ),
+        "{text}"
+    );
+    let p = parse(text);
+    let points: Vec<[i64; 3]> = p.arrays["Points"]
+        .as_chunks::<3>()
+        .0
+        .iter()
+        .map(|c| c.clone().map(|x| x.parse::<i64>().unwrap()))
+        .collect();
+    let conn: Vec<usize> = p.arrays["connectivity"].iter().map(|s| s.parse().unwrap()).collect();
+    let values = &p.arrays["velocity"];
+    assert_eq!(values.len(), 3 * p.cells);
+    let same64 = |a: f64, b: f64| a.to_bits() == b.to_bits() || (a.is_nan() && b.is_nan());
+    for (corners, v) in conn.as_chunks::<8>().0.iter().zip(values.as_chunks::<3>().0) {
+        let origin = points[corners[0]].map(|x| i32::try_from(x).unwrap());
+        let got = v.clone().map(|s| s.parse::<f64>().unwrap());
+        let want = vector(origin);
+        assert!((0..3).all(|k| same64(got[k], want[k])), "{got:?} against {want:?} at {origin:?}");
+    }
+}
+
+/// A `[f64; 3]` field on `t`, each cell's components from its origin, written as
+/// `vectors.vtu` with every 97th leaf voxel and every tile as samples (cell centre, then
+/// the three components) in `vector_samples.txt`, which `spikes/vtk/check.py` reads back.
+fn write_vectors_for_vtk(tag: &str, t: &Topology) {
+    let of = |o: Coord| [f64::from(o[0]) + 0.125, f64::from(o[1]) * 2.0, -f64::from(o[2]) / 3.0];
+    let mut g = Field::new(t, [0.0_f64; 3]);
+    let mut samples = String::new();
+    let mut k = 0;
+    let mut sample = |c: [f64; 3], v: [f64; 3]| {
+        samples.push_str(&format!("{} {} {} {} {} {}\n", c[0], c[1], c[2], v[0], v[1], v[2]));
+    };
+    for n in t.leaf_numbers().collect::<Vec<_>>() {
+        let o = t.leaf_origin(n).unwrap();
+        for (i, x) in (0..).zip(g.leaf_mut(t, n).unwrap().iter_mut()) {
+            let v = [o[0] + i % 8, o[1] + i / 8 % 8, o[2] + i / 64];
+            *x = of(v);
+            k += 1;
+            if k % 97 == 0 {
+                sample(v.map(|c| f64::from(c) + 0.5), *x);
+            }
+        }
+    }
+    for n in t.tile_numbers().collect::<Vec<_>>() {
+        let (level, o) = t.tile(n).unwrap();
+        g.set_tile(t, n, of(o)).unwrap();
+        let half = f64::from(1_u32 << level.edge_log2()) / 2.0;
+        sample(o.map(|x| f64::from(x) + half), of(o));
+    }
+    let dir =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../out/vtk/brodo").join(tag);
+    std::fs::create_dir_all(&dir).unwrap();
+    write_vtu(t, &g, "velocity", std::fs::File::create(dir.join("vectors.vtu")).unwrap()).unwrap();
+    std::fs::write(dir.join("vector_samples.txt"), samples).unwrap();
 }

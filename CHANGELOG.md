@@ -6,6 +6,9 @@ are recorded here when they change (V6).
 
 ## Unreleased
 
+- `brodo::vtk::VtkScalar` is renamed `VtkValue` and gains `COMPONENTS`; `write_vtu` also
+  writes `[f32; 3]` and `[f64; 3]` fields, as three-component `Vectors` (ADR-0018). Code
+  naming `VtkScalar` needs the new name; a scalar field's bytes are as before.
 - `[f64; 3]` is a value type, type code 6, frozen and cached under layout and format
   version 1 (ADR-0029). brodo 0.2.0 refuses a grid of it, naming the code; files of every
   other type keep their bytes.

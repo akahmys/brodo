@@ -71,3 +71,25 @@ and `Float64` arrays, read `NaN` and `inf` back as written but `-inf` as `+inf`,
 refused the whole file on `Infinity` or `1e999`; so a NaN is written as `NaN`, and an
 infinity of either sign is refused before anything is written, keeping the rule
 symmetric.
+
+## Amendment
+
+- **Date**: 2026-10-20
+
+A user asked to look at velocity fields in ParaView (ROADMAP.md §4, R7). VTK's XML
+file-format page gives a `DataArray` a `NumberOfComponents`, "the number of components
+per value", and `CellData` a `Vectors` attribute naming "the active vectors array"; it
+states neither a default nor the order of a value's components in ASCII. The human
+decided:
+
+- The sealed `VtkScalar` becomes `VtkValue`, with its number of components, 1 or 3. It is
+  implemented for `f32`, `f64`, `u8`, `u32`, `[f32; 3]` and `[f64; 3]`, and `write_vtu`
+  takes any of them.
+- A field of three components is written as `NumberOfComponents="3"`, each value's
+  components on one line, and named by `CellData`'s `Vectors` attribute; a scalar field
+  keeps `Scalars`, and its bytes.
+- One field per file, as before.
+- A NaN component is written as `NaN`; a value with an infinite component is refused
+  before anything is written.
+- The components' order, not stated in the documentation, is checked by reading files
+  back in VTK 9.6.2, as the voxel's point order was.

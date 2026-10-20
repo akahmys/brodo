@@ -44,6 +44,7 @@ lib brodo tree::tests::tree_matches_the_model
 lib brodo vtk::tests::a_name_needing_escapes_or_empty_is_refused
 lib brodo vtk::tests::a_nan_is_written_as_nan
 lib brodo vtk::tests::a_tile_is_one_voxel_cell_of_its_size
+lib brodo vtk::tests::a_vector_is_three_components_named_as_vectors
 lib brodo vtk::tests::an_empty_grid_has_no_cell
 lib brodo vtk::tests::an_infinity_is_refused_before_anything_is_written
 lib brodo vtk::tests::two_tiles_side_by_side_share_four_points
@@ -85,3 +86,4 @@ test value_morphology_reference an_integer_peak_spreads_and_shrinks
 test value_morphology_reference values_filter_as_a_dense_grid_does
 test vtk_reference cells_read_back_as_the_leaves_and_tiles_written
 test vtk_reference files_for_vtk
+test vtk_reference vectors_read_back_component_by_component

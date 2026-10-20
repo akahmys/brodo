@@ -75,7 +75,33 @@ def check_vti(base, pts):
     return cells, took, bad
 
 
+def check_vectors(base):
+    """brodo's three-component `velocity`, read back component by component at its
+    samples, exactly: the cell's active vectors, three components each (ADR-0018)."""
+    r = vtk.vtkXMLUnstructuredGridReader()
+    r.SetFileName(os.path.join(base, "vectors.vtu"))
+    r.Update()
+    grid = r.GetOutput()
+    values = grid.GetCellData().GetArray("velocity")
+    active = grid.GetCellData().GetVectors()
+    loc = vtk.vtkCellLocator()
+    loc.SetDataSet(grid)
+    loc.BuildLocator()
+    with open(os.path.join(base, "vector_samples.txt")) as f:
+        pts = [tuple(float(x) for x in line.split()) for line in f]
+    bad = 0
+    for x, y, z, *want in pts:
+        cid = loc.FindCell((x, y, z))
+        if cid < 0 or list(values.GetTuple3(cid)) != want:
+            bad += 1
+    name = active.GetName() if active is not None else None
+    return values.GetNumberOfComponents(), name, bad, len(pts)
+
+
 for base in sorted(glob.glob(os.path.join(sys.argv[1], "r*"))):
+    if os.path.exists(os.path.join(base, "vectors.vtu")):
+        comps, name, bad, n = check_vectors(base)
+        print(f"{os.path.basename(base)} vectors: {comps} components, active vectors {name!r}, {bad} of {n} samples wrong")
     pts = samples(base)
     n, took, bad, flat = check_vtu(base, pts)
     print(f"{os.path.basename(base)} vtu: {n} cells, read {took:.2f} s, {bad} of {len(pts)} samples wrong, {flat} flat cells of those checked")

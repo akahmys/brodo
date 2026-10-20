@@ -4,12 +4,15 @@
 //! Each leaf voxel is a VTK_VOXEL cell of edge 1 and each tile one VTK_VOXEL cell of its
 //! region's size, in index space. Points are shared between cells, in the order the cells
 //! first use them; a cell's eight points run x fastest, then y, then z. Values are cell
-//! data. Cells are leaves by leaf number, each leaf's voxels x fastest, then tiles by tile
-//! number, so the same input always gives the same bytes.
+//! data: a scalar field named by `CellData`'s `Scalars`, a field of three components, one
+//! value's components to a line, by its `Vectors`. Cells are leaves by leaf number, each
+//! leaf's voxels x fastest, then tiles by tile number, so the same input always gives the
+//! same bytes.
 //!
 //! Points are `Float64`, which holds every `i32` coordinate exactly; connectivity and
 //! offsets are `Int64`. VTK 9.6.2 reads `NaN` back as a NaN but `-inf` as `+inf`
-//! (measured 2026-10-17, ADR-0018), so a NaN is written as `NaN` and an infinity is refused.
+//! (measured 2026-10-17, ADR-0018), so a NaN, or a NaN component, is written as `NaN` and a
+//! value with an infinite component is refused.
 
 use std::collections::BTreeMap;
 use std::io::{BufWriter, Write};
@@ -26,28 +29,34 @@ const VOXEL: u8 = 11;
 type Point = [i64; 3];
 
 mod sealed {
-    /// Keeps [`super::VtkScalar`] to the types this module writes.
+    /// Keeps [`super::VtkValue`] to the types this module writes.
     pub trait Sealed {}
     impl Sealed for f32 {}
     impl Sealed for f64 {}
     impl Sealed for u8 {}
     impl Sealed for u32 {}
+    impl Sealed for [f32; 3] {}
+    impl Sealed for [f64; 3] {}
 }
 
-/// A value type with a VTK data-array type.
-pub trait VtkScalar: Value + sealed::Sealed {
+/// A value type with a VTK data-array type and a number of components (ADR-0018).
+pub trait VtkValue: Value + sealed::Sealed {
     /// The `type` attribute of its `DataArray`.
     const TYPE_NAME: &'static str;
+
+    /// Its components: 1 for a scalar, 3 for a vector.
+    const COMPONENTS: u32;
 
     /// Whether VTK reads the value back as written: false for an infinity.
     fn readable(self) -> bool;
 
-    /// Writes the value as ASCII; a NaN as `NaN`.
+    /// Writes the value as ASCII, components apart by a space; a NaN as `NaN`.
     fn write_ascii(self, w: &mut dyn Write) -> std::io::Result<()>;
 }
 
-impl VtkScalar for f32 {
+impl VtkValue for f32 {
     const TYPE_NAME: &'static str = "Float32";
+    const COMPONENTS: u32 = 1;
 
     fn readable(self) -> bool {
         !self.is_infinite()
@@ -59,8 +68,9 @@ impl VtkScalar for f32 {
     }
 }
 
-impl VtkScalar for f64 {
+impl VtkValue for f64 {
     const TYPE_NAME: &'static str = "Float64";
+    const COMPONENTS: u32 = 1;
 
     fn readable(self) -> bool {
         !self.is_infinite()
@@ -71,8 +81,9 @@ impl VtkScalar for f64 {
     }
 }
 
-impl VtkScalar for u8 {
+impl VtkValue for u8 {
     const TYPE_NAME: &'static str = "UInt8";
+    const COMPONENTS: u32 = 1;
 
     fn readable(self) -> bool {
         true
@@ -83,8 +94,9 @@ impl VtkScalar for u8 {
     }
 }
 
-impl VtkScalar for u32 {
+impl VtkValue for u32 {
     const TYPE_NAME: &'static str = "UInt32";
+    const COMPONENTS: u32 = 1;
 
     fn readable(self) -> bool {
         true
@@ -92,6 +104,42 @@ impl VtkScalar for u32 {
 
     fn write_ascii(self, w: &mut dyn Write) -> std::io::Result<()> {
         write!(w, "{self}")
+    }
+}
+
+/// Writes a vector's components through their scalar type, apart by a space.
+fn write_components<S: VtkValue>(c: [S; 3], w: &mut dyn Write) -> std::io::Result<()> {
+    c[0].write_ascii(w)?;
+    for x in &c[1..] {
+        w.write_all(b" ")?;
+        x.write_ascii(w)?;
+    }
+    Ok(())
+}
+
+impl VtkValue for [f32; 3] {
+    const TYPE_NAME: &'static str = "Float32";
+    const COMPONENTS: u32 = 3;
+
+    fn readable(self) -> bool {
+        self.iter().all(|x| x.readable())
+    }
+
+    fn write_ascii(self, w: &mut dyn Write) -> std::io::Result<()> {
+        write_components(self, w)
+    }
+}
+
+impl VtkValue for [f64; 3] {
+    const TYPE_NAME: &'static str = "Float64";
+    const COMPONENTS: u32 = 3;
+
+    fn readable(self) -> bool {
+        self.iter().all(|x| x.readable())
+    }
+
+    fn write_ascii(self, w: &mut dyn Write) -> std::io::Result<()> {
+        write_components(self, w)
     }
 }
 
@@ -119,7 +167,7 @@ impl<T> Cell<T> {
 /// Writes `f` on `t` as one ASCII `.vtu`, its values named `name`.
 ///
 /// `name` is one or more printable ASCII characters or spaces, none of `<>&"'`.
-pub fn write_vtu<T: VtkScalar, W: Write>(
+pub fn write_vtu<T: VtkValue, W: Write>(
     t: &Topology,
     f: &Field<T>,
     name: &str,
@@ -133,8 +181,12 @@ pub fn write_vtu<T: VtkScalar, W: Write>(
     writeln!(w, r#"<VTKFile type="UnstructuredGrid" version="0.1" byte_order="LittleEndian">"#)?;
     writeln!(w, "<UnstructuredGrid>")?;
     writeln!(w, r#"<Piece NumberOfPoints="{}" NumberOfCells="{}">"#, points.len(), cells.len())?;
-    writeln!(w, r#"<CellData Scalars="{name}">"#)?;
-    writeln!(w, r#"<DataArray type="{}" Name="{name}" format="ascii">"#, T::TYPE_NAME)?;
+    let (role, components) = match T::COMPONENTS {
+        1 => ("Scalars", String::new()),
+        n => ("Vectors", format!(r#" NumberOfComponents="{n}""#)),
+    };
+    writeln!(w, r#"<CellData {role}="{name}">"#)?;
+    writeln!(w, r#"<DataArray type="{}" Name="{name}"{components} format="ascii">"#, T::TYPE_NAME)?;
     for c in &cells {
         c.value.write_ascii(&mut w)?;
         writeln!(w)?;
@@ -161,7 +213,7 @@ fn check_name(name: &str) -> Result<(), VtkError> {
 }
 
 /// The cells, leaves then tiles; an infinite value is refused before anything is written.
-fn cells<T: VtkScalar>(t: &Topology, f: &Field<T>) -> Result<Vec<Cell<T>>, VtkError> {
+fn cells<T: VtkValue>(t: &Topology, f: &Field<T>) -> Result<Vec<Cell<T>>, VtkError> {
     let mut out = Vec::new();
     for n in t.leaf_numbers() {
         for (origin, value) in t.leaf_voxels(n)?.zip(f.leaf(t, n)?) {
@@ -226,7 +278,7 @@ mod tests {
     use crate::tree::TileLevel;
 
     /// One tile of edge 8 at the given origin, holding `value`, on a background of zero.
-    fn one_tile<T: VtkScalar + Default>(origin: Coord, value: T) -> (Topology, Field<T>) {
+    fn one_tile<T: VtkValue + Default>(origin: Coord, value: T) -> (Topology, Field<T>) {
         let empty = Topology::new();
         let mut e = empty.edit();
         e.add_tile(TileLevel::Lower, origin).unwrap();
@@ -237,7 +289,7 @@ mod tests {
         (t, f)
     }
 
-    fn text<T: VtkScalar>(t: &Topology, f: &Field<T>) -> String {
+    fn text<T: VtkValue>(t: &Topology, f: &Field<T>) -> String {
         let mut out = Vec::new();
         write_vtu(t, f, "d", &mut out).unwrap();
         String::from_utf8(out).unwrap()
@@ -283,6 +335,27 @@ mod tests {
 </VTKFile>
 "#;
         assert_eq!(text(&t, &f), want);
+    }
+
+    #[test]
+    fn a_vector_is_three_components_named_as_vectors() {
+        let (t, f) = one_tile([8, -16, 0], [0.5_f64, -0.0025, f64::NAN]);
+        let s = text(&t, &f);
+        let want = r#"<CellData Vectors="d">
+<DataArray type="Float64" Name="d" NumberOfComponents="3" format="ascii">
+0.5 -0.0025 NaN
+</DataArray>
+</CellData>"#;
+        assert!(s.contains(want), "{s}");
+        let (t, f) = one_tile([0, 0, 0], [1.25_f32, -2.0, 3.5]);
+        assert!(text(&t, &f).contains("format=\"ascii\">\n1.25 -2 3.5\n</DataArray>"));
+        for v in [[0.0, f32::NEG_INFINITY, 0.0], [0.0, 0.0, f32::INFINITY]] {
+            let (t, f) = one_tile([0, 8, 0], v);
+            let mut out = Vec::new();
+            let got = write_vtu(&t, &f, "d", &mut out);
+            assert!(matches!(got, Err(VtkError::Infinite { origin: [0, 8, 0] })), "{got:?}");
+            assert!(out.is_empty());
+        }
     }
 
     #[test]

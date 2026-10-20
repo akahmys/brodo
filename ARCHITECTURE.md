@@ -296,8 +296,10 @@ In `brodo`, each behind a cargo feature:
 - **A field for ParaView** (`brodo::vtk`, feature `vtk`, on by default), written from the
   published file-format documentation only, as one ASCII UnstructuredGrid (`.vtu`): a
   VTK_VOXEL cell per leaf voxel, a tile one cell of its region's size, in index space,
-  points shared and `Float64`, values as cell data (ADR-0018, B-012). A NaN is written as
-  `NaN`; an infinity is refused, since VTK reads `-inf` back as `+inf`. The same input
+  points shared and `Float64`, values as cell data (ADR-0018, B-012): a scalar field as
+  `Scalars`, a field of `[f32; 3]` or `[f64; 3]` as three-component `Vectors`, one field
+  per file. A NaN, or a NaN component, is written as `NaN`; an infinity is refused, since
+  VTK reads `-inf` back as `+inf`. The same input
   gives the same bytes. The files read back in VTK are written to `out/vtk/brodo/` by
   `cargo test -p brodo --test vtk_reference -- --ignored`, and checked by
   `out/vtk-venv/bin/python -I spikes/vtk/check.py out/vtk/brodo`. Binary data waits for
