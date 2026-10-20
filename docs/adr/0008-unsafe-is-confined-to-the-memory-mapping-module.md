@@ -94,3 +94,18 @@ the update, natively and under Miri. Each checks every value against the field i
 from, so it also fails natively: reading a leaf's values with x and y swapped, and
 handing the update its leaves in reverse, each failed it.
 
+
+## Amendment
+
+- **Date**: 2026-10-20 (T7's scope)
+
+colino brought dependencies of its own. `rawzip`, `miniz_oxide` and `quick-xml` each
+forbid unsafe code at their roots, but `quick-xml` scans XML with `memchr`, much of which
+is unsafe. T7 named brodo's dependencies only. The human decided:
+
+- T7 covers the dependencies of every crate in the workspace. colino's
+  `tests/miri_paths.rs` reads a 3MF package of one tetrahedron, written by `rawzip`'s own
+  writer, under Stacked Borrows; it checks every coordinate's bits and every triangle.
+
+It ran under Miri in 2 s with no report. Natively, the triangles' orientation flipped in
+the reader failed it.
