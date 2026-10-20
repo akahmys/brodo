@@ -54,3 +54,18 @@ for its users, which no document answered. The human decided:
 
 Shown to fire: an assertion in colino's README changed to a wrong value failed as a
 doctest of `cargo test --workspace --all-features`, and passed again once restored.
+
+## Amendment
+
+- **Date**: 2026-10-20
+
+P2's retrospective found two ADRs whose claims about the code were wrong, each found only
+while implementing. ADR-0028 had the complement's Betti numbers counted, not derived, but
+under the 26/6 pairing each lattice vertex adds as much to the complement's χ as to the
+solid's, so only its β₀ could be counted on its own. ADR-0029 had no section of the frozen
+layout change shape, but the header held the background in twelve bytes, too few for
+`[f64; 3]`. The human decided:
+
+- PLANNING.md §2: an ADR's claims about the code as it is are established by running
+  something before the human decides; one found wrong while implementing goes back to the
+  human as an amendment before the work lands. Held by review alone.

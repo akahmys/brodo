@@ -17,7 +17,8 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   update's benchmark disagrees within a pair by up to 17 %; whether a load average of 3.0
   catches other work is unknown (ADR-0019); readings: other work in another project
   raised it to 14.76 (2026-10-19); a program using more than one core let the run start
-  and failed the leaf-parallel update at +16 % (2026-10-20). Allocating and dropping its
+  and failed the leaf-parallel update at +16 % (2026-10-20); the Claude app's own drawing
+  held the load average near 3 during runs (2026-10-20). Allocating and dropping its
   output field takes about a third of that item (1.04 of 3.3 ms, 2026-10-18, load 3.3),
   but the update alone varied as much, so it is not shown to cause the spread.
   Labelling held about 440 MB for the 33 million leaf voxels of a sphere of radius 400,

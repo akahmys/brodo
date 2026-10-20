@@ -25,6 +25,12 @@ before any of these:
 4. **A second mechanism for a purpose one already serves.** The ADR removes one of them.
 5. **A change to a rule** (AGENTS.md, "Changing the rules").
 
+An ADR's claims about the code as it is (a size, a layout, what a function returns or what
+can be counted) are established by running something before the human decides, as
+AGENTS.md's "Measurement outranks documentation" asks; a claim found wrong while
+implementing goes back to the human as an amendment before the work lands. Held by review
+alone (ADR-0001).
+
 ## 3. Spikes
 
 A spike is a throwaway prototype that answers an open question by measurement. It is run
