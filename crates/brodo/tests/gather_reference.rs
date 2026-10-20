@@ -1,10 +1,11 @@
 //! Reference tier (TESTING.md §1): a gather equals the field read voxel by voxel. For every
-//! leaf of random topologies, each of the 10³ gathered values must have the bits of
+//! leaf of random topologies, each of the 10³ gathered values, and of the 10³, 12³ or 14³
+//! of a gather one, two or three layers wide (ADR-0015), must have the bits of
 //! `Field::value_at` at that voxel, which finds it through the tree rather than the leaf
-//! manifest.
+//! manifest; one layer wide, `gather_wide` gives `gather`'s values.
 
 use brodo::field::Field;
-use brodo::gather::{GATHER_VOXELS, gather};
+use brodo::gather::{GATHER_VOXELS, GhostWidth, gather, gather_wide};
 use brodo::topology::Topology;
 use brodo::tree::{Coord, TileLevel};
 use proptest::prelude::*;
@@ -96,6 +97,34 @@ proptest! {
                 else { continue };
                 let v = [v[0], v[1], v[2]];
                 prop_assert_eq!(*got, f.value_at(&t, v).unwrap(), "leaf at {:?}, voxel {:?}", o, v);
+            }
+        }
+    }
+
+    #[test]
+    fn a_wide_gather_equals_the_field_voxel_by_voxel(
+        ops in ops(),
+        width in prop_oneof![Just(GhostWidth::One), Just(GhostWidth::Two), Just(GhostWidth::Three)],
+    ) {
+        let t = build(&ops);
+        let f = field(&t);
+        let (w, e) = (width.layers(), width.edge());
+        let mut g = vec![7; 3];
+        let mut one = [0; GATHER_VOXELS];
+        for n in t.leaf_numbers() {
+            gather_wide(&t, &f, n, width, &mut g).unwrap();
+            prop_assert_eq!(g.len(), width.voxels());
+            let o = t.leaf_origin(n).unwrap();
+            for (i, got) in g.iter().enumerate() {
+                let d = [i % e, i / e % e, i / (e * e)].map(|c| i32::try_from(c).unwrap() - w);
+                let Some(v) = [0, 1, 2].map(|k| o[k].checked_add(d[k])).iter().copied().collect::<Option<Vec<i32>>>()
+                else { continue };
+                let v = [v[0], v[1], v[2]];
+                prop_assert_eq!(*got, f.value_at(&t, v).unwrap(), "leaf at {:?}, voxel {:?}", o, v);
+            }
+            if width == GhostWidth::One {
+                gather(&t, &f, n, &mut one).unwrap();
+                prop_assert_eq!(&g[..], &one[..]);
             }
         }
     }

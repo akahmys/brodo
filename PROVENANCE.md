@@ -22,7 +22,7 @@ papers, public documentation and permissively licensed code (S1, S2) may appear 
 | `crates/brodo/src/error.rs` | none | the crate's error types |
 | `crates/brodo/src/euler.rs` | ARCHITECTURE.md §4.5, ADR-0024; the Euler–Poincaré formula over a voxel complex as stated by Sánchez-Cruz et al. (2013, J. Appl. Res. Technol. 11(1), 65–78); a sum over 2×2×2 neighbourhoods as ImageJ Ops' documentation of `EulerCharacteristic26N` describes it | the Euler characteristic of the voxels meeting a condition, under 6- or 26-connectivity |
 | `crates/brodo/src/frozen.rs` | ARCHITECTURE.md §4.6, ADR-0016 only; `zerocopy`'s public API documentation (0.8.63) | the frozen layout, version 1, and `freeze` |
-| `crates/brodo/src/gather.rs` | ARCHITECTURE.md §4.4, ADR-0015 only | the gather of a leaf and one ghost layer |
+| `crates/brodo/src/gather.rs` | ARCHITECTURE.md §4.4, ADR-0015 only | the gather of a leaf and one, two or three ghost layers |
 | `crates/brodo/src/field.rs` | ARCHITECTURE.md §4.2, ADR-0014 only | fields: the `Value` trait, values by leaf and tile number, the stamp check, the remap and merge rules |
 | `crates/brodo/src/grid.rs` | ARCHITECTURE.md §4.2, ADR-0014 only | a grid: one topology and one field, edited in one step |
 | `crates/brodo/src/lib.rs` | none | crate root |

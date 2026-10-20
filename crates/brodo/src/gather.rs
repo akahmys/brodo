@@ -1,6 +1,8 @@
 //! The gather (ARCHITECTURE.md §4.4, ADR-0015): a leaf and one ghost layer from its 26
-//! neighbours, copied into a dense 10³ array. A neighbour that is not a leaf gives its
-//! tile's value or the background. The width is one layer; B-002 is open.
+//! neighbours, copied into a dense 10³ array, or one to three layers into a caller's `Vec`
+//! (`gather_wide`). A neighbour that is not a leaf gives its tile's value or the
+//! background. A leaf of 8³ reaches only its 26 neighbours up to seven layers; a read
+//! beyond the window goes through `ValueAccessor`, faster there than `Field::value_at`.
 
 use crate::error::FieldError;
 use crate::field::{Field, LEAF_VOXELS, Value, local_index};
@@ -62,6 +64,72 @@ pub fn gather<T: Value>(
             Source::Leaf(values) => values[local_index(g)],
             Source::Value(v) => v,
         };
+    }
+    Ok(())
+}
+
+/// How many ghost layers `gather_wide` copies around a leaf (ADR-0015).
+#[non_exhaustive]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GhostWidth {
+    /// One layer: 10³ values, as `gather` copies.
+    One,
+    /// Two layers: 12³ values.
+    Two,
+    /// Three layers: 14³ values.
+    Three,
+}
+
+impl GhostWidth {
+    /// Its layers.
+    pub fn layers(self) -> i32 {
+        match self {
+            GhostWidth::One => 1,
+            GhostWidth::Two => 2,
+            GhostWidth::Three => 3,
+        }
+    }
+
+    /// Voxels along a gathered window's edge: 8 + 2 layers.
+    pub fn edge(self) -> usize {
+        match self {
+            GhostWidth::One => 10,
+            GhostWidth::Two => 12,
+            GhostWidth::Three => 14,
+        }
+    }
+
+    /// Voxels in a gathered window.
+    pub fn voxels(self) -> usize {
+        self.edge() * self.edge() * self.edge()
+    }
+}
+
+/// Copies leaf `n` of `f` and `width` layers around it into `out`, replacing what it held,
+/// x fastest: with w layers and an edge e = 8 + 2w, the element for the voxel at (x, y, z)
+/// from the leaf's origin, each from −w to 7 + w, is at (x + w) + e (y + w) + e² (z + w).
+/// A caller keeps one `Vec` per thread, so that its storage is reused leaf after leaf.
+pub fn gather_wide<T: Value>(
+    t: &Topology,
+    f: &Field<T>,
+    n: LeafNumber,
+    width: GhostWidth,
+    out: &mut Vec<T>,
+) -> Result<(), FieldError> {
+    let sources = sources(t, f, n)?;
+    let w = width.layers();
+    out.clear();
+    out.reserve(width.voxels());
+    for z in -w..8 + w {
+        for y in -w..8 + w {
+            for x in -w..8 + w {
+                let g = [x, y, z];
+                out.push(match sources[block(g.map(|c| c.div_euclid(8)))] {
+                    Source::Leaf(values) => values[local_index(g)],
+                    Source::Value(v) => v,
+                });
+            }
+        }
     }
     Ok(())
 }

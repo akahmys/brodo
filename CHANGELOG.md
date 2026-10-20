@@ -6,6 +6,9 @@ are recorded here when they change (V6).
 
 ## Unreleased
 
+- `brodo::gather::{gather_wide, GhostWidth}`: a leaf and one, two or three ghost layers
+  copied into a caller's `Vec` (ADR-0015). `GhostWidth` is `#[non_exhaustive]`: a `match`
+  over it needs a wildcard arm.
 - `brodo::vtk::VtkScalar` is renamed `VtkValue` and gains `COMPONENTS`; `write_vtu` also
   writes `[f32; 3]` and `[f64; 3]` fields, as three-component `Vectors` (ADR-0018). Code
   naming `VtkScalar` needs the new name; a scalar field's bytes are as before.

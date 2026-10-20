@@ -8,10 +8,10 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: B-002 answered by `spikes/ghost/` (ADR-0015): a gather one to three layers wide
-  for R9, and R10 declined; before it, R2 and R7 (§4).
-- **Next**: `gather_wide` (R9, ADR-0015), unless the human takes up P2's fifth item,
-  colino's README and examples, first.
+- **Done**: `gather_wide`, one to three ghost layers (R9, ADR-0015); before it, B-002
+  answered, R10 declined, and R2 and R7 (§4).
+- **Next**: the remaining requests, R4 and R8, as documentation (§4), or P2's fifth item,
+  colino's README and examples, as the human chooses.
 - **Unresolved problems**: Miri's Stacked Borrows reports undefined behaviour in
   `crossbeam-epoch` under rayon; Tree Borrows does not (ADR-0015). The leaf-parallel
   update's benchmark disagrees within a pair by up to 17 %; whether a load average of 3.0
@@ -146,8 +146,8 @@ No spike is running. `spikes/remap/` answered B-001 and B-008, and `spikes/merge
   user keeping time-stepped fields on brodo's tree, received 2026-10-20 against v0.2.0,
   highest priority first, each with its proposed answer:
   - R2, `[f64; 3]` as a value type, frozen files included: done (ADR-0029).
-  - R9, ghost data up to three voxels away: `gather_wide`, one to three layers, decided by
-    B-002's spike (ADR-0015); to be implemented.
+  - R9, ghost data up to three voxels away: done, `gather_wide`, one to three layers,
+    decided by B-002's spike (ADR-0015); reads beyond the window through `ValueAccessor`.
   - R4, two dimensions: not taken; ARCHITECTURE.md §1 to state that a grid one leaf thick
     is the supported way, not expected to change, by an amendment to ADR-0012.
   - R8, splitting every tile in a region in one edit: met by `split_tile` per leaf origin

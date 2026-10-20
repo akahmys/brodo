@@ -12,7 +12,7 @@ use brodo::accessor::ValueAccessor;
 use brodo::cache::{self, CacheEntry, CacheFile};
 use brodo::field::Field;
 use brodo::frozen::freeze;
-use brodo::gather::{GATHER_VOXELS, gather};
+use brodo::gather::{GATHER_VOXELS, GhostWidth, gather, gather_wide};
 use brodo::meta::GridMeta;
 use brodo::parallel::par_update;
 use brodo::topology::Topology;
@@ -160,6 +160,14 @@ impl Data {
                     Ok(f64::from(out.background()))
                 }),
             ),
+        ];
+        items.into_iter().chain(self.gather_items()).chain(self.file_items()).collect()
+    }
+
+    /// The gathers: one ghost layer into an array, and three into a `Vec` (ADR-0015).
+    fn gather_items(&self) -> Vec<Item<'_>> {
+        let (t, f) = (&self.t, &self.f);
+        vec![
             repeated(
                 "gather",
                 1,
@@ -173,8 +181,20 @@ impl Data {
                     Ok(sum)
                 }),
             ),
-        ];
-        items.into_iter().chain(self.file_items()).collect()
+            repeated(
+                "gather_w3",
+                1,
+                Box::new(|| {
+                    let mut g = Vec::new();
+                    let mut sum = 0.0;
+                    for n in t.leaf_numbers() {
+                        gather_wide(t, f, n, GhostWidth::Three, &mut g)?;
+                        sum += f64::from(g[GhostWidth::Three.voxels() / 2]);
+                    }
+                    Ok(sum)
+                }),
+            ),
+        ]
     }
 
     /// `freeze` and the cache profile's file I/O.
