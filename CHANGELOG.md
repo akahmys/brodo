@@ -42,6 +42,8 @@ are recorded here when they change (V6).
   `colino::error::ReportError`: the topology report's first two layers, the solid's and
   the complement's Betti numbers, χ against the input's when it is a closed 2-manifold,
   and the components of named points (ADR-0028).
+- colino's feature `serde`, off by default: the report and `Surface` derive `Serialize` and
+  `Deserialize` (ADR-0028).
 
 ## 0.2.0 (2026-10-17)
 

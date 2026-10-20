@@ -12,11 +12,18 @@ brodo.workspace = true
 miniz_oxide.workspace = true
 quick-xml.workspace = true
 rawzip.workspace = true
+serde = { workspace = true, optional = true }
 thiserror.workspace = true
+
+[features]
+# The topology report as plain data serialisable with serde (ARCHITECTURE.md §5.2,
+# ADR-0028); off by default.
+serde = ["dep:serde"]
 
 [dev-dependencies]
 proptest.workspace = true
 rayon.workspace = true
+serde_json.workspace = true
 
 [lints]
 workspace = true

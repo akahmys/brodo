@@ -32,6 +32,7 @@ use crate::surface::Surface;
 
 /// Betti numbers: components, tunnels and cavities.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Betti {
     /// β₀.
     pub components: i64,
@@ -43,6 +44,7 @@ pub struct Betti {
 
 /// What the input says the solid's Euler characteristic is, if it can.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Reference {
     /// The welded input is a closed 2-manifold: half its V − E + F.
     Closed {
@@ -63,6 +65,7 @@ pub type Pair = (usize, usize);
 
 /// Where a named point lies.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Place {
     /// In the solid.
     Solid,
@@ -77,6 +80,7 @@ pub enum Place {
 
 /// A named point and where it lies.
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Region {
     /// The name the caller gave.
     pub name: String,
@@ -88,6 +92,7 @@ pub struct Region {
 
 /// The topology report's first two layers.
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Report {
     /// The solid's Betti numbers.
     pub solid: Betti,

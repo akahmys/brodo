@@ -8,9 +8,9 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: the second unit of P2's fourth item (ADR-0028): the topology report's first
-  two layers, Betti numbers, χ against the input's, and named points' components.
-- **Next**: `serde` for the report, after its check and the human's approval.
+- **Done**: P2's fourth item (ADR-0028): the topology report's first two layers, and the
+  report as plain data behind colino's feature `serde`.
+- **Next**: P2's fifth item, colino's README and examples for publishing on its own.
 - **Unresolved problems**: Miri's Stacked Borrows reports undefined behaviour in
   `crossbeam-epoch` under rayon; Tree Borrows does not (ADR-0015). The leaf-parallel
   update's benchmark disagrees within a pair by up to 17 %; whether a load average of 3.0
@@ -103,7 +103,7 @@ Not part of P1's acceptance, and not started while ParaView suffices (ADR-0018).
 - [x] Euler characteristic, connected components, dilation and erosion (§4.5)
 - [x] STL, OBJ and 3MF readers, each in `UNTRUSTED_INPUT` and fuzzed (§5.1)
 - [x] Generalised winding number and the narrow-band output (§5.1)
-- [ ] Topology report, layers 1 and 2 (§5.2)
+- [x] Topology report, layers 1 and 2 (§5.2)
 - [ ] README and examples for publishing on its own
 - [ ] Retrospective and refactoring; fuzz round; Miri run; mutation run (ADR-0023)
 - [ ] **Accepted when** the invariants are right for a sphere, a torus and a double torus;

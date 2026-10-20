@@ -62,3 +62,10 @@ The human decided:
   solid's β₂, which fails unless exactly one complement component reaches the outside.
   Its β₁ and β₂ are given by duality in the 3-sphere: β₁ the solid's, β₂ the solid's
   components less one, or 1 when there is no solid.
+- `serde` 1.0.229 with `derive` is colino's optional dependency behind `serde`, and
+  `serde_json` 1.0.154 a dev-dependency for the test that writes a report and reads it
+  back. Checked in a scratch crate on 2026-10-20: every crate MIT OR Apache-2.0, except
+  `zmij` (MIT) and `memchr` (Unlicense OR MIT, already present); no `cc` on either target,
+  the build scripts of `serde` and `serde_core` running only `rustc --version`;
+  `cargo deny check` passing. Besides them, `serde_core`, `serde_derive`, `itoa` and `zmij`
+  are new; `proc-macro2`, `quote`, `syn` and `unicode-ident` are already present.
