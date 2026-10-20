@@ -179,25 +179,70 @@ fn a_larger_sphere_has_inside_tiles_and_the_approximation_agrees() {
     }
 }
 
+/// The solid's Betti numbers: components 26-connected, cavities as the complement's
+/// components, 6-connected, that do not reach the outside, and tunnels from χ.
+fn betti(c: &Converted) -> [i64; 3] {
+    let solid = |v: f32| v < 0.0;
+    let b0 =
+        i64::from(label(&c.topology, &c.field, solid, Connectivity::TwentySix).unwrap().count());
+    let out = label(&c.topology, &c.field, |v| !solid(v), Connectivity::Six).unwrap();
+    let b2 = i64::try_from(
+        (0..out.count()).filter(|k| !out.reaches_outside(Label::Component(*k))).count(),
+    )
+    .unwrap();
+    let b1 = b0 + b2 - euler(&c.topology, &c.field, solid, Connectivity::TwentySix).unwrap();
+    [b0, b1, b2]
+}
+
 #[test]
 fn a_sphere_and_a_torus_keep_their_betti_numbers() {
-    for (name, mesh, betti) in [
+    for (name, mesh, want) in [
         ("sphere", sphere(4, 20.0, [0.0; 3]), [1, 0, 0]),
         ("torus", torus(20.0, 7.0, 48), [1, 1, 0]),
     ] {
         let c = convert(&mesh, &Options::new(1.0)).unwrap();
-        let solid = |v: f32| v < 0.0;
-        let b0 = i64::from(
-            label(&c.topology, &c.field, solid, Connectivity::TwentySix).unwrap().count(),
-        );
-        let out = label(&c.topology, &c.field, |v| !solid(v), Connectivity::Six).unwrap();
-        let b2 = i64::try_from(
-            (0..out.count()).filter(|k| !out.reaches_outside(Label::Component(*k))).count(),
-        )
-        .unwrap();
-        let b1 = b0 + b2 - euler(&c.topology, &c.field, solid, Connectivity::TwentySix).unwrap();
-        assert_eq!([b0, b1, b2], betti, "{name}");
+        assert_eq!(betti(&c), want, "{name}");
     }
+}
+
+/// A sphere of radius 20 with a hole in its cap, the triangles whose middle lies above
+/// z = 18 taken out (ROADMAP.md, P2's acceptance). The winding number spans the hole, so
+/// the sign does not leak through it: the solid is still one ball, and every voxel more
+/// than three voxels from the hole has the sign the closed sphere gives it.
+#[test]
+fn a_holed_mesh_leaks_no_sign() {
+    let closed = sphere(4, 20.0, [0.0; 3]);
+    let mut holed = closed.clone();
+    let middle_z =
+        |t: &[u32; 3]| t.iter().map(|i| closed.vertices[*i as usize][2]).sum::<f64>() / 3.0;
+    holed.triangles.retain(|t| middle_z(t) <= 18.0);
+    assert!(holed.triangles.len() < closed.triangles.len());
+    let (a, b) = [&closed, &holed].map(|m| convert(m, &Options::new(1.0)).unwrap()).into();
+    assert_eq!(betti(&b), [1, 0, 0]);
+    // The hole's rim lies at z ≈ 18, within √(20² − 18²) ≈ 8.7 of the axis.
+    let near_hole = |v: Coord| {
+        let p = v.map(|c| f64::from(c) + 0.5);
+        p[2] > 18.0 - 3.0 - 1.0 && p[0].hypot(p[1]) < 8.8 + 3.0
+    };
+    let (mut compared, mut inside) = (0, 0);
+    for z in -26..26 {
+        for y in -26..26 {
+            for x in -26..26 {
+                let v = [x, y, z];
+                if near_hole(v) {
+                    continue;
+                }
+                let (p, q) = (
+                    a.field.value_at(&a.topology, v).unwrap(),
+                    b.field.value_at(&b.topology, v).unwrap(),
+                );
+                assert_eq!(p < 0.0, q < 0.0, "at {v:?}: closed {p}, holed {q}");
+                compared += 1;
+                inside += usize::from(p < 0.0);
+            }
+        }
+    }
+    assert!(compared > 100_000 && inside > 25_000, "{compared} voxels, {inside} inside");
 }
 
 #[test]
