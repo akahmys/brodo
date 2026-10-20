@@ -8,15 +8,16 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: P2's fifth item: colino's README, its code a doctest (ADR-0001), and the
-  examples `torus` and `vent`.
-- **Next**: P2's close: the fuzz round and the mutation run (ADR-0023). The retrospective's
-  proposals are in (ADR-0001, -0019, -0020). Refactoring is done:
-  a survey found one duplicate in library code, now gone; the duplicates among tests,
-  benchmarks and examples are kept. Miri ran with no error; a test that a holed mesh
-  leaks no sign, for P2's acceptance, is in place.
+- **Done**: P2's close but its mutation run: the retrospective's proposals (ADR-0001,
+  -0019, -0020); refactoring, one duplicate in library code gone, those among tests,
+  benchmarks and examples kept; a test that a holed mesh leaks no sign; Miri, widened to
+  colino (ADR-0008), with no error; the fuzz round, each of the five targets 901 s with no
+  finding (2026-10-20).
+- **Next**: the mutation run (TESTING.md T11, ADR-0023), then P2's acceptance.
 - **Unresolved problems**: Miri's Stacked Borrows reports undefined behaviour in
-  `crossbeam-epoch` under rayon; Tree Borrows does not (ADR-0015). The leaf-parallel
+  `crossbeam-epoch` under rayon; Tree Borrows does not (ADR-0015), but Miri's nightly of
+  2026-07-21 warns there of integer-to-pointer casts in `crossbeam-epoch` 0.9.21, which
+  Tree Borrows does not support, so it may miss a bug past them (2026-10-20). The leaf-parallel
   update's benchmark disagrees within a pair by up to 17 %; whether a load average of 3.0
   catches other work is unknown (ADR-0019); readings: other work in another project
   raised it to 14.76 (2026-10-19); a program using more than one core let the run start
@@ -112,7 +113,8 @@ Not part of P1's acceptance, and not started while ParaView suffices (ADR-0018).
 - [x] README and examples for publishing on its own: `crates/colino/README.md`, its code a
       doctest; `torus` and `vent` in `crates/colino/examples/`, run by tests and written
       from textbook material, both needing no workaround of the API
-- [ ] Retrospective and refactoring; fuzz round; Miri run; mutation run (ADR-0023)
+- [ ] Retrospective and refactoring (done); fuzz round (done); Miri run (done); mutation run
+      (ADR-0023)
 - [ ] **Accepted when** the invariants are right for a sphere, a torus and a double torus;
       a holed mesh leaks no sign; a wall thinner than a voxel is reported
 
