@@ -201,6 +201,53 @@ fn golden() -> FrozenGrid {
 
 const GOLDEN: &[u8] = include_bytes!("data/frozen_v1_f32.bin");
 
+/// The committed grid's values as `[f64; 3]`, every word of each nonzero, the background's
+/// included, so that its six words of the header are all written.
+fn golden_vectors() -> (Topology, Field<[f64; 3]>) {
+    let (t, f) = golden_grid();
+    let of = |x: f32| {
+        let x = f64::from(x);
+        [x + 0.1, -x / 3.0, x * 1e10 + 0.7]
+    };
+    let mut g = Field::new(&t, of(f.background()));
+    for n in t.leaf_numbers() {
+        for (o, x) in g.leaf_mut(&t, n).unwrap().iter_mut().zip(f.leaf(&t, n).unwrap()) {
+            *o = of(*x);
+        }
+    }
+    for n in t.tile_numbers() {
+        g.set_tile(&t, n, of(f.tile(&t, n).unwrap())).unwrap();
+    }
+    (t, g)
+}
+
+const GOLDEN_VECTORS: &[u8] = include_bytes!("data/frozen_v1_f64x3.bin");
+
+/// `[f64; 3]` came after layout version 1 without changing it (ADR-0029): its header holds a
+/// background of six words, all of them written, and every other type's bytes are as
+/// before (the test above).
+#[test]
+fn a_grid_of_f64_vectors_keeps_its_bytes() {
+    let (t, g) = golden_vectors();
+    let frozen = freeze(&t, &g).unwrap();
+    assert!(frozen.as_bytes() == GOLDEN_VECTORS, "the bytes of [f64; 3] grids changed");
+    let copy = aligned(GOLDEN_VECTORS);
+    let view = GridView::<[f64; 3]>::new(copy.as_bytes()).unwrap();
+    let bits = |x: [f64; 3]| x.map(f64::to_bits);
+    assert_eq!(bits(view.background()), bits(g.background()));
+    for v in
+        [[-1, 0, 0], [4095, 7, 9], [4096, 7, 9], [9, 9, 9], [130, 5, 5], [0, 8200, 3], [50, 50, 50]]
+    {
+        assert_eq!(bits(view.get(v).unwrap()), bits(g.value_at(&t, v).unwrap()), "at {v:?}");
+    }
+    let wrong = GridView::<[f32; 3]>::new(copy.as_bytes()).map(|_| ());
+    assert_eq!(wrong, Err(FormatError::WrongValueType { expected: 5, found: 6 }));
+    // Merge rules compare by bits, every component: the last, and a zero's sign.
+    assert!([1.0, 2.0, 3.0_f64].same_bits(&[1.0, 2.0, 3.0]));
+    assert!(![1.0, 2.0, 3.0_f64].same_bits(&[1.0, 2.0, 4.0]));
+    assert!(![0.0, 2.0, 3.0_f64].same_bits(&[-0.0, 2.0, 3.0]));
+}
+
 #[test]
 fn layout_version_1_keeps_its_bytes() {
     let g = golden();

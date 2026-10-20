@@ -108,7 +108,8 @@ pub enum FreezeError {
     /// The topology refused a lookup by number.
     #[error(transparent)]
     Tree(#[from] TreeError),
-    /// A count or offset does not fit the layout's `u32` words.
+    /// A count or offset does not fit the layout's `u32` words, or a value its header's
+    /// background.
     #[error("the grid is too large for the frozen layout")]
     TooLarge,
     /// The topology's lists and its tree disagree.

@@ -67,6 +67,15 @@ impl Value for [f32; 3] {
     }
 }
 
+/// Read by brodo from 0.3.0 on; 0.2.0 refuses its code by name (ADR-0029).
+impl Value for [f64; 3] {
+    const TYPE_CODE: u32 = 6;
+
+    fn same_bits(&self, other: &Self) -> bool {
+        self.iter().zip(other).all(|(a, b)| a.to_bits() == b.to_bits())
+    }
+}
+
 /// How a merged tile's value comes from the values it covers, each with the number of
 /// voxels holding it (ADR-0014); `None` refuses the merge.
 pub type MergeRule<T> = dyn Fn(&[(T, u32)]) -> Option<T> + Send + Sync;

@@ -303,6 +303,43 @@ fn a_mapped_file_reads_as_a_copied_one() {
     }
 }
 
+/// A `[f64; 3]` grid beside the committed file's two, read by copy and by mapping
+/// (ADR-0029).
+#[test]
+#[cfg_attr(miri, ignore = "needs a real file mapping, which Miri cannot run")]
+fn a_grid_of_f64_vectors_reads_copied_and_mapped() {
+    let t = build(&[[-1, 0, 0], [4096, 7, 9]], &[(TileLevel::Upper, [128, 0, 0])]);
+    let of = |k: u32| [f64::from(k) + 0.1, -f64::from(k) / 3.0, 1e300];
+    let f = numbered(&t, [-0.5, 0.25, 1e-300], of);
+    let bytes = to_bytes(&[
+        CacheEntry::new(&meta("density", &[]), &t, &numbered(&t, 0.0_f32, |k| k as f32)).unwrap(),
+        CacheEntry::new(&meta("velocity", &[("precision", "double")]), &t, &f).unwrap(),
+    ])
+    .unwrap();
+    let path = tmp("f64_vectors.brdc");
+    std::fs::write(&path, &bytes).unwrap();
+    let bits = |x: [f64; 3]| x.map(f64::to_bits);
+    for file in [CacheFile::map(&path).unwrap(), CacheFile::from_bytes(&bytes).unwrap()] {
+        assert_eq!(file.value_type(1).unwrap(), 6);
+        assert_eq!(file.meta(1).unwrap(), &meta("velocity", &[("precision", "double")]));
+        let view = file.view::<[f64; 3]>(1).unwrap();
+        for v in [[-1, 0, 0], [4100, 3, 15], [130, 5, 5], [50, 50, 50], [-9, 0, 0]] {
+            assert_eq!(bits(view.get(v).unwrap()), bits(f.value_at(&t, v).unwrap()), "at {v:?}");
+        }
+        let wrong = file.view::<[f32; 3]>(1).map(|_| ());
+        assert!(
+            matches!(
+                wrong,
+                Err(CacheError::Grid {
+                    index: 1,
+                    error: FormatError::WrongValueType { found: 6, .. }
+                })
+            ),
+            "{wrong:?}"
+        );
+    }
+}
+
 #[test]
 #[cfg_attr(miri, ignore = "needs a real file mapping, which Miri cannot run")]
 fn a_file_unfit_to_map_is_refused() {

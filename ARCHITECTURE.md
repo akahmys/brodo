@@ -182,8 +182,9 @@ fastest. A neighbour beyond the `i32` coordinate range is the background.
 - Links between nodes are offsets from the start, in 32-byte units. Every structure is
   32-byte aligned, little-endian, and laid out in `u32` words.
 - Layout version 1, in order: a header (magic number, layout version, value type, the
-  count and offset of each section, the buffer's length, the background); the root table,
-  sorted by key; upper nodes, then lower nodes, each in the Morton order of its origin;
+  count and offset of each section, the buffer's length, the background in up to six
+  words); the root table, sorted by key; upper nodes, then lower nodes, each in the Morton
+  order of its origin;
   leaf values in leaf-number order; tile values, root tiles first, then each upper node's,
   then each lower node's, in node order.
 - A node's masks number its children's places in Morton order, so that its children,
@@ -228,9 +229,10 @@ fastest. A neighbour beyond the `i32` coordinate range is the background.
 
 ### 4.8 Value types
 
-`f32`, `f64`, `u8`, `u32` and `[f32; 3]`, the types implementing brodo's `Value` trait:
-`Copy`, `Send` and `Sync`, with a comparison by bits for merge rules, and `zerocopy`'s
-traits from `freeze` on (§4.6).
+`f32`, `f64`, `u8`, `u32`, `[f32; 3]` and `[f64; 3]` (ADR-0029), the types implementing
+brodo's `Value` trait: `Copy`, `Send` and `Sync`, with a comparison by bits for merge
+rules, and `zerocopy`'s traits from `freeze` on (§4.6). Each is named in frozen grids and
+cache files by a type code brodo assigns, 1 to 6 in that order.
 
 ## 5. `colino` (ADR-0017)
 

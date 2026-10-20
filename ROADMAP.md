@@ -121,7 +121,8 @@ implementation (PLANNING.md §2).
 
 | # | Question | Proposal so far |
 | :--- | :--- | :--- |
-| B-002 | How wide is the ghost layer? | One layer; a macro makes two possible |
+| B-002 | How wide is the ghost layer? | One layer; a macro makes two possible. A user asks for three (§4, R9): a leaf of 8³ reaches only its 26 neighbours up to seven layers |
+| B-017 | Is `Value` sealed, so that only brodo assigns type codes? | Not yet: a type outside brodo is refused by every other build's reader, and sealing would forbid types used in memory only (ADR-0029) |
 | B-016 | What is colino's orientation-independent sign (ADR-0017)? | None yet; candidates: flooding from the outside through cells the surface does not cross, or the winding number's magnitude |
 | B-003 | Do level-set operations (CSG, redistancing) belong in brodo? | No, until shown to be general |
 | B-004 | Does a shared IR schema crate live in this repository? | Undecided; for brodo's users to agree, not for brodo to anticipate |
@@ -141,4 +142,21 @@ No spike is running. `spikes/remap/` answered B-001 and B-008, and `spikes/merge
 - Before registering on crates.io: `publish`, and each crate's description and keywords
   naming its function (sparse volume, VDB, SDF, level set, voxel). Both names were found
   unregistered on 2026-10-16, per the design.
-- Requests from users: none yet. Held until one asks: merging into a root tile (ADR-0014).
+- Requests from users. Held until one asks: merging into a root tile (ADR-0014). From a
+  user keeping time-stepped fields on brodo's tree, received 2026-10-20 against v0.2.0,
+  highest priority first, each with its proposed answer:
+  - R2, `[f64; 3]` as a value type, frozen files included: ADR-0029, being implemented.
+  - R9, ghost data up to three voxels away: B-002's spike, a gather up to three layers
+    wide against `ValueAccessor` on near reads, measured; then an amendment to ADR-0015.
+  - R4, two dimensions: not taken; ARCHITECTURE.md §1 to state that a grid one leaf thick
+    is the supported way, not expected to change, by an amendment to ADR-0012.
+  - R8, splitting every tile in a region in one edit: met by `split_tile` per leaf origin
+    within one `TopologyEditor`, one `Remap` at `commit`; to be shown by a test and
+    documented. An operation of its own only if a benchmark shows the calls cost.
+  - R7, vector fields in VTK output: after R2, `[f32; 3]` and `[f64; 3]` as three-component
+    cell arrays, by an amendment to ADR-0018.
+  - R10, several fields of one leaf gathered at once: only if B-002's spike measures the
+    neighbour resolution worth sharing.
+  - Asked, not requested: grids of several resolutions with a defined relation between
+    coarse and fine voxels. The design does not decide it: a cache file holds several
+    grids, each with its own affine transform, and nothing relates their voxels.

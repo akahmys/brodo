@@ -258,6 +258,7 @@ fn check_grid(bytes: &[u8], value_type: u32) -> Result<(), FormatError> {
         t if t == u8::TYPE_CODE => view::<u8>(bytes),
         t if t == u32::TYPE_CODE => view::<u32>(bytes),
         t if t == <[f32; 3]>::TYPE_CODE => view::<[f32; 3]>(bytes),
+        t if t == <[f64; 3]>::TYPE_CODE => view::<[f64; 3]>(bytes),
         found => Err(FormatError::WrongValueType { expected: 0, found }),
     }
 }

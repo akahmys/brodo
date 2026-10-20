@@ -6,6 +6,9 @@ are recorded here when they change (V6).
 
 ## Unreleased
 
+- `[f64; 3]` is a value type, type code 6, frozen and cached under layout and format
+  version 1 (ADR-0029). brodo 0.2.0 refuses a grid of it, naming the code; files of every
+  other type keep their bytes.
 - `brodo::slice::render` refuses a colour map whose range is not finite or is empty, with
   the new `SliceError::BadColorMap`; it drew such a range in no colour of its own. A
   `match` over `SliceError` needs the new arm.

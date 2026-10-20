@@ -50,9 +50,11 @@ pub(crate) struct Header {
     pub(crate) offsets: [U32; 5],
     /// The buffer's length, in blocks.
     pub(crate) blocks: U32,
-    /// The background value's bytes, zero beyond its size.
-    pub(crate) background: [U32; 3],
-    pub(crate) pad: [U32; 6],
+    /// The background value's bytes, zero beyond its size: up to 24, `[f64; 3]`'s. Its
+    /// last three words were padding before `[f64; 3]`, zero for every smaller type, so
+    /// that their bytes are as before (ADR-0029).
+    pub(crate) background: [U32; 6],
+    pub(crate) pad: [U32; 3],
 }
 
 /// One entry of the root table: an upper node or a root tile, by its region's origin.
@@ -356,8 +358,12 @@ fn header<T: Value>(
     [leaves, tiles]: [usize; 2],
 ) -> Result<Header, FreezeError> {
     let counts = [plan.roots.len(), plan.uppers.len(), plan.lowers.len(), leaves, tiles];
-    let mut background = [U32::ZERO; 3];
-    background.as_mut_bytes()[..size_of::<T>()].copy_from_slice(f.background().as_bytes());
+    let mut background = [U32::ZERO; 6];
+    background
+        .as_mut_bytes()
+        .get_mut(..size_of::<T>())
+        .ok_or(FreezeError::TooLarge)?
+        .copy_from_slice(f.background().as_bytes());
     Ok(Header {
         magic: U32::new(MAGIC),
         version: U32::new(VERSION),
@@ -381,6 +387,6 @@ fn header<T: Value>(
         .map(U32::new),
         blocks: U32::new(to_u32(total)?),
         background,
-        pad: [U32::ZERO; 6],
+        pad: [U32::ZERO; 3],
     })
 }
