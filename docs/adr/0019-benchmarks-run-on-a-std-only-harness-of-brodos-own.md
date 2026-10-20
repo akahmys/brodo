@@ -105,3 +105,21 @@ before changing it, and to share the harness rather than write a second (PLANNIN
 Including a file outside the crate means colino's benchmark cannot be packaged as it
 stands; before colino is published, its benchmark is excluded or the harness becomes a
 crate of its own.
+
+## Amendment
+
+- **Date**: 2026-10-20
+
+`gather_w3` was added after the baselines of 2026-10-17. `--record` replaces every row of
+the hardware model, so recording the new item would have reset the rest, against which
+drift is measured; its row was added by hand instead. P2's retrospective proposed, and
+the human decided:
+
+- `--record NAME` replaces or adds that item's row alone, with the faster of the pair, the
+  other rows kept with their dates; a name no item has is refused. `--record` alone
+  records every item, as before.
+
+Shown, at a load average of 2.5 to 2.6: with the name ignored, `--record gather_w3`
+rewrote all ten rows; `--record nosuch` was refused and changed nothing; `--record
+gather_w3` changed its row alone, 4437000 to 4358416 ns, the other nine keeping
+2026-10-17.

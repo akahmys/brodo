@@ -1,5 +1,6 @@
 //! Benchmark tier (TESTING.md §1) for brodo, on the shared harness (`harness/mod.rs`,
-//! ADR-0019): `cargo bench -p brodo --bench brodo`, `--record` to record a baseline.
+//! ADR-0019): `cargo bench -p brodo --bench brodo`, `--record` to record a baseline,
+//! `--record NAME` one item's.
 //!
 //! The workload is a narrow-band sphere SDF of radius 80, the textbook |p| − r clamped to a
 //! band of ±3: a leaf where the band passes, an inside tile where all of a leaf's region

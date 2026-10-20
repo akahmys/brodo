@@ -10,8 +10,8 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
 
 - **Done**: P2's fifth item: colino's README, its code a doctest (ADR-0001), and the
   examples `torus` and `vent`.
-- **Next**: P2's close: the retrospective's last proposal (a benchmark item recorded on
-  its own, ADR-0019), the fuzz round and the mutation run (ADR-0023). Refactoring is done:
+- **Next**: P2's close: the fuzz round and the mutation run (ADR-0023). The retrospective's
+  proposals are in (ADR-0001, -0019, -0020). Refactoring is done:
   a survey found one duplicate in library code, now gone; the duplicates among tests,
   benchmarks and examples are kept. Miri ran with no error; a test that a holed mesh
   leaks no sign, for P2's acceptance, is in place.

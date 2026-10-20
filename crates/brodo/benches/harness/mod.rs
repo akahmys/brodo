@@ -9,7 +9,9 @@
 //! agree, and the change from the baseline of this hardware model to
 //! `out/bench/<crate>/report.tsv`, and fails when an item is more than `TOLERANCE` slower
 //! than its baseline in both. With `--record` it instead replaces this model's rows of the
-//! member's `benches/baseline.tsv` with the faster of the two times, dated.
+//! member's `benches/baseline.tsv` with the faster of the two times, dated; with
+//! `--record NAME`, only that item's row, the others kept with their dates, so that an item
+//! added later gains a baseline without the rest losing theirs.
 //!
 //! Run and record on a machine doing nothing else; a run waits, then refuses, while the
 //! load average says otherwise. With other work running, brodo's leaf-parallel update once
@@ -90,12 +92,18 @@ pub fn run<D>(
         let data = data()?;
         return child(&items(&data), Path::new(path));
     }
-    let record = args.iter().any(|a| a == "--record");
+    let at = args.iter().position(|a| a == "--record");
+    // The argument after `--record`, unless it is another flag, such as cargo's `--bench`.
+    let only = at.and_then(|i| args.get(i + 1)).filter(|a| !a.starts_with("--")).cloned();
     std::fs::create_dir_all(&places.out)?;
     wait_for_rest()?;
     let runs = [run_child(&places, 0)?, run_child(&places, 1)?];
     let model = hardware_model()?;
-    if record { record_baseline(&places, &runs, &model) } else { compare(&places, &runs, &model) }
+    if at.is_some() {
+        record_baseline(&places, &runs, &model, only.as_deref())
+    } else {
+        compare(&places, &runs, &model)
+    }
 }
 
 /// The one-minute load average: `vm.loadavg` on macOS, `/proc/loadavg` on Linux.
@@ -196,16 +204,23 @@ fn read_baseline(places: &Places) -> Result<Baseline, Failure> {
     Ok(rows)
 }
 
-/// Replaces this model's rows with the faster of the two runs, dated today.
+/// Replaces this model's rows with the faster of the two runs, dated today; with `only`,
+/// that item's row alone, refused if no item has the name.
 fn record_baseline(
     places: &Places,
     runs: &[BTreeMap<String, u128>; 2],
     model: &str,
+    only: Option<&str>,
 ) -> Result<(), Failure> {
     let mut rows = read_baseline(places)?;
-    rows.retain(|(_, m), _| m != model);
+    if let Some(name) = only
+        && !runs[0].contains_key(name)
+    {
+        return Err(Failure(format!("no item named {name} to record")));
+    }
+    rows.retain(|(n, m), _| m != model || only.is_some_and(|o| o != n));
     let date = today()?;
-    for (name, a) in &runs[0] {
+    for (name, a) in runs[0].iter().filter(|(n, _)| only.is_none_or(|o| o == n.as_str())) {
         let b = runs[1].get(name).ok_or(Failure(format!("{name} missing from run 2")))?;
         rows.insert((name.clone(), model.to_owned()), (*a.min(b), date.clone()));
     }
