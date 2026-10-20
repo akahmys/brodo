@@ -6,6 +6,9 @@ are recorded here when they change (V6).
 
 ## Unreleased
 
+- colino has a README, the front page of its documentation, and two examples: a torus
+  checked against its exact distance, and a vented box whose vent closes at a coarser
+  voxel size.
 - `brodo::gather::{gather_wide, GhostWidth}`: a leaf and one, two or three ghost layers
   copied into a caller's `Vec` (ADR-0015). `GhostWidth` is `#[non_exhaustive]`: a `match`
   over it needs a wildcard arm.

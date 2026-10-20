@@ -37,3 +37,20 @@ section references. It was made to fail on a `NAME.md §N` or `§N.M`, in a docu
 source comment, that names a root document without a heading so numbered; it checked 107
 such references when added. Changing a reference in `vtk.rs` from §6.1 to §6.9 failed it.
 
+
+## Amendment
+
+- **Date**: 2026-10-20
+
+colino was readied for publishing on its own (ROADMAP.md, P2), and a crate needs a README
+for its users, which no document answered. The human decided:
+
+- A crate's README answers what the crate does and how it is used, and holds no rule or
+  design; AGENTS.md lists it.
+- It is the crate's documentation front page, read in by `include_str!` in a `#![doc]`
+  attribute of its `lib.rs`, so that its code runs as a doctest in the gate's
+  `cargo test` and cannot drift from the API. That a README is read in so, nothing
+  checks.
+
+Shown to fire: an assertion in colino's README changed to a wrong value failed as a
+doctest of `cargo test --workspace --all-features`, and passed again once restored.

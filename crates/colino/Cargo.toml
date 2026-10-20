@@ -6,6 +6,7 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 publish.workspace = true
+readme = "README.md"
 
 [dependencies]
 brodo.workspace = true
@@ -27,6 +28,15 @@ serde_json.workspace = true
 
 [lints]
 workspace = true
+
+# The examples run as tests (ROADMAP.md, P2).
+[[example]]
+name = "torus"
+test = true
+
+[[example]]
+name = "vent"
+test = true
 
 # The Benchmark tier on brodo's harness (TESTING.md §1, ADR-0019).
 [[bench]]

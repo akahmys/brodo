@@ -1,7 +1,6 @@
-//! Conversion of external shapes (triangle meshes) to narrow-band signed distance fields on
-//! brodo's sparse tree, with a report of the topology changes the conversion may cause.
-//! The design is in `ARCHITECTURE.md` §5. Meshes are read, and distances to them found, so
-//! far (ROADMAP.md, P2).
+#![doc = include_str!("../README.md")]
+//!
+//! The design is in the repository's `ARCHITECTURE.md` §5.
 
 pub mod bvh;
 pub mod convert;

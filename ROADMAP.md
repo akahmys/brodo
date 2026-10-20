@@ -8,9 +8,10 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: every request of the user's (§4) answered: R2, R7 and R9 built, R10 declined,
-  R4 and R8 answered in the design.
-- **Next**: P2's fifth item, colino's README and examples for publishing on its own.
+- **Done**: P2's fifth item: colino's README, its code a doctest (ADR-0001), and the
+  examples `torus` and `vent`.
+- **Next**: P2's close: retrospective and refactoring, the fuzz round, Miri, and the
+  mutation run (ADR-0023).
 - **Unresolved problems**: Miri's Stacked Borrows reports undefined behaviour in
   `crossbeam-epoch` under rayon; Tree Borrows does not (ADR-0015). The leaf-parallel
   update's benchmark disagrees within a pair by up to 17 %; whether a load average of 3.0
@@ -104,7 +105,9 @@ Not part of P1's acceptance, and not started while ParaView suffices (ADR-0018).
 - [x] STL, OBJ and 3MF readers, each in `UNTRUSTED_INPUT` and fuzzed (§5.1)
 - [x] Generalised winding number and the narrow-band output (§5.1)
 - [x] Topology report, layers 1 and 2 (§5.2)
-- [ ] README and examples for publishing on its own
+- [x] README and examples for publishing on its own: `crates/colino/README.md`, its code a
+      doctest; `torus` and `vent` in `crates/colino/examples/`, run by tests and written
+      from textbook material, both needing no workaround of the API
 - [ ] Retrospective and refactoring; fuzz round; Miri run; mutation run (ADR-0023)
 - [ ] **Accepted when** the invariants are right for a sphere, a torus and a double torus;
       a holed mesh leaks no sign; a wall thinner than a voxel is reported
@@ -112,7 +115,8 @@ Not part of P1's acceptance, and not started while ParaView suffices (ADR-0018).
 ### After P2
 
 Ordered by users' requests (§4): the archive profile, value quantisation, colino's layer 3,
-writing `.vdb`, STEP input.
+writing `.vdb`, STEP input. brodo's own README, in the form colino's took (AGENTS.md), is
+not started.
 
 ## 3. Open questions and spikes
 
