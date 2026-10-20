@@ -148,8 +148,8 @@ No spike is running. `spikes/remap/` answered B-001 and B-008, and `spikes/merge
   - R2, `[f64; 3]` as a value type, frozen files included: done (ADR-0029).
   - R9, ghost data up to three voxels away: done, `gather_wide`, one to three layers,
     decided by B-002's spike (ADR-0015); reads beyond the window through `ValueAccessor`.
-  - R4, two dimensions: not taken; ARCHITECTURE.md §1 to state that a grid one leaf thick
-    is the supported way, not expected to change, by an amendment to ADR-0012.
+  - R4, two dimensions: answered, no mode of its own; a grid one leaf thick is the
+    supported way and is not expected to change (ARCHITECTURE.md §1, ADR-0012).
   - R8, splitting every tile in a region in one edit: met by `split_tile` per leaf origin
     within one `TopologyEditor`, one `Remap` at `commit`; to be shown by a test and
     documented. An operation of its own only if a benchmark shows the calls cost.

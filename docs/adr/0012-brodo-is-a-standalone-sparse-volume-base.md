@@ -1,6 +1,6 @@
 # ADR-0012: brodo is a standalone sparse-volume base, in two crates
 
-- **Status**: Accepted
+- **Status**: Amended
 - **Date**: 2026-10-16
 
 ## Context
@@ -25,3 +25,16 @@ analysis.
 ## Consequences
 
 A request from a user that falls outside this scope is recorded, not built (AGENTS.md S4).
+
+## Amendment
+
+- **Date**: 2026-10-20
+
+A user asked for two-dimensional runs, and later axisymmetric ones (ROADMAP.md §4, R4).
+They run today as a grid one leaf thick, each value of a field one voxel thick in z held
+in a leaf of eight layers. A mode of its own would double the voxel coordinate, the tree,
+the frozen layout and the files. The human decided:
+
+- A grid one leaf thick is the supported way to keep two-dimensional fields, and is not
+  expected to change; brodo has no two-dimensional mode.
+- Axisymmetry is a discretisation, outside brodo's scope (ARCHITECTURE.md §1).

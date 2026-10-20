@@ -24,6 +24,11 @@ own and knows nothing of its users.
 discretisation and linear algebra; an application's own interface (choosing faces,
 labelling, showing provenance), which belongs to the application (ADR-0018).
 
+Two-dimensional fields are kept on a grid one leaf thick: a leaf of 8³ is fixed
+(ADR-0013), so a field one voxel thick in z still takes a leaf's eight layers. brodo has
+no two-dimensional mode and is not expected to gain one (ADR-0012). An axisymmetric run is
+a discretisation, its user's.
+
 ## 2. Crates and layers
 
 | Crate | Contents |
