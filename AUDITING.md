@@ -40,6 +40,7 @@ grep -E '^echo "\[' scripts/audit/verify_compliance.sh
 | test files in `src/`, and `#[ignore]` reasons, direct or under `cfg_attr`, in every target | T1 |
 | `scripts/audit/documents.py`, and `cargo doc` with warnings denied | AGENTS.md writing rules 1, 2, 6, S3, and no `CLAUDE.md`; Rule 10 |
 | `scripts/audit/mutants.py`: `.cargo/mutants.toml` holds no setting, and each pattern in its `exclude_re` has a comment above it and excludes a mutant | T11 |
+| `scripts/hooks/provenance_guard.py --check`: the local list of forbidden sources exists and names a project | S1 |
 | `cargo deny check` | 13 |
 | hooks installed; betterleaks over the tree and the history, personal rules, `scripts/audit/paths.py` (also: each of `OUTPUT_DIRS` git-ignored and in betterleaks' allow-list) | 14, L2 |
 | `cargo test --workspace --all-features`, a crate README's code among the doctests | TESTING.md §4; AGENTS.md, crate READMEs |
@@ -75,8 +76,10 @@ the guard; the history scan is the backstop.
 
 **Forbidden sources.** The same file runs `scripts/hooks/provenance_guard.py` before every
 read, search, fetch and shell command, which blocks a path or URL naming a source AGENTS.md
-S1 forbids. It matches names only, so no directory on any machine is written into the
-repository. Nothing backs it up: what was read leaves no trace in the tree.
+S1 forbids: OpenVDB, OpenFOAM, and the names in the owner's local list, kept outside the
+repository so that it names no other project of the owner's. It matches names only, so no
+directory on any machine is written into the repository. Nothing backs it up: what was
+read leaves no trace in the tree.
 
 Install the hooks once per clone:
 

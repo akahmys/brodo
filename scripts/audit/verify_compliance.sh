@@ -158,6 +158,9 @@ echo "[Rule 13] cargo deny check (licences, advisories, bans, sources)..."
 if out=$(cargo deny check 2>&1); then echo "  PASS"
 else echo "$out" | grep -E "^error" | head -20; fail "cargo deny"; fi
 
+echo "[S1] The local list of forbidden sources the guard reads..."
+python3 scripts/hooks/provenance_guard.py --check || ERROR=1
+
 echo "[Rule 14] Secrets, personal data and paths outside the project..."
 ERROR_BEFORE=$ERROR; ERROR=0
 [ "$(git config core.hooksPath)" = "scripts/hooks" ] \

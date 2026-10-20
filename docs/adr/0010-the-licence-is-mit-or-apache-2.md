@@ -6,7 +6,7 @@
 ## Context
 
 brodo is meant to be published on its own and used by projects under other licences,
-the solver (GPLv3) and the design platform (not yet decided) among them.
+copyleft ones among them.
 
 ## Decision
 

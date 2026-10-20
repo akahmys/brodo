@@ -29,7 +29,9 @@ what the design is. Contributors, human or agent, start with [AGENTS.md](AGENTS.
    `rust-toolchain.toml`), `cargo-deny`, `betterleaks` and `python3`; for the fuzzer and
    Miri, a nightly toolchain, `cargo-fuzz` and the `miri` component (TESTING.md §3).
 3. Write the personal rules, which match the owner's name and stay outside the repository
-   (AUDITING.md §2), at `~/.config/betterleaks/personal.toml` or `$PERSONAL_LEAKS`.
+   (AUDITING.md §2), at `~/.config/betterleaks/personal.toml` or `$PERSONAL_LEAKS`; and
+   the local list of forbidden sources (AGENTS.md S1), one project a line, at
+   `~/.config/brodo/forbidden-sources` or `$BRODO_FORBIDDEN_SOURCES`.
 4. Run the gate:
 
    ```bash

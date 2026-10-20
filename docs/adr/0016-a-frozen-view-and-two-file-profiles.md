@@ -5,7 +5,7 @@
 
 ## Context
 
-Grids are passed between processes (the solver and the design platform) and replayed from frame caches,
+Grids are passed between processes and replayed from frame caches,
 where copying is the cost; they are also archived and shipped, where size is. Compression
 and zero-copy reading exclude each other. Future GPU use (WGSL) has no 8-bit loads and
 limited 64-bit integers.

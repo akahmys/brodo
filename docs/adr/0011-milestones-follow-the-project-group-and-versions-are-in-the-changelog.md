@@ -5,9 +5,9 @@
 
 ## Context
 
-The template numbered milestones M0, M1 and listed versions in a table in ROADMAP.md. The
-project group plans in phases P0 to P7, of which brodo carries P0 to P2, and brodo's users
-(the solver, the design platform) pin it by git revision and need to see what each version breaks. The
+The template numbered milestones M0, M1 and listed versions in a table in ROADMAP.md.
+brodo carries the phases P0 to P2 of a larger plan, and its users pin it by git revision
+and need to see what each version breaks. The
 grid layout and the file formats outlive any one crate version.
 
 ## Decision
