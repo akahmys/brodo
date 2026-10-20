@@ -1,6 +1,6 @@
 # ADR-0021: The gate covers every target, every feature set, and every way to ignore a test
 
-- **Status**: Accepted
+- **Status**: Amended
 - **Date**: 2026-10-17
 
 ## Context
@@ -28,3 +28,21 @@ failed the gate, which passed again once each was removed.
 
 Combinations of two or more non-default features are not linted; with two features,
 every combination is covered. The tests themselves run with the default features only.
+
+## Amendment
+
+- **Date**: 2026-10-20
+
+colino's feature `serde`, off by default (ADR-0028), showed what the Consequences left
+open: the tests ran with the default features only, and so did Rule 12's `cargo tree` and
+T2's list of tests. A test behind a feature off by default never ran in the gate, nor was
+it listed, and a dependency behind one could pull `cc` unseen; `cargo deny` alone already
+read every feature (`deny.toml`'s `all-features`). The human decided:
+
+- The gate runs the tests with `--all-features`, `cargo tree` for Rule 12 and
+  `scripts/audit/tests.py` for T2 likewise. The features are additive, so all of them
+  together is one more build, not one per combination.
+
+Each was shown to fire: a failing test behind `serde` failed the gate, and was missing from
+the list until listed; a dependency named `cc` behind a feature failed Rule 12. Each passed
+with the default features only.

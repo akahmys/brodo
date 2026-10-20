@@ -19,7 +19,7 @@ LIST = "test-list.txt"
 
 def executables() -> list[tuple[Path, str, str, str]]:
     out = subprocess.run(
-        ["cargo", "test", "--workspace", "--lib", "--bins", "--tests", "--examples",
+        ["cargo", "test", "--workspace", "--all-features", "--lib", "--bins", "--tests", "--examples",
          "--no-run", "--quiet", "--message-format=json"],
         cwd=ROOT, capture_output=True, text=True, check=True,
     ).stdout

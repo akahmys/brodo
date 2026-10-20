@@ -125,7 +125,7 @@ echo "[Rule 12] No dependency compiles C ($TARGETS)..."
 c_builders=""
 for member in $MEMBERS; do
     for triple in $TARGETS; do
-        if cargo tree -p "$member" --target "$triple" --edges normal,build --prefix none \
+        if cargo tree -p "$member" --target "$triple" --all-features --edges normal,build --prefix none \
                 2>/dev/null | grep -q '^cc v'; then
             c_builders+=" $member($triple)"
         fi
@@ -187,8 +187,8 @@ fi
 [ $ERROR -eq 0 ] && echo "  PASS"
 [ $ERROR_BEFORE -eq 0 ] || ERROR=1
 
-echo "[Gate] cargo test --workspace..."
-if out=$(cargo test --workspace --quiet 2>&1); then
+echo "[Gate] cargo test --workspace --all-features..."
+if out=$(cargo test --workspace --all-features --quiet 2>&1); then
     echo "  PASS ($(grep -oE 'test result: ok\. [0-9]+ passed' <<<"$out" \
         | awk '{s += $4} END {print s + 0}') tests)"
 else echo "$out" | grep -E "^test .* FAILED|^error|panicked" | head -20; fail "cargo test"; fi

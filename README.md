@@ -40,5 +40,5 @@ what the design is. Contributors, human or agent, start with [AGENTS.md](AGENTS.
 
 ```bash
 cargo build --workspace
-cargo test --workspace
+cargo test --workspace --all-features
 ```
