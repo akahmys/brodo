@@ -252,4 +252,36 @@ mod tests {
             assert_eq!(draw(map).unwrap().rgba.len(), 8 * 8 * 4, "{map:?}");
         }
     }
+
+    #[test]
+    fn a_range_empty_along_one_axis_is_refused() {
+        let t = Topology::new();
+        let f = Field::new(&t, 1.0_f32);
+        let map = ColorMap::Diverging { limit: 3.0 };
+        for (min, max) in [([0, 0], [-1, 7]), ([0, 0], [7, -1])] {
+            let got = render(&t, &f, Slice { axis: Axis::Z, position: 0, min, max }, map);
+            assert!(matches!(got, Err(SliceError::EmptyRange)), "{max:?}: {got:?}");
+        }
+    }
+
+    /// Two neighbours of equal size and opposite sign are both on the contour: neither is
+    /// nearer zero, so leaving either out would break the line.
+    #[test]
+    fn equal_and_opposite_neighbours_are_both_on_the_contour() {
+        let empty = Topology::new();
+        let mut e = empty.edit();
+        e.activate([0, 0, 0]).unwrap();
+        let t = e.commit().unwrap().0;
+        let mut f = Field::new(&t, 2.0_f32);
+        let n = t.leaf_numbers().next().unwrap();
+        let leaf = f.leaf_mut(&t, n).unwrap();
+        leaf.fill(2.0);
+        (leaf[0], leaf[1]) = (0.5, -0.5);
+        let slice = Slice { axis: Axis::Z, position: 0, min: [0, 0], max: [7, 7] };
+        let image = render(&t, &f, slice, ColorMap::Diverging { limit: 3.0 }).unwrap();
+        // Rows run from the top, so y = 0 is the last of eight.
+        let rgb = |x: usize| &image.rgba[(7 * 8 + x) * 4..(7 * 8 + x) * 4 + 3];
+        assert_eq!((rgb(0), rgb(1)), (&CONTOUR[..], &CONTOUR[..]));
+        assert_ne!(rgb(2), &CONTOUR[..]);
+    }
 }

@@ -14,7 +14,10 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   colino (ADR-0008), with no error; the fuzz round, each of the five targets 901 s with no
   finding (2026-10-20).
 - **Next**: the mutation run (TESTING.md T11, ADR-0023), then P2's acceptance; then R11
-  (ADR-0030).
+  (ADR-0030). brodo's run (2026-10-21) missed 48 of 1463 mutants and timed out on 35
+  before any test failed, the machine busy: 18 missed ones now fail new tests; 30 are to
+  be shown equivalent before `.cargo/mutants.toml` lists them; the timeouts are to be run
+  again at rest. colino's run is under way.
 - **Unresolved problems**: Miri's Stacked Borrows reports undefined behaviour in
   `crossbeam-epoch` under rayon; Tree Borrows does not (ADR-0015), but Miri's nightly of
   2026-07-21 warns there of integer-to-pointer casts in `crossbeam-epoch` 0.9.21, which

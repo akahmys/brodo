@@ -177,6 +177,31 @@ proptest! {
     }
 }
 
+/// Cells at the edge of reach, which random cases seldom place: under 6-connectivity, a
+/// background cell two cells along and one across from a leaf is 10 steps away, so k = 9
+/// does not grow it; and a leaf whose only background neighbour is across an edge is 2
+/// steps from it, so k = 1 does not erode it.
+#[test]
+fn cells_just_beyond_reach_stay_as_they_are() {
+    let leaf_at = |cells: &[[i32; 3]]| {
+        let empty = Topology::new();
+        let mut e = empty.edit();
+        for c in cells {
+            e.activate(c.map(|x| x * 8)).unwrap();
+        }
+        e.commit().unwrap().0
+    };
+    let d = Dense { lo: -32, side: 96 };
+    let one = leaf_at(&[[0, 0, 0]]);
+    assert_eq!(kind(&dilate(&one, Connectivity::Six, 9).unwrap().0, [16, 8, 0]), Kind::Background);
+    assert_eq!(check(&one, &d, Connectivity::Six, 9, true), Ok(()));
+    let block: Vec<[i32; 3]> =
+        (0..27).map(|i| [i % 3, i / 3 % 3, i / 9]).filter(|c| *c != [2, 2, 1]).collect();
+    let block = leaf_at(&block);
+    assert_eq!(kind(&erode(&block, Connectivity::Six, 1).unwrap().0, [8, 8, 8]), Kind::Leaf);
+    assert_eq!(check(&block, &d, Connectivity::Six, 1, false), Ok(()));
+}
+
 /// An upper tile, with leaves beside it and one apart: its cells near the background go,
 /// split from it, and the rest stays tile.
 #[test]

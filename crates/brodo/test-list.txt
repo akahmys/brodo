@@ -4,14 +4,18 @@ lib brodo accessor::tests::accessors_read_and_write_as_the_field_does
 lib brodo accessor::tests::each_level_of_the_path_answers_in_turn
 lib brodo accessor::tests::writes_go_to_leaves_only_and_a_stale_field_is_refused
 lib brodo analysis::tests::a_corner_joins_under_26_and_not_under_6
+lib brodo analysis::tests::an_upper_nodes_empty_places_are_the_outsides
 lib brodo analysis::tests::background_enclosed_by_leaves_is_apart_from_the_outside
 lib brodo analysis::tests::root_tiles_can_enclose_a_root_region
+lib brodo analysis::tests::six_and_twenty_six_neighbours_are_one_step_away
 lib brodo analysis::tests::tiles_join_what_touches_them
 lib brodo field::tests::a_merge_weighs_each_value_by_its_voxels
 lib brodo field::tests::a_root_tile_split_passes_its_value_to_every_part
 lib brodo field::tests::a_stale_field_is_refused_everywhere
 lib brodo field::tests::a_voxel_finds_its_place_in_its_leaf
+lib brodo field::tests::every_value_type_compares_by_bits
 lib brodo field::tests::regions_activated_in_the_merging_commit_count_as_the_background
+lib brodo grid::tests::a_grid_shows_its_topology_and_field
 lib brodo grid::tests::an_edit_keeps_the_values_and_a_refused_one_changes_nothing
 lib brodo manifest::tests::a_location_is_eight_bytes
 lib brodo manifest::tests::a_step_beyond_the_coordinate_range_is_nothing
@@ -23,6 +27,8 @@ lib brodo parallel::tests::same_bits_at_any_thread_count
 lib brodo parallel::tests::the_lowest_failing_leaf_is_reported
 lib brodo slice::tests::a_colour_map_with_a_range_draws
 lib brodo slice::tests::a_colour_map_with_no_usable_range_is_refused
+lib brodo slice::tests::a_range_empty_along_one_axis_is_refused
+lib brodo slice::tests::equal_and_opposite_neighbours_are_both_on_the_contour
 lib brodo topology::tests::a_commit_keeps_no_arena_entry_a_merge_left
 lib brodo topology::tests::a_commit_leaves_the_old_topology_as_it_was
 lib brodo topology::tests::a_split_records_the_tile_each_new_part_came_from
@@ -55,6 +61,7 @@ test cache_format a_mapped_file_reads_as_a_copied_one
 test cache_format bounds_cover_leaves_and_tiles_and_an_empty_grid_has_none
 test cache_format damaged_files_are_refused_or_read_safely
 test cache_format each_check_refuses_its_damage
+test cache_format every_value_type_is_written_and_read_back
 test cache_format format_version_1_keeps_its_bytes_and_a_file_round_trips
 test cache_format metadata_needs_a_unit_and_finite_sizes
 test cache_format only_the_bytes_the_writer_puts_are_read
@@ -79,6 +86,7 @@ test miri_paths miri_a_frozen_grid_reads_in_place
 test miri_paths miri_the_leaf_parallel_update_and_reduction_run_on_four_threads
 test morphology_reference an_upper_tile_is_split_where_it_must_go
 test morphology_reference cells_change_as_a_dense_search_says
+test morphology_reference cells_just_beyond_reach_stay_as_they_are
 test remap_reference every_tile_in_a_region_splits_in_one_edit
 test remap_reference remap_keeps_every_fields_values
 test slice_images slices_keep_their_golden_pixels

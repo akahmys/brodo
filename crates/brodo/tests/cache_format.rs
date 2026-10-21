@@ -175,6 +175,14 @@ fn each_check_refuses_its_damage() {
         read(&with_word(&g, 12, 5)),
         Err(CacheError::Grid { index: 0, error: FormatError::WrongValueType { .. } })
     ));
+    // A type code no value type has: refused as such, not read as any type.
+    assert!(matches!(
+        read(&with_word(&g, 12, 7)),
+        Err(CacheError::Grid {
+            index: 0,
+            error: FormatError::WrongValueType { expected: 0, found: 7 }
+        })
+    ));
     // The name's first byte made invalid UTF-8.
     let mut bad = g.clone();
     bad[usize::try_from(meta_at).unwrap() * 32 + 4] = 0xff;
@@ -353,4 +361,47 @@ fn a_file_unfit_to_map_is_refused() {
     std::fs::write(&damaged, with_word(&golden(), 0, 9)).unwrap();
     assert!(matches!(CacheFile::map(&damaged), Err(CacheError::BadMagic(9))));
     assert!(matches!(CacheFile::map(&tmp("missing.brdc")), Err(CacheError::Io(_))));
+}
+
+fn entries_u8(t: &Topology) -> Field<u8> {
+    numbered(t, 9_u8, |n| u8::try_from(n % 251).unwrap())
+}
+
+/// A grid of each value type, written to a file by `cache::write` and read back by copy:
+/// each read as its type at every voxel probed.
+#[test]
+fn every_value_type_is_written_and_read_back() {
+    let t = build(&[[-1, 0, 0], [4096, 7, 9]], &[(TileLevel::Lower, [8, 8, 8])]);
+    let k = |k: u32| f64::from(k) + 0.25;
+    #[expect(clippy::cast_possible_truncation, reason = "small test values")]
+    let entries = [
+        CacheEntry::new(&meta("f32", &[]), &t, &numbered(&t, -1.0_f32, |n| k(n) as f32)).unwrap(),
+        CacheEntry::new(&meta("f64", &[]), &t, &numbered(&t, -1.0_f64, k)).unwrap(),
+        CacheEntry::new(&meta("u8", &[]), &t, &entries_u8(&t)).unwrap(),
+        CacheEntry::new(&meta("u32", &[]), &t, &numbered(&t, 9_u32, |n| n * 3)).unwrap(),
+        CacheEntry::new(
+            &meta("f32x3", &[]),
+            &t,
+            &numbered(&t, [0.0_f32; 3], |n| [n as f32, 1.0, 2.0]),
+        )
+        .unwrap(),
+        CacheEntry::new(&meta("f64x3", &[]), &t, &numbered(&t, [0.0_f64; 3], |n| [k(n), 1.0, 2.0]))
+            .unwrap(),
+    ];
+    let path = tmp("every_type.brdc");
+    // A file left by an earlier run would pass for one written now.
+    let _absent = std::fs::remove_file(&path);
+    write(&path, &entries).unwrap();
+    assert_eq!(std::fs::read(&path).ok(), Some(to_bytes(&entries).unwrap()));
+    let file = CacheFile::read(&path).unwrap();
+    let codes: Vec<u32> = (0..6).map(|i| file.value_type(i).unwrap()).collect();
+    assert_eq!(codes, [1, 2, 3, 4, 5, 6]);
+    let (u8s, u32s, f64s) =
+        (entries_u8(&t), numbered(&t, 9_u32, |n| n * 3), numbered(&t, -1.0_f64, k));
+    for v in [[-1, 0, 0], [4100, 7, 9], [9, 9, 9], [500, 0, 0]] {
+        assert_eq!(file.view::<u8>(2).unwrap().get(v).unwrap(), u8s.value_at(&t, v).unwrap());
+        assert_eq!(file.view::<u32>(3).unwrap().get(v).unwrap(), u32s.value_at(&t, v).unwrap());
+        let got = file.view::<f64>(1).unwrap().get(v).unwrap();
+        assert_eq!(got.to_bits(), f64s.value_at(&t, v).unwrap().to_bits(), "at {v:?}");
+    }
 }

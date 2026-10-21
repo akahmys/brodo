@@ -275,6 +275,21 @@ mod tests {
     use super::*;
     use crate::tree::TileLevel;
 
+    /// Every value type compares by bits: equal values agree, a zero's sign and a NaN's
+    /// payload are told apart, and so is any other difference, in each component.
+    #[test]
+    fn every_value_type_compares_by_bits() {
+        assert!(1.5_f32.same_bits(&1.5) && !0.0_f32.same_bits(&-0.0) && !1.0_f32.same_bits(&2.0));
+        assert!(1.5_f64.same_bits(&1.5) && !0.0_f64.same_bits(&-0.0) && !1.0_f64.same_bits(&2.0));
+        assert!(f64::NAN.same_bits(&f64::NAN) && !f64::NAN.same_bits(&-f64::NAN));
+        assert!(7_u8.same_bits(&7) && !7_u8.same_bits(&8));
+        assert!(7_u32.same_bits(&7) && !7_u32.same_bits(&8));
+        assert!([1.0_f32, 2.0, 3.0].same_bits(&[1.0, 2.0, 3.0]));
+        assert!(![1.0_f32, 2.0, 3.0].same_bits(&[1.0, 2.0, -3.0]));
+        assert!([1.0_f64, 2.0, 3.0].same_bits(&[1.0, 2.0, 3.0]));
+        assert!(![1.0_f64, 2.0, 3.0].same_bits(&[-1.0, 2.0, 3.0]));
+    }
+
     #[test]
     fn a_root_tile_split_passes_its_value_to_every_part() {
         let t0 = Topology::new();

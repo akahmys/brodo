@@ -92,6 +92,13 @@ mod tests {
     use crate::tree::TileLevel;
 
     #[test]
+    fn a_grid_shows_its_topology_and_field() {
+        let s = format!("{:?}", Grid::new(1.5_f32));
+        assert!(s.starts_with("Grid {") && s.contains("topology:") && s.contains("1.5"), "{s}");
+        assert!(s.ends_with(".. }"), "{s}");
+    }
+
+    #[test]
     fn an_edit_keeps_the_values_and_a_refused_one_changes_nothing() {
         let mut g = Grid::new(1.5_f32);
         g.edit(|e| e.add_tile(TileLevel::Lower, [0, 0, 0])).unwrap();

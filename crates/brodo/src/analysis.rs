@@ -654,6 +654,42 @@ mod tests {
     }
 
     #[test]
+    fn six_and_twenty_six_neighbours_are_one_step_away() {
+        for (conn, n) in [(Connectivity::Six, 6), (Connectivity::TwentySix, 26)] {
+            let o = conn.offsets();
+            assert_eq!(o.len(), n, "{conn:?}");
+            assert!(o.iter().all(|d| *d != [0, 0, 0] && d.iter().all(|c| c.abs() <= 1)));
+        }
+    }
+
+    /// Voxels in an upper node's empty places, where no lower node is, are labelled through
+    /// the node's own empty units, not the root grid: here they are the outside's, and a
+    /// flood from one reaches it. Eight leaves that do not meet the condition number the
+    /// first 4096 units after the outside, so a unit miscounted from an empty place's lands
+    /// among them, excluded.
+    #[test]
+    fn an_upper_nodes_empty_places_are_the_outsides() {
+        let t = topology(|e| {
+            for x in 0..8 {
+                e.activate([x * 8, 0, 0]).unwrap();
+            }
+        });
+        let mut f = Field::new(&t, 1.0_f32);
+        for n in t.leaf_numbers().collect::<Vec<_>>() {
+            f.leaf_mut(&t, n).unwrap().fill(-1.0);
+        }
+        let l = label(&t, &f, positive, Connectivity::Six).unwrap();
+        let far = l.label_at(&t, [1_000_000, 0, 0]).unwrap();
+        assert_ne!(far, Label::Excluded);
+        for v in [[130, 0, 0], [500, 300, 200], [4095, 4095, 4095]] {
+            assert_eq!(l.label_at(&t, v), Ok(far), "{v:?}");
+        }
+        let fill = flood_fill(&t, &f, positive, Connectivity::Six, [500, 300, 200]).unwrap();
+        assert!(fill.reaches_outside());
+        assert!(fill.contains(&t, [64, 0, 0]).unwrap() && !fill.contains(&t, [63, 0, 0]).unwrap());
+    }
+
+    #[test]
     fn a_corner_joins_under_26_and_not_under_6() {
         let t = topology(|e| {
             e.activate([0, 0, 0]).unwrap();
