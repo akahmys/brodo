@@ -253,7 +253,10 @@ cache files by a type code brodo assigns, 1 to 6 in that order.
   (ADR-0026). Badly oriented, holed and degenerate meshes are accepted as they are;
   `Mesh::welded` joins vertices at equal positions, never within a tolerance. A 3MF
   package is read through `rawzip`, `miniz_oxide` and `quick-xml`, its model as a stream;
-  the mesh holds every build item placed by its transforms.
+  the mesh holds every build item placed by its transforms. STEP and other boundary
+  representations are not read: a user working with B-reps triangulates with its own
+  kernel and passes a `Mesh`, its faces' names as triangle groups once those are built
+  (ADR-0030, ADR-0031).
 - Grid: the caller's voxel size, on the world's lattice unless given another origin; each
   voxel sampled at its centre (ADR-0027).
 - Distance: exact, to the nearest triangle through a BVH of axis-aligned boxes.

@@ -125,7 +125,7 @@ Not part of P1's acceptance, and not started while ParaView suffices (ADR-0018).
 ### After P2
 
 Ordered by users' requests (§4): R11 (ADR-0030), the archive profile, value quantisation, colino's layer 3,
-writing `.vdb`, STEP input. brodo's own README, in the form colino's took (AGENTS.md), is
+writing `.vdb`. STEP is not read (ADR-0031). brodo's own README, in the form colino's took (AGENTS.md), is
 not started.
 
 ## 3. Open questions and spikes

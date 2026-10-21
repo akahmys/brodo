@@ -58,3 +58,4 @@ A record is `Proposed` until the human accepts it.
 | [0028](0028-the-topology-report-counts-betti-numbers-and-region-connectivity.md) | The topology report counts Betti numbers and region connectivity |
 | [0029](0029-f64-vectors-are-a-value-type.md) | `[f64; 3]` is a value type |
 | [0030](0030-colino-keeps-triangle-groups-and-gives-hermite-data-on-voxel-corners.md) | colino keeps triangle groups and gives Hermite data on voxel corners |
+| [0031](0031-colino-reads-triangle-meshes-not-step.md) | colino reads triangle meshes, not STEP |
