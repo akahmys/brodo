@@ -51,6 +51,7 @@ fn each_damage_is_its_own_error() {
     let cases: Vec<(String, ReadError)> = vec![
         (format!("{three}f 1 2 0\n"), ReadError::NoVertex { line: 4, index: 0 }),
         (format!("{three}f 1 2 4\n"), ReadError::NoVertex { line: 4, index: 4 }),
+        (format!("{three}f 1 2 5\nf 1 2 5\n"), ReadError::NoVertex { line: 4, index: 5 }),
         (format!("{three}f -1 -2 -4\n"), ReadError::NoVertex { line: 4, index: -4 }),
         (format!("{three}f 1 2\n"), ReadError::BadFace { line: 4 }),
         (format!("{three}f 1 x 3\n"), ReadError::BadFace { line: 4 }),

@@ -356,6 +356,17 @@ mod tests {
             assert!(matches!(got, Err(VtkError::Infinite { origin: [0, 8, 0] })), "{got:?}");
             assert!(out.is_empty());
         }
+        let (t, f) = one_tile([0, 8, 0], [1.0_f64, f64::INFINITY, 0.0]);
+        let got = write_vtu(&t, &f, "d", Vec::new());
+        assert!(matches!(got, Err(VtkError::Infinite { origin: [0, 8, 0] })), "{got:?}");
+    }
+
+    #[test]
+    fn integers_are_written_as_they_are() {
+        let (t, f) = one_tile([0, 0, 0], 200_u8);
+        assert!(text(&t, &f).contains("format=\"ascii\">\n200\n</DataArray>"));
+        let (t, f) = one_tile([0, 0, 0], 4_000_000_000_u32);
+        assert!(text(&t, &f).contains("format=\"ascii\">\n4000000000\n</DataArray>"));
     }
 
     #[test]

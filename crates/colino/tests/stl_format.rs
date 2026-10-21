@@ -103,6 +103,10 @@ fn each_damage_is_its_own_error() {
         read(&binary(&[b' '; 80], &t), Limits { triangles: 100, vertices: 11, bytes: 1 << 30 }),
         Err(ReadError::TooLarge { what: "vertices", limit: 11 })
     );
+    // Exactly at each limit, the file reads.
+    let file = binary(&[b' '; 80], &t);
+    let exact = Limits { triangles: 4, vertices: 12, bytes: u64::try_from(file.len()).unwrap() };
+    assert_eq!(read(&file, exact).map(|m| m.triangles.len()), Ok(4));
     let tiny = Limits { bytes: 83, ..ROOMY };
     assert_eq!(
         read(&binary(&[b' '; 80], &t), tiny),
@@ -204,4 +208,17 @@ proptest! {
             prop_assert!(m.welded().is_ok());
         }
     }
+}
+
+/// An ASCII file counts its triangles against the limit as it reads them.
+#[test]
+fn an_ascii_file_holds_to_the_triangle_limit() {
+    let t: Vec<[[f64; 3]; 3]> = tetrahedron().iter().map(|f| f.map(|p| p.map(f64::from))).collect();
+    let text = ascii(&t);
+    let limits = |triangles| Limits { triangles, ..ROOMY };
+    assert_eq!(read(text.as_bytes(), limits(4)).map(|m| m.triangles.len()), Ok(4));
+    assert_eq!(
+        read(text.as_bytes(), limits(3)),
+        Err(ReadError::TooLarge { what: "triangles", limit: 3 })
+    );
 }

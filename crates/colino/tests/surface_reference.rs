@@ -65,9 +65,10 @@ fn each_way_of_breaking_a_surface_is_counted() {
     );
 
     let mut degenerate = tetrahedron();
-    degenerate.triangles.push([0, 0, 1]);
+    // A corner repeated in each of its three places.
+    degenerate.triangles.extend([[0, 0, 1], [1, 0, 0], [0, 1, 0]]);
     let s = count(&degenerate);
-    assert_eq!((s.degenerate_triangles, s.faces, s.euler()), (1, 4, 2));
+    assert_eq!((s.degenerate_triangles, s.faces, s.euler()), (3, 4, 2));
 
     let mut bad = tetrahedron();
     bad.triangles.push([0, 1, 9]);

@@ -149,3 +149,17 @@ proptest! {
         }
     }
 }
+
+/// Triangles with no area wind nothing, approximated or summed: their expansions are taken
+/// about their corners' mean, never about a centre weighted by no area.
+#[test]
+fn triangles_with_no_area_wind_nothing() {
+    let vertices: Vec<Point> =
+        (0..30).map(|i| [f64::from(i % 5), f64::from(i % 3) * 2.0, 1.0]).collect();
+    let triangles = (0..10).map(|i| [3 * i, 3 * i, 3 * i + 1]).collect();
+    let w = Winding::new(&Mesh { vertices, triangles, unit: None }).unwrap();
+    for q in [[0.0, 0.0, 0.0], [10.0, 10.0, 10.0], [2.0, 2.0, 1.5]] {
+        assert!(w.number(q, Accuracy::Exact).abs() < 1e-15, "{q:?}");
+        assert_eq!(w.number(q, BETA).to_bits(), 0.0_f64.to_bits(), "{q:?}");
+    }
+}

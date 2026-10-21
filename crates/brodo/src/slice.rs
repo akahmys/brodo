@@ -284,4 +284,39 @@ mod tests {
         assert_eq!((rgb(0), rgb(1)), (&CONTOUR[..], &CONTOUR[..]));
         assert_ne!(rgb(2), &CONTOUR[..]);
     }
+
+    /// A sequential map runs from dark at `min` through the middle colour to light at
+    /// `max`, wherever the range lies.
+    #[test]
+    fn a_sequential_map_spans_its_range() {
+        let map = ColorMap::Sequential { min: 10.0, max: 30.0 };
+        let at = |c: [f64; 3]| lerp(c, c, 0.0);
+        let dark = at(DARK);
+        assert_eq!(color(map, 10.0), dark);
+        assert_eq!(color(map, 5.0), dark);
+        assert_eq!(color(map, 20.0), at(MIDDLE));
+        assert_eq!(color(map, 30.0), at(LIGHT));
+        assert_eq!(color(map, 25.0), lerp(MIDDLE, LIGHT, 0.5));
+    }
+
+    /// Zeros beside positive values, and beside each other, are not on the contour: zero
+    /// counts with the positive side, so no sign changes there.
+    #[test]
+    fn zeros_among_positives_are_off_the_contour() {
+        let empty = Topology::new();
+        let mut e = empty.edit();
+        e.activate([0, 0, 0]).unwrap();
+        let t = e.commit().unwrap().0;
+        let mut f = Field::new(&t, 2.0_f32);
+        let n = t.leaf_numbers().next().unwrap();
+        let leaf = f.leaf_mut(&t, n).unwrap();
+        leaf.fill(2.0);
+        (leaf[0], leaf[1]) = (0.0, 0.0);
+        let slice = Slice { axis: Axis::Z, position: 0, min: [0, 0], max: [7, 7] };
+        let image = render(&t, &f, slice, ColorMap::Diverging { limit: 3.0 }).unwrap();
+        for x in [0, 1] {
+            let at = (7 * 8 + x) * 4;
+            assert_eq!(&image.rgba[at..at + 3], &lerp(WHITE, WHITE, 0.0)[..], "pixel {x}");
+        }
+    }
 }

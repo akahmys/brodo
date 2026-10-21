@@ -310,3 +310,85 @@ proptest! {
         prop_assert_eq!(check(&m, &o, &c, false, 1e-5), Ok(()));
     }
 }
+
+/// A mesh with no triangle converts to the background alone.
+#[test]
+fn a_mesh_with_no_triangle_converts_to_nothing() {
+    let m = Mesh { vertices: vec![[1.0, 2.0, 3.0]], triangles: vec![], unit: Some("mm".into()) };
+    let counts =
+        convert(&m, &Options::new(1.0)).map(|c| (c.topology.leaf_count(), c.topology.tile_count()));
+    assert_eq!(counts, Ok((0, 0)));
+}
+
+/// A small triangle at `p`, in the mesh's unit.
+fn speck(p: Point) -> Mesh {
+    Mesh {
+        vertices: vec![p, [p[0] + 0.01, p[1], p[2]], [p[0], p[1] + 0.01, p[2]]],
+        triangles: vec![[0, 1, 2]],
+        unit: Some("millimeter".into()),
+    }
+}
+
+/// Index space reaches 2³¹ − 1 less two root regions, 8192 voxels, a margin the walk
+/// down from a root region needs: a mesh whose box, grown by the band, ends exactly there
+/// converts, and one a voxel further is refused.
+#[test]
+fn index_space_ends_two_root_regions_short_of_the_i32_range() {
+    let limit = f64::from(i32::MAX) - 8192.0;
+    let o = Options::new(1.0);
+    let at_edge = convert(&speck([limit - 3.01, 0.0, 0.0]), &o);
+    assert_eq!(at_edge.map(|c| c.topology.leaf_count() > 0), Ok(true));
+    let beyond = convert(&speck([limit - 2.0, 0.0, 0.0]), &o).map(|_| ());
+    assert_eq!(beyond, Err(ConvertError::OutOfRange));
+    let far = convert(&speck([-limit, 0.0, 0.0]), &o).map(|_| ());
+    assert_eq!(far, Err(ConvertError::OutOfRange));
+}
+
+/// A cell's corner voxel within the band of a triangle beyond that corner is found,
+/// though the cell's centre lies further than the band and the voxels' reach from it:
+/// the corner voxel is 2.9 voxels from the triangle, the cell's centre 8.96, at voxels of
+/// one unit and of two.
+#[test]
+fn a_cell_reached_only_at_its_corner_is_a_leaf() {
+    for h in [1.0, 2.0] {
+        let m = speck([(7.5 + 2.9 / 3.0_f64.sqrt()) * h; 3]);
+        let o = exact(h);
+        let c = convert(&m, &o).unwrap();
+        assert!(matches!(c.topology.locate([0, 0, 0]), Location::Leaf(_)), "h = {h}");
+        assert_eq!(check(&m, &o, &c, false, 1e-5), Ok(()), "h = {h}");
+    }
+}
+
+/// Spheres of radius 28, whose inside tiles reach two cells from the centre: one about the
+/// origin, one across the root regions' boundary at x = 4096. Every voxel is as the
+/// reference says, tiles included.
+#[test]
+fn larger_spheres_convert_as_the_reference_says_everywhere() {
+    for x in [0, 4096, -100] {
+        let m = sphere(2, 28.0, [f64::from(x) + 0.3, -0.2, 0.1]);
+        let o = exact(1.0);
+        let c = convert(&m, &o).unwrap();
+        for v in [[x - 12, 0, 0], [x + 12, 0, 0], [x, -12, 0], [x, 0, 12]] {
+            assert!(matches!(c.topology.locate(v), Location::Tile(..)), "{v:?}");
+        }
+        assert_eq!(check(&m, &o, &c, true, 1e-5), Ok(()), "{x}");
+    }
+}
+
+/// A cube from -5 to 37: its box, grown by the band, ends at 40, in the fifth cell, and
+/// an inside tile lies in the cell below the one before it, which the walk must reach.
+#[test]
+fn a_cubes_inside_tiles_reach_near_its_box() {
+    let (lo, hi) = (-5.0, 37.0);
+    let corner = |i: u32| [0, 1, 2].map(|k| if i >> k & 1 == 1 { hi } else { lo });
+    let vertices: Vec<Point> = (0..8).map(corner).collect();
+    // Each face's corners, counter-clockwise seen from outside.
+    let faces =
+        [[0, 2, 3, 1], [4, 5, 7, 6], [0, 1, 5, 4], [2, 6, 7, 3], [0, 4, 6, 2], [1, 3, 7, 5]];
+    let triangles = faces.iter().flat_map(|[a, b, c, d]| [[*a, *b, *c], [*a, *c, *d]]).collect();
+    let m = Mesh { vertices, triangles, unit: Some("millimeter".into()) };
+    let o = exact(1.0);
+    let c = convert(&m, &o).unwrap();
+    assert!(matches!(c.topology.locate([24, 8, 8]), Location::Tile(..)));
+    assert_eq!(check(&m, &o, &c, true, 1e-5), Ok(()));
+}

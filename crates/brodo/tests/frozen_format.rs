@@ -339,3 +339,46 @@ fn each_check_refuses_its_damage() {
     let shifted = aligned(&shifted);
     assert_eq!(read(&shifted.as_bytes()[1..=bytes.len()]), Err(FormatError::Misaligned));
 }
+
+/// The committed grid with words changed: each `(word, value)` set, the rest kept.
+fn with_words(changes: &[(usize, u32)]) -> Vec<Block> {
+    let mut bytes = golden().as_bytes().to_vec();
+    for (word, value) in changes {
+        bytes[word * 4..word * 4 + 4].copy_from_slice(&value.to_le_bytes());
+    }
+    aligned(&bytes)
+}
+
+/// Each check on the links between sections refuses its own damage, the others passing.
+/// The committed grid holds four root entries, from block 3 (-4096 and 0 upper nodes, a
+/// root tile at y = 8192, 4096 an upper node), and three upper nodes of 257 blocks from
+/// block 7; upper node 1 has two children from lower node 1 and one tile from tile 1.
+#[test]
+fn each_link_check_refuses_its_damage() {
+    let read = |b: &[Block]| GridView::<f32>::new(b.as_bytes()).map(|_| ());
+    let word =
+        |at: usize| u32::from_le_bytes(golden().as_bytes()[at * 4..at * 4 + 4].try_into().unwrap());
+    let root = |i: usize, field: usize| (3 + i) * 8 + field;
+    let upper = |i: usize, w: usize| (7 + 257 * i) * 8 + w;
+    let lost = |what| Err(FormatError::Inconsistent(what));
+    assert_eq!(read(&aligned(golden().as_bytes())), Ok(()));
+    // Two root entries with one key: not sorted.
+    assert_eq!(read(&with_words(&[(root(1, 0), (-4096_i32).cast_unsigned())])), lost("root"));
+    // A key off a root region's corner, still in order.
+    assert_eq!(read(&with_words(&[(root(0, 0), (-4095_i32).cast_unsigned())])), lost("root"));
+    // An upper node's number, and a root tile's, one past the last.
+    assert_eq!(read(&with_words(&[(root(0, 4), 3)])), lost("root"));
+    assert_eq!(read(&with_words(&[(root(2, 4), 3)])), lost("root"));
+    // Upper node 1's children run one past the lower nodes; its tiles one past the tiles.
+    assert_eq!(read(&with_words(&[(upper(1, 2048), 3)])), lost("upper node"));
+    assert_eq!(read(&with_words(&[(upper(1, 2049), 3)])), lost("upper node"));
+    // A place both a child and a tile, the counts still fitting.
+    let (w, bits) = (0..1024).map(|w| (w, word(upper(1, w)))).find(|(_, b)| *b != 0).unwrap();
+    let tiles = word(upper(1, 1024 + w));
+    let overlap = bits.isolate_lowest_one();
+    assert_eq!(tiles & overlap, 0);
+    assert_eq!(
+        read(&with_words(&[(upper(1, 1024 + w), tiles | overlap), (upper(1, 2049), 0)])),
+        lost("upper node")
+    );
+}

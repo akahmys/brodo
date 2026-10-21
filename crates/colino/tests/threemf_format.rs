@@ -570,3 +570,103 @@ proptest! {
         }
     }
 }
+
+/// What a 3MF writer may put, which a strict reading must still take: a thumbnail's
+/// relationship beside the model's, the predefined and character references, CDATA in an
+/// element, foreign elements nested in one another, a flattening transform.
+#[test]
+fn what_the_format_allows_is_read() {
+    let (v, t) = tetra();
+    let body = format!(
+        "<metadata name=\"Title\">a &amp; b &#65;<![CDATA[<c>]]></metadata>\
+         <p:x><p:y><p:z/></p:y></p:x>\
+         <resources>{}</resources><build><item objectid=\"1\"/></build>",
+        mesh_object(1, "model", &v, &t)
+    );
+    let m = format!(
+        "<?xml version=\"1.0\"?>\n<model xmlns=\"{CORE}\" xmlns:p=\"urn:x\">{body}</model>"
+    );
+    let thumbnail = RELS.replace(
+        "<Relationship ",
+        "<Relationship Target=\"/Metadata/thumbnail.png\" Id=\"t0\" \
+         Type=\"http://schemas.openxmlformats.org/package/2006/relationships/metadata/thumbnail\"/>\
+         <Relationship ",
+    );
+    let parts = [
+        stored("[Content_Types].xml", TYPES.as_bytes()),
+        stored("_rels/.rels", thumbnail.as_bytes()),
+        stored("3D/3dmodel.model", m.as_bytes()),
+    ];
+    let read_back = read(&zip(&parts), ROOMY).map(|m| (bits(&m.vertices), m.triangles));
+    assert_eq!(read_back, Ok((bits(&v), t.clone())));
+    // A transform that flattens z: its determinant is zero, so nothing turns over.
+    let flat = one(
+        "<item objectid=\"1\" transform=\"1 0 0 0 1 0 0 0 0 0 0 0\"/>",
+        &mesh_object(1, "model", &v, &t),
+    )
+    .unwrap();
+    assert_eq!(flat.triangles, t);
+}
+
+/// Each break the format forbids that the tests above leave out.
+#[test]
+fn what_the_format_forbids_is_refused() {
+    let model_error = |text: &str| match read(&package(text.as_bytes().to_vec()), ROOMY) {
+        Err(ReadError::Model { at, reason }) => Ok((at, reason.to_owned())),
+        other => Err(format!("{other:?}")),
+    };
+    let reason = |text: &str| model_error(text).map(|(_, r)| r);
+    let m = |body: &str| format!("<model xmlns=\"{CORE}\">{body}</model>");
+    assert_eq!(reason("<?xml version=\"1.0\"?>\n"), Ok("no root element".to_owned()));
+    assert_eq!(
+        reason(&format!("{}<![CDATA[x]]>", m(""))),
+        Ok("text outside the root element".to_owned())
+    );
+    // An object with neither mesh nor components is refused where it ends.
+    let text = m("<resources><object id=\"1\"></object><object id=\"2\"/></resources>");
+    let (at, why) = model_error(&text).unwrap();
+    assert_eq!(why, "an object with neither mesh nor components");
+    assert!(at < u64::try_from(text.find("<object id=\"2\"").unwrap()).unwrap(), "{at}");
+    let rels = |target: &str| RELS.replace("/3D/3dmodel.model", target);
+    assert_eq!(
+        read(&zip(&[stored("_rels/.rels", rels("/3D//3dmodel.model").as_bytes())]), ROOMY),
+        Err(ReadError::Package("a start part's name that is not a plain path"))
+    );
+}
+
+/// Limits hold at their exact values: as many vertices, triangles and placements as the
+/// limits allow are read; one more, anywhere in the model, is refused.
+#[test]
+fn limits_hold_at_their_exact_values() {
+    let (v, t) = tetra();
+    let tetra_model = |extra: &str| {
+        package(model(
+            "",
+            &format!(
+                "<resources>{}{extra}</resources><build><item objectid=\"1\"/></build>",
+                mesh_object(1, "model", &v, &t)
+            ),
+        ))
+    };
+    let exact = Limits { vertices: 4, triangles: 4, ..ROOMY };
+    assert_eq!(read(&tetra_model(""), exact).map(|m| m.triangles.len()), Ok(4));
+    // A second object, never placed, still counts as read.
+    let unused = mesh_object(2, "model", &v, &t);
+    let six = Limits { vertices: 8, triangles: 6, ..ROOMY };
+    assert_eq!(
+        read(&tetra_model(&unused), six),
+        Err(ReadError::TooLarge { what: "triangles", limit: 6 })
+    );
+    // Four placements of an empty mesh, against a triangle limit of four.
+    let empty = "<object id=\"1\"><mesh><vertices/><triangles/></mesh></object>\
+                 <object id=\"2\"><components><component objectid=\"1\"/>\
+                 <component objectid=\"1\"/><component objectid=\"1\"/></components></object>";
+    let placed = package(model(
+        "",
+        &format!("<resources>{empty}</resources><build><item objectid=\"2\"/></build>"),
+    ));
+    let four = Limits { triangles: 4, ..ROOMY };
+    assert_eq!(read(&placed, four).map(|m| m.triangles.len()), Ok(0));
+    let three = Limits { triangles: 3, ..ROOMY };
+    assert!(matches!(read(&placed, three), Err(ReadError::TooLarge { what: "triangles", .. })));
+}

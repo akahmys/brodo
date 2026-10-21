@@ -58,6 +58,20 @@ fn the_nearest_point_of_a_triangle_by_region() {
         on_triangle([2.0, 1.0, 0.0], line).map(f64::to_bits),
         [2.0, 0.0, 0.0].map(f64::to_bits)
     );
+    // On a line off the axes, where each part of the normal is a sum of non-zero products.
+    let slant = [[0.0, 0.0, 0.0], [1.0, 2.0, 3.0], [3.0, 6.0, 9.0]];
+    let (p, q) = ([2.0, 1.0, 0.0], on_triangle([2.0, 1.0, 0.0], slant));
+    let foot = on_segment(p, slant[0], slant[2]);
+    assert!(squared(q, foot) < 1e-24, "{q:?} against {foot:?}");
+    // Triangles with area whose normal has one part a difference of equal products, so
+    // that a sum in its place would call them flat: points over their faces fall on them.
+    for (t, p, want) in [
+        ([[0.0, 0.0, 0.0], [0.0, 1.0, 1.0], [0.0, 1.0, -1.0]], [5.0, 0.7, 0.0], [0.0, 0.7, 0.0]),
+        ([[0.0, 0.0, 0.0], [1.0, 0.0, 1.0], [1.0, 0.0, -1.0]], [0.7, 5.0, 0.0], [0.7, 0.0, 0.0]),
+        ([[0.0, 0.0, 0.0], [1.0, 1.0, 0.0], [1.0, -1.0, 0.0]], [0.7, 0.0, 5.0], [0.7, 0.0, 0.0]),
+    ] {
+        assert_eq!(on_triangle(p, t).map(f64::to_bits), want.map(f64::to_bits), "{t:?}");
+    }
     let point = [[1.0, 1.0, 1.0]; 3];
     assert_eq!(on_triangle([0.0, 0.0, 0.0], point).map(f64::to_bits), [1.0; 3].map(f64::to_bits));
 }

@@ -169,6 +169,40 @@ fn a_transform_not_axis_aligned_is_refused() {
     let mut c = convert(&m, &Options::new(1.0)).unwrap();
     c.meta.transform[0][1] = 0.5;
     assert_eq!(report(&m, &c, &[("p".into(), [0.0; 3])]), Err(ReportError::Transform));
+    // Axis-aligned, but with a voxel of no size or of negative size.
+    for h in [0.0, -1.0] {
+        let mut c = convert(&m, &Options::new(1.0)).unwrap();
+        c.meta.transform[1][1] = h;
+        assert_eq!(report(&m, &c, &[("p".into(), [0.0; 3])]), Err(ReportError::Transform));
+    }
     // With no point to place, the transform is never read.
     assert!(report(&m, &c, &[]).is_ok());
+}
+
+/// A point is placed by the grid's own origin: a sphere at x = 100 converted on a lattice
+/// starting there holds its centre in the solid and a point beyond it outside.
+#[test]
+fn points_are_placed_from_the_grids_origin() {
+    let m = sphere(2, 10.0, [100.0, 0.0, 0.0]);
+    let c = convert(&m, &Options { origin: [100.0, 0.0, 0.0], ..Options::new(1.0) }).unwrap();
+    let points = [("centre".into(), [100.0, 0.0, 0.0]), ("beyond".into(), [150.0, 0.0, 0.0])];
+    let r = report(&m, &c, &points).unwrap();
+    assert_eq!(r.regions[0].place, Place::Solid);
+    assert!(matches!(r.regions[1].place, Place::Complement { outside: true, .. }));
+}
+
+/// The solid is the voxels below zero: a voxel holding -0.0, on the surface, lies outside
+/// it, as ADR-0028 has the complement take φ ≥ 0.
+#[test]
+fn a_negative_zero_is_not_solid() {
+    let m = sphere(2, 10.0, [0.0; 3]);
+    let mut c = convert(&m, &Options::new(1.0)).unwrap();
+    let n = c.topology.leaf_numbers().next().unwrap();
+    let origin = c.topology.leaf_origin(n).unwrap();
+    let leaf = c.field.leaf_mut(&c.topology, n).unwrap();
+    leaf.fill(1.0);
+    leaf[0] = -0.0;
+    let at = origin.map(|x| f64::from(x) + 0.5);
+    let r = report(&m, &c, &[("surface".into(), at)]).unwrap();
+    assert!(matches!(r.regions[0].place, Place::Complement { .. }), "{:?}", r.regions[0]);
 }
