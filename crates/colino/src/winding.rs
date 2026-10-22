@@ -233,3 +233,25 @@ impl Winding {
         w
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The approximation over a few hundred triangles ends: a mutant that makes its walk
+    /// down the tree loop for ever fails here within a minute, in the first test binary,
+    /// before the tests that would only wait for it (TESTING.md T11).
+    #[test]
+    fn approximating_a_small_soup_ends_in_time() {
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let corner = |i: u32| [f64::from(i % 17), f64::from(i % 13) * 0.5, f64::from(i % 7)];
+            let vertices: Vec<Point> = (0..900).map(corner).collect();
+            let triangles = (0..300).map(|i| [3 * i, 3 * i + 1, 3 * i + 2]).collect();
+            let w = Winding::new(&Mesh { vertices, triangles, unit: None });
+            let n = w.map(|w| w.number([4.0, 3.0, 2.0], Accuracy::Approximate { beta: 2.0 }));
+            tx.send(n.map(f64::is_finite)).unwrap_or(());
+        });
+        assert_eq!(rx.recv_timeout(std::time::Duration::from_secs(60)), Ok(Ok(true)));
+    }
+}

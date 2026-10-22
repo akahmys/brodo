@@ -6,6 +6,7 @@ lib brodo accessor::tests::writes_go_to_leaves_only_and_a_stale_field_is_refused
 lib brodo analysis::tests::a_corner_joins_under_26_and_not_under_6
 lib brodo analysis::tests::an_upper_nodes_empty_places_are_the_outsides
 lib brodo analysis::tests::background_enclosed_by_leaves_is_apart_from_the_outside
+lib brodo analysis::tests::labelling_a_small_grid_ends_in_time
 lib brodo analysis::tests::root_tiles_can_enclose_a_root_region
 lib brodo analysis::tests::six_and_twenty_six_neighbours_are_one_step_away
 lib brodo analysis::tests::tiles_join_what_touches_them

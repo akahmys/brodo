@@ -653,6 +653,23 @@ mod tests {
         assert_eq!(l.label_at(&t, [-8, 0, 0]).unwrap(), Label::Excluded);
     }
 
+    /// Labelling a small grid ends: a mutant that makes it loop for ever fails here within a
+    /// minute, in the first test binary, before the tests that would only wait for it
+    /// (TESTING.md T11).
+    #[test]
+    fn labelling_a_small_grid_ends_in_time() {
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let t = topology(|e| {
+                e.activate([0, 0, 0]).unwrap();
+                e.add_tile(TileLevel::Lower, [8, 0, 0]).unwrap();
+            });
+            let f = Field::new(&t, 1.0_f32);
+            tx.send(label(&t, &f, positive, Connectivity::Six).map(|l| l.count())).unwrap_or(());
+        });
+        assert_eq!(rx.recv_timeout(std::time::Duration::from_secs(60)), Ok(Ok(1)));
+    }
+
     #[test]
     fn six_and_twenty_six_neighbours_are_one_step_away() {
         for (conn, n) in [(Connectivity::Six, 6), (Connectivity::TwentySix, 26)] {
