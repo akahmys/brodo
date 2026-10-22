@@ -59,3 +59,4 @@ A record is `Proposed` until the human accepts it.
 | [0029](0029-f64-vectors-are-a-value-type.md) | `[f64; 3]` is a value type |
 | [0030](0030-colino-keeps-triangle-groups-and-gives-hermite-data-on-voxel-corners.md) | colino keeps triangle groups and gives Hermite data on voxel corners |
 | [0031](0031-colino-reads-triangle-meshes-not-step.md) | colino reads triangle meshes, not STEP |
+| [0032](0032-hermite-data-is-a-brodo-format-any-producer-writes.md) | Hermite data is a brodo format that any producer writes |
