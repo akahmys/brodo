@@ -8,23 +8,12 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: P2's close but its mutation run: the retrospective's proposals (ADR-0001,
-  -0019, -0020); refactoring, one duplicate in library code gone, those among tests,
-  benchmarks and examples kept; a test that a holed mesh leaks no sign; Miri, widened to
-  colino (ADR-0008), with no error; the fuzz round, each of the five targets 901 s with no
-  finding (2026-10-20).
-- **Next**: T11's final verdict, then P2's acceptance; then R11 (ADR-0030). Where the
-  mutation run stands (2026-10-22): every mutant brodo's and colino's runs missed is killed
-  by a test or listed in `.cargo/mutants.toml`, 75 of them, each with its reason (60
-  equivalent, 15 only slower by `--run --patient`, ADR-0023). Four mutants loop for ever:
-  `Units::find` and `per_axis` in brodo's `analysis.rs`, `root` in colino's `surface.rs`
-  and the walk in `Winding::approximate`; a test in each library's unit tests now fails
-  within 60 s under each. The final verdict: copy `out/mutants/brodo-2026-10-22-iter2` to
-  `out/mutants/mutants.out`, run `python3 scripts/audit/mutants.py --run -f
-  'crates/brodo/src/**' --iterate`, then the same for colino from
-  `colino-2026-10-22-iter2`; each must pass, a timeout only after a failed test. Then P2's
-  acceptance: the version 0.3.0, CHANGELOG.md's section and the tag v0.3.0 (TESTING.md V2
-  to V4), the push left to the owner.
+- **Done**: P2 accepted by the human and closed as 0.3.0 (2026-10-22). T11's final
+  verdict passed: brodo's run left no mutant missed, each timeout after a failed test;
+  colino's left 16 timing out before any, all killed by `--run --patient` (ADR-0023).
+- **Next**: R11 (ADR-0030), a group per triangle and Hermite data; with the groups,
+  colino's README says a B-rep's face names travel in `Mesh`'s `groups` and
+  `group_names` (ADR-0031).
 - **Unresolved problems**: Miri's Stacked Borrows reports undefined behaviour in
   `crossbeam-epoch` under rayon; Tree Borrows does not (ADR-0015), but Miri's nightly of
   2026-07-21 warns there of integer-to-pointer casts in `crossbeam-epoch` 0.9.21, which
@@ -124,9 +113,9 @@ Not part of P1's acceptance, and not started while ParaView suffices (ADR-0018).
 - [x] README and examples for publishing on its own: `crates/colino/README.md`, its code a
       doctest; `torus` and `vent` in `crates/colino/examples/`, run by tests and written
       from textbook material, both needing no workaround of the API
-- [ ] Retrospective and refactoring (done); fuzz round (done); Miri run (done); mutation run
+- [x] Retrospective and refactoring; fuzz round; Miri run (ADR-0008); mutation run
       (ADR-0023)
-- [ ] **Accepted when** the invariants are right for a sphere, a torus and a double torus;
+- [x] **Accepted when** the invariants are right for a sphere, a torus and a double torus;
       a holed mesh leaks no sign; a wall thinner than a voxel is reported
 
 ### After P2

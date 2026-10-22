@@ -6,6 +6,12 @@ are recorded here when they change (V6).
 
 ## Unreleased
 
+## 0.3.0 (2026-10-22)
+
+Closes P2: `colino`, triangle meshes read from STL, OBJ and 3MF into a narrow-band signed
+distance field by the generalised winding number, and a report of the solid's topology;
+in `brodo`, the Euler characteristic, dilation and erosion.
+
 - colino has a README, the front page of its documentation, and two examples: a torus
   checked against its exact distance, and a vented box whose vent closes at a coarser
   voxel size.
