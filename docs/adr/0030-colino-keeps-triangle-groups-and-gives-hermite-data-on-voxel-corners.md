@@ -136,3 +136,17 @@ The record left the API's shape and the cache file's grid names open. The human 
   test against a committed file.
 - `group_names` is indexed by group id. Empty, it stands for `[""]`; otherwise a first
   name other than `""` is a `MeshError`, as are the two cases above.
+
+## Amendment
+
+- **Date**: 2026-10-22
+
+ADR-0032 made Hermite data a brodo format that any producer writes. What this record says
+of the lattice, the edges' owners, the meaning of signs, fractions, normals and groups, the
+values of an edge with no crossing, the types and the cache file is that format's, and is
+held there. What stays here is colino's as a producer: signs by the winding number, the
+watertight test, the tie rule, edges no triangle hit and their count, the degenerate cases,
+`f64` arithmetic and determinism. The first amendment's API is replaced: the type, its
+check and its cache entries are brodo's, set apart by `extra` keys rather than fixed grid
+names, and colino's `hermite` returns brodo's set with its `unhit` count beside it.
+

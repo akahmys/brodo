@@ -1,6 +1,6 @@
 # ADR-0032: Hermite data is a brodo format that any producer writes
 
-- **Status**: Proposed
+- **Status**: Accepted
 - **Date**: 2026-10-22
 
 ## Context
@@ -31,8 +31,8 @@ brodo (ARCHITECTURE.md §1).
 
 ## Decision
 
-The owner decided, on 2026-10-22, the frame below; the points marked **Open** are the
-owner's to choose, each with a recommendation.
+The owner decided, on 2026-10-22, the frame below, then chose among the options set out
+for the points it left open.
 
 **Where each rule lives**
 
@@ -59,38 +59,35 @@ owner's to choose, each with a recommendation.
 - colino builds its output with this type. ADR-0030's acceptance tests hold it; colino's
   Hermite output was not built, so no bytes existed to keep.
 
-**Open**
+**The points the frame left open**
 
-- **a. Where the type and its check live.** (1) A module of `brodo`. (2) A small crate of
-  its own, after `brodo`. *Recommended: (1).* The check that ten frozen grids share a
-  topology compares their node sections, which only `brodo` can see; `brodo` already holds
-  the file profiles and their versions (TESTING.md V6). (2) adds a crate, its README, audit
-  settings and a public brodo API to compare frozen topologies.
-- **b. How a file tells a set's grids apart.** (1) Fixed grid names, `sign`,
-  `x.fraction`, …, as ADR-0030's amendment had: one set per file. (2) Names prefixed by
-  the set's name, `<set>/sign`. (3) Keys in `GridMeta::extra`: `hermite.set`, the set's
-  name, and `hermite.field`, which of the ten the grid is, with `GridMeta::name` left to
-  the producer. *Recommended: (3)*, which allows several sets in one file and leaves names
-  free. Under each, the group names go in the sign grid's `extra`, as `hermite.group.<id>`,
-  group 0 omitted.
-- **c. A producer's optional information**, such as edges no triangle hit. (1) Not in the
-  format: the producer reports it beside the set, as colino's `unhit` count. (2) Keys under
-  a producer's prefix in `extra`, which the check ignores. (3) An optional eleventh grid of
-  per-edge flags. *Recommended: (1)*; `extra` stays free for keys outside `hermite.`.
-- **d. The format's version.** (1) A key `hermite.version` in each grid's `extra`, `1` now;
-  a reader accepts its own version only, as the cache reader does (ADR-0016), so that
-  several crossings per edge or an `f64` table come as a new version. (2) No version until
-  a second one exists. *Recommended: (1)*: a file written now stays recognisable after the
-  change.
-- **e. The form a set is read in.** (1) Ten `GridView`s, checked, without a copy, as the
-  cache profile reads. (2) Also a `Topology` and ten `Field`s, which needs a new brodo
-  function turning a frozen grid back into a tree. *Recommended: (1)*; (2) waits for a
-  user's request.
+- **a. Where the type and its check live**: a module of `brodo`. The check that ten frozen
+  grids share a topology compares their node sections, which only `brodo` can see, and
+  `brodo` already holds the file profiles and their versions (TESTING.md V6). A crate of
+  its own was set aside: it would have needed a public brodo API comparing frozen
+  topologies, besides a crate's README and audit settings.
+- **b. How a file tells a set's grids apart**: keys in `GridMeta::extra`. `hermite.set`
+  holds the set's name, and `hermite.field` which of the ten the grid is: `sign`, then
+  `x.fraction`, `x.normal`, `x.group`, and the same for `y` and `z`. `GridMeta::name` is
+  left to the producer, and one file can hold several sets. The group names go in the sign
+  grid's `extra` as `hermite.group.<id>`, group 0 omitted. Fixed grid names, one set per
+  file, and names prefixed by the set's were set aside.
+- **c. A producer's optional information**, such as edges no triangle hit, is not in the
+  format: the producer reports it beside the set, as colino's `unhit` count. Keys outside
+  `hermite.` stay free. Keys under a producer's prefix and an eleventh grid of per-edge
+  flags were set aside.
+- **d. The format's version**: a key `hermite.version` in each grid's `extra`, `1` now. A
+  reader accepts its own version only, as the cache reader does (ADR-0016), so that several
+  crossings per edge or an `f64` table come as a new version. No version until a second one
+  was set aside: a file written now stays recognisable after the change.
+- **e. The form a set is read in**: ten `GridView`s, checked, without a copy, as the cache
+  profile reads. A function turning a frozen grid back into a `Topology` and `Field`s waits
+  for a user's request.
 
 ## Consequences
 
-- Once accepted, ADR-0030 is amended to point here for the format and keeps colino's
-  choices; its amendment's `Hermite::entries` and fixed names give way to b.
+- ADR-0030 is amended to point here for the format and keeps colino's choices; its
+  amendment's `Hermite::entries` and fixed names give way to b.
 - ARCHITECTURE.md gains the format in §4, beside the file profiles, and §5.1 says colino
   produces it; §1's table names a producer of Hermite data and a reader building cut
   cells.

@@ -12,9 +12,11 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   `group_names`, checked by `check_groups` and kept by `welded` (ADR-0030, amended
   2026-10-22 with the API, the cache grid names and group 0's name); the three readers
   take them from OBJ's `g` and `o`, ASCII STL's solids and 3MF's objects.
-- **Next**: a fuzz round for the three readers; then `colino::intersect` and
-  `colino::hermite`, with ADR-0030's acceptance tests; with the groups read, colino's
-  README says a B-rep's face names travel in `groups` and `group_names` (ADR-0031).
+- **Next**: ADR-0032, accepted: Hermite data as a brodo format, its set type, check and
+  cache entries in `brodo`; then `colino::intersect` and `colino::hermite` built on it,
+  with ADR-0030's acceptance tests; a fuzz round for the three readers; with the groups
+  read, colino's README says a B-rep's face names travel in `groups` and `group_names`
+  (ADR-0031).
 - **Unresolved problems**: Miri's Stacked Borrows reports undefined behaviour in
   `crossbeam-epoch` under rayon; Tree Borrows does not (ADR-0015), but Miri's nightly of
   2026-07-21 warns there of integer-to-pointer casts in `crossbeam-epoch` 0.9.21, which
