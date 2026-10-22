@@ -59,3 +59,12 @@ else. A push with any option (`--force`, `--delete`, `--mirror`, `--all`, `--tag
 does a bare `git push`. Shown to fire: each blocked form was refused by the hook and each
 allowed one passed, by feeding it the tool call's JSON.
 
+## Amendment (2026-10-22): redirections
+
+P3's retrospective found `git push origin main 2>&1` blocked though its push was one the
+guard allows: the guard split commands at `&`, so `2>` became a ref. The human decided
+that the guard drops a redirection and its target, `2>&1`, `> out.log` or `&> all.log`,
+before it splits a command. Shown to fire: of three pushable commands with redirections,
+the guard before the change blocked two and after it blocked none; a forced push, another
+ref, a bare push and `--no-verify` stayed blocked with a redirection added.
+

@@ -39,11 +39,15 @@ def push_allowed(rest: str) -> bool:
 
 HEREDOC = re.compile(r"<<-?\s*(['\"]?)(\w+)\1[^\n]*\n.*?\n\s*\2\s*(?=\n|$)", re.DOTALL)
 QUOTED = re.compile(r"'[^']*'|\"(?:\\.|[^\"\\])*\"")
+# A redirection with its target, `2>&1`, `> out.log`, `&> all.log`: its `&` does not end a
+# command, and its words are not the command's (ADR-0003).
+REDIRECT = re.compile(r"(?:\d*|&)(?:>>|>|<)&?\s*[^\s;&|<>]+")
 
 
 def code_only(command: str) -> str:
-    """The command without heredoc bodies and quoted strings, which are data, not commands."""
-    return QUOTED.sub("''", HEREDOC.sub("", command))
+    """The command without heredoc bodies, quoted strings and redirections, which are data,
+    not commands."""
+    return REDIRECT.sub(" ", QUOTED.sub("''", HEREDOC.sub("", command)))
 
 
 def main() -> int:
