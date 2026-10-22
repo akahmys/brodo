@@ -41,3 +41,14 @@ decided:
   target it may affect is run on its own.
 
 Held by review alone, as the rest of T3 is.
+
+## Amendment
+
+- **Date**: 2026-10-22
+
+P3's retrospective found a property test of `colino::intersect` meant for products that
+round equal reached none in 4096 cases: drawn at random, such a case almost never comes. It
+was rebuilt to construct them, by Bezout coefficients, and reached 3563. The human decided
+that a kind of input reached by under 1 % of a test's cases is built by its generator,
+not left to chance (TESTING.md T9). Held by review alone, as the rest of T9 is.
+
