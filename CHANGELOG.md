@@ -27,7 +27,9 @@ are recorded here when they change (V6).
   nearest a triangle; `Bvh::near_segment` and `Bvh::corners` (ADR-0030).
 - `colino::hermite::{hermite, Produced}` and `colino::error::HermiteError`: a mesh's Hermite
   data on its conversion's topology, as `brodo::hermite`'s set, with the count of crossed
-  edges no triangle was hit on (ADR-0030); `Bvh::len` and `Bvh::is_empty`.
+  edges no triangle was hit on (ADR-0030); `Bvh::len` and `Bvh::is_empty`. A badly oriented
+  mesh whose winding number changes sign beyond the band is refused with
+  `HermiteError::SignOutsideBand`.
 
 ## 0.3.0 (2026-10-22)
 

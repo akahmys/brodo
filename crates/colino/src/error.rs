@@ -213,6 +213,10 @@ pub enum HermiteError {
     /// The grid's transform is not the axis-aligned one conversion writes.
     #[error("the grid's transform is not axis-aligned with positive voxel sizes")]
     Transform,
+    /// The winding number's inside changes beyond the band, across an edge no leaf point
+    /// owns: a badly oriented mesh, whose sign the winding number cannot give (B-016).
+    #[error("the signs change beyond the band, at point {0:?}: is the mesh badly oriented?")]
+    SignOutsideBand(brodo::tree::Coord),
 }
 
 /// Why a topology report could not be made.

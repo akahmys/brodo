@@ -177,3 +177,22 @@ length 1, 737 were hit (2026-10-22). The search for a triangle widens an edge's 
 translation's rounding, which keeps them, as the paper widens its boxes
 (§3.3).
 
+## Amendment
+
+- **Date**: 2026-10-22
+
+The claim that every crossed edge's owner is a leaf held for the meshes tested, but not
+for a badly oriented one. With one face of a cube (half-side 6.3, h = 0.5) turned in, the
+exact winding number fell from 0.667 at the centre to 0.5 four units, eight voxels, inside
+the turned face, so a false surface lay inside the cube. With a band of 3 its signs
+differed across an edge no leaf point owned, 4.07 voxels from the mesh, and brodo's check
+refused the set; with bands of 6 and 12 the leaves covered it and the set was accepted,
+its false surface's edges counted as unhit (2026-10-22). The human decided:
+
+- Hermite data keeps to the winding number's sign. Where its inside changes beyond the
+  band, `hermite` refuses the mesh with `HermiteError::SignOutsideBand`, naming the
+  point; within the band, the false surface's edges are counted as unhit.
+- A sign that does not depend on orientation is B-016's to answer.
+- Adding leaves where the sign changes, which would change conversion (ADR-0027), and
+  answering B-016 first were set aside.
+

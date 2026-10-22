@@ -11,15 +11,10 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
 - **Done**: R11 but its fuzz round: groups read from OBJ, STL and 3MF (ADR-0030); Hermite
   data as a brodo format (ADR-0032); `colino::intersect`, watertight in `f64`; and
   `colino::hermite`, ADR-0030's acceptance tests passing (2026-10-22).
-- **Next**: P3's close (§2), scheduled 2026-10-22: first an ADR on Hermite data from badly
-  oriented meshes (below), then the retrospective and refactoring, the fuzz round, Miri,
-  benchmarks and the mutation run.
-- **Unresolved problems**: Hermite data from a badly oriented mesh can break brodo's
-  format: with one face of a cube turned in, the winding number's 1/2 reaches inside the
-  cube beyond the band, so signs differ across an edge no leaf point owns, and `hermite`
-  refuses with the format's `Owner` violation (2026-10-22). ADR-0030's claim that every
-  crossed edge's owner is a leaf holds where the signs change near the mesh; which way to
-  go is the owner's. Miri's Stacked Borrows reports undefined behaviour in
+- **Next**: P3's close (§2), scheduled 2026-10-22: the retrospective and refactoring, the
+  fuzz round, Miri, benchmarks and the mutation run. Badly oriented meshes are decided
+  (ADR-0030): refused where the sign changes beyond the band.
+- **Unresolved problems**: Miri's Stacked Borrows reports undefined behaviour in
   `crossbeam-epoch` under rayon; Tree Borrows does not (ADR-0015), but Miri's nightly of
   2026-07-21 warns there of integer-to-pointer casts in `crossbeam-epoch` 0.9.21, which
   Tree Borrows does not support, so it may miss a bug past them (2026-10-20). The leaf-parallel
@@ -130,7 +125,8 @@ Scheduled by the human on 2026-10-22, from a user's request (§4, R11).
 - [x] A group per triangle, read from OBJ, STL and 3MF (ADR-0030)
 - [x] Hermite data as a brodo format any producer writes, with its check (ADR-0032)
 - [x] `colino::intersect`, watertight in `f64`, and `colino::hermite` producing the format
-- [ ] Hermite data from a badly oriented mesh: decided by an ADR (§1)
+- [x] Hermite data from a badly oriented mesh: refused where its sign changes beyond the
+      band, counted as unhit within it (ADR-0030); B-016 is the fix
 - [ ] Retrospective and refactoring; fuzz round, the Hermite reader's target included;
       Miri run; benchmarks against their baselines; mutation run (ADR-0023)
 - [ ] **Accepted when** ADR-0030's acceptance tests pass and colino's Hermite data keeps

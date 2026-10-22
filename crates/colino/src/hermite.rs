@@ -14,8 +14,12 @@
 //! triangle's, turned to point from the inside end out where it is not perpendicular to the
 //! edge; the group is the triangle's. Values are found in `f64` and stored in `f32`, each
 //! point and edge on its own, so the bytes do not depend on the thread count.
+//!
+//! A badly oriented mesh can move the winding number's inside away from the mesh: within
+//! the band its false surface shows as unhit edges; beyond it, signs would differ across
+//! an edge no leaf point owns, and the mesh is refused (ADR-0030, B-016).
 
-use brodo::error::FieldError;
+use brodo::error::{FieldError, Rule};
 use brodo::field::Field;
 use brodo::hermite::{Crossings, Hermite, NO_CROSSING};
 use brodo::parallel::par_update;
@@ -136,7 +140,13 @@ pub fn hermite(mesh: &Mesh, c: &Converted, accuracy: Accuracy) -> Result<Produce
         axes.push(crossings);
     }
     let [x, y, z]: [Crossings; 3] = axes.try_into().map_err(|_| HermiteError::Transform)?;
-    let set = Hermite::new(t.clone(), signs, [x, y, z], mesh.group_names.clone())?;
+    let set = Hermite::new(t.clone(), signs, [x, y, z], mesh.group_names.clone()).map_err(|e| {
+        if let brodo::error::HermiteError::Violation { at: Some(at), rule: Rule::Owner, .. } = e {
+            HermiteError::SignOutsideBand(at)
+        } else {
+            HermiteError::Format(e)
+        }
+    })?;
     Ok(Produced { set, unhit })
 }
 

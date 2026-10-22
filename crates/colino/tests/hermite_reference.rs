@@ -389,3 +389,20 @@ fn a_triangle_turned_in_still_gives_normals_pointing_out() {
     }
     assert!(turned > 10, "{turned} crossings on the turned triangle");
 }
+
+#[test]
+fn a_face_turned_in_is_refused_beyond_the_band_and_counted_within_it() {
+    // The winding number's 1/2 lies 8 voxels inside the turned face (2026-10-22).
+    let cube = Cube::new(6.3, [0.37, -0.21, 0.13], 0.4, 0.7);
+    let mut m = turned_cube(cube.r, cube.centre, cube.a, cube.b);
+    for t in m.triangles.iter_mut().skip(2).take(2) {
+        t.swap(1, 2);
+    }
+    let run = |band| {
+        let o = Options { accuracy: Accuracy::Exact, band, ..Options::new(0.5) };
+        hermite(&m, &convert(&m, &o).unwrap(), o.accuracy)
+    };
+    assert!(matches!(run(3), Err(colino::error::HermiteError::SignOutsideBand(_))));
+    let wide = run(6);
+    assert!(wide.as_ref().is_ok_and(|p| p.unhit > 0), "{:?}", wide.map(|p| p.unhit));
+}
