@@ -21,6 +21,10 @@
 //! over, so that their orientation keeps to the outside. Support objects are skipped;
 //! a surface or an object of type `other` in the build is refused, as it bounds no solid.
 //! Objects no item reaches are not returned. Overlapping items are kept as they are.
+//!
+//! Groups (ADR-0030): each object holding a mesh is a group, named by its `name`, or by
+//! its `id` as written when it has none; every placement of it shares the group.
+//! Per-triangle properties are not read.
 
 use std::collections::BTreeMap;
 
@@ -31,7 +35,7 @@ use quick_xml::reader::NsReader;
 use rawzip::{CompressionMethod, ZipArchive, ZipArchiveEntryWayfinder, ZipSliceArchive};
 
 use crate::error::ReadError;
-use crate::mesh::{Limits, Mesh};
+use crate::mesh::{Grouping, Limits, Mesh};
 
 const CORE: &str = "http://schemas.microsoft.com/3dmanufacturing/core/2015/02";
 const RELATIONSHIPS: &str = "http://schemas.openxmlformats.org/package/2006/relationships";
@@ -362,6 +366,8 @@ enum Body {
 struct Object {
     kind: Kind,
     body: Body,
+    /// Its group's name: its `name`, or its `id` as written when it has none.
+    group: String,
 }
 
 /// Two counts of vertices, triangles and placements, added without overflow.
@@ -504,7 +510,8 @@ impl Reading {
     }
 
     fn object(&mut self, attrs: &[(String, String)], at: u64) -> Result<(), ReadError> {
-        let id: u64 = attr(attrs, "id")
+        let written = attr(attrs, "id").unwrap_or("");
+        let id: u64 = Some(written)
             .and_then(|v| v.trim().parse().ok())
             .ok_or(ReadError::Model { at, reason: "an object id missing or not a number" })?;
         let kind = match attr(attrs, "type").unwrap_or("model") {
@@ -522,7 +529,8 @@ impl Reading {
         if self.ids.insert(id, self.objects.len()).is_some() {
             return Err(ReadError::Model { at, reason: "two objects of one id" });
         }
-        self.objects.push(Object { kind, body: Body::None });
+        let group = attr(attrs, "name").filter(|n| !n.is_empty()).unwrap_or(written).to_owned();
+        self.objects.push(Object { kind, body: Body::None, group });
         Ok(())
     }
 
@@ -598,6 +606,7 @@ impl Reading {
             return Err(ReadError::TooLarge { what: "triangles", limit: limits.triangles });
         }
         let mut mesh = Mesh { unit: Some(self.unit.clone()), ..Mesh::default() };
+        let mut grouping = Grouping::default();
         let mut stack: Vec<(usize, Transform)> = self.items.iter().rev().copied().collect();
         while let Some((i, m)) = stack.pop() {
             let Some(object) = self.objects.get(i) else { continue };
@@ -609,12 +618,16 @@ impl Reading {
                         reason: "a surface or other object in the build",
                     });
                 }
-                (Kind::Model, Body::Mesh(v, t)) => place(&mut mesh, v, t, &m)?,
+                (Kind::Model, Body::Mesh(v, t)) => {
+                    place(&mut mesh, v, t, &m)?;
+                    grouping.take(&object.group, t.len());
+                }
                 (Kind::Model, Body::Components(c)) => {
                     stack.extend(c.iter().rev().map(|(child, cm)| (*child, then(cm, &m))));
                 }
             }
         }
+        grouping.into(&mut mesh);
         Ok(mesh)
     }
 }

@@ -177,6 +177,28 @@ fn components_move_first_then_the_item_and_a_mirror_turns_triangles_over() {
     assert_eq!(mirrored.triangles, t.iter().map(|[a, b, c]| [*a, *c, *b]).collect::<Vec<_>>());
 }
 
+/// Groups (ADR-0030): each object holding a mesh is a group, named by its `name`, else by
+/// its `id` as written; every placement of it, through components or items, shares it.
+#[test]
+fn each_object_is_a_group_named_by_its_name_else_its_id() {
+    let (v, t) = tetra();
+    let triangle = mesh_object(0, "model", &v[..3], &[[0, 1, 2]]);
+    let resources = format!(
+        "{}{}{}<object id=\"4\" name=\"Assembly\"><components>\
+         <component objectid=\"1\"/><component objectid=\"1\" transform=\"1 0 0 0 1 0 0 0 1 5 0 0\"/>\
+         <component objectid=\"7\"/></components></object>",
+        mesh_object(1, "model", &v, &t).replacen("id=\"1\"", "id=\"1\" name=\"Bolt\"", 1),
+        triangle.replacen("id=\"0\"", "id=\"07\"", 1),
+        triangle.replacen("id=\"0\"", "id=\"3\" name=\"\"", 1),
+    );
+    let m = one("<item objectid=\"4\"/><item objectid=\"7\"/><item objectid=\"3\"/>", &resources)
+        .unwrap();
+    assert_eq!(m.triangles.len(), 11);
+    assert_eq!(m.groups, vec![1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 3]);
+    assert_eq!(m.group_names, ["", "Bolt", "07", "3"]);
+    assert_eq!(m.check_groups(), Ok(()));
+}
+
 #[test]
 fn units_types_and_extensions_are_read_as_the_format_says() {
     let (v, t) = tetra();

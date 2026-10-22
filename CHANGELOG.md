@@ -15,6 +15,8 @@ are recorded here when they change (V6).
   `o`'s (ADR-0030).
 - `colino::stl::read` reads each ASCII solid as a group, named by its words; binary STL
   has none (ADR-0030).
+- `colino::threemf::read` reads each object holding a mesh as a group, named by its `name`,
+  else its `id` as written; every placement shares it (ADR-0030).
 
 ## 0.3.0 (2026-10-22)
 
