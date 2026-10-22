@@ -25,6 +25,7 @@ pub fn sphere(levels: u32, r: f64, centre: Point) -> Mesh {
             [0, 3, 5],
         ],
         unit: Some("millimeter".into()),
+        ..Mesh::default()
     };
     for _ in 0..levels {
         let mut triangles = Vec::new();
@@ -66,5 +67,5 @@ pub fn torus(big: f64, small: f64, n: u32) -> Mesh {
             triangles.push([at(i, j), at(i + 1, j + 1), at(i, j + 1)]);
         }
     }
-    Mesh { vertices, triangles, unit: Some("millimeter".into()) }
+    Mesh { vertices, triangles, unit: Some("millimeter".into()), ..Mesh::default() }
 }

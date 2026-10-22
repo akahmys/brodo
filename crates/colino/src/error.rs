@@ -151,6 +151,25 @@ pub enum MeshError {
     /// More vertices than a `u32` numbers.
     #[error("more vertices than a u32 numbers")]
     TooManyVertices,
+    /// `groups` is neither empty nor one per triangle.
+    #[error("{groups} groups for {triangles} triangles")]
+    GroupCount {
+        /// The groups given.
+        groups: usize,
+        /// The triangles.
+        triangles: usize,
+    },
+    /// A triangle's group has no name.
+    #[error("triangle {triangle} is in group {group}, which has no name")]
+    UnnamedGroup {
+        /// The triangle's place.
+        triangle: usize,
+        /// Its group.
+        group: u32,
+    },
+    /// Group 0 is named other than `""`.
+    #[error("group 0 is named, but it is no group")]
+    GroupZeroNamed,
 }
 
 /// Why a mesh could not be converted.

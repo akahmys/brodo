@@ -142,6 +142,7 @@ fn welding_joins_zeros_of_either_sign_and_refuses_a_bad_index() {
         vertices: vec![[0.0, 1.0, 2.0], [-0.0, 1.0, 2.0], [3.0, 4.0, 5.0]],
         triangles: vec![[0, 1, 2]],
         unit: None,
+        ..Mesh::default()
     };
     let w = m.welded().unwrap();
     assert_eq!(w.vertices.len(), 2);

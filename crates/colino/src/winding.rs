@@ -248,7 +248,7 @@ mod tests {
             let corner = |i: u32| [f64::from(i % 17), f64::from(i % 13) * 0.5, f64::from(i % 7)];
             let vertices: Vec<Point> = (0..900).map(corner).collect();
             let triangles = (0..300).map(|i| [3 * i, 3 * i + 1, 3 * i + 2]).collect();
-            let w = Winding::new(&Mesh { vertices, triangles, unit: None });
+            let w = Winding::new(&Mesh { vertices, triangles, unit: None, ..Mesh::default() });
             let n = w.map(|w| w.number([4.0, 3.0, 2.0], Accuracy::Approximate { beta: 2.0 }));
             tx.send(n.map(f64::is_finite)).unwrap_or(());
         });

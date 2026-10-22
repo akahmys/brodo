@@ -161,6 +161,7 @@ mod tests {
                 vertices: vec![[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
                 triangles: vec![[0, 2, 1], [0, 1, 3], [0, 3, 2], [1, 2, 3]],
                 unit: None,
+                ..Mesh::default()
             };
             tx.send(Surface::of(&m).map(|s| s.closed_manifold())).unwrap_or(());
         });

@@ -15,6 +15,12 @@ pub struct Mesh {
     pub triangles: Vec<[u32; 3]>,
     /// The unit of length the file states, uninterpreted; none when it states none.
     pub unit: Option<String>,
+    /// Each triangle's group, in `triangles`' order; empty when every triangle is in group
+    /// 0 (ADR-0030).
+    pub groups: Vec<u32>,
+    /// Each group's name, indexed by its id, the ids given in the order each name first
+    /// appears. Group 0 is `""`, no group; empty, this stands for `[""]`.
+    pub group_names: Vec<String>,
 }
 
 /// The most a reader takes from an untrusted file; beyond them it fails.
@@ -39,11 +45,40 @@ impl Limits {
 }
 
 impl Mesh {
+    /// Refuses groups that do not fit the triangles: `groups` neither empty nor one per
+    /// triangle, an id with no name, or a first name other than `""`.
+    pub fn check_groups(&self) -> Result<(), MeshError> {
+        if !self.groups.is_empty() && self.groups.len() != self.triangles.len() {
+            return Err(MeshError::GroupCount {
+                groups: self.groups.len(),
+                triangles: self.triangles.len(),
+            });
+        }
+        if self.group_names.first().is_some_and(|n| !n.is_empty()) {
+            return Err(MeshError::GroupZeroNamed);
+        }
+        let named = self.group_names.len().max(1);
+        let unnamed =
+            self.groups.iter().position(|g| usize::try_from(*g).map_or(true, |g| g >= named));
+        if let Some(triangle) = unnamed {
+            let group = self.groups.get(triangle).copied().unwrap_or(0);
+            return Err(MeshError::UnnamedGroup { triangle, group });
+        }
+        Ok(())
+    }
+
+    /// The group of triangle `t`: 0 when the mesh has no groups or no such triangle.
+    pub fn group(&self, t: usize) -> u32 {
+        self.groups.get(t).copied().unwrap_or(0)
+    }
+
     /// The same mesh with equal positions as one vertex, numbered in the order each first
     /// appears; triangles keep their order and orientation. Positions are equal when their
     /// coordinates are: `-0.0` and `0.0` are one, nothing within a tolerance is. A file that
     /// lists each triangle's corners apart, as STL does, needs this for its connectivity.
+    /// Each triangle keeps its group; groups that do not fit are refused.
     pub fn welded(&self) -> Result<Mesh, MeshError> {
+        self.check_groups()?;
         let key = |p: [f64; 3]| p.map(|c| (c + 0.0).to_bits());
         let mut seen: BTreeMap<[u64; 3], u32> = BTreeMap::new();
         let mut vertices = Vec::new();
@@ -65,6 +100,67 @@ impl Mesh {
             }
             triangles.push(out);
         }
-        Ok(Mesh { vertices, triangles, unit: self.unit.clone() })
+        Ok(Mesh {
+            vertices,
+            triangles,
+            unit: self.unit.clone(),
+            groups: self.groups.clone(),
+            group_names: self.group_names.clone(),
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Two triangles over four vertices, the first two of them at one position.
+    fn pair(groups: Vec<u32>, names: &[&str]) -> Mesh {
+        Mesh {
+            vertices: vec![[0.0; 3], [0.0; 3], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]],
+            triangles: vec![[0, 2, 3], [1, 3, 2]],
+            unit: None,
+            groups,
+            group_names: names.iter().map(|n| (*n).to_string()).collect(),
+        }
+    }
+
+    #[test]
+    fn groups_that_fit_the_triangles_are_taken() {
+        assert_eq!(pair(vec![], &[]).check_groups(), Ok(()));
+        assert_eq!(pair(vec![0, 0], &[]).check_groups(), Ok(()));
+        assert_eq!(pair(vec![1, 0], &["", "a"]).check_groups(), Ok(()));
+        assert_eq!(pair(vec![], &["", "a"]).group(1), 0);
+        assert_eq!(pair(vec![1, 2], &["", "a", "b"]).group(1), 2);
+    }
+
+    #[test]
+    fn groups_that_do_not_fit_are_refused() {
+        assert_eq!(
+            pair(vec![0], &[]).check_groups(),
+            Err(MeshError::GroupCount { groups: 1, triangles: 2 })
+        );
+        assert_eq!(
+            pair(vec![0, 1], &[]).check_groups(),
+            Err(MeshError::UnnamedGroup { triangle: 1, group: 1 })
+        );
+        assert_eq!(
+            pair(vec![2, 1], &["", "a"]).check_groups(),
+            Err(MeshError::UnnamedGroup { triangle: 0, group: 2 })
+        );
+        assert_eq!(pair(vec![], &["a"]).check_groups(), Err(MeshError::GroupZeroNamed));
+        assert_eq!(
+            pair(vec![0], &[]).welded(),
+            Err(MeshError::GroupCount { groups: 1, triangles: 2 })
+        );
+    }
+
+    #[test]
+    fn welding_keeps_each_triangles_group() {
+        let m = pair(vec![2, 1], &["", "a", "b"]);
+        let w = m.welded().unwrap();
+        assert_eq!(w.vertices.len(), 3);
+        assert_eq!(w.triangles, vec![[0, 1, 2], [0, 2, 1]]);
+        assert_eq!((w.groups, w.group_names), (m.groups, m.group_names));
     }
 }

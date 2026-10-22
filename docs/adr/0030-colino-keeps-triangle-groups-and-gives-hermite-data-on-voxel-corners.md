@@ -134,3 +134,5 @@ The record left the API's shape and the cache file's grid names open. The human 
   `x.normal`, `x.group`, and the same for `y` and `z`, in that order; the rest of each
   entry's metadata is `meta`'s. The names are part of colino's API, held by a Format-tier
   test against a committed file.
+- `group_names` is indexed by group id. Empty, it stands for `[""]`; otherwise a first
+  name other than `""` is a `MeshError`, as are the two cases above.

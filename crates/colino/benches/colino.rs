@@ -38,6 +38,7 @@ fn sphere(levels: u32, r: f64) -> Mesh {
             [0, 3, 5],
         ],
         unit: Some("millimeter".into()),
+        ..Mesh::default()
     };
     for _ in 0..levels {
         let mut midpoints = std::collections::BTreeMap::new();

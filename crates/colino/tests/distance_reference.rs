@@ -101,7 +101,7 @@ proptest! {
     ) {
         let n = vertices.len();
         let triangles: Vec<[u32; 3]> = picks.iter().map(|t| t.map(|i| u32::try_from(i.index(n)).unwrap())).collect();
-        let mesh = Mesh { vertices, triangles, unit: None };
+        let mesh = Mesh { vertices, triangles, unit: None, ..Mesh::default() };
         let tree = Bvh::new(&mesh).unwrap();
         let corners = |t: &[u32; 3]| t.map(|i| mesh.vertices[usize::try_from(i).unwrap()]);
         for q in queries {

@@ -46,8 +46,12 @@ fn cells() -> Vec<[i32; 3]> {
 /// The boundary of the union of `cells`, each face two triangles facing out of its cube.
 fn boundary(cells: &[[i32; 3]]) -> Result<Mesh, BoxError> {
     let set: std::collections::BTreeSet<[i32; 3]> = cells.iter().copied().collect();
-    let mut m =
-        Mesh { vertices: Vec::new(), triangles: Vec::new(), unit: Some("millimeter".into()) };
+    let mut m = Mesh {
+        vertices: Vec::new(),
+        triangles: Vec::new(),
+        unit: Some("millimeter".into()),
+        ..Mesh::default()
+    };
     for c in cells {
         for axis in 0..3 {
             for side in [0, 1] {

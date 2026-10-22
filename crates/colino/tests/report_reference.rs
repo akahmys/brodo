@@ -15,8 +15,12 @@ use common::{sphere, torus};
 /// The boundary of the union of cubes of edge `s` at `cells`, each face between a cube and
 /// no cube facing out of the cube, as two triangles.
 fn cubes(cells: &[[i32; 3]], s: f64) -> Mesh {
-    let mut m =
-        Mesh { vertices: Vec::new(), triangles: Vec::new(), unit: Some("millimeter".into()) };
+    let mut m = Mesh {
+        vertices: Vec::new(),
+        triangles: Vec::new(),
+        unit: Some("millimeter".into()),
+        ..Mesh::default()
+    };
     for c in cells {
         for axis in 0..3 {
             for side in [0, 1] {

@@ -304,7 +304,7 @@ proptest! {
     ) {
         let vertices: Vec<Point> = soup.iter().flatten().copied().collect();
         let triangles = (0..u32::try_from(soup.len()).unwrap()).map(|i| [3 * i, 3 * i + 1, 3 * i + 2]).collect();
-        let m = Mesh { vertices, triangles, unit: Some("m".into()) };
+        let m = Mesh { vertices, triangles, unit: Some("m".into()), ..Mesh::default() };
         let o = Options { origin, band, ..exact(h) };
         let c = convert(&m, &o).unwrap();
         prop_assert_eq!(check(&m, &o, &c, false, 1e-5), Ok(()));
@@ -314,7 +314,12 @@ proptest! {
 /// A mesh with no triangle converts to the background alone.
 #[test]
 fn a_mesh_with_no_triangle_converts_to_nothing() {
-    let m = Mesh { vertices: vec![[1.0, 2.0, 3.0]], triangles: vec![], unit: Some("mm".into()) };
+    let m = Mesh {
+        vertices: vec![[1.0, 2.0, 3.0]],
+        triangles: vec![],
+        unit: Some("mm".into()),
+        ..Mesh::default()
+    };
     let counts =
         convert(&m, &Options::new(1.0)).map(|c| (c.topology.leaf_count(), c.topology.tile_count()));
     assert_eq!(counts, Ok((0, 0)));
@@ -326,6 +331,7 @@ fn speck(p: Point) -> Mesh {
         vertices: vec![p, [p[0] + 0.01, p[1], p[2]], [p[0], p[1] + 0.01, p[2]]],
         triangles: vec![[0, 1, 2]],
         unit: Some("millimeter".into()),
+        ..Mesh::default()
     }
 }
 
@@ -386,7 +392,7 @@ fn a_cubes_inside_tiles_reach_near_its_box() {
     let faces =
         [[0, 2, 3, 1], [4, 5, 7, 6], [0, 1, 5, 4], [2, 6, 7, 3], [0, 4, 6, 2], [1, 3, 7, 5]];
     let triangles = faces.iter().flat_map(|[a, b, c, d]| [[*a, *b, *c], [*a, *c, *d]]).collect();
-    let m = Mesh { vertices, triangles, unit: Some("millimeter".into()) };
+    let m = Mesh { vertices, triangles, unit: Some("millimeter".into()), ..Mesh::default() };
     let o = exact(1.0);
     let c = convert(&m, &o).unwrap();
     assert!(matches!(c.topology.locate([24, 8, 8]), Location::Tile(..)));

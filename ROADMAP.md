@@ -8,12 +8,13 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: P2 accepted by the human and closed as 0.3.0 (2026-10-22). T11's final
-  verdict passed: brodo's run left no mutant missed, each timeout after a failed test;
-  colino's left 16 timing out before any, all killed by `--run --patient` (ADR-0023).
-- **Next**: R11 (ADR-0030), a group per triangle and Hermite data; with the groups,
-  colino's README says a B-rep's face names travel in `Mesh`'s `groups` and
-  `group_names` (ADR-0031).
+- **Done**: R11's first step: `Mesh` holds a group per triangle, `groups` and
+  `group_names`, checked by `check_groups` and kept by `welded` (ADR-0030, amended
+  2026-10-22 with the API, the cache grid names and group 0's name).
+- **Next**: R11's readers, each in its own commit: OBJ's `g` and `o`, ASCII STL's `solid`
+  blocks, 3MF's objects; then a fuzz round for the three; then `colino::intersect` and
+  `colino::hermite`, with ADR-0030's acceptance tests; with the groups read, colino's
+  README says a B-rep's face names travel in `groups` and `group_names` (ADR-0031).
 - **Unresolved problems**: Miri's Stacked Borrows reports undefined behaviour in
   `crossbeam-epoch` under rayon; Tree Borrows does not (ADR-0015), but Miri's nightly of
   2026-07-21 warns there of integer-to-pointer casts in `crossbeam-epoch` 0.9.21, which

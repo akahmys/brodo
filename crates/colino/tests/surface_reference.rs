@@ -18,6 +18,7 @@ fn tetrahedron() -> Mesh {
         vertices: vec![[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
         triangles: vec![[0, 2, 1], [0, 1, 3], [0, 3, 2], [1, 2, 3]],
         unit: None,
+        ..Mesh::default()
     }
 }
 
@@ -82,6 +83,7 @@ fn an_unwelded_soup_is_a_closed_surface_once_welded() {
         vertices: t.triangles.iter().flat_map(|f| f.map(|i| t.vertices[i as usize])).collect(),
         triangles: (0..4).map(|i| [3 * i, 3 * i + 1, 3 * i + 2]).collect(),
         unit: None,
+        ..Mesh::default()
     };
     assert_eq!(Surface::of(&soup).unwrap().open_edges, 12);
     assert!(Surface::of(&soup.welded().unwrap()).unwrap().closed_manifold());

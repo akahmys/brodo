@@ -6,6 +6,12 @@ are recorded here when they change (V6).
 
 ## Unreleased
 
+- `colino::mesh::Mesh` gains `groups` and `group_names`, a group per triangle, and
+  `check_groups` and `group`; `welded` keeps each triangle's group and refuses groups that
+  do not fit (ADR-0030). A `Mesh` written field by field needs the two fields, or
+  `..Mesh::default()`. `MeshError` gains `GroupCount`, `UnnamedGroup` and
+  `GroupZeroNamed`: a `match` over it needs the new arms.
+
 ## 0.3.0 (2026-10-22)
 
 Closes P2: `colino`, triangle meshes read from STL, OBJ and 3MF into a narrow-band signed

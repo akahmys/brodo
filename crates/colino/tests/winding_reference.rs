@@ -32,7 +32,7 @@ fn octahedron() -> Mesh {
         [3, 1, 5],
         [0, 3, 5],
     ];
-    Mesh { vertices, triangles, unit: None }
+    Mesh { vertices, triangles, unit: None, ..Mesh::default() }
 }
 
 /// The octahedron with each face split in four, `levels` times, its vertices pushed out to
@@ -93,7 +93,7 @@ fn the_expansion_error_falls_as_the_fifth_power_of_distance() {
     };
     let vertices: Vec<Point> = (0..120).map(|_| [r(), r(), r()]).collect();
     let triangles = (0..40).map(|i| [3 * i, 3 * i + 1, 3 * i + 2]).collect();
-    let w = Winding::new(&Mesh { vertices, triangles, unit: None }).unwrap();
+    let w = Winding::new(&Mesh { vertices, triangles, unit: None, ..Mesh::default() }).unwrap();
     let error = |d: f64| {
         let q = [0.6, -0.48, 0.64].map(|c| 0.5 + c * d);
         (w.number(q, Accuracy::Approximate { beta: 0.0 }) - w.number(q, Accuracy::Exact)).abs()
@@ -135,7 +135,7 @@ proptest! {
         } else {
             let vertices: Vec<Point> = soup.iter().flatten().copied().collect();
             let triangles = (0..soup.len()).map(|i| u32::try_from(i).unwrap()).map(|i| [3 * i, 3 * i + 1, 3 * i + 2]).collect();
-            Mesh { vertices, triangles, unit: None }
+            Mesh { vertices, triangles, unit: None, ..Mesh::default() }
         };
         let w = Winding::new(&mesh).unwrap();
         for q in queries {
@@ -157,7 +157,7 @@ fn triangles_with_no_area_wind_nothing() {
     let vertices: Vec<Point> =
         (0..30).map(|i| [f64::from(i % 5), f64::from(i % 3) * 2.0, 1.0]).collect();
     let triangles = (0..10).map(|i| [3 * i, 3 * i, 3 * i + 1]).collect();
-    let w = Winding::new(&Mesh { vertices, triangles, unit: None }).unwrap();
+    let w = Winding::new(&Mesh { vertices, triangles, unit: None, ..Mesh::default() }).unwrap();
     for q in [[0.0, 0.0, 0.0], [10.0, 10.0, 10.0], [2.0, 2.0, 1.5]] {
         assert!(w.number(q, Accuracy::Exact).abs() < 1e-15, "{q:?}");
         assert_eq!(w.number(q, BETA).to_bits(), 0.0_f64.to_bits(), "{q:?}");
