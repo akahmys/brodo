@@ -44,6 +44,43 @@ impl Limits {
     }
 }
 
+/// Groups as a reader meets them: each name numbered in the order a triangle first takes
+/// it, `""` always 0 (ADR-0030).
+#[derive(Debug, Default)]
+pub(crate) struct Grouping {
+    ids: BTreeMap<String, u32>,
+    names: Vec<String>,
+    groups: Vec<u32>,
+}
+
+impl Grouping {
+    /// Puts the next `n` triangles in the group named `name`.
+    pub(crate) fn take(&mut self, name: &str, n: usize) {
+        let id = if name.is_empty() {
+            0
+        } else if let Some(id) = self.ids.get(name) {
+            *id
+        } else {
+            if self.names.is_empty() {
+                self.names.push(String::new());
+            }
+            let id = u32::try_from(self.names.len()).unwrap_or(u32::MAX);
+            self.ids.insert(name.to_owned(), id);
+            self.names.push(name.to_owned());
+            id
+        };
+        self.groups.extend(std::iter::repeat_n(id, n));
+    }
+
+    /// Gives `mesh` the groups taken, none when every triangle is in group 0.
+    pub(crate) fn into(self, mesh: &mut Mesh) {
+        if !self.names.is_empty() {
+            mesh.groups = self.groups;
+            mesh.group_names = self.names;
+        }
+    }
+}
+
 impl Mesh {
     /// Refuses groups that do not fit the triangles: `groups` neither empty nor one per
     /// triangle, an id with no name, or a first name other than `""`.

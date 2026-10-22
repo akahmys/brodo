@@ -10,22 +10,23 @@
 //! triangles from its first vertex. `#` begins a comment, and a line ending in `\` goes on
 //! in the next.
 //!
+//! Groups (ADR-0030): a triangle takes the names of the last `g`, joined by one space;
+//! where no `g` precedes it, the name of the last `o`; failing that, group 0.
+//!
 //! Skipped by name, having no part in a mesh's triangles: texture and normal vertices,
-//! grouping, display and rendering attributes, points and lines. Refused: free-form
+//! smoothing and merging groups, display and rendering attributes, points and lines. Refused: free-form
 //! geometry, which defines shape this reader does not triangulate; `call` and `csh`, which
 //! would read another file or run a command; and any statement the format does not name.
 
 use crate::error::ReadError;
-use crate::mesh::{Limits, Mesh};
+use crate::mesh::{Grouping, Limits, Mesh};
 
 /// Statements with no part in the triangles: skipped.
 const SKIPPED: &[&str] = &[
     "vt",
     "vn",
-    "g",
     "s",
     "mg",
-    "o",
     "usemtl",
     "mtllib",
     "usemap",
@@ -150,12 +151,21 @@ pub fn read(bytes: &[u8], limits: Limits) -> Result<Mesh, ReadError> {
     let text = std::str::from_utf8(bytes).map_err(|_| ReadError::NotText)?;
     let mut mesh = Mesh::default();
     let mut furthest: Option<(usize, i64)> = None;
+    let (mut g, mut o): (Option<String>, Option<String>) = (None, None);
+    let mut grouping = Grouping::default();
     for (line, statement) in statements(text) {
         let mut words = statement.split_ascii_whitespace();
         match words.next() {
             None => {}
             Some("v") => vertex(&mut mesh, words, line, limits)?,
-            Some("f") => face(&mut mesh, words, line, limits, &mut furthest)?,
+            Some("f") => {
+                let before = mesh.triangles.len();
+                face(&mut mesh, words, line, limits, &mut furthest)?;
+                let name = g.as_deref().or(o.as_deref()).unwrap_or("");
+                grouping.take(name, mesh.triangles.len() - before);
+            }
+            Some("g") => g = Some(words.collect::<Vec<_>>().join(" ")),
+            Some("o") => o = Some(words.collect::<Vec<_>>().join(" ")),
             Some(k) if SKIPPED.contains(&k) => {}
             Some(k) if REFUSED.contains(&k) => {
                 return Err(ReadError::Unsupported { line, word: k.to_owned() });
@@ -168,5 +178,6 @@ pub fn read(bytes: &[u8], limits: Limits) -> Result<Mesh, ReadError> {
     {
         return Err(ReadError::NoVertex { line, index: i });
     }
+    grouping.into(&mut mesh);
     Ok(mesh)
 }

@@ -11,6 +11,8 @@ are recorded here when they change (V6).
   do not fit (ADR-0030). A `Mesh` written field by field needs the two fields, or
   `..Mesh::default()`. `MeshError` gains `GroupCount`, `UnnamedGroup` and
   `GroupZeroNamed`: a `match` over it needs the new arms.
+- `colino::obj::read` reads `g` and `o` as groups: the last `g`'s names, else the last
+  `o`'s (ADR-0030).
 
 ## 0.3.0 (2026-10-22)
 

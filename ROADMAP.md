@@ -8,11 +8,12 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: R11's first step: `Mesh` holds a group per triangle, `groups` and
+- **Done**: R11's first steps: `Mesh` holds a group per triangle, `groups` and
   `group_names`, checked by `check_groups` and kept by `welded` (ADR-0030, amended
-  2026-10-22 with the API, the cache grid names and group 0's name).
-- **Next**: R11's readers, each in its own commit: OBJ's `g` and `o`, ASCII STL's `solid`
-  blocks, 3MF's objects; then a fuzz round for the three; then `colino::intersect` and
+  2026-10-22 with the API, the cache grid names and group 0's name); the OBJ reader takes
+  them from `g` and `o`.
+- **Next**: R11's other readers, each in its own commit: ASCII STL's `solid` blocks,
+  3MF's objects; then a fuzz round for the three; then `colino::intersect` and
   `colino::hermite`, with ADR-0030's acceptance tests; with the groups read, colino's
   README says a B-rep's face names travel in `groups` and `group_names` (ADR-0031).
 - **Unresolved problems**: Miri's Stacked Borrows reports undefined behaviour in
