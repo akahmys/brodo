@@ -148,6 +148,7 @@ implementation (PLANNING.md §2).
 
 | # | Question | Proposal so far |
 | :--- | :--- | :--- |
+| B-019 | Does `colino` move to a repository of its own? | Not now (owner, 2026-10-23; ADR-0012 keeps two crates in one repository): changes span both, as P3's Hermite format and producer did, and before 1.0 a split would turn each into two releases, duplicate the rules and their audit, and take colino's tests out of brodo's gate. Revisited when brodo's API and formats settle (1.0), both are on crates.io, colino needs what brodo's rules forbid, or others maintain it |
 | B-018 | Does model checking with Kani join the closing checks? | Not now (owner, 2026-10-23): it fits only integer bit work and `view.rs`'s small helpers, already fuzzed and mutation-tested, and cannot reach rayon or the memory mapping; this milestone's defects were numeric and in design claims. Revisited by a spike if Miri-unreachable unsafe code grows, an integer coordinate bug escapes the tests, or before 1.0 |
 | B-017 | Is `Value` sealed, so that only brodo assigns type codes? | Not yet: a type outside brodo is refused by every other build's reader, and sealing would forbid types used in memory only (ADR-0029) |
 | B-016 | What is colino's orientation-independent sign (ADR-0017)? | None yet; candidates: flooding from the outside through cells the surface does not cross, or the winding number's magnitude |
