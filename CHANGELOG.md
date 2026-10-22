@@ -13,6 +13,8 @@ are recorded here when they change (V6).
   `GroupZeroNamed`: a `match` over it needs the new arms.
 - `colino::obj::read` reads `g` and `o` as groups: the last `g`'s names, else the last
   `o`'s (ADR-0030).
+- `colino::stl::read` reads each ASCII solid as a group, named by its words; binary STL
+  has none (ADR-0030).
 
 ## 0.3.0 (2026-10-22)
 

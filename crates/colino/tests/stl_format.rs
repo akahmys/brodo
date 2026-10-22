@@ -83,6 +83,25 @@ fn ascii_words_are_read_without_case_normals_optional_solids_several() {
     assert_eq!(m.vertices[2].map(f64::to_bits), [0.0, 1.0, 0.0].map(f64::to_bits));
 }
 
+/// Groups (ADR-0030): each ASCII solid is a group, named by its words joined by one space;
+/// a binary file has none, whatever its header says.
+#[test]
+fn each_ascii_solid_is_a_group_and_binary_has_none() {
+    let facet = "facet outer loop vertex 0 0 0 vertex 1 0 0 vertex 0 1 0 endloop endfacet\n";
+    let text = format!(
+        "solid part   one\n{facet}{facet}endsolid part one\nsolid\n{facet}endsolid\n\
+         solid Lid\n{facet}endsolid\nsolid part one\n{facet}endsolid\nsolid empty\nendsolid\n"
+    );
+    let m = read(text.as_bytes(), ROOMY).unwrap();
+    assert_eq!(m.groups, vec![1, 1, 0, 2, 1]);
+    assert_eq!(m.group_names, ["", "part one", "Lid"]);
+    assert_eq!(m.check_groups(), Ok(()));
+    let mut header = [b' '; 80];
+    header[..10].copy_from_slice(b"solid name");
+    let m = read(&binary(&header, &tetrahedron()), ROOMY).unwrap();
+    assert!(m.groups.is_empty() && m.group_names.is_empty());
+}
+
 #[test]
 fn each_damage_is_its_own_error() {
     let t = tetrahedron();

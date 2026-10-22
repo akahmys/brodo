@@ -17,9 +17,12 @@
 //! follows from the vertices, and the two colour conventions for the attribute cannot be
 //! told apart. Each triangle's corners are vertices of their own; `Mesh::welded` joins
 //! equal ones.
+//!
+//! Groups (ADR-0030): in ASCII, each solid is a group, named by the words after `solid`
+//! joined by one space; a binary file's triangles are all in group 0.
 
 use crate::error::ReadError;
-use crate::mesh::{Limits, Mesh};
+use crate::mesh::{Grouping, Limits, Mesh};
 
 const HEADER: usize = 80;
 const RECORD: usize = 50;
@@ -125,13 +128,16 @@ impl<'a> Words<'a> {
             .ok_or_else(|| ReadError::BadNumber { at, found: w.to_owned() })
     }
 
-    /// Skips a solid's name: the words up to the next `stop`, or the end.
-    fn name(&mut self, stops: &[&str]) {
-        while self
-            .words
-            .next_if(|(_, w)| !stops.iter().any(|s| w.eq_ignore_ascii_case(s)))
-            .is_some()
-        {}
+    /// Takes a solid's name: the words up to the next `stop`, or the end, joined by one
+    /// space.
+    fn name(&mut self, stops: &[&str]) -> String {
+        let mut name = Vec::new();
+        while let Some((_, w)) =
+            self.words.next_if(|(_, w)| !stops.iter().any(|s| w.eq_ignore_ascii_case(s)))
+        {
+            name.push(w);
+        }
+        name.join(" ")
     }
 }
 
@@ -146,8 +152,10 @@ fn read_ascii(bytes: &[u8], limits: Limits) -> Result<Mesh, ReadError> {
     let mut words = Words { words: text.split_ascii_whitespace().enumerate().peekable() };
     let mut mesh = Mesh::default();
     let mut triangles = 0_u64;
+    let mut grouping = Grouping::default();
     while words.take_if("solid") {
-        words.name(&["facet", "endsolid"]);
+        let name = words.name(&["facet", "endsolid"]);
+        let before = mesh.triangles.len();
         while words.take_if("facet") {
             if words.take_if("normal") {
                 for _ in 0..3 {
@@ -171,9 +179,13 @@ fn read_ascii(bytes: &[u8], limits: Limits) -> Result<Mesh, ReadError> {
         }
         words.keyword("endsolid")?;
         words.name(&["solid"]);
+        grouping.take(&name, mesh.triangles.len() - before);
     }
     match words.words.next() {
-        None => Ok(mesh),
+        None => {
+            grouping.into(&mut mesh);
+            Ok(mesh)
+        }
         Some((at, w)) => {
             Err(ReadError::Unexpected { expected: "solid or the end", at, found: w.to_owned() })
         }

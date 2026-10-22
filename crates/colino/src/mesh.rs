@@ -56,6 +56,9 @@ pub(crate) struct Grouping {
 impl Grouping {
     /// Puts the next `n` triangles in the group named `name`.
     pub(crate) fn take(&mut self, name: &str, n: usize) {
+        if n == 0 {
+            return;
+        }
         let id = if name.is_empty() {
             0
         } else if let Some(id) = self.ids.get(name) {
