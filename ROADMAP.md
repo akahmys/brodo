@@ -11,8 +11,9 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
 - **Done**: R11 but its fuzz round: groups read from OBJ, STL and 3MF (ADR-0030); Hermite
   data as a brodo format (ADR-0032); `colino::intersect`, watertight in `f64`; and
   `colino::hermite`, ADR-0030's acceptance tests passing (2026-10-22).
-- **Next**: an answer on badly oriented meshes (below); a fuzz round for the three mesh
-  readers and the Hermite reader, 900 s each (TESTING.md T6).
+- **Next**: P3's close (§2), scheduled 2026-10-22: first an ADR on Hermite data from badly
+  oriented meshes (below), then the retrospective and refactoring, the fuzz round, Miri,
+  benchmarks and the mutation run.
 - **Unresolved problems**: Hermite data from a badly oriented mesh can break brodo's
   format: with one face of a cube turned in, the winding number's 1/2 reaches inside the
   cube beyond the band, so signs differ across an edge no leaf point owns, and `hermite`
@@ -122,10 +123,23 @@ Not part of P1's acceptance, and not started while ParaView suffices (ADR-0018).
 - [x] **Accepted when** the invariants are right for a sphere, a torus and a double torus;
       a holed mesh leaks no sign; a wall thinner than a voxel is reported
 
-### After P2
+### P3 — R11: triangle groups and Hermite data
 
-Ordered by users' requests (§4): R11 (ADR-0030), the archive profile, value quantisation,
-colino's layer 3, writing `.vdb`. STEP is not read (ADR-0031).
+Scheduled by the human on 2026-10-22, from a user's request (§4, R11).
+
+- [x] A group per triangle, read from OBJ, STL and 3MF (ADR-0030)
+- [x] Hermite data as a brodo format any producer writes, with its check (ADR-0032)
+- [x] `colino::intersect`, watertight in `f64`, and `colino::hermite` producing the format
+- [ ] Hermite data from a badly oriented mesh: decided by an ADR (§1)
+- [ ] Retrospective and refactoring; fuzz round, the Hermite reader's target included;
+      Miri run; benchmarks against their baselines; mutation run (ADR-0023)
+- [ ] **Accepted when** ADR-0030's acceptance tests pass and colino's Hermite data keeps
+      to brodo's format
+
+### After P3
+
+Ordered by users' requests (§4): the archive profile, value quantisation, colino's layer
+3, writing `.vdb`. STEP is not read (ADR-0031).
 
 ## 3. Open questions and spikes
 
