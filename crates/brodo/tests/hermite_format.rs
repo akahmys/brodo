@@ -164,6 +164,11 @@ fn each_broken_value_is_refused_for_its_rule() {
             Edit::Fraction(1, i, 0.5),
             (Some(i), Some(1), Rule::NoCrossing),
         ),
+        (
+            "an inward normal, the upper end inside",
+            Edit::Normal(0, [3, 10, 10], [0.6, 0.8, 0.0]),
+            (Some([3, 10, 10]), Some(0), Rule::NormalInward),
+        ),
         ("a fraction above 1", Edit::Fraction(0, c, 1.5), (Some(c), Some(0), Rule::Fraction)),
         ("a fraction below 0", Edit::Fraction(0, c, -0.5), (Some(c), Some(0), Rule::Fraction)),
         ("a NaN fraction", Edit::Fraction(0, c, f32::NAN), (Some(c), Some(0), Rule::Fraction)),
@@ -196,6 +201,17 @@ fn each_broken_value_is_refused_for_its_rule() {
     let t = p.topology.tile_numbers().next().unwrap();
     p.signs.set_tile(&p.topology, t, 0).unwrap();
     assert_eq!(rule(p.make()).map(|r| r.2), Ok(Rule::Fraction));
+}
+
+/// A normal perpendicular to its edge points neither way and is taken, whichever end is
+/// inside: 19 → 20 has its lower end inside, 3 → 4 its upper.
+#[test]
+fn a_normal_perpendicular_to_its_edge_is_taken() {
+    for v in [[19, 10, 10], [3, 10, 10]] {
+        let mut p = valid();
+        apply(&mut p, Edit::Normal(0, v, [0.0, 1.0, 0.0]));
+        assert!(p.make().is_ok(), "at {v:?}");
+    }
 }
 
 #[test]
