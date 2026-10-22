@@ -6,20 +6,20 @@
 /// A point in space.
 pub type Point = [f64; 3];
 
-fn sub(a: Point, b: Point) -> Point {
+pub(crate) fn sub(a: Point, b: Point) -> Point {
     [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
 }
 
-fn dot(a: Point, b: Point) -> f64 {
+pub(crate) fn dot(a: Point, b: Point) -> f64 {
     a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
 }
 
-fn cross(a: Point, b: Point) -> Point {
+pub(crate) fn cross(a: Point, b: Point) -> Point {
     [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
 }
 
 /// `a + s (b − a)`.
-fn along(a: Point, b: Point, s: f64) -> Point {
+pub(crate) fn along(a: Point, b: Point, s: f64) -> Point {
     [a[0] + s * (b[0] - a[0]), a[1] + s * (b[1] - a[1]), a[2] + s * (b[2] - a[2])]
 }
 

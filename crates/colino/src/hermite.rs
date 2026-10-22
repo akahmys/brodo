@@ -28,7 +28,7 @@ use brodo::tree::Coord;
 
 use crate::bvh::Bvh;
 use crate::convert::Converted;
-use crate::distance::Point;
+use crate::distance::{Point, cross, dot, sub};
 use crate::error::HermiteError;
 use crate::intersect::{crossing, nearest};
 use crate::mesh::Mesh;
@@ -77,9 +77,8 @@ fn step(axis: usize, v: Coord) -> Coord {
 /// The triangle's unit normal, by its corners' order; zero for one with no area.
 fn normal(t: [Point; 3]) -> Point {
     let [a, b, c] = t;
-    let (u, v) = ([0, 1, 2].map(|k| b[k] - a[k]), [0, 1, 2].map(|k| c[k] - a[k]));
-    let n = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
-    let length = (n[0] * n[0] + n[1] * n[1] + n[2] * n[2]).sqrt();
+    let n = cross(sub(b, a), sub(c, a));
+    let length = dot(n, n).sqrt();
     if length > 0.0 { n.map(|x| x / length) } else { [0.0; 3] }
 }
 

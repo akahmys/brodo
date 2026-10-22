@@ -11,7 +11,7 @@
 //! Both faces of a triangle are hit; a segment in a triangle's plane, or a triangle with no
 //! area, is not.
 
-use crate::distance::{Point, on_triangle, squared};
+use crate::distance::{Point, along as at, dot, on_triangle, squared, sub};
 
 /// Below this, a product's rounding error may itself be rounded, so two equal products are
 /// left equal: 2⁵³ times the smallest normal `f64`.
@@ -29,10 +29,6 @@ pub(crate) fn edge(a: f64, b: f64, c: f64, d: f64) -> f64 {
         return 0.0;
     }
     a.mul_add(b, -p) - c.mul_add(d, -q)
-}
-
-fn sub(a: Point, b: Point) -> Point {
-    [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
 }
 
 /// Where the segment from `a` to `b` crosses triangle `t`: the fraction `s` in [0, 1] with
@@ -73,15 +69,6 @@ pub fn crossing(a: Point, b: Point, t: [Point; 3]) -> Option<f64> {
         return None;
     }
     Some(along / det)
-}
-
-/// `a + s (b − a)`.
-fn at(a: Point, b: Point, s: f64) -> Point {
-    [a[0] + s * (b[0] - a[0]), a[1] + s * (b[1] - a[1]), a[2] + s * (b[2] - a[2])]
-}
-
-fn dot(a: Point, b: Point) -> f64 {
-    a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
 }
 
 /// The fraction along the segment from `a` to `b` nearest `p`, the lowest of equals.
