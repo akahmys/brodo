@@ -216,11 +216,13 @@ fn check(s: &impl Source, names: &[String]) -> Result<(), HermiteError> {
             return Err(violation(Some(voxel(*origin, i)), None, Rule::Sign));
         }
     }
-    for (n, origin) in (0_u32..).zip(leaves) {
-        check_leaf(s, n, origin, groups)?;
-    }
+    // Tiles' faces before leaves, so that a change only a tile's face meets is the one
+    // reported.
     for (level, origin, t) in &tiles {
         check_tile_faces(s, *level, *origin, s.sign_tile(*t)?)?;
+    }
+    for (n, origin) in (0_u32..).zip(leaves) {
+        check_leaf(s, n, origin, groups)?;
     }
     Ok(())
 }

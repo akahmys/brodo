@@ -147,9 +147,67 @@ fn rule(r: Result<Hermite, HermiteError>) -> Result<(Option<Coord>, Option<usize
 
 #[test]
 fn a_valid_set_is_taken() {
-    let set = valid().make().unwrap();
-    assert_eq!(set.group_names(), ["", "a", "b"]);
-    assert_eq!(set.topology().tile_count(), 1);
+    let set = valid().make();
+    assert!(set.as_ref().is_ok_and(|s| s.group_names() == ["", "a", "b"]), "{set:?}");
+    // Crossings on edges from one leaf into the next, at 15 → 16.
+    let across = parts(3, None, 4, 16).make();
+    assert!(across.is_ok(), "{across:?}");
+    // An outside tile at the leaves' edge, next to the background of its own sign.
+    let edge = parts(2, Some([8, 8, 8]), 2, 6).make();
+    assert!(edge.is_ok(), "{edge:?}");
+}
+
+/// An inside upper tile wrapped in a shell of leaves, inside to 135 and from −7, but for one
+/// leaf of the shell left out by the tile's +x face: only the tile's face, at the patch
+/// (y, z) = (64, 32), meets the background there, and it is reported, not the leaves'
+/// own changes beside the hole.
+#[test]
+fn a_change_on_a_far_patch_of_a_tiles_face_is_found_there() {
+    let (tile, hole) = ([0, 0, 0], [128, 64, 32]);
+    let empty = Topology::new();
+    let mut e = empty.edit();
+    for x in -1..17 {
+        for y in -1..17 {
+            for z in -1..17 {
+                let o = [8 * x, 8 * y, 8 * z];
+                let in_tile = o.iter().all(|c| (0..128).contains(c));
+                if !in_tile && o != hole {
+                    e.activate(o).unwrap();
+                }
+            }
+        }
+    }
+    e.add_tile(TileLevel::Upper, tile).unwrap();
+    let topology = e.commit().unwrap().0;
+    let inside = |v: Coord| v.iter().all(|c| (-7..136).contains(c));
+    let mut signs = Field::new(&topology, 0_u8);
+    let none = |t: &Topology| Crossings {
+        fraction: Field::new(t, NO_CROSSING.0),
+        normal: Field::new(t, NO_CROSSING.1),
+        group: Field::new(t, NO_CROSSING.2),
+    };
+    let mut axes = [none(&topology), none(&topology), none(&topology)];
+    for n in topology.leaf_numbers() {
+        let voxels: Vec<Coord> = topology.leaf_voxels(n).unwrap().collect();
+        for (s, v) in signs.leaf_mut(&topology, n).unwrap().iter_mut().zip(&voxels) {
+            *s = u8::from(inside(*v));
+        }
+        for (axis, c) in axes.iter_mut().enumerate() {
+            for (i, v) in voxels.iter().enumerate() {
+                if inside(*v) == inside(plus(*v, step(axis))) {
+                    continue;
+                }
+                let mut normal = [0.0_f32; 3];
+                normal[axis] = if inside(*v) { 1.0 } else { -1.0 };
+                c.fraction.leaf_mut(&topology, n).unwrap()[i] = 0.5;
+                c.normal.leaf_mut(&topology, n).unwrap()[i] = normal;
+            }
+        }
+    }
+    let t = topology.tile_numbers().next().unwrap();
+    signs.set_tile(&topology, t, 1).unwrap();
+    let p = Parts { topology, signs, axes, names: Vec::new() };
+    assert_eq!(rule(p.make()), Ok((Some([127, 64, 32]), Some(0), Rule::Owner)));
 }
 
 #[test]
