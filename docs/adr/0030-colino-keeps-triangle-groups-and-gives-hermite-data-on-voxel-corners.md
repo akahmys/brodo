@@ -1,6 +1,6 @@
 # ADR-0030: colino keeps triangle groups and gives Hermite data on voxel corners
 
-- **Status**: Accepted
+- **Status**: Amended
 - **Date**: 2026-10-20
 
 ## Context
@@ -118,3 +118,19 @@ between an edge and a triangle.
   - an open mesh counts its edges with no triangle hit.
 - Two things wait for a user's request: a table in the cache file, and every crossing
   along an edge.
+
+## Amendment
+
+- **Date**: 2026-10-22
+
+The record left the API's shape and the cache file's grid names open. The human decided:
+
+- `colino::hermite::hermite(mesh, &Converted, accuracy)` returns a `Hermite` or a
+  `HermiteError`. `Hermite` holds `signs`, a `Field<u8>`; `axes`, three `Crossings`, for
+  x, y and z; and `unhit`, the count of crossed edges with no triangle hit. `Crossings`
+  holds `fraction`, a `Field<f32>`; `normal`, a `Field<[f32; 3]>`; and `group`, a
+  `Field<u32>`. Every field lies on the conversion's topology, under its `GridMeta`.
+- `Hermite::entries(&meta)` gives the ten `CacheEntry`s, named `sign`, then `x.fraction`,
+  `x.normal`, `x.group`, and the same for `y` and `z`, in that order; the rest of each
+  entry's metadata is `meta`'s. The names are part of colino's API, held by a Format-tier
+  test against a committed file.
