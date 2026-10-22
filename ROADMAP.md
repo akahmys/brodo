@@ -11,11 +11,12 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
 - **Done**: R11 but its fuzz round: groups read from OBJ, STL and 3MF (ADR-0030); Hermite
   data as a brodo format (ADR-0032); `colino::intersect`, watertight in `f64`; and
   `colino::hermite`, ADR-0030's acceptance tests passing (2026-10-22).
-- **Next**: P3's close (§2): the fuzz round, structured targets seeded from the golden
-  files (TESTING.md §3), Miri, benchmarks and the mutation run, in which why the two
-  `Winding::approximate` mutants that loop for ever passed 60 s without a failed test
-  (2026-10-22) is found out. The retrospective's five proposals were decided and landed.
-- **Unresolved problems**: Miri's Stacked Borrows reports undefined behaviour in
+- **Next**: P3's mutation run, in which why the two `Winding::approximate` mutants that
+  loop for ever passed 60 s without a failed test (2026-10-22) is found out; then its
+  acceptance and version 0.4.0.
+- **Unresolved problems**: `cache_map_x256` runs 8 to 10 % behind its baseline of
+  2026-10-17 at v0.3.0 and now alike, run in turn (2026-10-23); a first run straight after
+  the fuzz round and Miri failed at +13 %. Machine drift is the likely cause, not shown. Miri's Stacked Borrows reports undefined behaviour in
   `crossbeam-epoch` under rayon; Tree Borrows does not (ADR-0015), but Miri's nightly of
   2026-07-21 warns there of integer-to-pointer casts in `crossbeam-epoch` 0.9.21, which
   Tree Borrows does not support, so it may miss a bug past them (2026-10-20). The leaf-parallel
@@ -129,8 +130,9 @@ Scheduled by the human on 2026-10-22, from a user's request (§4, R11).
 - [x] Hermite data from a badly oriented mesh: refused where its sign changes beyond the
       band, counted as unhit within it (ADR-0030); B-016 is the fix
 - [x] Retrospective (ADR-0001, -0003, -0006, -0020) and refactoring
-- [ ] Fuzz round, the Hermite reader's target included; Miri run; benchmarks against their
-      baselines; mutation run (ADR-0023)
+- [x] Fuzz round, six targets 901 s each, structured ones seeded, no finding; Miri run, no
+      report; benchmarks within their baselines (2026-10-23)
+- [ ] Mutation run (ADR-0023)
 - [ ] **Accepted when** ADR-0030's acceptance tests pass and colino's Hermite data keeps
       to brodo's format
 
