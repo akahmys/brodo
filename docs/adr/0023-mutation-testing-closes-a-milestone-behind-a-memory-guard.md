@@ -74,3 +74,22 @@ A review found two gaps, and the human decided both.
   13 binaries, none of them the benchmark, which does. `--run` on `manifest.rs` passed
   again: 42 mutants in 7 minutes, the timeout 162 s from the command line's multiplier,
   every binary logged by the guard.
+
+## Amendment
+
+- **Date**: 2026-10-22 (slow mutants)
+
+P2's run found mutants that leave every result as it was but make a search exhaustive: a
+bounding-volume test that never prunes, a partition that never splits. Run again on a
+machine at rest, 33 of colino's and 3 of brodo's still timed out before any test failed,
+and T11 gave them no way to pass. The human decided:
+
+- `mutants.py --run --patient` runs again, under a timeout of 1800 s, only the mutants the
+  last report shows timing out before any test failed, chosen by name. One caught is
+  killed. One whose tests all pass is equivalent, only slower, and goes into
+  `.cargo/mutants.toml` with that reason. One still timing out fails the run. cargo-mutants'
+  `--re` lets a deleted struct field through whatever its name, so only the named count.
+- The run's verdict is the last report's missed mutants and the patient run's.
+
+Shown to fire on P2's run: of brodo's 3, one passed only slower and two still timed out;
+of colino's 33, 17 were caught, 14 passed only slower and two still timed out.

@@ -13,6 +13,12 @@ With `--run [ARGS…]`, the milestone-close run: `cargo mutants --workspace` beh
 missed, or when a mutant timed out before any test failed, since only a failed test shows
 that the timeout was the mutant's doing. ARGS go to cargo-mutants (`-f <file>`,
 `--iterate`). With `--report DIR`, the same verdict on a `mutants.out` already written.
+
+With `--run --patient`, the mutants the last report shows timing out before any test
+failed run again, alone, under `PATIENT_TIMEOUT` seconds each, into `out/mutants/patient`:
+one caught is killed; one whose tests all pass is only slower, and is listed in
+`.cargo/mutants.toml` as equivalent with that reason; one still timing out fails. The
+verdict is the last report's missed mutants and the patient run's (ADR-0023).
 """
 
 import json
@@ -37,6 +43,10 @@ JOBS = 2
 # Twice the unmutated suite's time: each mutant still running then had already failed a
 # test (ADR-0023).
 TIMEOUT_MULTIPLIER = "2.0"
+# The patient run's timeout, in seconds: long enough for a search made exhaustive, such as
+# a bounding-volume test that never prunes, to finish the suite (ADR-0023).
+PATIENT_TIMEOUT = "1800"
+PATIENT_OUT = ROOT / "out" / "mutants" / "patient"
 
 
 def patterns() -> tuple[list[str], list[str]]:
@@ -95,27 +105,72 @@ def host() -> str:
     return next(l.split()[1] for l in out.splitlines() if l.startswith("host:"))
 
 
-def run(args: list[str]) -> int:
+def mutants(args: list[str], out: Path) -> None:
+    """Runs cargo-mutants over the workspace behind the guard, writing to `out`."""
     tmp = ROOT / "target" / "mutants-tmp"
     shutil.rmtree(tmp, ignore_errors=True)
     tmp.mkdir(parents=True)
-    OUT.mkdir(parents=True, exist_ok=True)
-    log = OUT / "rss_guard.log"
+    out.mkdir(parents=True, exist_ok=True)
+    log = out / "rss_guard.log"
     log.unlink(missing_ok=True)
     env = dict(os.environ)
     env[f"CARGO_TARGET_{host().upper().replace('-', '_')}_RUNNER"] = str(GUARD)
     env["RSS_GUARD_MIB"] = str(GUARD_MIB)
     env["RSS_GUARD_LOG"] = str(log)
     env["TMPDIR"] = str(tmp)
-    subprocess.run(
-        ["cargo", "mutants", "--workspace", "-j", str(JOBS), "--timeout-multiplier",
-         TIMEOUT_MULTIPLIER, "-o", str(OUT), *args],
-        cwd=ROOT, env=env, check=False,
-    )
-    failures = verdict(OUT / "mutants.out")
+    subprocess.run(["cargo", "mutants", "--workspace", "-j", str(JOBS), "-o", str(out), *args],
+                   cwd=ROOT, env=env, check=False)
+
+
+def guarded(out: Path) -> list[str]:
+    log = out / "rss_guard.log"
     if not (log.exists() and log.read_text().strip()):
-        failures.append("  rss_guard.py logged nothing: the test binaries ran unguarded")
-    return report(failures)
+        return ["  rss_guard.py logged nothing: the test binaries ran unguarded"]
+    return []
+
+
+def run(args: list[str]) -> int:
+    if args[:1] == ["--patient"]:
+        return patient(args[1:])
+    mutants(["--timeout-multiplier", TIMEOUT_MULTIPLIER, *args], OUT)
+    return report(verdict(OUT / "mutants.out") + guarded(OUT))
+
+
+def escaped(name: str) -> str:
+    """A mutant's name as a regex matching it alone; a space needs no escape."""
+    return re.sub(r"([\\.+*?()|\[\]{}^$#&\-~])", r"\\\1", name)
+
+
+def patient(args: list[str]) -> int:
+    """The last report's unexplained timeouts, run again under `PATIENT_TIMEOUT`."""
+    last = OUT / "mutants.out"
+    missed = [f for f in verdict(last) if f.startswith("  missed")]
+    slow = timed_out(last)
+    if not slow:
+        return report(missed)
+    pattern = "^(" + "|".join(escaped(n) for n in slow) + ")$"
+    mutants(["--timeout", PATIENT_TIMEOUT, "--re", pattern, *args], PATIENT_OUT)
+    failures = []
+    outcomes = json.loads((PATIENT_OUT / "mutants.out" / "outcomes.json").read_text())
+    for o in outcomes["outcomes"]:
+        if o["scenario"] == "Baseline":
+            continue
+        name = o["scenario"]["Mutant"]["name"]
+        # `--re` lets a deleted struct field through, whatever its name: only the named count.
+        if name not in slow:
+            continue
+        if o["summary"] == "MissedMutant":
+            failures.append(f"  only slower, its tests passing: {name}")
+        elif o["summary"] == "Timeout":
+            failures.append(f"  still timing out after {PATIENT_TIMEOUT} s: {name}")
+    print(f"  {len(slow)} timeouts run again under {PATIENT_TIMEOUT} s")
+    return report(missed + failures + guarded(PATIENT_OUT))
+
+
+def timed_out(out: Path) -> list[str]:
+    """The mutants a report shows timing out before any test failed."""
+    prefix = "  timed out before any test failed: "
+    return [f.removeprefix(prefix) for f in verdict(out) if f.startswith(prefix)]
 
 
 def verdict(out: Path) -> list[str]:
