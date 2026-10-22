@@ -8,8 +8,8 @@ use zerocopy::{FromBytes, IntoBytes};
 use crate::error::FormatError;
 use crate::field::{LEAF_VOXELS, Value};
 use crate::frozen::{
-    BLOCK, Header, LowerNode, MAGIC, ROOT_NODE, ROOT_TILE, RootEntry, UpperNode, VERSION, local,
-    place,
+    BLOCK, Header, LOWER_PLACES, LowerNode, MAGIC, ROOT_NODE, ROOT_TILE, RootEntry, UPPER_PLACES,
+    UpperNode, VERSION, local, place,
 };
 use crate::tree::{Coord, TileLevel};
 
@@ -249,5 +249,149 @@ impl<'a, T: Value> GridView<'a, T> {
     /// A leaf's 512 values, x fastest.
     pub fn leaf(&self, n: u32) -> Result<&'a [T; LEAF_VOXELS], FormatError> {
         self.leaves.get(n as usize).ok_or(lost("leaf value"))
+    }
+
+    /// A tile's value, by its place among the view's tile values (`ViewLocation::Tile`).
+    pub(crate) fn tile_value(&self, i: u32) -> Result<T, FormatError> {
+        self.tiles.get(i as usize).copied().ok_or(lost("tile value"))
+    }
+
+    /// Whether `other` holds the same tree: its root table and nodes are the same bytes,
+    /// which do not depend on the value type (ADR-0032).
+    pub(crate) fn same_topology<U: Value>(&self, other: &GridView<'_, U>) -> bool {
+        self.roots.as_bytes() == other.roots.as_bytes()
+            && self.uppers.as_bytes() == other.uppers.as_bytes()
+            && self.lowers.as_bytes() == other.lowers.as_bytes()
+    }
+
+    /// Every leaf's origin, by leaf number, and every tile's level and origin with its
+    /// place among the tile values, found by walking the nodes.
+    pub(crate) fn regions(&self) -> Result<Regions, FormatError> {
+        let mut leaves = vec![None; self.leaves.len()];
+        let mut tiles = Vec::with_capacity(self.tiles.len());
+        for e in self.roots {
+            let key = e.key.map(|k| k.get());
+            if e.kind.get() == ROOT_TILE {
+                tiles.push((TileLevel::Root, key, e.index.get()));
+                continue;
+            }
+            let u = self.uppers.get(e.index.get() as usize).ok_or(lost("root"))?;
+            for p in 0..UPPER_PLACES {
+                let at = offset(key, unplace(p, 5), TileLevel::Upper.edge_log2());
+                if is_set(&u.tiles, p) {
+                    tiles.push((
+                        TileLevel::Upper,
+                        at,
+                        nth(u.first_tile, &u.tiles, p, "upper node")?,
+                    ));
+                }
+                if !is_set(&u.children, p) {
+                    continue;
+                }
+                let n = nth(u.first_child, &u.children, p, "upper node")?;
+                let l = self.lowers.get(n as usize).ok_or(lost("upper node"))?;
+                for q in 0..LOWER_PLACES {
+                    let leaf_at = offset(at, unplace(q, 4), TileLevel::Lower.edge_log2());
+                    if is_set(&l.tiles, q) {
+                        let i = nth(l.first_tile, &l.tiles, q, "lower node")?;
+                        tiles.push((TileLevel::Lower, leaf_at, i));
+                    }
+                    if is_set(&l.children, q) {
+                        let i = nth(l.first_child, &l.children, q, "lower node")?;
+                        *leaves.get_mut(i as usize).ok_or(lost("lower node"))? = Some(leaf_at);
+                    }
+                }
+            }
+        }
+        let leaves = leaves.into_iter().collect::<Option<Vec<_>>>().ok_or(lost("leaf value"))?;
+        Ok(Regions { leaves, tiles })
+    }
+}
+
+/// A view's leaves and tiles (`GridView::regions`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Regions {
+    /// Each leaf's origin, by leaf number.
+    pub(crate) leaves: Vec<Coord>,
+    /// Each tile's level and origin, with its place among the tile values.
+    pub(crate) tiles: Vec<(TileLevel, Coord, u32)>,
+}
+
+/// The local coordinates of Morton place `p` in a node of `2^bits` places a side: the
+/// inverse of `place`.
+fn unplace(p: usize, bits: u32) -> [u32; 3] {
+    let mut out = [0_u32; 3];
+    for b in 0..bits {
+        for (axis, c) in out.iter_mut().enumerate() {
+            *c |= u32::from((p >> (3 * b as usize + axis)) & 1 == 1) << b;
+        }
+    }
+    out
+}
+
+/// The origin of the child at local coordinates `l` of a node at `origin`, each child
+/// `2^child_log2` voxels a side.
+fn offset(origin: Coord, l: [u32; 3], child_log2: u32) -> Coord {
+    let mut out = origin;
+    for (o, c) in out.iter_mut().zip(l) {
+        *o = o.wrapping_add(c.cast_signed() << child_log2);
+    }
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::field::Field;
+    use crate::frozen::freeze;
+    use crate::topology::Topology;
+
+    /// Leaves and tiles of every level, in several root regions, some at negative
+    /// coordinates.
+    fn mixed() -> Topology {
+        let empty = Topology::new();
+        let mut e = empty.edit();
+        for v in [[0, 0, 0], [8, 0, 0], [-9, 130, 7], [5000, -4097, 64], [127, 127, 127]] {
+            e.activate(v).unwrap();
+        }
+        e.add_tile(TileLevel::Lower, [16, 0, 0]).unwrap();
+        e.add_tile(TileLevel::Upper, [128, 0, 0]).unwrap();
+        e.add_tile(TileLevel::Root, [0, 8192, 0]).unwrap();
+        e.add_tile(TileLevel::Root, [-8192, 0, 0]).unwrap();
+        e.commit().unwrap().0
+    }
+
+    #[test]
+    fn walking_a_view_finds_the_topologys_leaves_and_tiles() {
+        let t = mixed();
+        let frozen = freeze(&t, &Field::new(&t, 0_u8)).unwrap();
+        let view = frozen.view::<u8>().unwrap();
+        let r = view.regions().unwrap();
+        let leaves: Vec<Coord> = t.leaf_numbers().map(|n| t.leaf_origin(n).unwrap()).collect();
+        assert_eq!(r.leaves, leaves);
+        let mut tiles: Vec<(TileLevel, Coord)> = r.tiles.iter().map(|(l, o, _)| (*l, *o)).collect();
+        let mut want: Vec<(TileLevel, Coord)> =
+            t.tile_numbers().map(|n| t.tile(n).unwrap()).collect();
+        tiles.sort_by_key(|(_, o)| *o);
+        want.sort_by_key(|(_, o)| *o);
+        assert_eq!(tiles, want);
+        for (level, o, i) in &r.tiles {
+            assert_eq!(view.locate(*o).unwrap(), ViewLocation::Tile(*i, *level), "at {o:?}");
+        }
+    }
+
+    #[test]
+    fn views_of_one_topology_share_it_whatever_their_type() {
+        let t = mixed();
+        let a = freeze(&t, &Field::new(&t, 0_u8)).unwrap();
+        let b = freeze(&t, &Field::new(&t, [1.0_f32; 3])).unwrap();
+        let mut e = t.edit();
+        e.activate([300, 0, 0]).unwrap();
+        let other = e.commit().unwrap().0;
+        let c = freeze(&other, &Field::new(&other, 0_u8)).unwrap();
+        let (a, b, c) =
+            (a.view::<u8>().unwrap(), b.view::<[f32; 3]>().unwrap(), c.view::<u8>().unwrap());
+        assert!(a.same_topology(&b));
+        assert!(!a.same_topology(&c));
     }
 }

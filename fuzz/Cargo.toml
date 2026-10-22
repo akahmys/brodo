@@ -53,3 +53,9 @@ path = "fuzz_targets/threemf.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "hermite"
+path = "fuzz_targets/hermite.rs"
+test = false
+doc = false

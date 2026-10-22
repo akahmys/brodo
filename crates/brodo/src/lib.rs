@@ -11,6 +11,7 @@ pub mod field;
 pub mod frozen;
 pub mod gather;
 pub mod grid;
+pub mod hermite;
 pub mod manifest;
 mod mapping;
 pub mod meta;

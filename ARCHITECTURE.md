@@ -16,6 +16,7 @@ own and knows nothing of its users.
 | a shape kernel | building, combining and offsetting level sets | tiles, random access, dilation and pruning |
 | a process exchanging fields | passing grids between processes | a zero-copy, memory-mappable file |
 | `colino` | converting and checking outside shapes | flood fill, connected components, Euler characteristic |
+| a producer of Hermite data, such as one building from analytic shapes, and a reader building cut cells | writing and reading signs and edge crossings without knowing each other | the Hermite data format (§4.9) |
 | a developer or agent checking a change | seeing a field | a slice as PNG, a field for ParaView (§6.1) |
 | a process inspecting grids | viewing a grid file as an external program | `piatto`'s program (§6.2) |
 | an application with its own interface | showing grids inside it | `piatto`'s drawing library (§6.2) |
@@ -33,7 +34,7 @@ a discretisation, its user's.
 
 | Crate | Contents |
 | :--- | :--- |
-| `brodo` | The sparse tree, `Topology`, `Field<T>`, `Grid<T>`, topology editing and `Remap`, `LeafManifest`, `ValueAccessor`, leaf-parallel updates and gather, topology analysis, `GridView`, the file profiles, OpenVDB files, checking output (slice PNG, VTK) |
+| `brodo` | The sparse tree, `Topology`, `Field<T>`, `Grid<T>`, topology editing and `Remap`, `LeafManifest`, `ValueAccessor`, leaf-parallel updates and gather, topology analysis, `GridView`, the file profiles, the Hermite data format, OpenVDB files, checking output (slice PNG, VTK) |
 | `colino` | Meshes to narrow-band SDFs on brodo's tree, and the topology report |
 | `piatto` | A viewer of cache-profile files, as a library and a thin windowed program; built after P1 (ADR-0018) |
 
@@ -244,6 +245,35 @@ brodo's `Value` trait: `Copy`, `Send` and `Sync`, with a comparison by bits for 
 rules, and `zerocopy`'s traits from `freeze` on (§4.6). Each is named in frozen grids and
 cache files by a type code brodo assigns, 1 to 6 in that order.
 
+### 4.9 Hermite data (ADR-0032)
+
+A format any producer writes and any reader reads without knowing the producer: a sign at
+each lattice point and, on each edge whose ends differ, where a surface crosses it, its
+normal there and its group (Ju et al. 2002). The producer's methods are its own; colino's
+are in ADR-0030.
+
+- Lattice: point v at the corner of voxel v, the image of v under the grid's transform,
+  the sampling lattice of an SDF on the same topology shifted by −h/2. Point v owns its
+  +x, +y and +z edges.
+- A set, `brodo::hermite::Hermite`, is ten fields on one topology: signs (`u8`, 1 inside,
+  0 outside), and per axis a fraction (`f32`), a normal (`[f32; 3]`) and a group (`u32`),
+  with a table naming each group, group 0 `""`.
+- An edge has a crossing exactly when the stored signs of its ends differ, tiles' and the
+  background's included; its owner is then a leaf point. The fraction is the crossing's
+  place from the edge's lower end, in [0, 1]; the normal is of unit length within 1e-6,
+  its component along the edge, where not zero, pointing from the inside end outward. An
+  edge with no crossing, every tile and the background hold fraction −1, normal zero and
+  group 0, by bits; the signs' background is 0.
+- A set is checked whole when made and when read; a broken rule is a typed error naming
+  the point, the axis and the rule.
+- In a cache file, a set is ten grids told apart by keys in `GridMeta::extra`:
+  `hermite.version` (1), `hermite.set` and `hermite.field`; the sign grid holds the group
+  table as `hermite.group.<id>`. The ten agree in voxel size, unit and transform. A reader
+  accepts its own version only and reads a set as ten `GridView`s, without a copy, the
+  shared topology checked by comparing their node sections.
+- A producer's own information, such as edges it found no surface for, is not in the
+  format; it reports it beside the set.
+
 ## 5. `colino` (ADR-0017)
 
 ### 5.1 Conversion
@@ -267,6 +297,9 @@ cache files by a type code brodo assigns, 1 to 6 in that order.
   signed distances clamped to ±N·h; negative tiles inside, each region classified once,
   from the root region down; the positive background outside. No dense grid: memory follows
   the band's volume, at 3000³ resolution as well.
+- Hermite data: a set in brodo's format (§4.9) on the conversion's topology, its signs
+  the winding number's and its crossings found by a watertight edge test, with the count
+  of crossed edges no triangle was hit on beside it (ADR-0030); built with R11.
 - It reports changes; it does not repair a shape or refine a grid.
 
 ### 5.2 Topology report

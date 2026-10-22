@@ -1,6 +1,6 @@
 # ADR-0032: Hermite data is a brodo format that any producer writes
 
-- **Status**: Accepted
+- **Status**: Amended
 - **Date**: 2026-10-22
 
 ## Context
@@ -95,3 +95,17 @@ for the points it left open.
   (TESTING.md T3), and a Format-tier test against a committed file.
 - R11's fuzz round and `colino::intersect` do not wait for this record; `colino::hermite`
   does.
+
+## Amendment
+
+- **Date**: 2026-10-22
+
+Three details of the format were left to its implementation. The owner decided:
+
+- The group table's ids run from 1 with no gap; each name is non-empty and differs from
+  the others, since a group is known by its name (ADR-0030).
+- A set's ten grids agree in voxel size, unit and transform; their names, and keys outside
+  `hermite.`, are free.
+- A normal is of unit length when its length differs from 1 by no more than 1e-6. A unit
+  `f64` vector rounded to `f32` errs by about 1e-7.
+

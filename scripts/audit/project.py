@@ -22,6 +22,7 @@ APPLICATIONS = []
 # is fuzzed (TESTING.md T6). A module is listed in the commit that creates it (ADR-0009).
 UNTRUSTED_INPUT = [
     "crates/brodo/src/cache.rs",
+    "crates/brodo/src/hermite.rs",
     "crates/brodo/src/view.rs",
     "crates/colino/src/obj.rs",
     "crates/colino/src/stl.rs",

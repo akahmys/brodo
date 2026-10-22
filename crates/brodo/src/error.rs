@@ -205,6 +205,80 @@ pub enum CacheError {
     TooLarge,
 }
 
+/// Which rule of the Hermite data format a set breaks (ADR-0032).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Rule {
+    /// A sign other than 0 or 1, or a background sign other than 0.
+    Sign,
+    /// An edge with no crossing, a tile or a background holding other than `NO_CROSSING`.
+    NoCrossing,
+    /// A crossing's fraction outside [0, 1].
+    Fraction,
+    /// A crossing's normal not of unit length.
+    NormalLength,
+    /// A crossing's normal pointing from the outside end to the inside end.
+    NormalInward,
+    /// A crossing's group with no name in the table.
+    UnnamedGroup,
+    /// Signs that differ across an edge whose owner is not a leaf point.
+    Owner,
+}
+
+/// Why a set of Hermite data was refused (ARCHITECTURE.md §4.9, ADR-0032).
+#[derive(Debug, thiserror::Error)]
+pub enum HermiteError {
+    /// A field refused an access.
+    #[error(transparent)]
+    Field(#[from] FieldError),
+    /// The topology refused a lookup by number.
+    #[error(transparent)]
+    Tree(#[from] TreeError),
+    /// The cache file refused a read, or an entry could not be made.
+    #[error(transparent)]
+    Cache(#[from] CacheError),
+    /// A frozen grid refused a read.
+    #[error(transparent)]
+    Format(FormatError),
+    /// The set breaks a rule of the format, at a point, on an axis's edge, or at the
+    /// background when neither is given.
+    #[error("{rule:?} broken at {at:?}, axis {axis:?}")]
+    Violation {
+        /// The point, or the tile's origin; none for the background.
+        at: Option<Coord>,
+        /// The axis of the edge, when an edge's values break it.
+        axis: Option<usize>,
+        /// The rule broken.
+        rule: Rule,
+    },
+    /// A field of the set is on another topology.
+    #[error("the {0} field is on another topology")]
+    OtherTopology(&'static str),
+    /// A grid of the set differs from the sign grid in voxel size, unit or transform.
+    #[error("the {0} grid's voxel size, unit or transform differs from the sign grid's")]
+    OtherMeta(&'static str),
+    /// A field of the set is not in the file.
+    #[error("no {0} grid in the set")]
+    Missing(&'static str),
+    /// A field of the set is in the file twice.
+    #[error("two {0} grids in the set")]
+    Twice(&'static str),
+    /// A grid names a field the format does not.
+    #[error("a grid names field {0:?}, which the format does not")]
+    UnknownField(String),
+    /// A grid states a format version this build does not read.
+    #[error("format version {0:?} is not read by this build")]
+    Version(String),
+    /// A group's name is empty, repeated, or missing from the ids' run, or group 0 is named.
+    #[error("group {0} has no name of its own")]
+    BadGroupName(u32),
+    /// A group key whose id is not a number from 1 written plainly.
+    #[error("bad group key {0:?}")]
+    BadGroupKey(String),
+    /// The metadata given for the entries already holds a key of the format.
+    #[error("the metadata already holds the format's key {0:?}")]
+    ReservedKey(String),
+}
+
 /// Why a slice could not be drawn or encoded (ARCHITECTURE.md §6.1).
 #[derive(Debug, thiserror::Error)]
 pub enum SliceError {

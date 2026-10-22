@@ -17,6 +17,10 @@ are recorded here when they change (V6).
   has none (ADR-0030).
 - `colino::threemf::read` reads each object holding a mesh as a group, named by its `name`,
   else its `id` as written; every placement shares it (ADR-0030).
+- `brodo::hermite::{Hermite, Crossings, HermiteView, CrossingsView}`: Hermite data as a
+  format any producer writes, checked whole when made and read, written to a cache file as
+  ten grids told apart by `hermite.` keys in `GridMeta::extra`, format version 1
+  (ADR-0032); `brodo::error::{HermiteError, Rule}`.
 
 ## 0.3.0 (2026-10-22)
 

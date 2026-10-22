@@ -25,6 +25,7 @@ papers, public documentation and permissively licensed code (S1, S2) may appear 
 | `crates/brodo/src/gather.rs` | ARCHITECTURE.md §4.4, ADR-0015 only | the gather of a leaf and one, two or three ghost layers |
 | `crates/brodo/src/field.rs` | ARCHITECTURE.md §4.2, ADR-0014 only | fields: the `Value` trait, values by leaf and tile number, the stamp check, the remap and merge rules |
 | `crates/brodo/src/grid.rs` | ARCHITECTURE.md §4.2, ADR-0014 only | a grid: one topology and one field, edited in one step |
+| `crates/brodo/src/hermite.rs` | ARCHITECTURE.md §4.9, ADR-0032; Ju, Losasso, Schaefer and Warren (2002), *Dual Contouring of Hermite Data*, for Hermite data as signs on a lattice and a crossing and normal on each edge whose ends differ | the Hermite data format: a set of ten fields, its check, its cache entries and its reading in place |
 | `crates/brodo/src/lib.rs` | none | crate root |
 | `crates/brodo/src/manifest.rs` | ARCHITECTURE.md §4.3, ADR-0014 only | the leaf manifest: 26 directions and each leaf's neighbours |
 | `crates/brodo/src/mapping.rs` | ARCHITECTURE.md §4.7, ADR-0008 only; `memmap2`'s public API documentation (0.9.11) | mapping a file read-only: brodo's one unsafe operation |
@@ -32,7 +33,7 @@ papers, public documentation and permissively licensed code (S1, S2) may appear 
 | `crates/brodo/src/morphology.rs` | ARCHITECTURE.md §4.5, ADR-0025 only; dilation and erosion by a structuring element as textbook material | dilation and erosion of a topology on whole leaves, and of values by a max or min filter |
 | `crates/brodo/src/parallel.rs` | ARCHITECTURE.md §4.4, ADR-0015 only | the leaf-parallel update and the fixed-order reduction |
 | `crates/brodo/src/topology.rs` | ARCHITECTURE.md §4.2, ADR-0014 only; Morton order as bit interleaving | topologies: stamps, Morton numbering, the editor, `Remap` |
-| `crates/brodo/src/view.rs` | ARCHITECTURE.md §4.6, ADR-0016 only; `zerocopy`'s public API documentation (0.8.63) | `GridView`: checking a frozen grid whole and reading it in place |
+| `crates/brodo/src/view.rs` | ARCHITECTURE.md §4.6, ADR-0016, ADR-0032 only; `zerocopy`'s public API documentation (0.8.63) | `GridView`: checking a frozen grid whole, reading it in place, and walking its leaves and tiles |
 | `crates/brodo/src/slice.rs` | ARCHITECTURE.md §6.1, ADR-0018 only; `png`'s public API documentation (0.18.1) | a slice of a scalar field drawn and encoded as PNG |
 | `crates/brodo/src/vtk.rs` | ARCHITECTURE.md §6.1, ADR-0018 only; VTK's published XML file-format documentation, its `NumberOfComponents` and `Vectors` included; VTK_VOXEL's number from VTK's public Python API | a field, scalar or of three components, written as one ASCII `.vtu` of voxel cells |
 | `crates/brodo/src/tree.rs` | ARCHITECTURE.md §4.1, ADR-0013 only | the sparse tree: levels, masks, arenas, activation, tiles, their split and merge, iteration, compaction |
