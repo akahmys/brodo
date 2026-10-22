@@ -22,6 +22,9 @@ are recorded here when they change (V6).
   format any producer writes, checked whole when made and read, written to a cache file as
   ten grids told apart by `hermite.` keys in `GridMeta::extra`, format version 1
   (ADR-0032); `brodo::error::{HermiteError, Rule}`.
+- `colino::intersect::{crossing, nearest}`: where a segment crosses a triangle, by Woop et
+  al.'s watertight test in `f64` with ties decided exactly, and the point of a segment
+  nearest a triangle; `Bvh::near_segment` and `Bvh::corners` (ADR-0030).
 
 ## 0.3.0 (2026-10-22)
 

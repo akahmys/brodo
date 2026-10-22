@@ -6,6 +6,7 @@ pub mod bvh;
 pub mod convert;
 pub mod distance;
 pub mod error;
+pub mod intersect;
 pub mod mesh;
 pub mod obj;
 pub mod report;

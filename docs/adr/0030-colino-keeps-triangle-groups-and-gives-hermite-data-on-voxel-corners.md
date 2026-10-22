@@ -150,3 +150,30 @@ watertight test, the tie rule, edges no triangle hit and their count, the degene
 check and its cache entries are brodo's, set apart by `extra` keys rather than fixed grid
 names, and colino's `hermite` returns brodo's set with its `unhit` count beside it.
 
+## Amendment
+
+- **Date**: 2026-10-22
+
+Woop et al. compute in `f32` and, where an edge value is exactly 0, recompute its two
+products in `f64`, which holds a product of two `f32`s exactly; their §3.1 shows the rest
+of the test watertight because rounding keeps the order of two products. colino computes
+in `f64` (above), where no wider type holds a product exactly. The human decided:
+
+- An edge value whose two products round equal is decided by their rounding errors, each
+  found exactly by a fused multiply-add (`f64::mul_add`, rounded once by IEEE 754); where
+  the products are so small that their errors may not be exact, the value is 0 and the
+  edge counts as hit, as the paper counts a 0.
+- A test compares the sign with exact `i128` arithmetic on integer coordinates, where
+  products tie.
+- Computing in `f32`, as the paper does, was set aside: vertices rounded to `f32` could
+  not give crossings exact to `f32` rounding. Counting every 0 as a hit, with no
+  recomputation, was set aside as further from the paper.
+
+Since the lattice's edges are parallel to an axis, the paper's shear is zero. Across an
+edge, moving a corner by the edge's start keeps the sign of each coordinate, so a triangle
+whose box misses the edge's is never hit there. Along it, rounding can put a hit one ulp
+past the edge's end: of 200 000 triangles drawn in the plane one ulp beyond an edge of
+length 1, 737 were hit (2026-10-22). The search for a triangle widens an edge's box by the
+translation's rounding, which keeps them, as the paper widens its boxes
+(§3.3).
+

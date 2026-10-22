@@ -10,12 +10,13 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
 
 - **Done**: R11's first steps: `Mesh` holds a group per triangle, read from OBJ's `g` and
   `o`, ASCII STL's solids and 3MF's objects (ADR-0030); Hermite data is a brodo format
-  any producer writes, `brodo::hermite`, with its check, cache entries and reading in
-  place (ADR-0032), and a fuzz target for its reader.
-- **Next**: `colino::intersect`, then `colino::hermite` producing `brodo::hermite`'s set,
-  with ADR-0030's acceptance tests; a fuzz round for the three mesh readers and the
-  Hermite reader; with the groups read, colino's README says a B-rep's face names travel
-  in `groups` and `group_names` (ADR-0031).
+  any producer writes, `brodo::hermite` (ADR-0032); `colino::intersect`, Woop et al.'s
+  watertight test in `f64` with ties decided exactly, and a segment's nearest point
+  (ADR-0030, amended 2026-10-22).
+- **Next**: `colino::hermite` producing `brodo::hermite`'s set, with ADR-0030's acceptance
+  tests; a fuzz round for the three mesh readers and the Hermite reader; with the groups
+  read, colino's README says a B-rep's face names travel in `groups` and `group_names`
+  (ADR-0031).
 - **Unresolved problems**: Miri's Stacked Borrows reports undefined behaviour in
   `crossbeam-epoch` under rayon; Tree Borrows does not (ADR-0015), but Miri's nightly of
   2026-07-21 warns there of integer-to-pointer casts in `crossbeam-epoch` 0.9.21, which

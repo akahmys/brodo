@@ -183,4 +183,49 @@ impl Bvh {
         }
         best.map(|(d, i)| (d.sqrt(), i))
     }
+
+    /// The triangles whose boxes meet the box of the segment from `a` to `b`, in ascending
+    /// order. The box is widened by twice the rounding of moving a corner by `a`, as the
+    /// crossing test does, so that no triangle it would hit is left out (ADR-0030).
+    pub fn near_segment(&self, a: Point, b: Point) -> Vec<u32> {
+        let root = self.nodes.first().map_or(Aabb::EMPTY, |n| n.bounds);
+        let reach = root
+            .lo
+            .iter()
+            .chain(&root.hi)
+            .chain(&a)
+            .chain(&b)
+            .fold(0.0_f64, |m, c| if c.is_finite() { m.max(c.abs()) } else { m });
+        let margin = 4.0 * f64::EPSILON * reach;
+        let query = Aabb::EMPTY.grow(a).grow(b);
+        let query = Aabb { lo: query.lo.map(|c| c - margin), hi: query.hi.map(|c| c + margin) };
+        let meets = |x: &Aabb| (0..3).all(|k| x.lo[k] <= query.hi[k] && query.lo[k] <= x.hi[k]);
+        let mut out = Vec::new();
+        let mut stack = vec![0_usize];
+        while let Some(id) = stack.pop() {
+            let Some(node) = self.nodes.get(id) else { continue };
+            if !meets(&node.bounds) {
+                continue;
+            }
+            if node.children != 0 {
+                stack.extend([node.children, node.children + 1]);
+                continue;
+            }
+            for i in self.order.get(node.first..node.first + node.count).unwrap_or(&[]) {
+                let Some(t) = self.corners.get(usize::try_from(*i).unwrap_or(usize::MAX)) else {
+                    continue;
+                };
+                if meets(&t.iter().fold(Aabb::EMPTY, |x, p| x.grow(*p))) {
+                    out.push(*i);
+                }
+            }
+        }
+        out.sort_unstable();
+        out
+    }
+
+    /// Triangle `i`'s corners.
+    pub fn corners(&self, i: u32) -> Option<[Point; 3]> {
+        self.corners.get(usize::try_from(i).ok()?).copied()
+    }
 }

@@ -40,6 +40,7 @@ papers, public documentation and permissively licensed code (S1, S2) may appear 
 | `crates/colino/src/bvh.rs` | ARCHITECTURE.md §5.1, ADR-0027; a bounding volume hierarchy split at the median, as textbook material | a tree of axis-aligned boxes over a mesh's triangles, and the nearest triangle to a point |
 | `crates/colino/src/convert.rs` | ARCHITECTURE.md §5.1, ADR-0027 only | a mesh converted into a narrow-band signed distance field, with inside tiles |
 | `crates/colino/src/distance.rs` | ARCHITECTURE.md §5.1, ADR-0027; the nearest point of a triangle by its Voronoi regions, as textbook material | the nearest point of a segment and of a triangle |
+| `crates/colino/src/intersect.rs` | ARCHITECTURE.md §5.1, ADR-0030; Woop, Benthin and Wald (2013), *Watertight Ray/Triangle Intersection*, JCGT 2(1), for the sheared 2D edge test and its tie rule; the nearest points of two segments by their stationary point and clamped sides, as textbook material | where a segment crosses a triangle, watertight, and the point of a segment nearest a triangle |
 | `crates/colino/src/lib.rs` | none | crate root |
 | `crates/colino/src/error.rs` | none | the crate's error types |
 | `crates/colino/src/mesh.rs` | ARCHITECTURE.md §5.1, ADR-0026 only | the mesh type, reading limits, and welding by exact position |
