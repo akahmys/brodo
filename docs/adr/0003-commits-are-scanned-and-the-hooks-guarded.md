@@ -49,3 +49,13 @@ directories on its own. They were listed once, as `OUTPUT_DIRS` in
 when one of them is missing from `.gitignore` or from `.betterleaks.toml`'s allow-list.
 Removing `out/` from the allow-list, and `/target/` from `.gitignore`, each failed it.
 
+## Amendment (2026-10-22): pushing `main` and version tags
+
+The guard blocked every `git push` until the human decided the repository had a remote. It
+has one, `origin`, and the owner decided that an agent pushes what the gate has passed:
+`git push origin` with `main` and tags of the form `vX.Y.Z` (TESTING.md V4), and nothing
+else. A push with any option (`--force`, `--delete`, `--mirror`, `--all`, `--tags`), a
+`+` forcing a ref, a `:` naming another, another remote or another ref stays blocked, as
+does a bare `git push`. Shown to fire: each blocked form was refused by the hook and each
+allowed one passed, by feeding it the tool call's JSON.
+

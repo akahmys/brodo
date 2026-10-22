@@ -3,7 +3,8 @@
 
 It stops what would get round the commit hooks or leave the machine (AUDITING.md §2):
 `--no-verify` or `-n` on a commit, any change to `core.hooksPath` other than installing
-the hooks, and `git push`, until the human decides the repository has a remote.
+the hooks, and every `git push` but one with no option to `origin` of `main` and version
+tags `vX.Y.Z` (ADR-0003).
 
 Only a git invocation is read: once heredoc bodies and quoted strings are removed, a
 segment of the command, split at `;`, `&`, `|` and line ends, whose first word is `git`.
@@ -23,9 +24,17 @@ BLOCKED = [
      "skipping the commit hooks"),
     (re.compile(r"core\.hookspath(?!\s+scripts/hooks\s*$)", re.IGNORECASE),
      "changing core.hooksPath"),
-    (re.compile(r"^(\s+(-C\s+\S+|-c\s+\S+|--\S+))*\s+push\b"),
-     "git push: pushing is the human's to do"),
 ]
+PUSH = re.compile(r"^(\s+(-C\s+\S+|-c\s+\S+|--\S+))*\s+push\b(.*)$", re.DOTALL)
+# What may be pushed: the main branch and version tags, by name, to origin.
+PUSHABLE = re.compile(r"^(main|v\d+\.\d+\.\d+)$")
+
+
+def push_allowed(rest: str) -> bool:
+    """Whether the words after `push` are `origin` and one or more pushable refs, with no
+    option, no `+` forcing a ref and no `:` naming another."""
+    words = rest.split()
+    return len(words) >= 2 and words[0] == "origin" and all(PUSHABLE.match(w) for w in words[1:])
 
 
 HEREDOC = re.compile(r"<<-?\s*(['\"]?)(\w+)\1[^\n]*\n.*?\n\s*\2\s*(?=\n|$)", re.DOTALL)
@@ -43,11 +52,14 @@ def main() -> int:
         invocation = GIT.match(segment)
         if not invocation:
             continue
-        for pattern, what in BLOCKED:
-            if pattern.search(invocation.group(1)):
-                print(f"Blocked by scripts/hooks/claude_guard.py: {what}. Ask the human.",
-                      file=sys.stderr)
-                return 2
+        found = [what for pattern, what in BLOCKED if pattern.search(invocation.group(1))]
+        push = PUSH.match(invocation.group(1))
+        if push and not push_allowed(push.group(3)):
+            found.append("git push other than origin's main and version tags, with no option")
+        if found:
+            print(f"Blocked by scripts/hooks/claude_guard.py: {found[0]}. Ask the human.",
+                  file=sys.stderr)
+            return 2
     return 0
 
 

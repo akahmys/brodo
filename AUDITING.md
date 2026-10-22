@@ -71,7 +71,8 @@ break the rule once and watch the step fail (TESTING.md T3).
 **Getting round the hooks.** The audit fails while `core.hooksPath` is not `scripts/hooks`.
 In Claude Code, [`.claude/settings.json`](.claude/settings.json) runs
 `scripts/hooks/claude_guard.py` before every shell command, which blocks skipping the
-hooks, a change to `core.hooksPath`, and pushing. A command written another way can pass
+hooks, a change to `core.hooksPath`, and every push but `git push origin` of `main` and
+version tags `vX.Y.Z`, with no option (ADR-0003). A command written another way can pass
 the guard; the history scan is the backstop.
 
 **Forbidden sources.** The same file runs `scripts/hooks/provenance_guard.py` before every
