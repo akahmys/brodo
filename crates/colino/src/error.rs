@@ -198,6 +198,23 @@ pub enum ConvertError {
     OutOfRange,
 }
 
+/// Why Hermite data could not be made (ADR-0030).
+#[derive(Debug, thiserror::Error)]
+pub enum HermiteError {
+    /// The mesh names a vertex it lacks, or its groups do not fit it.
+    #[error(transparent)]
+    Mesh(#[from] MeshError),
+    /// A field refused a read or write.
+    #[error(transparent)]
+    Field(#[from] brodo::error::FieldError),
+    /// The set broke brodo's format (ADR-0032), which colino's own checks should prevent.
+    #[error(transparent)]
+    Format(#[from] brodo::error::HermiteError),
+    /// The grid's transform is not the axis-aligned one conversion writes.
+    #[error("the grid's transform is not axis-aligned with positive voxel sizes")]
+    Transform,
+}
+
 /// Why a topology report could not be made.
 #[derive(Debug, Clone, PartialEq, thiserror::Error)]
 pub enum ReportError {

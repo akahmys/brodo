@@ -8,16 +8,17 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: R11's first steps: `Mesh` holds a group per triangle, read from OBJ's `g` and
-  `o`, ASCII STL's solids and 3MF's objects (ADR-0030); Hermite data is a brodo format
-  any producer writes, `brodo::hermite` (ADR-0032); `colino::intersect`, Woop et al.'s
-  watertight test in `f64` with ties decided exactly, and a segment's nearest point
-  (ADR-0030, amended 2026-10-22).
-- **Next**: `colino::hermite` producing `brodo::hermite`'s set, with ADR-0030's acceptance
-  tests; a fuzz round for the three mesh readers and the Hermite reader; with the groups
-  read, colino's README says a B-rep's face names travel in `groups` and `group_names`
-  (ADR-0031).
-- **Unresolved problems**: Miri's Stacked Borrows reports undefined behaviour in
+- **Done**: R11 but its fuzz round: groups read from OBJ, STL and 3MF (ADR-0030); Hermite
+  data as a brodo format (ADR-0032); `colino::intersect`, watertight in `f64`; and
+  `colino::hermite`, ADR-0030's acceptance tests passing (2026-10-22).
+- **Next**: an answer on badly oriented meshes (below); a fuzz round for the three mesh
+  readers and the Hermite reader, 900 s each (TESTING.md T6).
+- **Unresolved problems**: Hermite data from a badly oriented mesh can break brodo's
+  format: with one face of a cube turned in, the winding number's 1/2 reaches inside the
+  cube beyond the band, so signs differ across an edge no leaf point owns, and `hermite`
+  refuses with the format's `Owner` violation (2026-10-22). ADR-0030's claim that every
+  crossed edge's owner is a leaf holds where the signs change near the mesh; which way to
+  go is the owner's. Miri's Stacked Borrows reports undefined behaviour in
   `crossbeam-epoch` under rayon; Tree Borrows does not (ADR-0015), but Miri's nightly of
   2026-07-21 warns there of integer-to-pointer casts in `crossbeam-epoch` 0.9.21, which
   Tree Borrows does not support, so it may miss a bug past them (2026-10-20). The leaf-parallel

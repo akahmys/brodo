@@ -285,8 +285,8 @@ are in ADR-0030.
   tolerance. A 3MF package is read through `rawzip`, `miniz_oxide` and `quick-xml`, its
   model as a stream; the mesh holds every build item placed by its transforms. STEP and
   other boundary representations are not read: a user working with B-reps triangulates
-  with its own kernel and passes a `Mesh`, its faces' names as triangle groups once those
-  are built (ADR-0030, ADR-0031).
+  with its own kernel and passes a `Mesh`, its faces' names as triangle groups (ADR-0030,
+  ADR-0031).
 - Grid: the caller's voxel size, on the world's lattice unless given another origin; each
   voxel sampled at its centre (ADR-0027).
 - Distance: exact, to the nearest triangle through a BVH of axis-aligned boxes.
@@ -299,7 +299,7 @@ are in ADR-0030.
   the band's volume, at 3000³ resolution as well.
 - Hermite data: a set in brodo's format (§4.9) on the conversion's topology, its signs
   the winding number's and its crossings found by a watertight edge test, with the count
-  of crossed edges no triangle was hit on beside it (ADR-0030); built with R11.
+  of crossed edges no triangle was hit on beside it (ADR-0030).
 - It reports changes; it does not repair a shape or refine a grid.
 
 ### 5.2 Topology report

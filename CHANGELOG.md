@@ -25,6 +25,9 @@ are recorded here when they change (V6).
 - `colino::intersect::{crossing, nearest}`: where a segment crosses a triangle, by Woop et
   al.'s watertight test in `f64` with ties decided exactly, and the point of a segment
   nearest a triangle; `Bvh::near_segment` and `Bvh::corners` (ADR-0030).
+- `colino::hermite::{hermite, Produced}` and `colino::error::HermiteError`: a mesh's Hermite
+  data on its conversion's topology, as `brodo::hermite`'s set, with the count of crossed
+  edges no triangle was hit on (ADR-0030); `Bvh::len` and `Bvh::is_empty`.
 
 ## 0.3.0 (2026-10-22)
 

@@ -43,6 +43,7 @@ papers, public documentation and permissively licensed code (S1, S2) may appear 
 | `crates/colino/src/intersect.rs` | ARCHITECTURE.md §5.1, ADR-0030; Woop, Benthin and Wald (2013), *Watertight Ray/Triangle Intersection*, JCGT 2(1), for the sheared 2D edge test and its tie rule; the nearest points of two segments by their stationary point and clamped sides, as textbook material | where a segment crosses a triangle, watertight, and the point of a segment nearest a triangle |
 | `crates/colino/src/lib.rs` | none | crate root |
 | `crates/colino/src/error.rs` | none | the crate's error types |
+| `crates/colino/src/hermite.rs` | ARCHITECTURE.md §5.1, ADR-0030, ADR-0032 only | Hermite data from a mesh: signs by the winding number, crossings by the watertight test, in brodo's format |
 | `crates/colino/src/mesh.rs` | ARCHITECTURE.md §5.1, ADR-0026 only | the mesh type, reading limits, and welding by exact position |
 | `crates/colino/src/obj.rs` | ARCHITECTURE.md §5.1, ADR-0026; the Wavefront OBJ specification as published at paulbourke.net/dataformats/obj/ | reading Wavefront OBJ |
 | `crates/colino/src/stl.rs` | ARCHITECTURE.md §5.1, ADR-0026; the Library of Congress's format descriptions fdd000505 (STL binary) and fdd000506 (STL ASCII) | reading binary and ASCII STL |

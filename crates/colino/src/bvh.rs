@@ -228,4 +228,14 @@ impl Bvh {
     pub fn corners(&self, i: u32) -> Option<[Point; 3]> {
         self.corners.get(usize::try_from(i).ok()?).copied()
     }
+
+    /// The number of triangles.
+    pub fn len(&self) -> u32 {
+        u32::try_from(self.corners.len()).unwrap_or(u32::MAX)
+    }
+
+    /// Whether the mesh has no triangle.
+    pub fn is_empty(&self) -> bool {
+        self.corners.is_empty()
+    }
 }
