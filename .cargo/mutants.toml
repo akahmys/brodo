@@ -10,4 +10,154 @@ exclude_re = [
     # x, y and z are each masked to `dim_log2` bits and shifted apart, so they share no
     # bit and `|` and `^` agree.
     'tree\.rs:.*: replace \| with \^ in child_place$',
+    # The last interval of a root axis holds no key: its cells, taken as empty regions rather than
+    # the outside, still join the outside through cells unbounded along another axis.
+    'analysis\.rs:.*: replace \+ with \* in Axis::unbounded$',
+    # As above.
+    'analysis\.rs:.*: replace \+ with \- in Axis::unbounded$',
+    # A region is classified at the root level only where an upper node or a root tile is, so
+    # the guard always holds there.
+    'analysis\.rs:.*: replace match guard self\.t\.has_upper_node\(r\) with true in Walk<._>::classify$',
+    # A child classified at a wrong level is split, and classified again at its own level when
+    # its pairs are joined: the same units are joined.
+    'analysis\.rs:.*: replace > with >= in Walk<._>::kinds$',
+    # As above.
+    'analysis\.rs:.*: replace \+ with \* in Walk<._>::kinds$',
+    # As above.
+    'analysis\.rs:\d+:72: replace \+ with \- in Walk<._>::kinds$',
+    # `inside` is pushed only for split regions above the voxels, so its early return never
+    # decides.
+    'analysis\.rs:.*: replace \|\| with \&\& in Walk<._>::inside$',
+    # A touching pair is joined once whichever way it is walked; and a first non-zero step is
+    # never zero, so `>` and `>=` agree on it.
+    'analysis\.rs:.*: replace > with < in Walk<._>::inside$',
+    # As above.
+    'analysis\.rs:.*: replace > with >= in Walk<._>::inside$',
+    # As above.
+    'analysis\.rs:.*: replace > with < in Walk<._>::root$',
+    # As above.
+    'analysis\.rs:.*: replace > with >= in Walk<._>::root$',
+    # A step can leave the root grid only past its last cell, which is the outside, as the cell
+    # it leaves is.
+    'analysis\.rs:.*: replace \|\| with \&\& in Walk<._>::root$',
+    # 3 − d and 3 + d have the same parity.
+    'euler\.rs:.*: replace \- with \+ in table$',
+    # The bits combined do not overlap, so `|` and `^` agree.
+    'euler\.rs:.*: replace \| with \^ in leaf_vertices$',
+    # As above.
+    'frozen\.rs:.*: replace \| with \^ in set$',
+    # As above.
+    'topology\.rs:.*: replace \| with \^ in morton$',
+    # Only edges on a tile's far sides go unvisited; such an edge's vertices add to χ only where
+    # another tile meeting the condition touches the edge, and it lies on that tile's near side.
+    'euler\.rs:\d+:49: replace \+ with \* in tile_edges$',
+    # As above.
+    'euler\.rs:\d+:54: replace % with / in tile_edges$',
+    # A wider scan finds the same cells, each still held to its exact distance in steps.
+    'morphology\.rs:.*: replace < with <= in removed$',
+    # As above.
+    'morphology\.rs:.*: replace \- with \+ in reach$',
+    # As above.
+    'morphology\.rs:.*: replace \- with / in reach$',
+    # As above.
+    'morphology\.rs:.*: replace / with \* in reach$',
+    # At c = lo the gap is c − lo, zero, as the other branch gives.
+    'morphology\.rs:.*: replace < with <= in around$',
+    # The voxel joins its own neighbourhood, and the largest or smallest already starts from it.
+    'morphology\.rs:.*: replace > with >= in neighbourhood$',
+    # The neighbourhood is symmetric, so negating the y or z offset gives the same set.
+    'morphology\.rs:\d+:32: replace \+ with \- in neighbourhood$',
+    # As above.
+    'morphology\.rs:\d+:44: replace \+ with \- in neighbourhood$',
+    # At the threshold both branches give the same colour: white at 0, the middle colour at 0.5.
+    'slice\.rs:.*: replace < with <= in color$',
+    # Bit 8 of a byte is zero, so the table gains nothing.
+    'topology\.rs:\d+:17: replace < with <=$',
+    # Only slower (ADR-0023): the result is unchanged and the tests pass under the patient run's
+    # 1800 s; a search or partition is only made less selective.
+    'topology\.rs:.*: replace match guard !old\.tree\.has_lower_node\(origin\) with false in tile_source$',
+    # As above.
+    'bvh\.rs:.*: replace <= with > in Bvh::nearest$',
+    # As above.
+    'bvh\.rs:.*: replace Aabb::squared_to \-> f64 with \-1\.0$',
+    # As above.
+    'bvh\.rs:.*: replace Aabb::squared_to \-> f64 with 0\.0$',
+    # As above.
+    'bvh\.rs:.*: replace \+ with \- in Aabb::squared_to$',
+    # As above.
+    'bvh\.rs:.*: replace centre \-> Point with Default::default\(\)$',
+    # As above.
+    'bvh\.rs:.*: replace \+ with \* in centre$',
+    # As above.
+    'bvh\.rs:.*: replace / with % in centre$',
+    # As above.
+    'bvh\.rs:.*: replace longest \-> usize with 0$',
+    # As above.
+    'bvh\.rs:.*: replace longest \-> usize with 1$',
+    # As above.
+    'bvh\.rs:.*: replace \- with \+ in longest$',
+    # As above.
+    'bvh\.rs:.*: replace \- with / in longest$',
+    # As above.
+    'bvh\.rs:\d+:17: replace >= with < in longest$',
+    # The tree's partition changes, not its answer: every node's box still holds its triangles,
+    # and ties go to the lowest triangle number.
+    'bvh\.rs:.*: replace \+ with \- in centre$',
+    # As above.
+    'bvh\.rs:.*: replace / with \* in centre$',
+    # As above.
+    'bvh\.rs:.*: replace \&\& with \|\| in longest$',
+    # More cells are scanned at the range's ends, each held to the band or the winding number.
+    'convert\.rs:\d+:31: replace \- with \+ in cell_range$',
+    # As above.
+    'convert\.rs:\d+:23: replace \+ with \* in candidates$',
+    # As above.
+    'convert\.rs:.*: replace < with <= in inside$',
+    # As above.
+    'convert\.rs:.*: replace \&\& with \|\| in inside$',
+    # As above.
+    'convert\.rs:.*: replace > with >= in inside$',
+    # An inside tile lies at least the band inside the mesh's box, so narrowing the box by the
+    # band leaves every one in.
+    'convert\.rs:.*: replace \- with \+ in inside$',
+    # As above.
+    'convert\.rs:\d+:74: replace \+ with \- in inside$',
+    # A region holding no leaf has no surface within the band of any voxel, so its corner and its
+    # centre lie on one side.
+    'convert\.rs:\d+:48: replace / with % in inside$',
+    # A flat triangle's edges cover the segment between its farthest corners, so its nearest
+    # point is unique and no tie arises.
+    'distance\.rs:.*: replace < with <= in on_triangle$',
+    # Zero is refused by the arm before, so `<` and `<=` agree.
+    'obj\.rs:\d+:20: replace < with <= in face$',
+    # In the complement's labelling the outside is the first unit, so its component is 0.
+    'report\.rs:.*: replace outside_component \-> u32 with 0$',
+    # Swapping a triangle's up and down runs leaves every count, symmetric in them; u = v is
+    # skipped as degenerate before.
+    'surface\.rs:.*: replace > with < in Surface::of$',
+    # As above.
+    'surface\.rs:.*: replace > with >= in Surface::of$',
+    # An attribute with a prefix, kept, is never looked up: attributes are found by plain name.
+    'threemf\.rs:.*: replace \|\| with \&\& in attributes$',
+    # Only the far-field expansion's accuracy changes, by its centre or where it is used: the
+    # tests hold every sign to the exact sum and the error to the expansion's order, and passed
+    # with eight times their cases (2026-10-22).
+    'winding\.rs:.*: replace > with >= in Winding::approximate$',
+    # As above.
+    'winding\.rs:\d+:46: replace \* with \+ in Winding::approximate$',
+    # As above.
+    'winding\.rs:\d+:83: replace / with % in Expansion::of$',
+    # As above.
+    'winding\.rs:\d+:83: replace / with \* in Expansion::of$',
+    # As above.
+    'winding\.rs:.*: replace > with < in Expansion::of$',
+    # As above.
+    'winding\.rs:.*: replace > with == in Expansion::of$',
+    # Only triangles with no area take these weights, and their moments are zero, or their NaN
+    # centre sends the walk to the exact sum: the number is the same.
+    'winding\.rs:.*: replace > with >= in Expansion::of$',
+    # As above.
+    'winding\.rs:\d+:22: replace / with % in Expansion::of$',
+    # As above.
+    'winding\.rs:\d+:22: replace / with \* in Expansion::of$',
 ]
