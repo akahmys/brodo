@@ -12,8 +12,10 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   data as a brodo format (ADR-0032); `colino::intersect`, watertight in `f64`; and
   `colino::hermite`, ADR-0030's acceptance tests passing (2026-10-22).
 - **Next**: P3's close (§2), scheduled 2026-10-22: the retrospective and refactoring, the
-  fuzz round, Miri, benchmarks and the mutation run. Badly oriented meshes are decided
-  (ADR-0030): refused where the sign changes beyond the band.
+  fuzz round, structured targets seeded from the golden files (TESTING.md §3), Miri,
+  benchmarks and the mutation run, in which why the two `Winding::approximate` mutants that
+  loop for ever passed 60 s without a failed test (2026-10-22) is found out. Badly oriented
+  meshes are decided (ADR-0030): refused where the sign changes beyond the band.
 - **Unresolved problems**: Miri's Stacked Borrows reports undefined behaviour in
   `crossbeam-epoch` under rayon; Tree Borrows does not (ADR-0015), but Miri's nightly of
   2026-07-21 warns there of integer-to-pointer casts in `crossbeam-epoch` 0.9.21, which

@@ -80,6 +80,10 @@ cargo +nightly fuzz run --fuzz-dir fuzz -a -O <target> -- -max_total_time=900 -t
 `-a` keeps debug assertions on, so an overflow is a finding rather than a wrapped value. A
 finding is a non-zero exit and an input written under `fuzz/artifacts/<target>/`.
 
+A target whose input has a structure random bytes rarely reach, a cache file, a frozen
+grid, a set of Hermite data, starts from the committed files under
+`crates/brodo/tests/data/` as seeds, copied into `fuzz/corpus/<target>/` before the run.
+
 Miri (T7) needs `rustup +nightly component add miri`. Isolation is off, since the tests
 read files; the leak check is off for the threaded test, since rayon's threads outlive it:
 

@@ -38,3 +38,14 @@ records it by amending this record. The corpus and findings are not committed.
 `UNTRUSTED_INPUT` lists parsing modules rather than crates (ADR-0009); the crate of each
 listed module is fuzzed. Miri, which also builds on nightly, runs outside the gate in the
 same way (ADR-0008).
+
+## Amendment
+
+- **Date**: 2026-10-22
+
+P3 added a target for Hermite data in a cache file, which random bytes almost never reach:
+a valid cache file with ten keyed grids is far from any short random input. The human
+decided that a target whose input has such a structure starts from the committed files
+under `crates/brodo/tests/data/` as seeds (TESTING.md §3). Held by nothing; the
+milestone's checklist lists the fuzz round.
+
