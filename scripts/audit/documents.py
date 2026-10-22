@@ -14,6 +14,9 @@
 7. Provenance (AGENTS.md S3): every source file under `crates/*/src/` has a row in
    PROVENANCE.md, and every row names a file that exists. Whether the row is true,
    nothing checks.
+8. Crate READMEs (AGENTS.md): every crate in `LAYERS` has a README.md, read in as its
+   documentation's front page by `#![doc = include_str!("../README.md")]` in its `lib.rs`,
+   so that its code runs as a doctest. What it says, nothing checks.
 """
 
 import os
@@ -21,7 +24,7 @@ import re
 import sys
 from pathlib import Path
 
-from project import OUTPUT_DIRS
+from project import LAYERS, OUTPUT_DIRS
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 SKIP_DIRS = {".git", *OUTPUT_DIRS}
@@ -133,6 +136,21 @@ def provenance() -> list[str]:
     return out
 
 
+READ_IN = '#![doc = include_str!("../README.md")]'
+
+
+def readmes() -> list[str]:
+    out = []
+    for crate in LAYERS:
+        directory = ROOT / "crates" / crate
+        if not (directory / "README.md").is_file():
+            out.append(f"  crates/{crate} has no README.md")
+        lib = directory / "src" / "lib.rs"
+        if not lib.is_file() or READ_IN not in lib.read_text():
+            out.append(f"  crates/{crate}/src/lib.rs does not read its README in: {READ_IN}")
+    return out
+
+
 def main() -> int:
     paths = walk()
     failures = []
@@ -144,6 +162,7 @@ def main() -> int:
         ("ADR index", adr_index),
         ("instruction files", instruction_files),
         ("provenance", provenance),
+        ("crate READMEs", readmes),
     )
     for label, check in checks:
         found = check()

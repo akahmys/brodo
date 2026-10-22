@@ -38,7 +38,7 @@ grep -E '^echo "\[' scripts/audit/verify_compliance.sh
 | `cargo fmt --all --check` | 10 |
 | `cargo tree --all-features … -i cc` per member and target | 12 |
 | test files in `src/`, and `#[ignore]` reasons, direct or under `cfg_attr`, in every target | T1 |
-| `scripts/audit/documents.py`, and `cargo doc` with warnings denied | AGENTS.md writing rules 1, 2, 6, S3, and no `CLAUDE.md`; Rule 10 |
+| `scripts/audit/documents.py`, and `cargo doc` with warnings denied | AGENTS.md writing rules 1, 2, 6, S3, no `CLAUDE.md`, and each crate's README read in; Rule 10 |
 | `scripts/audit/mutants.py`: `.cargo/mutants.toml` holds no setting, and each pattern in its `exclude_re` has a comment above it and excludes a mutant | T11 |
 | `scripts/hooks/provenance_guard.py --check`: the local list of forbidden sources exists and names a project | S1 |
 | `cargo deny check` | 13 |

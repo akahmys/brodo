@@ -89,3 +89,14 @@ decided that a claim holding for every input is measured on each kind of input t
 accepts, a badly oriented, holed or degenerate mesh among them (PLANNING.md §2). Held by
 review alone.
 
+## Amendment
+
+- **Date**: 2026-10-22
+
+P3's retrospective found that brodo had no README until asked for one, and that nothing
+would have said so: AGENTS.md held that a README is read in, but nothing checked it. The
+human decided that `scripts/audit/documents.py` checks every crate in `LAYERS` for a
+README.md and for the `include_str!` in its `lib.rs` that reads it in. Shown to fire:
+with brodo's `lib.rs` line removed, and with colino's README moved away, the check failed
+naming each; restored, it passed.
+

@@ -45,7 +45,7 @@ If a rule and the design seem to conflict, stop and ask the human.
 
 A crate's README is its documentation's front page, read in by `include_str!` in a
 `#![doc]` attribute of its `lib.rs`, so that its code runs as a doctest in the gate's
-`cargo test`; that a crate's README is read in so, **nothing** checks.
+`cargo test`; that every crate has one, read in so, `scripts/audit/documents.py` checks.
 
 Claude Code loads this file at the start of a session only while no `CLAUDE.md`,
 `.claude/CLAUDE.md` or `CLAUDE.local.md` exists, so the repository has none; the audit
