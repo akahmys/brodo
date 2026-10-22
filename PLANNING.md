@@ -28,8 +28,10 @@ before any of these:
 An ADR's claims about the code as it is (a size, a layout, what a function returns or what
 can be counted) are established by running something before the human decides, as
 AGENTS.md's "Measurement outranks documentation" asks; a claim found wrong while
-implementing goes back to the human as an amendment before the work lands. Held by review
-alone (ADR-0001).
+implementing goes back to the human as an amendment before the work lands. A claim that
+holds for every input is measured on each kind of input the design accepts, such as a
+badly oriented, holed or degenerate mesh (ADR-0026), not only on well-made ones. Held by
+review alone (ADR-0001).
 
 ## 3. Spikes
 

@@ -79,3 +79,13 @@ used, read in by its `lib.rs`, its code a doctest. The human decided that AGENTS
 it beside colino's. Shown to fire: the README's Euler characteristic changed to a wrong
 value failed as a doctest of `cargo test -p brodo --doc`, and passed again once restored.
 
+## Amendment
+
+- **Date**: 2026-10-22
+
+P3's retrospective found ADR-0030's claim that every crossed edge's owner is a leaf
+measured on well-made meshes only; a cube with one face turned in broke it. The human
+decided that a claim holding for every input is measured on each kind of input the design
+accepts, a badly oriented, holed or degenerate mesh among them (PLANNING.md §2). Held by
+review alone.
+
