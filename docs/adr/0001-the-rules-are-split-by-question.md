@@ -69,3 +69,13 @@ layout change shape, but the header held the background in twelve bytes, too few
 - PLANNING.md §2: an ADR's claims about the code as it is are established by running
   something before the human decides; one found wrong while implementing goes back to the
   human as an amendment before the work lands. Held by review alone.
+
+## Amendment
+
+- **Date**: 2026-10-22
+
+brodo gained a README at the owner's request, as colino had: what it does and how it is
+used, read in by its `lib.rs`, its code a doctest. The human decided that AGENTS.md lists
+it beside colino's. Shown to fire: the README's Euler characteristic changed to a wrong
+value failed as a doctest of `cargo test -p brodo --doc`, and passed again once restored.
+

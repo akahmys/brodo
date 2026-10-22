@@ -40,6 +40,7 @@ If a rule and the design seem to conflict, stop and ask the human.
 | [CHANGELOG.md](CHANGELOG.md) | What changed in each version, and what breaks a user? | Plans |
 | [README.md](README.md) | What is the project, and how is it built? | Rules, design |
 | [docs/adr/](docs/adr/README.md) | Why is a rule or the design the way it is? | The present design |
+| [crates/brodo/README.md](crates/brodo/README.md) | What does the crate do, and how is it used? | Rules, design |
 | [crates/colino/README.md](crates/colino/README.md) | What does the crate do, and how is it used? | Rules, design |
 
 A crate's README is its documentation's front page, read in by `include_str!` in a
