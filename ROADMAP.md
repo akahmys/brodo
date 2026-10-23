@@ -136,10 +136,27 @@ Scheduled by the human on 2026-10-22, from a user's request (§4, R11).
 - [ ] **Accepted when** ADR-0030's acceptance tests pass and colino's Hermite data keeps
       to brodo's format
 
-### After P3
+### P4 — Archives, quantisation, OpenVDB files, local risk, a sign without orientation
 
-Ordered by users' requests (§4): the archive profile, value quantisation, colino's layer
-3, writing `.vdb`. STEP is not read (ADR-0031).
+Scheduled by the human on 2026-10-23: what was left after P3, with B-016. Each step is a
+spike and an ADR before it is built.
+
+- [ ] B-016: a sign that does not depend on orientation, by a spike on synthetic broken
+      meshes (`spikes/sign/`), as an option of conversion and Hermite data
+- [ ] colino's layer 3, places thinner or gaps narrower than two voxels (B-020)
+- [ ] B-005: the archive's compressor, pure Rust, its dependency approved
+- [ ] The archive profile (ARCHITECTURE.md §4.7), its reader in `UNTRUSTED_INPUT` and fuzzed
+- [ ] Value quantisation in the archive, 16-bit float and 8-bit range, with byte shuffling
+- [ ] `.vdb`: B-006 for reading through `vdb-rs`; writing only if the format can be learnt
+      within AGENTS.md S1, as the human decides
+- [ ] Retrospective and refactoring; fuzz round, the new readers included; Miri run;
+      benchmarks, the archive's with baselines; mutation run (ADR-0023)
+- [ ] **Accepted when** a badly oriented mesh converts with the new sign, layer 3 finds
+      thin walls and narrow gaps, and archives round-trip within their stated error
+
+### After P4
+
+STEP is not read (ADR-0031). `piatto` waits after P1 (§2).
 
 ## 3. Open questions and spikes
 
@@ -151,7 +168,8 @@ implementation (PLANNING.md §2).
 | B-019 | Does `colino` move to a repository of its own? | Not now (owner, 2026-10-23; ADR-0012 keeps two crates in one repository): changes span both, as P3's Hermite format and producer did, and before 1.0 a split would turn each into two releases, duplicate the rules and their audit, and take colino's tests out of brodo's gate. Revisited when brodo's API and formats settle (1.0), both are on crates.io, colino needs what brodo's rules forbid, or others maintain it |
 | B-018 | Does model checking with Kani join the closing checks? | Not now (owner, 2026-10-23): it fits only integer bit work and `view.rs`'s small helpers, already fuzzed and mutation-tested, and cannot reach rayon or the memory mapping; this milestone's defects were numeric and in design claims. Revisited by a spike if Miri-unreachable unsafe code grows, an integer coordinate bug escapes the tests, or before 1.0 |
 | B-017 | Is `Value` sealed, so that only brodo assigns type codes? | Not yet: a type outside brodo is refused by every other build's reader, and sealing would forbid types used in memory only (ADR-0029) |
-| B-016 | What is colino's orientation-independent sign (ADR-0017)? | None yet; candidates: flooding from the outside through cells the surface does not cross, or the winding number's magnitude |
+| B-020 | How does colino's layer 3 find places thinner, or gaps narrower, than two voxels before conversion, and check them by a local reconversion at h/2 (ARCHITECTURE.md §5.2)? | None yet; to be read from papers and answered by a spike in P4 |
+| B-016 | What is colino's orientation-independent sign (ADR-0017)? | None yet; candidates: flooding from the outside through cells the surface does not cross, or the winding number's magnitude. Answered in P4 by a spike on synthetic broken meshes, the cube with a face turned in among them (ADR-0030) |
 | B-003 | Do level-set operations (CSG, redistancing) belong in brodo? | No, until shown to be general |
 | B-004 | Does a shared IR schema crate live in this repository? | Undecided; for brodo's users to agree, not for brodo to anticipate |
 | B-005 | What is the archive profile's default compressor, and is it pure Rust (CODING.md Rule 12)? | Zstd, LZ4 when decompression speed is asked for; whether a pure-Rust implementation suffices is to be measured |
