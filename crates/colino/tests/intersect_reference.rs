@@ -231,3 +231,31 @@ fn a_crossing_rounding_puts_past_the_end_is_still_found() {
     };
     assert_eq!(Bvh::new(&m).unwrap().near_segment(a, b), vec![0]);
 }
+
+/// The same past the end, under a triangle thousands of units wide: the widening follows
+/// the largest coordinate the search sees, so it still finds it.
+#[test]
+fn a_crossing_past_the_end_under_a_wide_triangle_is_still_found() {
+    let z = 1.0 + f64::EPSILON;
+    let t = [
+        [-2_513.774_746_881_219, 2_759.691_683_418_149, z],
+        [2_760.577_330_185_404, -824.801_710_038_715_7, z],
+        [763.210_924_871_714_5, -1_708.689_310_165_436_2, z],
+    ];
+    let (a, b) = ([0.0; 3], [0.0, 0.0, 1.0]);
+    assert!(crossing(a, b, t).is_some(), "rounding no longer reaches past the end");
+    let m = colino::mesh::Mesh {
+        vertices: t.to_vec(),
+        triangles: vec![[0, 1, 2]],
+        ..colino::mesh::Mesh::default()
+    };
+    assert_eq!(Bvh::new(&m).unwrap().near_segment(a, b), vec![0]);
+}
+
+#[test]
+fn a_tree_of_no_triangle_is_empty() {
+    let empty = Bvh::new(&colino::mesh::Mesh::default()).unwrap();
+    assert!(empty.is_empty() && empty.len() == 0);
+    let one = Bvh::new(&common::sphere(0, 1.0, [0.0; 3])).unwrap();
+    assert!(!one.is_empty() && one.len() == 8);
+}
