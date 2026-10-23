@@ -79,7 +79,8 @@ Never guess at an implementation, a schema, an API, or a library's behaviour.
 ## 7. Retrospective and refactoring
 
 A unit of work that looks back, then tidies up, held before a milestone closes and
-whenever a unit leaves duplication behind (ADR-0004).
+whenever a unit leaves duplication behind (ADR-0004); from P5 on, before a milestone
+closes only when its checklist lists it (ADR-0033).
 
 1. **The retrospective** sets what happened since the last one against the rules: every
    claim a measurement later corrected, every check found passing without checking, every

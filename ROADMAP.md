@@ -36,8 +36,10 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
 
 Named after the project group's phases (ADR-0011). Every milestone closes with a
 retrospective and refactoring (PLANNING.md §7), a fuzz round with no finding (TESTING.md
-T6), a Miri run (T7) and a mutation run with none missed (T11), and benchmarks compared with their baselines (TESTING.md §1),
-before its version is set (TESTING.md V2).
+T6), a Miri run (T7) and a mutation run with none missed (T11), and benchmarks compared
+with their baselines (TESTING.md §1), before its version is set (TESTING.md V2). From P5
+on, the human chooses which of these a milestone closes with, by its content, and its
+checklist lists them (ADR-0033).
 
 ### P0 — Repository with its rules
 

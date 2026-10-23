@@ -60,3 +60,4 @@ A record is `Proposed` until the human accepts it.
 | [0030](0030-colino-keeps-triangle-groups-and-gives-hermite-data-on-voxel-corners.md) | colino keeps triangle groups and gives Hermite data on voxel corners |
 | [0031](0031-colino-reads-triangle-meshes-not-step.md) | colino reads triangle meshes, not STEP |
 | [0032](0032-hermite-data-is-a-brodo-format-any-producer-writes.md) | Hermite data is a brodo format that any producer writes |
+| [0033](0033-a-milestones-closing-checks-are-chosen-by-its-content-after-p4.md) | A milestone's closing checks are chosen by its content after P4 |
