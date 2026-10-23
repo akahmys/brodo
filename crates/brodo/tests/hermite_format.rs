@@ -161,8 +161,7 @@ fn a_valid_set_is_taken() {
 /// leaf of the shell left out by the tile's +x face: only the tile's face, at the patch
 /// (y, z) = (64, 32), meets the background there, and it is reported, not the leaves'
 /// own changes beside the hole.
-#[test]
-fn a_change_on_a_far_patch_of_a_tiles_face_is_found_there() {
+fn shell_with_hole() -> Parts {
     let (tile, hole) = ([0, 0, 0], [128, 64, 32]);
     let empty = Topology::new();
     let mut e = empty.edit();
@@ -206,8 +205,12 @@ fn a_change_on_a_far_patch_of_a_tiles_face_is_found_there() {
     }
     let t = topology.tile_numbers().next().unwrap();
     signs.set_tile(&topology, t, 1).unwrap();
-    let p = Parts { topology, signs, axes, names: Vec::new() };
-    assert_eq!(rule(p.make()), Ok((Some([127, 64, 32]), Some(0), Rule::Owner)));
+    Parts { topology, signs, axes, names: Vec::new() }
+}
+
+#[test]
+fn a_change_on_a_far_patch_of_a_tiles_face_is_found_there() {
+    assert_eq!(rule(shell_with_hole().make()), Ok((Some([127, 64, 32]), Some(0), Rule::Owner)));
 }
 
 #[test]
@@ -481,4 +484,63 @@ fn format_version_1_keeps_its_bytes() {
     let read = HermiteView::find(&f, "golden").unwrap();
     assert_eq!(read.axes()[0].fraction.get([5, 3, 3]).unwrap().to_bits(), 0.5_f32.to_bits());
     assert_eq!(read.axes()[0].group.get([5, 3, 3]).unwrap(), 1);
+}
+
+/// A set's parts written as they are, unchecked, under the keys `entries` would give.
+fn unchecked(p: &Parts) -> Vec<CacheEntry> {
+    let t = &p.topology;
+    let mut out = Vec::new();
+    for (i, field) in FIELDS.iter().enumerate() {
+        let mut m = meta("u");
+        for (k, v) in [("hermite.version", "1"), ("hermite.set", "u"), ("hermite.field", field)] {
+            m.extra.insert(k.into(), v.into());
+        }
+        if i == 0 {
+            for (id, name) in p.names.iter().enumerate().skip(1) {
+                m.extra.insert(format!("hermite.group.{id}"), name.clone());
+            }
+        }
+        let e = match (i, p.axes.get(i.saturating_sub(1) / 3)) {
+            (0, _) => CacheEntry::new(&m, t, &p.signs),
+            (i, Some(c)) if i % 3 == 1 => CacheEntry::new(&m, t, &c.fraction),
+            (i, Some(c)) if i % 3 == 2 => CacheEntry::new(&m, t, &c.normal),
+            (_, Some(c)) => CacheEntry::new(&m, t, &c.group),
+            _ => unreachable!(),
+        };
+        out.push(e.unwrap());
+    }
+    out
+}
+
+/// What a check decided: taken, or the violation it named.
+fn verdict<T>(r: Result<T, HermiteError>) -> Result<(), String> {
+    r.map(|_| ()).map_err(|e| format!("{e:?}"))
+}
+
+/// Sets taken and sets refused, written unchecked and read back: the file's check decides
+/// as the check in memory does.
+#[test]
+fn a_file_decides_as_memory_does() {
+    let tile_of = |p: &Parts| p.topology.tile_numbers().next().unwrap();
+    let mut bad_leaf = valid();
+    apply(&mut bad_leaf, Edit::Sign([19, 10, 10], 2));
+    let mut bad_tile = valid();
+    let t = tile_of(&bad_tile);
+    bad_tile.signs.set_tile(&bad_tile.topology, t, 2).unwrap();
+    let cases = [
+        ("valid", valid(), true),
+        ("crossing between leaves", parts(3, None, 4, 16), true),
+        ("an outside tile by the background", parts(2, Some([8, 8, 8]), 2, 6), true),
+        ("a sign of 2 in a later leaf", bad_leaf, false),
+        ("a tile's sign of 2", bad_tile, false),
+        ("inside reaching the leaves' lower face", parts(3, Some([8, 8, 8]), 0, 20), false),
+        ("a hole by a tile's face", shell_with_hole(), false),
+    ];
+    for (name, p, taken) in cases {
+        let bytes = to_bytes(&unchecked(&p)).unwrap();
+        let in_memory = verdict(p.make());
+        assert_eq!(in_memory.is_ok(), taken, "{name}: {in_memory:?}");
+        let f = CacheFile::from_bytes(&bytes).unwrap();
+        assert_eq!(verdict(HermiteView::find(&f, "u")), in_memory, "{name}");
+    }
 }
