@@ -527,8 +527,18 @@ fn a_file_decides_as_memory_does() {
     let mut bad_tile = valid();
     let t = tile_of(&bad_tile);
     bad_tile.signs.set_tile(&bad_tile.topology, t, 2).unwrap();
+    let mut bad_tile_crossing = valid();
+    let t = tile_of(&bad_tile_crossing);
+    bad_tile_crossing.axes[2].group.set_tile(&bad_tile_crossing.topology, t, 1).unwrap();
+    let mut bad_background = valid();
+    bad_background.axes[1].normal = Field::new(&bad_background.topology, [0.0, 0.0, -0.0]);
+    let mut inside_background = valid();
+    inside_background.signs = Field::new(&inside_background.topology, 1);
     let cases = [
         ("valid", valid(), true),
+        ("a crossing on a tile", bad_tile_crossing, false),
+        ("a crossing's background other than none", bad_background, false),
+        ("a sign's background inside", inside_background, false),
         ("crossing between leaves", parts(3, None, 4, 16), true),
         ("an outside tile by the background", parts(2, Some([8, 8, 8]), 2, 6), true),
         ("a sign of 2 in a later leaf", bad_leaf, false),
