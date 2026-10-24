@@ -61,3 +61,12 @@ decided:
   against the SHA-256 published in its `checksums.txt` before it is installed.
 - The rest of the review, which touches the public API, goes to P4.
 
+## Amendment
+
+- **Date**: 2026-10-25
+
+The gate's GitHub mode was shown to work on the owner's machine before any run on GitHub:
+with `GITHUB_ACTIONS=true` and the two local files pointed at nothing, the gate passed,
+saying it skipped the list and the personal rules; without it, the same run failed at
+exactly those two checks.
+
