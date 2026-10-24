@@ -12,10 +12,11 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   found a real defect, a crossing at a segment's very end rounded off, now fixed and held
   by a test (ADR-0030); and the two looping `Winding::approximate` mutants are caught,
   P2's misses having been a timeout just short of their 60 s test's failure.
-- **Next**: P4's changes, every decision of it made (ADR-0035 to ADR-0041, 2026-10-25):
-  the API's shape, the attack-surface features and limits, the format document and its
-  reader, the SDF convention's key; then P4's closing checks. The GitHub workflows held on
-  their first runs (ADR-0034).
+- **Next**: P4's closing checks (ADR-0023): retrospective and refactoring, fuzz round,
+  Miri, benchmarks, mutation run, the owner deciding where the run goes; then the owner's
+  acceptance. P4's changes are in (2026-10-25): the API's shape, the features and limits,
+  `docs/formats.md` held by its reader, the SDF convention's key, and `api_growth.rs` in
+  each crate showing that a field or a variant added later breaks no user (ADR-0035).
 - **Unresolved problems**: `cache_map_x256` runs 8 to 10 % behind its baseline of
   2026-10-17 at v0.3.0 and now alike, run in turn (2026-10-23); a first run straight after
   the fuzz round and Miri failed at +13 %. Machine drift is the likely cause, not shown. Miri's Stacked Borrows reports undefined behaviour in
@@ -185,13 +186,14 @@ review of what brodo and colino show, so that later additions break no user.
         the two revisions differ
   - [x] (Optional) whether the cache file and a Hermite set get a generic media type name
         users can register or refer to
-- [ ] The changes ADR-0035 to ADR-0041 ask for: the API's shape, the features and limits,
+- [x] The changes ADR-0035 to ADR-0041 ask for: the API's shape, the features and limits,
       `docs/formats.md` with its Python reader, the SDF convention's key, the README's
       pinning; breaking ones listed in CHANGELOG.md together
 - [ ] Retrospective and refactoring; fuzz round; Miri run; benchmarks; mutation run
       (ADR-0023)
 - [ ] **Accepted when** adding a field or an error variant later breaks no code written
-      against the API, shown by a test outside the crate
+      against the API, shown by a test outside the crate: `api_growth.rs` in each crate,
+      measured with a variant and a field added (ADR-0035); the owner's acceptance waits
 
 ### P5 — Archives, quantisation, OpenVDB files, local risk, a sign without orientation
 

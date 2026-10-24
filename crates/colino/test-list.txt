@@ -7,6 +7,8 @@ lib colino mesh::tests::groups_that_fit_the_triangles_are_taken
 lib colino mesh::tests::welding_keeps_each_triangles_group
 lib colino surface::tests::counting_a_tetrahedron_ends_in_time
 lib colino winding::tests::approximating_a_small_soup_ends_in_time
+test api_growth every_enum_that_may_grow_is_matched_with_a_wildcard
+test api_growth every_struct_is_built_by_its_constructor_set_by_assignment_and_read_by_its_fields
 test convert_reference a_cell_reached_only_at_its_corner_is_a_leaf
 test convert_reference a_cubes_inside_tiles_reach_near_its_box
 test convert_reference a_holed_mesh_leaks_no_sign

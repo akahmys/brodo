@@ -79,3 +79,17 @@ chose:
   `Limits::with_triangles`, `with_vertices`, `with_bytes`), beside their constructors and
   public fields. `Slice::new` and `Image::new` were added for the tests that build them.
 
+## Amendment: the acceptance test
+
+- **Date**: 2026-10-25
+
+`api_growth.rs` in each crate's tests, compiled as a user's crate is, holds P4's
+acceptance. Each enum that may grow is matched by naming every variant and a wildcard arm;
+each struct a user builds is built by its constructor and set by assignment, and each one a
+user reads is read by its fields. Measured: without `#[non_exhaustive]` on `brodo`'s
+`Rule` or `colino`'s `Place`, the gate's clippy refused the wildcard as an unreachable
+pattern; with a variant added to `MetaError` and a field to `Options`, both tests built and
+passed unchanged. With that variant unnamed, clippy's `wildcard_enum_match_arm`, one of the
+workspace's lints and not a user's, refused the brodo test, so a variant added later is
+added to the test's list too, which keeps the first check true.
+
