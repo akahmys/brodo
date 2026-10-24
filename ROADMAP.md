@@ -154,6 +154,14 @@ review of what brodo and colino show, so that later additions break no user.
       a limit on the bytes `CacheFile::read` takes; `CacheFile::map`'s promise, that the
       file is not changed while mapped, made harder to miss; and whether default
       behaviour reaches a parser or an option weakens a check that nothing needs
+- [ ] An ADR deciding whether the narrow-band SDF's conventions (where samples lie, which
+      sign is inside, the unit of values, the band's width and the value it clamps to, the
+      values of tiles and the background) stay colino's choices as a producer (ADR-0027)
+      or become a brodo convention any producer writes, as Hermite data did (ADR-0032).
+      To weigh: the Hermite format already assumes the SDF's sampling lattice, its own
+      lattice being that one shifted by −h/2; and a producer other than colino, one
+      building SDFs from analytic shapes, writes its SDFs to the same conventions
+      (the owner, 2026-10-24)
 - [ ] The changes, breaking ones listed in CHANGELOG.md together
 - [ ] Retrospective and refactoring; fuzz round; Miri run; benchmarks; mutation run
       (ADR-0023)
