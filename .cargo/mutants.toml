@@ -160,4 +160,13 @@ exclude_re = [
     'winding\.rs:\d+:22: replace / with % in Expansion::of$',
     # As above.
     'winding\.rs:\d+:22: replace / with \* in Expansion::of$',
+    # On a tie between the largest components of the segment's direction, either axis
+    # serves: the test is watertight about each, and the paper asks only for the largest.
+    'intersect\.rs:\d+:23: replace > with >= in crossing$',
+    # `limit` is det·D, with det and D already found not to be zero: it is zero only where
+    # the product underflows, below coordinates any test can reach.
+    'intersect\.rs:\d+:35: replace < with <= in crossing$',
+    # Parallel segments: dividing by a zero denominator gives an infinite or NaN fraction,
+    # which the range check leaves out, as skipping the division does.
+    'intersect\.rs:\d+:14: replace > with >= in segments$',
 ]

@@ -132,3 +132,29 @@ pub fn nearest(a: Point, b: Point, t: [Point; 3]) -> (f64, f64) {
     }
     best
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// 2 to the power `e`, exactly, for a normal `f64`.
+    fn pow2(e: i64) -> f64 {
+        f64::from_bits(u64::try_from(e + 1023).unwrap_or(0) << 52)
+    }
+
+    /// Products that round equal at three sizes: near 1, the tie is decided by the rounding
+    /// errors; just below `SMALL`, where an error may itself round, it is left at 0, a hit;
+    /// at `SMALL` exactly, it is decided again.
+    #[test]
+    fn ties_are_decided_by_rounding_errors_down_to_small() {
+        let (up, down) = (1.0 + f64::EPSILON, 1.0 - f64::EPSILON);
+        // (1 + ε)(1 − ε) = 1 − ε², which rounds to 1.
+        assert!(edge(up, down, 1.0, 1.0) < 0.0);
+        assert_eq!(SMALL.to_bits(), pow2(-969).to_bits());
+        // The same tie scaled to 2^−970, below SMALL.
+        let h = pow2(-485);
+        assert_eq!(edge(up * h, down * h, h, h).to_bits(), 0.0_f64.to_bits());
+        // A product of exactly SMALL against one 2^−1073 below it, rounded up to it.
+        assert!(edge(SMALL, 1.0, up, SMALL * down) > 0.0);
+    }
+}

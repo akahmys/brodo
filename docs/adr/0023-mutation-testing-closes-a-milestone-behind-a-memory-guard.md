@@ -93,3 +93,19 @@ and T11 gave them no way to pass. The human decided:
 
 Shown to fire on P2's run: of brodo's 3, one passed only slower and two still timed out;
 of colino's 33, 17 were caught, 14 passed only slower and two still timed out.
+
+## Amendment
+
+- **Date**: 2026-10-25
+
+P3's full run counted as caught seven mutants of `colino::intersect` that no test could
+kill: the property test of crossings fails at random on a case it happens to draw, and
+until 2026-10-25 a real defect, a crossing at a segment's end rounded off, sometimes made
+it fail under any mutant. With the defect fixed, the run of that file's mutants left the
+seven missed. Four were killed by a unit test of ties at three sizes; the human decided
+that three are equivalent and listed them with their reasons: the axis taken on a tie of
+the largest components, `limit`'s sign where it cannot be zero, and a division by a zero
+denominator left out by the range check. A mutant's kill by a property test is only as
+sound as that test is steady: a run follows a gate in which every test passes, and a
+property test that fails in a run is investigated before the run is trusted.
+
