@@ -12,9 +12,10 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   found a real defect, a crossing at a segment's very end rounded off, now fixed and held
   by a test (ADR-0030); and the two looping `Winding::approximate` mutants are caught,
   P2's misses having been a timeout just short of their 60 s test's failure.
-- **Next**: P4, the public API's review (§2): its first step, the ADR on the API's shape,
-  the attack-surface review and the SDF's conventions among its points; the first runs of
-  the GitHub workflows (ADR-0034).
+- **Next**: P4's changes, every decision of it made (ADR-0035 to ADR-0041, 2026-10-25):
+  the API's shape, the attack-surface features and limits, the format document and its
+  reader, the SDF convention's key; then P4's closing checks. The GitHub workflows held on
+  their first runs (ADR-0034).
 - **Unresolved problems**: `cache_map_x256` runs 8 to 10 % behind its baseline of
   2026-10-17 at v0.3.0 and now alike, run in turn (2026-10-23); a first run straight after
   the fuzz round and Miri failed at +13 %. Machine drift is the likely cause, not shown. Miri's Stacked Borrows reports undefined behaviour in
@@ -157,18 +158,19 @@ review of what brodo and colino show, so that later additions break no user.
       a limit on the bytes `CacheFile::read` takes; `CacheFile::map`'s promise, that the
       file is not changed while mapped, made harder to miss; and whether default
       behaviour reaches a parser or an option weakens a check that nothing needs
-- [ ] File formats and how users pin brodo, scheduled by the human on 2026-10-25: each of
-      these decided by its own ADR, the options set out for the human to choose among
-  - [ ] A specification of the file formats as one document in `docs/`, apart from the
+- [x] File formats and how users pin brodo, scheduled by the human on 2026-10-25: each
+      decided by its own ADR, the owner choosing every recommended option (ADR-0037 to
+      ADR-0041); what they ask is built with the API's changes below
+  - [x] A specification of the file formats as one document in `docs/`, apart from the
         code: the cache profile (layout version 1, format version 1), Hermite data
         (ADR-0032) and the narrow-band SDF's conventions (below), written so that a reader
         in another language, or one that will not depend on the crates, can read and write
         them from it alone; ARCHITECTURE.md and the ADRs then point to it
-  - [ ] The formats' version policy: a reader now takes its own version only, and some
+  - [x] The formats' version policy: a reader now takes its own version only, and some
         users pass files across process boundaries, so how producers and readers move
         when a version is raised (older versions read as well, refused with an error
         naming the version, or another way)
-  - [ ] Whether the narrow-band SDF's conventions (where samples lie, which sign is inside,
+  - [x] Whether the narrow-band SDF's conventions (where samples lie, which sign is inside,
         the unit of values, the band's width and the value it clamps to, the values of
         tiles and the background) stay colino's choices as a producer (ADR-0027) or
         become a public convention any producer writes, as Hermite data's did. To weigh:
@@ -176,14 +178,16 @@ review of what brodo and colino show, so that later additions break no user.
         being that one shifted by −h/2; and a producer other than colino, one building
         SDFs from analytic shapes, writes its SDFs to the same conventions (the owner,
         2026-10-24)
-  - [ ] How users pin brodo: the README says to pin a release tag; and whether, when a
+  - [x] How users pin brodo: the README says to pin a release tag; and whether, when a
         user needs a feature not yet released, a small release is cut rather than letting
         it pin an arbitrary revision, since a user reaching brodo both directly and
         through another crate in one process gets two distinct copies of its types when
         the two revisions differ
-  - [ ] (Optional) whether the cache file and a Hermite set get a generic media type name
+  - [x] (Optional) whether the cache file and a Hermite set get a generic media type name
         users can register or refer to
-- [ ] The changes, breaking ones listed in CHANGELOG.md together
+- [ ] The changes ADR-0035 to ADR-0041 ask for: the API's shape, the features and limits,
+      `docs/formats.md` with its Python reader, the SDF convention's key, the README's
+      pinning; breaking ones listed in CHANGELOG.md together
 - [ ] Retrospective and refactoring; fuzz round; Miri run; benchmarks; mutation run
       (ADR-0023)
 - [ ] **Accepted when** adding a field or an error variant later breaks no code written
