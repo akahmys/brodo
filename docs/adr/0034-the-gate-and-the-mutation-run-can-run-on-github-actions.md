@@ -43,3 +43,21 @@ private and its publication is decided later:
 Whether the workflows work is shown only by a first run, which spends minutes of the free
 allowance; it is held until the local mutation run no longer needs the machine. Moving a
 milestone's mutation run there, and how often, is decided with P4 and ADR-0033.
+
+## Amendment
+
+- **Date**: 2026-10-24
+
+Anthropic's article on attack-surface reduction (2026) argued for shrinking what an
+attacker can reach rather than chasing each bug, and a review of the workflows by it found
+two ways in for someone controlling a dependency of the build: actions named by a movable
+release tag, and betterleaks installed at whatever version Homebrew held. The owner
+decided:
+
+- Each action is pinned to the commit of a release, the release named beside it:
+  `actions/checkout` v7.0.1, `actions/upload-artifact` v7.0.2,
+  `actions/download-artifact` v8.0.2, looked up through GitHub's API on 2026-10-24.
+- betterleaks 1.9.0, as on the owner's machine, is fetched from its release and checked
+  against the SHA-256 published in its `checksums.txt` before it is installed.
+- The rest of the review, which touches the public API, goes to P4.
+

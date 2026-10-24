@@ -148,6 +148,12 @@ review of what brodo and colino show, so that later additions break no user.
 - [ ] An ADR on the API's shape: `#[non_exhaustive]` on error enums and on structs that
       grow (`Options`, `Report`, `Limits`, `Mesh` and the like), with constructors; which
       of colino's parts (`bvh`, `winding`, `distance`, `intersect`) stay public
+- [ ] The API reviewed for attack surface too, after Anthropic's article on it (2026):
+      colino's STL, OBJ and 3MF readers behind cargo features, 3MF's ZIP and XML parsing
+      not built for those who do not read 3MF; brodo's `slice-png` and `vtk` off by default;
+      a limit on the bytes `CacheFile::read` takes; `CacheFile::map`'s promise, that the
+      file is not changed while mapped, made harder to miss; and whether default
+      behaviour reaches a parser or an option weakens a check that nothing needs
 - [ ] The changes, breaking ones listed in CHANGELOG.md together
 - [ ] Retrospective and refactoring; fuzz round; Miri run; benchmarks; mutation run
       (ADR-0023)
