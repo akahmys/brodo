@@ -93,3 +93,17 @@ decided:
   before anything is written.
 - The components' order, not stated in the documentation, is checked by reading files
   back in VTK 9.6.2, as the voxel's point order was.
+
+## Amendment
+
+- **Date**: 2026-10-24
+
+`piatto` was planned for after P1 and not started while ParaView sufficed. By P3 no user
+had asked for a viewer: the slice as PNG checked changes (TESTING.md T8), VTK for ParaView
+showed fields in three dimensions, and `.vdb`, if P5 can write it, opens in common tools.
+A GPU, window and GUI stack would bring heavy dependencies, Rules 12 and 13 to measure,
+perhaps `unsafe`, and `f64` values a GPU seldom reads. The human decided:
+
+- `piatto` is not built for now. It is built when a user asks for a viewer or for drawing to embed, grids too large for VTK and `.vdb` must be looked at, or P5 finds `.vdb` cannot be written.
+- Its design in ARCHITECTURE.md §6.2 is kept as the one it would follow; B-013 waits with it.
+

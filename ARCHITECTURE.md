@@ -18,8 +18,8 @@ own and knows nothing of its users.
 | `colino` | converting and checking outside shapes | flood fill, connected components, Euler characteristic |
 | a producer of Hermite data, such as one building from analytic shapes, and a reader building cut cells | writing and reading signs and edge crossings without knowing each other | the Hermite data format (§4.9) |
 | a developer or agent checking a change | seeing a field | a slice as PNG, a field for ParaView (§6.1) |
-| a process inspecting grids | viewing a grid file as an external program | `piatto`'s program (§6.2) |
-| an application with its own interface | showing grids inside it | `piatto`'s drawing library (§6.2) |
+| a process inspecting grids | viewing a grid file as an external program | `piatto`'s program, if built (§6.2) |
+| an application with its own interface | showing grids inside it | `piatto`'s drawing library, if built (§6.2) |
 
 **Out of scope**: level-set operations (CSG, offset, redistancing) and SDF-to-mesh; solvers,
 discretisation and linear algebra; an application's own interface (choosing faces,
@@ -36,7 +36,7 @@ a discretisation, its user's.
 | :--- | :--- |
 | `brodo` | The sparse tree, `Topology`, `Field<T>`, `Grid<T>`, topology editing and `Remap`, `LeafManifest`, `ValueAccessor`, leaf-parallel updates and gather, topology analysis, `GridView`, the file profiles, the Hermite data format, OpenVDB files, checking output (slice PNG, VTK) |
 | `colino` | Meshes to narrow-band SDFs on brodo's tree, and the topology report |
-| `piatto` | A viewer of cache-profile files, as a library and a thin windowed program; built after P1 (ADR-0018) |
+| `piatto` | A viewer of cache-profile files, as a library and a thin windowed program; built only when needed (ADR-0018) |
 
 The dependency order between crates is CODING.md Rule 11, listed in
 `scripts/audit/project.py`.
@@ -55,7 +55,7 @@ The dependency order between crates is CODING.md Rule 11, listed in
 ├── docs/adr/                    # decision records
 ├── scripts/audit/               # the audit, and project.py, its settings
 ├── scripts/hooks/               # git and Claude Code hooks
-├── crates/brodo/, crates/colino/, crates/piatto/ (after P1)
+├── crates/brodo/, crates/colino/, crates/piatto/ (if built)
 ├── xtask/                       # project tooling, when there is any
 ├── spikes/                      # throwaway prototypes, never in the build
 ├── fuzz/                        # cargo-fuzz targets, outside the workspace (ADR-0006)
@@ -352,6 +352,9 @@ In `brodo`, each behind a cargo feature:
   its header's documentation.
 
 ### 6.2 `piatto`
+
+Not built until a user asks for a viewer or for drawing to embed, grids too large for VTK and `.vdb` must be looked at, or P5 finds `.vdb` cannot be written (ADR-0018); the slice as PNG and VTK serve meanwhile. The design
+it would follow:
 
 - Reads a cache-profile file (§4.7) by memory mapping.
 - Its first version draws only: an isosurface by ray marching (zero by default); a slice,

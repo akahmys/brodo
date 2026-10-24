@@ -97,9 +97,9 @@ kinds of user before the rest is built on them.
       the Reference and Format tiers for these parts pass, at least one golden slice test
       passes, and both examples still pass
 
-### After P1 — `piatto`
+### Held — `piatto`
 
-Not part of P1's acceptance, and not started while ParaView suffices (ADR-0018).
+Not built for now (owner, 2026-10-24; ADR-0018, B-021). If it is, then:
 
 - [ ] Its dependencies approved and measured against CODING.md Rules 12 and 13 on every
       target (§4); B-013 answered first
@@ -174,7 +174,7 @@ spike and an ADR before it is built.
 
 ### After P5
 
-STEP is not read (ADR-0031). `piatto` waits after P1 (§2).
+STEP is not read (ADR-0031). `piatto` is held (§2, B-021).
 
 ## 3. Open questions and spikes
 
@@ -184,6 +184,7 @@ implementation (PLANNING.md §2).
 | # | Question | Proposal so far |
 | :--- | :--- | :--- |
 | B-019 | Does `colino` move to a repository of its own? | Not now (owner, 2026-10-23; ADR-0012 keeps two crates in one repository): changes span both, as P3's Hermite format and producer did, and before 1.0 a split would turn each into two releases, duplicate the rules and their audit, and take colino's tests out of brodo's gate. Revisited when brodo's API and formats settle (1.0), both are on crates.io, colino needs what brodo's rules forbid, or others maintain it |
+| B-021 | Does brodo build `piatto`? | Not now (owner, 2026-10-24; ADR-0018): no user has asked for a viewer, the slice as PNG and VTK for ParaView serve checking, `.vdb` from P5 would open in common tools, and a GPU, window and GUI stack is costly. Revisited when a user asks for a viewer or for drawing to embed, grids too large for VTK and `.vdb` must be looked at, or P5 finds `.vdb` cannot be written |
 | B-018 | Does model checking with Kani join the closing checks? | Not now (owner, 2026-10-23): it fits only integer bit work and `view.rs`'s small helpers, already fuzzed and mutation-tested, and cannot reach rayon or the memory mapping; this milestone's defects were numeric and in design claims. Revisited by a spike if Miri-unreachable unsafe code grows, an integer coordinate bug escapes the tests, or before 1.0 |
 | B-017 | Is `Value` sealed, so that only brodo assigns type codes? | Not yet: a type outside brodo is refused by every other build's reader, and sealing would forbid types used in memory only (ADR-0029) |
 | B-020 | How does colino's layer 3 find places thinner, or gaps narrower, than two voxels before conversion, and check them by a local reconversion at h/2 (ARCHITECTURE.md §5.2)? | None yet; to be read from papers and answered by a spike in P5 |
@@ -200,7 +201,7 @@ No spike is running. `spikes/remap/` answered B-001 and B-008, and `spikes/merge
 ## 4. Administrative items still open
 
 - Dependencies, each to be approved before it is added (CODING.md Rule 20): after
-  P1, for `piatto`: a GPU, window and GUI stack (B-013).
+  P1, for `piatto` if it is built: a GPU, window and GUI stack (B-013).
 - Before any distribution: confirm the licence terms for that form of distribution
   (ADR-0007).
 - Making the repository public, which the owner decides later (2026-10-24). Readiness is
