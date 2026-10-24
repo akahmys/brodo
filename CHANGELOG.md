@@ -6,6 +6,12 @@ are recorded here when they change (V6).
 
 ## Unreleased
 
+## 0.4.0 (2026-10-25)
+
+Closes P3: a group per triangle read from OBJ, STL and 3MF; Hermite data as a brodo format
+any producer writes, with its check; and colino producing it from a mesh, crossings found
+by a watertight segment-triangle test.
+
 - brodo has a README, the front page of its documentation, its example a doctest.
 - `colino::mesh::Mesh` gains `groups` and `group_names`, a group per triangle, and
   `check_groups` and `group`; `welded` keeps each triangle's group and refuses groups that

@@ -8,12 +8,13 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: R11 but its fuzz round: groups read from OBJ, STL and 3MF (ADR-0030); Hermite
-  data as a brodo format (ADR-0032); `colino::intersect`, watertight in `f64`; and
-  `colino::hermite`, ADR-0030's acceptance tests passing (2026-10-22).
-- **Next**: P3's mutation run, in which why the two `Winding::approximate` mutants that
-  loop for ever passed 60 s without a failed test (2026-10-22) is found out; then its
-  acceptance and version 0.4.0.
+- **Done**: P3 accepted by the human and closed as 0.4.0 (2026-10-25). Its mutation run
+  found a real defect, a crossing at a segment's very end rounded off, now fixed and held
+  by a test (ADR-0030); and the two looping `Winding::approximate` mutants are caught,
+  P2's misses having been a timeout just short of their 60 s test's failure.
+- **Next**: P4, the public API's review (§2): its first step, the ADR on the API's shape,
+  the attack-surface review and the SDF's conventions among its points; the first runs of
+  the GitHub workflows (ADR-0034).
 - **Unresolved problems**: `cache_map_x256` runs 8 to 10 % behind its baseline of
   2026-10-17 at v0.3.0 and now alike, run in turn (2026-10-23); a first run straight after
   the fuzz round and Miri failed at +13 %. Machine drift is the likely cause, not shown. Miri's Stacked Borrows reports undefined behaviour in
@@ -134,8 +135,10 @@ Scheduled by the human on 2026-10-22, from a user's request (§4, R11).
 - [x] Retrospective (ADR-0001, -0003, -0006, -0020) and refactoring
 - [x] Fuzz round, six targets 901 s each, structured ones seeded, no finding; Miri run, no
       report; benchmarks within their baselines (2026-10-23)
-- [ ] Mutation run (ADR-0023)
-- [ ] **Accepted when** ADR-0030's acceptance tests pass and colino's Hermite data keeps
+- [x] Mutation run (ADR-0023): every mutant of both crates, then the misses and timeouts
+      on the code that killed them, then every mutant of `intersect.rs` once its end
+      case was fixed; 26 misses killed by tests or listed as equivalent (2026-10-25)
+- [x] **Accepted when** ADR-0030's acceptance tests pass and colino's Hermite data keeps
       to brodo's format
 
 ### P4 — The public API, before it grows
