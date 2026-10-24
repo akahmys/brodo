@@ -255,7 +255,8 @@ fn a_crossing_past_the_end_under_a_wide_triangle_is_still_found() {
 #[test]
 fn a_tree_of_no_triangle_is_empty() {
     let empty = Bvh::new(&colino::mesh::Mesh::default()).unwrap();
-    assert!(empty.is_empty() && empty.len() == 0);
+    assert!(empty.is_empty());
+    assert_eq!(empty.len(), 0);
     let one = Bvh::new(&common::sphere(0, 1.0, [0.0; 3])).unwrap();
     assert!(!one.is_empty() && one.len() == 8);
 }
