@@ -27,6 +27,7 @@ pub enum Axis {
 /// Where to cut and what to draw: the plane, and the inclusive range of its two other
 /// coordinates (u, v). The image's top row is the largest v.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct Slice {
     /// The axis the plane is perpendicular to.
     pub axis: Axis,
@@ -39,6 +40,12 @@ pub struct Slice {
 }
 
 impl Slice {
+    /// The plane perpendicular to `axis` at `position`, drawn from `min` to `max` in its
+    /// other two coordinates, u and v.
+    pub fn new(axis: Axis, position: i32, min: [i32; 2], max: [i32; 2]) -> Slice {
+        Slice { axis, position, min, max }
+    }
+
     fn voxel(&self, u: i32, v: i32) -> Coord {
         match self.axis {
             Axis::X => [self.position, u, v],
@@ -50,6 +57,7 @@ impl Slice {
 
 /// How values become colours; the range is always given.
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
 pub enum ColorMap {
     /// For signed distances: blue below zero, white at zero, red above, saturated at
     /// ±`limit`; the zero contour drawn in black.
@@ -81,6 +89,7 @@ impl ColorMap {
 
 /// An image: rows from the top, four bytes per pixel (red, green, blue, alpha).
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct Image {
     /// Pixels per row.
     pub width: u32,
@@ -88,6 +97,13 @@ pub struct Image {
     pub height: u32,
     /// `width × height × 4` bytes.
     pub rgba: Vec<u8>,
+}
+
+impl Image {
+    /// An image of `width × height` pixels from its RGBA bytes, rows from the top.
+    pub fn new(width: u32, height: u32, rgba: Vec<u8>) -> Image {
+        Image { width, height, rgba }
+    }
 }
 
 const BACKGROUND: [u8; 3] = [128, 128, 128];
@@ -220,7 +236,7 @@ mod tests {
         e.activate([0, 0, 0]).unwrap();
         let t = e.commit().unwrap().0;
         let f = Field::new(&t, 1.0_f32);
-        render(&t, &f, Slice { axis: Axis::Z, position: 0, min: [0, 0], max: [7, 7] }, map)
+        render(&t, &f, Slice::new(Axis::Z, 0, [0, 0], [7, 7]), map)
     }
 
     #[test]
@@ -277,7 +293,7 @@ mod tests {
         let leaf = f.leaf_mut(&t, n).unwrap();
         leaf.fill(2.0);
         (leaf[0], leaf[1]) = (0.5, -0.5);
-        let slice = Slice { axis: Axis::Z, position: 0, min: [0, 0], max: [7, 7] };
+        let slice = Slice::new(Axis::Z, 0, [0, 0], [7, 7]);
         let image = render(&t, &f, slice, ColorMap::Diverging { limit: 3.0 }).unwrap();
         // Rows run from the top, so y = 0 is the last of eight.
         let rgb = |x: usize| &image.rgba[(7 * 8 + x) * 4..(7 * 8 + x) * 4 + 3];
@@ -312,7 +328,7 @@ mod tests {
         let leaf = f.leaf_mut(&t, n).unwrap();
         leaf.fill(2.0);
         (leaf[0], leaf[1]) = (0.0, 0.0);
-        let slice = Slice { axis: Axis::Z, position: 0, min: [0, 0], max: [7, 7] };
+        let slice = Slice::new(Axis::Z, 0, [0, 0], [7, 7]);
         let image = render(&t, &f, slice, ColorMap::Diverging { limit: 3.0 }).unwrap();
         for x in [0, 1] {
             let at = (7 * 8 + x) * 4;

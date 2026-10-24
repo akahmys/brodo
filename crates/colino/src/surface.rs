@@ -13,6 +13,7 @@ use crate::mesh::Mesh;
 /// A mesh's surface, counted.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
 pub struct Surface {
     /// Vertices some triangle uses.
     pub vertices: u64,

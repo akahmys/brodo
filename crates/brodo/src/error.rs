@@ -16,6 +16,7 @@ pub enum NodeKind {
 
 /// Why an edit of the tree was refused.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
 pub enum TreeError {
     /// No tile contains the voxel to split at.
     #[error("no tile contains voxel {0:?}")]
@@ -75,6 +76,7 @@ pub enum TreeError {
 
 /// Why a field refused an access or a remap.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
 pub enum FieldError {
     /// The field belongs to another topology: it was not remapped after a commit, or the
     /// remap is not from its topology (ADR-0014).
@@ -101,6 +103,7 @@ pub enum FieldError {
 
 /// Why a grid could not be frozen.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
 pub enum FreezeError {
     /// The field does not belong to the topology.
     #[error(transparent)]
@@ -119,6 +122,7 @@ pub enum FreezeError {
 
 /// Why bytes were refused as a frozen grid (ARCHITECTURE.md §4.6).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
 pub enum FormatError {
     /// The bytes do not start on a 32-byte boundary, or are not whole blocks.
     #[error("the bytes are not 32-byte aligned whole blocks")]
@@ -147,6 +151,7 @@ pub enum FormatError {
 
 /// Why a grid's metadata was refused.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
 pub enum MetaError {
     /// The unit is empty: a file always stores its physical size (ADR-0016).
     #[error("the unit is empty")]
@@ -161,6 +166,7 @@ pub enum MetaError {
 
 /// Why a cache file could not be written or read (ARCHITECTURE.md §4.7).
 #[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
 pub enum CacheError {
     /// Reading or writing the file failed.
     #[error(transparent)]
@@ -207,6 +213,7 @@ pub enum CacheError {
 
 /// Which rule of the Hermite data format a set breaks (ADR-0032).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Rule {
     /// A sign other than 0 or 1, or a background sign other than 0.
     Sign,
@@ -226,6 +233,7 @@ pub enum Rule {
 
 /// Why a set of Hermite data was refused (ARCHITECTURE.md §4.9, ADR-0032).
 #[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
 pub enum HermiteError {
     /// A field refused an access.
     #[error(transparent)]
@@ -281,6 +289,7 @@ pub enum HermiteError {
 
 /// Why a slice could not be drawn or encoded (ARCHITECTURE.md §6.1).
 #[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
 pub enum SliceError {
     /// The field does not belong to the topology.
     #[error(transparent)]
@@ -300,6 +309,7 @@ pub enum SliceError {
 
 /// Why a field could not be written as `.vtu` (ARCHITECTURE.md §6.1).
 #[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
 pub enum VtkError {
     /// The field does not belong to the topology.
     #[error(transparent)]

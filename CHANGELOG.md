@@ -6,6 +6,15 @@ are recorded here when they change (V6).
 
 ## Unreleased
 
+- Error enums, and enums that may gain variants (`Accuracy`, `ColorMap`, `Reference`,
+  `Place`, `Rule`), are `#[non_exhaustive]`: a `match` over one outside its crate needs a
+  wildcard arm (ADR-0035).
+- Structs a user only reads (`Converted`, `Produced`, `Report`, `Region`, `Surface`,
+  `Image`) and structs a user builds (`Options`, `Limits`, `Mesh`, `GridMeta`, `Slice`) are
+  `#[non_exhaustive]`: built through `Options::new`, `Limits::new`, `Mesh::new`,
+  `GridMeta::new`, `Slice::new` and `Image::new`, then set by a public field or a `with_…`
+  method; a struct expression no longer builds them outside their crate (ADR-0035).
+
 ## 0.4.0 (2026-10-25)
 
 Closes P3: a group per triangle read from OBJ, STL and 3MF; Hermite data as a brodo format

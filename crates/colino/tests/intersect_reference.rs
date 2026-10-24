@@ -224,11 +224,7 @@ fn a_crossing_rounding_puts_past_the_end_is_still_found() {
     ];
     let (a, b) = ([0.0; 3], [0.0, 0.0, 1.0]);
     assert!(crossing(a, b, t).is_some(), "rounding no longer reaches past the end");
-    let m = colino::mesh::Mesh {
-        vertices: t.to_vec(),
-        triangles: vec![[0, 1, 2]],
-        ..colino::mesh::Mesh::default()
-    };
+    let m = colino::mesh::Mesh::new(t.to_vec(), vec![[0, 1, 2]]);
     assert_eq!(Bvh::new(&m).unwrap().near_segment(a, b), vec![0]);
 }
 
@@ -244,11 +240,7 @@ fn a_crossing_past_the_end_under_a_wide_triangle_is_still_found() {
     ];
     let (a, b) = ([0.0; 3], [0.0, 0.0, 1.0]);
     assert!(crossing(a, b, t).is_some(), "rounding no longer reaches past the end");
-    let m = colino::mesh::Mesh {
-        vertices: t.to_vec(),
-        triangles: vec![[0, 1, 2]],
-        ..colino::mesh::Mesh::default()
-    };
+    let m = colino::mesh::Mesh::new(t.to_vec(), vec![[0, 1, 2]]);
     assert_eq!(Bvh::new(&m).unwrap().near_segment(a, b), vec![0]);
 }
 

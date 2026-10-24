@@ -50,7 +50,9 @@ fn turned_cube(r: f64, centre: Point, a: f64, b: f64) -> Mesh {
     }
     let group_names =
         ["", "-x", "+x", "-y", "+y", "-z", "+z"].iter().map(|s| (*s).to_owned()).collect();
-    Mesh { vertices, triangles, unit: Some("millimeter".into()), groups, group_names }
+    Mesh::new(vertices, triangles)
+        .with_unit(Some("millimeter".into()))
+        .with_groups(groups, group_names)
 }
 
 fn made(m: &Mesh, o: &Options) -> Produced {
@@ -124,7 +126,7 @@ impl Cube {
 fn a_turned_cube_crosses_each_edge_where_its_faces_plane_does() {
     let cube = Cube::new(6.3, [0.37, -0.21, 0.13], 0.4, 0.7);
     let m = turned_cube(cube.r, cube.centre, cube.a, cube.b);
-    let o = Options { accuracy: Accuracy::Exact, ..Options::new(0.5) };
+    let o = Options::new(0.5).with_accuracy(Accuracy::Exact);
     let p = hermite(&m, &convert(&m, &o).unwrap(), o.accuracy);
     // Brodo's check refuses a normal pointing in, among the rest.
     assert!(p.is_ok(), "{p:?}");
@@ -179,7 +181,7 @@ fn the_bytes_do_not_depend_on_the_thread_count() {
 #[test]
 fn every_crossed_edge_of_a_torus_is_hit() {
     let m = common::torus(20.0, 7.0, 48);
-    let p = made(&m, &Options { accuracy: Accuracy::Exact, ..Options::new(1.0) });
+    let p = made(&m, &Options::new(1.0).with_accuracy(Accuracy::Exact));
     assert_eq!(p.unhit, 0);
     let t = p.set.topology();
     let crossed: usize = t
@@ -215,7 +217,7 @@ fn every_band_keeps_crossed_edges_owned_by_leaves() {
     // Hermite::new refuses a set with a crossed edge whose owner is no leaf point.
     for band in 1..=3 {
         for m in [common::sphere(3, 9.7, [0.3, 0.1, -0.2]), common::torus(12.0, 4.1, 32)] {
-            let o = Options { band, ..Options::new(0.7) };
+            let o = Options::new(0.7).with_band(band);
             let c = convert(&m, &o).unwrap();
             assert!(hermite(&m, &c, o.accuracy).is_ok(), "band {band}");
         }
@@ -253,7 +255,7 @@ fn boxed(lo: Point, hi: Point, inward: bool) -> (Vec<Point>, Vec<[u32; 3]>) {
 
 /// Boxes appended to one mesh, each its own group in order.
 fn boxes(parts: &[(Point, Point, bool)]) -> Mesh {
-    let mut m = Mesh { unit: Some("millimeter".into()), ..Mesh::default() };
+    let mut m = Mesh::default().with_unit(Some("millimeter".into()));
     m.group_names.push(String::new());
     for (g, (lo, hi, inward)) in (1_u32..).zip(parts) {
         let (v, t) = boxed(*lo, *hi, *inward);
@@ -277,7 +279,7 @@ fn the_crossing_nearest_the_inside_end_and_the_lowest_triangle_are_kept() {
         ([-4.3; 3], [4.3; 3], false),
         ([-4.3; 3], [4.3; 3], false),
     ]);
-    let o = Options { origin: [0.25; 3], ..Options::new(1.0) };
+    let o = Options::new(1.0).with_origin([0.25; 3]);
     let p = made(&m, &o);
     let t = p.set.topology();
     let v = [4, 0, 0];
@@ -367,7 +369,7 @@ fn a_triangle_turned_in_still_gives_normals_pointing_out() {
     m.groups = vec![0; m.triangles.len()];
     m.groups[0] = 1;
     m.group_names = vec![String::new(), "turned".into()];
-    let o = Options { accuracy: Accuracy::Exact, ..Options::new(0.5) };
+    let o = Options::new(0.5).with_accuracy(Accuracy::Exact);
     let p = hermite(&m, &convert(&m, &o).unwrap(), o.accuracy);
     assert!(p.is_ok(), "{p:?}");
     let p = p.unwrap();
@@ -399,7 +401,7 @@ fn a_face_turned_in_is_refused_beyond_the_band_and_counted_within_it() {
         t.swap(1, 2);
     }
     let run = |band| {
-        let o = Options { accuracy: Accuracy::Exact, band, ..Options::new(0.5) };
+        let o = Options::new(0.5).with_band(band).with_accuracy(Accuracy::Exact);
         hermite(&m, &convert(&m, &o).unwrap(), o.accuracy)
     };
     assert!(matches!(run(3), Err(colino::error::HermiteError::SignOutsideBand(_))));

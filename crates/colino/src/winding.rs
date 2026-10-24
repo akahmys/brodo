@@ -137,6 +137,7 @@ impl Expansion {
 
 /// How the winding number is found.
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
 pub enum Accuracy {
     /// Every triangle's solid angle, summed.
     Exact,

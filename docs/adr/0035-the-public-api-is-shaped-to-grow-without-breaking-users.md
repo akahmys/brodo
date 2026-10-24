@@ -62,3 +62,20 @@ The owner chose, on 2026-10-25, the recommended option of each point:
 Every change is breaking once, listed together in CHANGELOG.md for 0.5.0. A test outside
 the crates, built against the API as a user would build it, shows that a variant or a
 field added later does not break it (P4's acceptance).
+
+## Amendment
+
+- **Date**: 2026-10-25
+
+Building the decision corrected two points of the proposal, within the rule the owner
+chose:
+
+- `Label` was listed as an enum that may grow, but a voxel is either in a component or
+  excluded, so it stays exhaustive; colino's report matches it whole.
+- Expressions that built a struct inline, such as a conversion's options for one call,
+  became blocks under assignment alone. `Options`, `Mesh` and `Limits` gained `with_…`
+  methods returning a copy with one field changed (`Options::with_origin`, `with_band`,
+  `with_accuracy`, `with_unit`; `Mesh::with_unit`, `with_triangles`, `with_groups`;
+  `Limits::with_triangles`, `with_vertices`, `with_bytes`), beside their constructors and
+  public fields. `Slice::new` and `Image::new` were added for the tests that build them.
+

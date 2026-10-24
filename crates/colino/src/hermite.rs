@@ -36,6 +36,7 @@ use crate::winding::{Accuracy, Winding};
 
 /// A mesh's Hermite data, with the count of crossed edges no triangle was hit on.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct Produced {
     /// The set, in brodo's format.
     pub set: Hermite,

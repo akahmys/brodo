@@ -46,7 +46,7 @@ fn package() -> Vec<u8> {
 
 #[test]
 fn miri_a_3mf_package_reads() {
-    let limits = Limits { triangles: 16, vertices: 16, bytes: 1 << 16 };
+    let limits = Limits::new(16, 16, 1 << 16);
     let mesh = read(&package(), limits).unwrap();
     let bits: Vec<u64> = mesh.vertices.iter().flatten().map(|c| c.to_bits()).collect();
     let want: Vec<u64> = [0.0, 0.0, 0.0, 1.5, 0.0, 0.0, 0.0, 2.5, 0.0, 0.0, 0.0, -3.25]

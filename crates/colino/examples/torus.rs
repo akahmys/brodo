@@ -28,7 +28,7 @@ const STEPS: u32 = 48;
 /// The voxel size, in millimetres.
 const H: f64 = 1.0;
 /// The most a file read here may hold.
-const LIMITS: Limits = Limits { triangles: 1 << 24, vertices: 1 << 24, bytes: 1 << 30 };
+const LIMITS: Limits = Limits::new(1 << 24, 1 << 24, 1 << 30);
 
 /// The torus as OBJ text, its quads split into triangles facing out.
 fn torus_obj() -> String {
@@ -90,8 +90,7 @@ fn out_dir() -> Result<PathBuf, BoxError> {
 /// Writes a slice through z = 0 and the report.
 fn write(name: &str, c: &Converted, r: &Report, half: i32) -> Result<(), BoxError> {
     let dir = out_dir()?;
-    let slice =
-        Slice { axis: Axis::Z, position: 0, min: [-half, -half], max: [half - 1, half - 1] };
+    let slice = Slice::new(Axis::Z, 0, [-half, -half], [half - 1, half - 1]);
     let image = render(&c.topology, &c.field, slice, ColorMap::Diverging { limit: 3.0 })?;
     std::fs::write(dir.join(format!("{name}_z0.png")), encode_png(&image)?)?;
     std::fs::write(dir.join(format!("{name}_report.txt")), format!("{r:#?}\n"))?;
@@ -101,7 +100,7 @@ fn write(name: &str, c: &Converted, r: &Report, half: i32) -> Result<(), BoxErro
 /// Converts the torus, checks it and writes it.
 fn run() -> Result<(Report, f64), BoxError> {
     let mesh = colino::obj::read(torus_obj().as_bytes(), LIMITS)?;
-    let options = Options { unit: Some("millimeter".into()), ..Options::new(H) };
+    let options = Options::new(H).with_unit(Some("millimeter".into()));
     let c = convert(&mesh, &options)?;
     let r = report(&mesh, &c, &[("hole".into(), [0.0; 3]), ("tube".into(), [RING, 0.0, 0.0])])?;
     write("torus", &c, &r, 32)?;
@@ -123,7 +122,7 @@ fn read(path: &Path) -> Result<Mesh, BoxError> {
 /// Converts the file at `path` with voxels of edge `h` and writes its report.
 fn convert_file(path: &Path, h: f64) -> Result<(), BoxError> {
     let mesh = read(path)?;
-    let options = Options { unit: Some("millimeter".into()), ..Options::new(h) };
+    let options = Options::new(h).with_unit(Some("millimeter".into()));
     let c = convert(&mesh, &options)?;
     let r = report(&mesh, &c, &[])?;
     let name = path.file_stem().and_then(|s| s.to_str()).unwrap_or("mesh");

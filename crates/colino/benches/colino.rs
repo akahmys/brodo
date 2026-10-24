@@ -18,8 +18,8 @@ use harness::{Failure, Item, repeated};
 /// The octahedron split `levels` times onto a sphere of radius `r`, its centre off the
 /// lattice so that no vertex lies on a voxel's boundary.
 fn sphere(levels: u32, r: f64) -> Mesh {
-    let mut m = Mesh {
-        vertices: vec![
+    let mut m = Mesh::new(
+        vec![
             [1.0, 0.0, 0.0],
             [-1.0, 0.0, 0.0],
             [0.0, 1.0, 0.0],
@@ -27,7 +27,7 @@ fn sphere(levels: u32, r: f64) -> Mesh {
             [0.0, 0.0, 1.0],
             [0.0, 0.0, -1.0],
         ],
-        triangles: vec![
+        vec![
             [0, 2, 4],
             [2, 1, 4],
             [1, 3, 4],
@@ -37,9 +37,8 @@ fn sphere(levels: u32, r: f64) -> Mesh {
             [3, 1, 5],
             [0, 3, 5],
         ],
-        unit: Some("millimeter".into()),
-        ..Mesh::default()
-    };
+    )
+    .with_unit(Some("millimeter".into()));
     for _ in 0..levels {
         let mut midpoints = std::collections::BTreeMap::new();
         let mut triangles = Vec::with_capacity(m.triangles.len() * 4);

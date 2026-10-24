@@ -7,7 +7,7 @@ use colino::mesh::{Limits, Mesh};
 use colino::stl::read;
 use proptest::prelude::*;
 
-const ROOMY: Limits = Limits { triangles: 1 << 20, vertices: 1 << 22, bytes: 1 << 30 };
+const ROOMY: Limits = Limits::new(1 << 20, 1 << 22, 1 << 30);
 
 /// A binary STL of triangles, with a header and, unused by readers, normals of zero.
 fn binary(header: &[u8; 80], triangles: &[[[f32; 3]; 3]]) -> Vec<u8> {
@@ -115,18 +115,18 @@ fn each_damage_is_its_own_error() {
     not_finite[2][1][0] = f32::NAN;
     assert_eq!(read(&binary(&[b' '; 80], &not_finite), ROOMY), Err(ReadError::NotFinite(2)));
     assert_eq!(
-        read(&binary(&[b' '; 80], &t), Limits { triangles: 3, vertices: 100, bytes: 1 << 30 }),
+        read(&binary(&[b' '; 80], &t), Limits::new(3, 100, 1 << 30)),
         Err(ReadError::TooLarge { what: "triangles", limit: 3 })
     );
     assert_eq!(
-        read(&binary(&[b' '; 80], &t), Limits { triangles: 100, vertices: 11, bytes: 1 << 30 }),
+        read(&binary(&[b' '; 80], &t), Limits::new(100, 11, 1 << 30)),
         Err(ReadError::TooLarge { what: "vertices", limit: 11 })
     );
     // Exactly at each limit, the file reads.
     let file = binary(&[b' '; 80], &t);
-    let exact = Limits { triangles: 4, vertices: 12, bytes: u64::try_from(file.len()).unwrap() };
+    let exact = Limits::new(4, 12, u64::try_from(file.len()).unwrap());
     assert_eq!(read(&file, exact).map(|m| m.triangles.len()), Ok(4));
-    let tiny = Limits { bytes: 83, ..ROOMY };
+    let tiny = ROOMY.with_bytes(83);
     assert_eq!(
         read(&binary(&[b' '; 80], &t), tiny),
         Err(ReadError::TooLarge { what: "bytes", limit: 83 })
@@ -157,16 +157,12 @@ fn each_damage_is_its_own_error() {
 
 #[test]
 fn welding_joins_zeros_of_either_sign_and_refuses_a_bad_index() {
-    let m = Mesh {
-        vertices: vec![[0.0, 1.0, 2.0], [-0.0, 1.0, 2.0], [3.0, 4.0, 5.0]],
-        triangles: vec![[0, 1, 2]],
-        unit: None,
-        ..Mesh::default()
-    };
+    let m = Mesh::new(vec![[0.0, 1.0, 2.0], [-0.0, 1.0, 2.0], [3.0, 4.0, 5.0]], vec![[0, 1, 2]])
+        .with_unit(None);
     let w = m.welded().unwrap();
     assert_eq!(w.vertices.len(), 2);
     assert_eq!(w.triangles, vec![[0, 0, 1]]);
-    let bad = Mesh { triangles: vec![[0, 1, 3]], ..m };
+    let bad = m.with_triangles(vec![[0, 1, 3]]);
     assert_eq!(bad.welded(), Err(MeshError::BadIndex { triangle: 0, index: 3 }));
 }
 
@@ -235,7 +231,7 @@ proptest! {
 fn an_ascii_file_holds_to_the_triangle_limit() {
     let t: Vec<[[f64; 3]; 3]> = tetrahedron().iter().map(|f| f.map(|p| p.map(f64::from))).collect();
     let text = ascii(&t);
-    let limits = |triangles| Limits { triangles, ..ROOMY };
+    let limits = |triangles| ROOMY.with_triangles(triangles);
     assert_eq!(read(text.as_bytes(), limits(4)).map(|m| m.triangles.len()), Ok(4));
     assert_eq!(
         read(text.as_bytes(), limits(3)),

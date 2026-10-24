@@ -28,11 +28,11 @@ use colino::report::{Place, report};
 // An octahedron, its faces turned outward, as OBJ text.
 let obj = b"v 10 0 0\nv -10 0 0\nv 0 10 0\nv 0 -10 0\nv 0 0 10\nv 0 0 -10\n\
             f 1 3 5\nf 3 2 5\nf 2 4 5\nf 4 1 5\nf 3 1 6\nf 2 3 6\nf 4 2 6\nf 1 4 6\n";
-let limits = Limits { triangles: 1 << 20, vertices: 1 << 20, bytes: 1 << 26 };
+let limits = Limits::new(1 << 20, 1 << 20, 1 << 26);
 let mesh = colino::obj::read(obj, limits)?;
 
 // Voxels of 0.5 in the mesh's unit; OBJ states none, so the grid is told its own.
-let options = Options { unit: Some("millimeter".into()), ..Options::new(0.5) };
+let options = Options::new(0.5).with_unit(Some("millimeter".into()));
 let converted = convert(&mesh, &options)?;
 
 let points = [("centre".to_string(), [0.1, 0.2, 0.3]), ("far".to_string(), [30.0, 0.0, 0.0])];

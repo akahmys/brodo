@@ -143,7 +143,7 @@ fn check(
 }
 
 fn exact(h: f64) -> Options {
-    Options { accuracy: Accuracy::Exact, ..Options::new(h) }
+    Options::new(h).with_accuracy(Accuracy::Exact)
 }
 
 #[test]
@@ -273,21 +273,18 @@ fn bad_options_and_a_missing_unit_are_refused() {
     let refused = |o: Options| convert(&m, &o).err();
     assert!(matches!(refused(Options::new(0.0)), Some(ConvertError::BadOption(_))));
     assert!(matches!(refused(Options::new(f64::NAN)), Some(ConvertError::BadOption(_))));
+    assert!(matches!(refused(Options::new(1.0).with_band(0)), Some(ConvertError::BadOption(_))));
     assert!(matches!(
-        refused(Options { band: 0, ..Options::new(1.0) }),
+        refused(Options::new(1.0).with_origin([f64::INFINITY, 0.0, 0.0])),
         Some(ConvertError::BadOption(_))
     ));
     assert!(matches!(
-        refused(Options { origin: [f64::INFINITY, 0.0, 0.0], ..Options::new(1.0) }),
+        refused(Options::new(1.0).with_accuracy(Accuracy::Approximate { beta: 0.0 })),
         Some(ConvertError::BadOption(_))
     ));
-    assert!(matches!(
-        refused(Options { accuracy: Accuracy::Approximate { beta: 0.0 }, ..Options::new(1.0) }),
-        Some(ConvertError::BadOption(_))
-    ));
-    let bare = Mesh { unit: None, ..m.clone() };
+    let bare = m.clone().with_unit(None);
     assert_eq!(convert(&bare, &Options::new(1.0)).err(), Some(ConvertError::NoUnit));
-    assert!(convert(&bare, &Options { unit: Some("inch".into()), ..Options::new(1.0) }).is_ok());
+    assert!(convert(&bare, &Options::new(1.0).with_unit(Some("inch".into()))).is_ok());
     let far = sphere(1, 5.0, [1e12, 0.0, 0.0]);
     assert_eq!(convert(&far, &Options::new(1.0)).err(), Some(ConvertError::OutOfRange));
 }
@@ -304,8 +301,8 @@ proptest! {
     ) {
         let vertices: Vec<Point> = soup.iter().flatten().copied().collect();
         let triangles = (0..u32::try_from(soup.len()).unwrap()).map(|i| [3 * i, 3 * i + 1, 3 * i + 2]).collect();
-        let m = Mesh { vertices, triangles, unit: Some("m".into()), ..Mesh::default() };
-        let o = Options { origin, band, ..exact(h) };
+        let m = Mesh::new(vertices, triangles).with_unit(Some("m".into()));
+        let o = exact(h).with_origin(origin).with_band(band);
         let c = convert(&m, &o).unwrap();
         prop_assert_eq!(check(&m, &o, &c, false, 1e-5), Ok(()));
     }
@@ -314,12 +311,7 @@ proptest! {
 /// A mesh with no triangle converts to the background alone.
 #[test]
 fn a_mesh_with_no_triangle_converts_to_nothing() {
-    let m = Mesh {
-        vertices: vec![[1.0, 2.0, 3.0]],
-        triangles: vec![],
-        unit: Some("mm".into()),
-        ..Mesh::default()
-    };
+    let m = Mesh::new(vec![[1.0, 2.0, 3.0]], vec![]).with_unit(Some("mm".into()));
     let counts =
         convert(&m, &Options::new(1.0)).map(|c| (c.topology.leaf_count(), c.topology.tile_count()));
     assert_eq!(counts, Ok((0, 0)));
@@ -327,12 +319,8 @@ fn a_mesh_with_no_triangle_converts_to_nothing() {
 
 /// A small triangle at `p`, in the mesh's unit.
 fn speck(p: Point) -> Mesh {
-    Mesh {
-        vertices: vec![p, [p[0] + 0.01, p[1], p[2]], [p[0], p[1] + 0.01, p[2]]],
-        triangles: vec![[0, 1, 2]],
-        unit: Some("millimeter".into()),
-        ..Mesh::default()
-    }
+    Mesh::new(vec![p, [p[0] + 0.01, p[1], p[2]], [p[0], p[1] + 0.01, p[2]]], vec![[0, 1, 2]])
+        .with_unit(Some("millimeter".into()))
 }
 
 /// Index space reaches 2³¹ − 1 less two root regions, 8192 voxels, a margin the walk
@@ -392,7 +380,7 @@ fn a_cubes_inside_tiles_reach_near_its_box() {
     let faces =
         [[0, 2, 3, 1], [4, 5, 7, 6], [0, 1, 5, 4], [2, 6, 7, 3], [0, 4, 6, 2], [1, 3, 7, 5]];
     let triangles = faces.iter().flat_map(|[a, b, c, d]| [[*a, *b, *c], [*a, *c, *d]]).collect();
-    let m = Mesh { vertices, triangles, unit: Some("millimeter".into()), ..Mesh::default() };
+    let m = Mesh::new(vertices, triangles).with_unit(Some("millimeter".into()));
     let o = exact(1.0);
     let c = convert(&m, &o).unwrap();
     assert!(matches!(c.topology.locate([24, 8, 8]), Location::Tile(..)));

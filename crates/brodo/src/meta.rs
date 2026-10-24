@@ -9,6 +9,7 @@ use crate::tree::Coord;
 
 /// What a file stores of a grid beside its topology and values.
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub struct GridMeta {
     /// The grid's name.
     pub name: String,

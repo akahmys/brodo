@@ -8,7 +8,7 @@ use colino::mesh::{Limits, Mesh};
 use colino::threemf::read;
 use proptest::prelude::*;
 
-const ROOMY: Limits = Limits { triangles: 1 << 20, vertices: 1 << 20, bytes: 1 << 26 };
+const ROOMY: Limits = Limits::new(1 << 20, 1 << 20, 1 << 26);
 const CORE: &str = "http://schemas.microsoft.com/3dmanufacturing/core/2015/02";
 const RELS: &str = "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">\
     <Relationship Target=\"/3D/3dmodel.model\" Id=\"rel0\" \
@@ -384,7 +384,7 @@ fn a_deflated_bomb_stops_at_the_byte_limit() {
     // A deflated bomb: 32 MiB of spaces from a few kilobytes, past a limit of 1 MiB.
     let mut bomb = m.clone();
     bomb.extend(std::iter::repeat_n(b' ', 32 << 20));
-    let small = Limits { bytes: 1 << 20, ..ROOMY };
+    let small = ROOMY.with_bytes(1 << 20);
     let packed = zip(&[rels_part(), deflated("3D/3dmodel.model", &bomb)]);
     assert!(packed.len() < 64 << 10);
     assert_eq!(read(&packed, small), Err(ReadError::TooLarge { what: "bytes", limit: 1 << 20 }));
@@ -407,7 +407,7 @@ fn limits_hold_before_placements_are_expanded() {
     }
     let r = one("<item objectid=\"40\"/>", &empty);
     assert_eq!(r, Err(ReadError::TooLarge { what: "triangles", limit: 1 << 20 }));
-    let few = Limits { vertices: 3, ..ROOMY };
+    let few = ROOMY.with_vertices(3);
     let r = read(
         &package(model(
             "",
@@ -670,11 +670,11 @@ fn limits_hold_at_their_exact_values() {
             ),
         ))
     };
-    let exact = Limits { vertices: 4, triangles: 4, ..ROOMY };
+    let exact = ROOMY.with_triangles(4).with_vertices(4);
     assert_eq!(read(&tetra_model(""), exact).map(|m| m.triangles.len()), Ok(4));
     // A second object, never placed, still counts as read.
     let unused = mesh_object(2, "model", &v, &t);
-    let six = Limits { vertices: 8, triangles: 6, ..ROOMY };
+    let six = ROOMY.with_triangles(6).with_vertices(8);
     assert_eq!(
         read(&tetra_model(&unused), six),
         Err(ReadError::TooLarge { what: "triangles", limit: 6 })
@@ -687,8 +687,8 @@ fn limits_hold_at_their_exact_values() {
         "",
         &format!("<resources>{empty}</resources><build><item objectid=\"2\"/></build>"),
     ));
-    let four = Limits { triangles: 4, ..ROOMY };
+    let four = ROOMY.with_triangles(4);
     assert_eq!(read(&placed, four).map(|m| m.triangles.len()), Ok(0));
-    let three = Limits { triangles: 3, ..ROOMY };
+    let three = ROOMY.with_triangles(3);
     assert!(matches!(read(&placed, three), Err(ReadError::TooLarge { what: "triangles", .. })));
 }

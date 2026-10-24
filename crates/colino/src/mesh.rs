@@ -8,6 +8,7 @@ use crate::error::MeshError;
 
 /// A triangle mesh.
 #[derive(Debug, Clone, PartialEq, Default)]
+#[non_exhaustive]
 pub struct Mesh {
     /// Vertex positions.
     pub vertices: Vec<[f64; 3]>,
@@ -25,6 +26,7 @@ pub struct Mesh {
 
 /// The most a reader takes from an untrusted file; beyond them it fails.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct Limits {
     /// The most triangles.
     pub triangles: u64,
@@ -35,6 +37,29 @@ pub struct Limits {
 }
 
 impl Limits {
+    /// At most `triangles` triangles, `vertices` vertices and `bytes` bytes.
+    pub const fn new(triangles: u64, vertices: u64, bytes: u64) -> Limits {
+        Limits { triangles, vertices, bytes }
+    }
+
+    /// The same limits, with at most `triangles` triangles.
+    #[must_use]
+    pub const fn with_triangles(self, triangles: u64) -> Limits {
+        Limits { triangles, ..self }
+    }
+
+    /// The same limits, with at most `vertices` vertices.
+    #[must_use]
+    pub const fn with_vertices(self, vertices: u64) -> Limits {
+        Limits { vertices, ..self }
+    }
+
+    /// The same limits, with at most `bytes` bytes.
+    #[must_use]
+    pub const fn with_bytes(self, bytes: u64) -> Limits {
+        Limits { bytes, ..self }
+    }
+
     /// Refuses `len` bytes beyond the limit.
     pub(crate) fn check_bytes(&self, len: u64) -> Result<(), crate::error::ReadError> {
         if len > self.bytes {
@@ -85,6 +110,31 @@ impl Grouping {
 }
 
 impl Mesh {
+    /// A mesh of `vertices` and the `triangles` that index them, with no unit and no
+    /// groups.
+    pub fn new(vertices: Vec<[f64; 3]>, triangles: Vec<[u32; 3]>) -> Mesh {
+        Mesh { vertices, triangles, ..Mesh::default() }
+    }
+
+    /// The same mesh, its unit `unit`.
+    #[must_use]
+    pub fn with_unit(self, unit: Option<String>) -> Mesh {
+        Mesh { unit, ..self }
+    }
+
+    /// The same mesh, its triangles `triangles`.
+    #[must_use]
+    pub fn with_triangles(self, triangles: Vec<[u32; 3]>) -> Mesh {
+        Mesh { triangles, ..self }
+    }
+
+    /// The same mesh, each triangle in its group of `groups`, the groups named by
+    /// `group_names` (ADR-0030).
+    #[must_use]
+    pub fn with_groups(self, groups: Vec<u32>, group_names: Vec<String>) -> Mesh {
+        Mesh { groups, group_names, ..self }
+    }
+
     /// Refuses groups that do not fit the triangles: `groups` neither empty nor one per
     /// triangle, an id with no name, or a first name other than `""`.
     pub fn check_groups(&self) -> Result<(), MeshError> {

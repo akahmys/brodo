@@ -5,8 +5,8 @@ use colino::mesh::Mesh;
 
 /// The octahedron split `levels` times onto a sphere of radius `r` about `centre`.
 pub fn sphere(levels: u32, r: f64, centre: Point) -> Mesh {
-    let mut m = Mesh {
-        vertices: vec![
+    let mut m = Mesh::new(
+        vec![
             [1.0, 0.0, 0.0],
             [-1.0, 0.0, 0.0],
             [0.0, 1.0, 0.0],
@@ -14,7 +14,7 @@ pub fn sphere(levels: u32, r: f64, centre: Point) -> Mesh {
             [0.0, 0.0, 1.0],
             [0.0, 0.0, -1.0],
         ],
-        triangles: vec![
+        vec![
             [0, 2, 4],
             [2, 1, 4],
             [1, 3, 4],
@@ -24,9 +24,8 @@ pub fn sphere(levels: u32, r: f64, centre: Point) -> Mesh {
             [3, 1, 5],
             [0, 3, 5],
         ],
-        unit: Some("millimeter".into()),
-        ..Mesh::default()
-    };
+    )
+    .with_unit(Some("millimeter".into()));
     for _ in 0..levels {
         let mut triangles = Vec::new();
         for [a, b, c] in m.triangles.clone() {
@@ -67,5 +66,5 @@ pub fn torus(big: f64, small: f64, n: u32) -> Mesh {
             triangles.push([at(i, j), at(i + 1, j + 1), at(i, j + 1)]);
         }
     }
-    Mesh { vertices, triangles, unit: Some("millimeter".into()), ..Mesh::default() }
+    Mesh::new(vertices, triangles).with_unit(Some("millimeter".into()))
 }

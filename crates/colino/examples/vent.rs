@@ -46,12 +46,7 @@ fn cells() -> Vec<[i32; 3]> {
 /// The boundary of the union of `cells`, each face two triangles facing out of its cube.
 fn boundary(cells: &[[i32; 3]]) -> Result<Mesh, BoxError> {
     let set: std::collections::BTreeSet<[i32; 3]> = cells.iter().copied().collect();
-    let mut m = Mesh {
-        vertices: Vec::new(),
-        triangles: Vec::new(),
-        unit: Some("millimeter".into()),
-        ..Mesh::default()
-    };
+    let mut m = Mesh::new(Vec::new(), Vec::new()).with_unit(Some("millimeter".into()));
     for c in cells {
         for axis in 0..3 {
             for side in [0, 1] {
@@ -91,7 +86,7 @@ fn run(mesh: &Mesh, h: f64, tag: &str) -> Result<Report, BoxError> {
     std::fs::create_dir_all(&dir)?;
     #[expect(clippy::cast_possible_truncation, reason = "a voxel index within the box")]
     let (vent, end) = (((middle + 1.0) / h) as i32, ((f64::from(SIDE) * CUBE) / h) as i32 + 4);
-    let slice = Slice { axis: Axis::Z, position: vent, min: [-4, -4], max: [end, end] };
+    let slice = Slice::new(Axis::Z, vent, [-4, -4], [end, end]);
     let image = render(&c.topology, &c.field, slice, ColorMap::Diverging { limit: 3.0 * h })?;
     std::fs::write(dir.join(format!("vent_h{tag}.png")), encode_png(&image)?)?;
     std::fs::write(dir.join(format!("vent_h{tag}_report.txt")), format!("{r:#?}\n"))?;

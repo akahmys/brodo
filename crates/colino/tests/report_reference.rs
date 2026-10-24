@@ -15,12 +15,7 @@ use common::{sphere, torus};
 /// The boundary of the union of cubes of edge `s` at `cells`, each face between a cube and
 /// no cube facing out of the cube, as two triangles.
 fn cubes(cells: &[[i32; 3]], s: f64) -> Mesh {
-    let mut m = Mesh {
-        vertices: Vec::new(),
-        triangles: Vec::new(),
-        unit: Some("millimeter".into()),
-        ..Mesh::default()
-    };
+    let mut m = Mesh::new(Vec::new(), Vec::new()).with_unit(Some("millimeter".into()));
     for c in cells {
         for axis in 0..3 {
             for side in [0, 1] {
@@ -188,7 +183,7 @@ fn a_transform_not_axis_aligned_is_refused() {
 #[test]
 fn points_are_placed_from_the_grids_origin() {
     let m = sphere(2, 10.0, [100.0, 0.0, 0.0]);
-    let c = convert(&m, &Options { origin: [100.0, 0.0, 0.0], ..Options::new(1.0) }).unwrap();
+    let c = convert(&m, &Options::new(1.0).with_origin([100.0, 0.0, 0.0])).unwrap();
     let points = [("centre".into(), [100.0, 0.0, 0.0]), ("beyond".into(), [150.0, 0.0, 0.0])];
     let r = report(&m, &c, &points).unwrap();
     assert_eq!(r.regions[0].place, Place::Solid);

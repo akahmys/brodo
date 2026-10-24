@@ -54,7 +54,7 @@ fn length(v: [f32; 3]) -> f32 {
 
 fn sphere() -> Image {
     let (t, f) = sdf([-32, -32, -8], [32, 32, 8], |v| length(v.map(|c| c as f32)) - 20.0);
-    let slice = Slice { axis: Axis::Z, position: 0, min: [-28, -28], max: [28, 28] };
+    let slice = Slice::new(Axis::Z, 0, [-28, -28], [28, 28]);
     render(&t, &f, slice, ColorMap::Diverging { limit: f64::from(BAND) }).unwrap()
 }
 
@@ -64,7 +64,7 @@ fn torus() -> Image {
         length([(x * x + y * y).sqrt() - 16.0, z, 0.0]) - 6.0
     };
     let (t, f) = sdf([-32, -8, -16], [32, 8, 16], d);
-    let slice = Slice { axis: Axis::Y, position: 0, min: [-28, -12], max: [28, 12] };
+    let slice = Slice::new(Axis::Y, 0, [-28, -12], [28, 12]);
     render(&t, &f, slice, ColorMap::Diverging { limit: f64::from(BAND) }).unwrap()
 }
 
@@ -91,7 +91,7 @@ fn tiles() -> Image {
     for (n, value) in t.tile_numbers().collect::<Vec<_>>().into_iter().zip([0.25, 0.5, 1.0]) {
         f.set_tile(&t, n, value).unwrap();
     }
-    let slice = Slice { axis: Axis::Z, position: 4, min: [-8, -8], max: [160, 40] };
+    let slice = Slice::new(Axis::Z, 4, [-8, -8], [160, 40]);
     render(&t, &f, slice, ColorMap::Sequential { min: 0.0, max: 1.0 }).unwrap()
 }
 
@@ -100,7 +100,7 @@ fn decode(bytes: &[u8]) -> Image {
     let mut rgba = vec![0; reader.output_buffer_size().unwrap()];
     let info = reader.next_frame(&mut rgba).unwrap();
     rgba.truncate(info.buffer_size());
-    Image { width: info.width, height: info.height, rgba }
+    Image::new(info.width, info.height, rgba)
 }
 
 fn scenes() -> [(&'static str, Image); 3] {

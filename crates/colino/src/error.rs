@@ -2,6 +2,7 @@
 
 /// Why a mesh file could not be read.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
 pub enum ReadError {
     /// Neither a binary STL, whose length its triangle count gives, nor an ASCII one.
     #[error("not an STL file: {0}")]
@@ -139,6 +140,7 @@ pub enum ReadError {
 
 /// Why a mesh could not be worked on.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
 pub enum MeshError {
     /// A triangle names a vertex the mesh does not hold.
     #[error("triangle {triangle} names vertex {index}, beyond the mesh's vertices")]
@@ -174,6 +176,7 @@ pub enum MeshError {
 
 /// Why a mesh could not be converted.
 #[derive(Debug, Clone, PartialEq, thiserror::Error)]
+#[non_exhaustive]
 pub enum ConvertError {
     /// The mesh names a vertex it lacks.
     #[error(transparent)]
@@ -200,6 +203,7 @@ pub enum ConvertError {
 
 /// Why Hermite data could not be made (ADR-0030).
 #[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
 pub enum HermiteError {
     /// The mesh names a vertex it lacks, or its groups do not fit it.
     #[error(transparent)]
@@ -221,6 +225,7 @@ pub enum HermiteError {
 
 /// Why a topology report could not be made.
 #[derive(Debug, Clone, PartialEq, thiserror::Error)]
+#[non_exhaustive]
 pub enum ReportError {
     /// The mesh names a vertex it lacks.
     #[error(transparent)]

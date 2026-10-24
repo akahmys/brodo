@@ -33,6 +33,7 @@ const CELL: i64 = 8;
 
 /// How a mesh is converted.
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub struct Options {
     /// A voxel's edge, h, in the mesh's unit.
     pub voxel_size: f64,
@@ -57,6 +58,30 @@ impl Options {
             accuracy: Accuracy::Approximate { beta: 2.0 },
             unit: None,
         }
+    }
+
+    /// The same options, voxel 0's corner at `origin`.
+    #[must_use]
+    pub fn with_origin(self, origin: Point) -> Options {
+        Options { origin, ..self }
+    }
+
+    /// The same options, with a band of `band` voxels.
+    #[must_use]
+    pub fn with_band(self, band: u32) -> Options {
+        Options { band, ..self }
+    }
+
+    /// The same options, winding numbers found with `accuracy`.
+    #[must_use]
+    pub fn with_accuracy(self, accuracy: Accuracy) -> Options {
+        Options { accuracy, ..self }
+    }
+
+    /// The same options, `unit` the grid's unit when the mesh states none.
+    #[must_use]
+    pub fn with_unit(self, unit: Option<String>) -> Options {
+        Options { unit, ..self }
     }
 
     fn check(&self) -> Result<(), ConvertError> {
@@ -90,6 +115,7 @@ impl Options {
 
 /// A mesh converted: its tree, its signed distances and the grid's metadata.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct Converted {
     /// Leaves in the band, tiles inside.
     pub topology: Topology,

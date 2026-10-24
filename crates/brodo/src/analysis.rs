@@ -38,6 +38,7 @@ impl Connectivity {
 
 /// Why an analysis failed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
 pub enum AnalysisError {
     /// The field does not belong to the topology.
     #[error(transparent)]

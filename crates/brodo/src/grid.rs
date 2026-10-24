@@ -11,6 +11,7 @@ use crate::tree::Coord;
 
 /// Why an edit of a grid was refused.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
 pub enum GridError {
     /// The edit of the topology was refused.
     #[error(transparent)]

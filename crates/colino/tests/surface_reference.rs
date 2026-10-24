@@ -14,12 +14,11 @@ mod common;
 use common::{sphere, torus};
 
 fn tetrahedron() -> Mesh {
-    Mesh {
-        vertices: vec![[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
-        triangles: vec![[0, 2, 1], [0, 1, 3], [0, 3, 2], [1, 2, 3]],
-        unit: None,
-        ..Mesh::default()
-    }
+    Mesh::new(
+        vec![[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
+        vec![[0, 2, 1], [0, 1, 3], [0, 3, 2], [1, 2, 3]],
+    )
+    .with_unit(None)
 }
 
 #[test]
@@ -79,12 +78,11 @@ fn each_way_of_breaking_a_surface_is_counted() {
 #[test]
 fn an_unwelded_soup_is_a_closed_surface_once_welded() {
     let t = tetrahedron();
-    let soup = Mesh {
-        vertices: t.triangles.iter().flat_map(|f| f.map(|i| t.vertices[i as usize])).collect(),
-        triangles: (0..4).map(|i| [3 * i, 3 * i + 1, 3 * i + 2]).collect(),
-        unit: None,
-        ..Mesh::default()
-    };
+    let soup = Mesh::new(
+        t.triangles.iter().flat_map(|f| f.map(|i| t.vertices[i as usize])).collect(),
+        (0..4).map(|i| [3 * i, 3 * i + 1, 3 * i + 2]).collect(),
+    )
+    .with_unit(None);
     assert_eq!(Surface::of(&soup).unwrap().open_edges, 12);
     assert!(Surface::of(&soup.welded().unwrap()).unwrap().closed_manifold());
 }
