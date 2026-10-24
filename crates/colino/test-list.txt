@@ -1,5 +1,6 @@
 example torus tests::the_torus_keeps_its_tunnel_and_its_distances
 example vent tests::the_vent_closes_when_narrower_than_a_voxel
+lib colino bvh::tests::searching_a_tetrahedron_ends_in_time
 lib colino mesh::tests::groups_that_do_not_fit_are_refused
 lib colino mesh::tests::groups_that_fit_the_triangles_are_taken
 lib colino mesh::tests::welding_keeps_each_triangles_group

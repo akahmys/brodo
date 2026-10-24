@@ -239,3 +239,26 @@ impl Bvh {
         self.corners.is_empty()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Searching a small tree ends: a mutant that makes the walk loop for ever fails here
+    /// within a minute, in the first test binary, before the tests that would only wait
+    /// for it (TESTING.md T11). The segment's box meets the faces at z = 0 and x + y + z = 1.
+    #[test]
+    fn searching_a_tetrahedron_ends_in_time() {
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let m = Mesh {
+                vertices: vec![[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
+                triangles: vec![[0, 2, 1], [0, 1, 3], [0, 3, 2], [1, 2, 3]],
+                ..Mesh::default()
+            };
+            let found = Bvh::new(&m).map(|b| b.near_segment([0.2, 0.2, -1.0], [0.2, 0.2, 1.0]));
+            tx.send(found).unwrap_or(());
+        });
+        assert_eq!(rx.recv_timeout(std::time::Duration::from_secs(60)), Ok(Ok(vec![0, 3])));
+    }
+}
