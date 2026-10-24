@@ -1,0 +1,30 @@
+# The gate on GitHub Actions (ADR-0034). Started by hand only, so that it spends nothing
+# until asked and runs for no pull request from a fork. The local list of forbidden sources
+# and the personal rules stay on the owner's machine, so the gate skips those two checks
+# here and says so; the run before a push, on that machine, still holds them.
+name: audit
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The whole history, for the gate's scan of it.
+          fetch-depth: 0
+      - name: Tools, at the versions the owner's machine runs
+        run: |
+          rustup toolchain install
+          cargo install --locked cargo-deny@0.20.2 cargo-mutants@27.1.0
+          /home/linuxbrew/.linuxbrew/bin/brew install betterleaks
+          echo "/home/linuxbrew/.linuxbrew/bin" >> "$GITHUB_PATH"
+          git config core.hooksPath scripts/hooks
+      - name: Gate
+        run: ./scripts/audit/verify_compliance.sh

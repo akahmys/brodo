@@ -12,13 +12,15 @@ With `--run [ARGS…]`, the milestone-close run: `cargo mutants --workspace` beh
 `rss_guard.py`, with its copies of the tree under `target/`. It fails when a mutant is
 missed, or when a mutant timed out before any test failed, since only a failed test shows
 that the timeout was the mutant's doing. ARGS go to cargo-mutants (`-f <file>`,
-`--iterate`). With `--report DIR`, the same verdict on a `mutants.out` already written.
+`--iterate`, `--shard k/n`). With `--report DIR [DIR…]`, the same verdict on reports
+already written, one or a shard each, taken together.
 
 With `--run --patient`, the mutants the last report shows timing out before any test
 failed run again, alone, under `PATIENT_TIMEOUT` seconds each, into `out/mutants/patient`:
 one caught is killed; one whose tests all pass is only slower, and is listed in
 `.cargo/mutants.toml` as equivalent with that reason; one still timing out fails. The
-verdict is the last report's missed mutants and the patient run's (ADR-0023).
+verdict is the last report's missed mutants and the patient run's (ADR-0023). With
+`--patient --from DIR [DIR…] [-- ARGS]`, the reports are those, a sharded run's.
 """
 
 import json
@@ -143,9 +145,15 @@ def escaped(name: str) -> str:
 
 def patient(args: list[str]) -> int:
     """The last report's unexplained timeouts, run again under `PATIENT_TIMEOUT`."""
-    last = OUT / "mutants.out"
-    missed = [f for f in verdict(last) if f.startswith("  missed")]
-    slow = timed_out(last)
+    reports = [OUT / "mutants.out"]
+    if args[:1] == ["--from"]:
+        rest = args[1:]
+        split = rest.index("--") if "--" in rest else len(rest)
+        reports, args = [Path(d).resolve() for d in rest[:split]], rest[split + 1:]
+    failures_before = verdicts(reports)
+    missed = [f for f in failures_before if f.startswith("  missed")]
+    prefix = "  timed out before any test failed: "
+    slow = [f.removeprefix(prefix) for f in failures_before if f.startswith(prefix)]
     if not slow:
         return report(missed)
     pattern = "^(" + "|".join(escaped(n) for n in slow) + ")$"
@@ -167,10 +175,12 @@ def patient(args: list[str]) -> int:
     return report(missed + failures + guarded(PATIENT_OUT))
 
 
-def timed_out(out: Path) -> list[str]:
-    """The mutants a report shows timing out before any test failed."""
-    prefix = "  timed out before any test failed: "
-    return [f.removeprefix(prefix) for f in verdict(out) if f.startswith(prefix)]
+def verdicts(outs: list[Path]) -> list[str]:
+    """What several reports, the shards of one run, show was not caught, each once."""
+    seen: list[str] = []
+    for out in outs:
+        seen += [f for f in verdict(out) if f not in seen]
+    return seen
 
 
 def verdict(out: Path) -> list[str]:
@@ -206,8 +216,8 @@ def main() -> int:
         return 1
     if sys.argv[1:2] == ["--run"]:
         return run(sys.argv[2:])
-    if sys.argv[1:2] == ["--report"] and len(sys.argv) == 3:
-        return report(verdict(Path(sys.argv[2]).resolve()))
+    if sys.argv[1:2] == ["--report"] and len(sys.argv) >= 3:
+        return report(verdicts([Path(d).resolve() for d in sys.argv[2:]]))
     return check()
 
 

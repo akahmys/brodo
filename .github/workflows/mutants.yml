@@ -1,0 +1,83 @@
+# The mutation run on GitHub Actions, in shards (TESTING.md T11, ADR-0023, ADR-0034).
+# Started by hand only. Each shard runs `mutants.py --run --shard k/n` behind the memory
+# guard and keeps its report; the last job takes the reports together, and, when asked,
+# runs the timeouts that came before any failed test again under the patient timeout.
+# A job may run six hours at most, so n is chosen to keep each shard below that.
+name: mutants
+
+on:
+  workflow_dispatch:
+    inputs:
+      shards:
+        description: "Shards, n (each at most six hours)"
+        default: "24"
+      args:
+        description: "Further arguments for cargo-mutants, such as -f 'crates/colino/src/**'"
+        default: ""
+      patient:
+        description: "Run the timeouts before any failed test again, under 1800 s each"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    runs-on: ubuntu-24.04
+    outputs:
+      shards: ${{ steps.list.outputs.shards }}
+    steps:
+      - id: list
+        env:
+          SHARDS: ${{ inputs.shards }}
+        run: echo "shards=$(python3 -c 'import json, os; print(json.dumps(list(range(int(os.environ["SHARDS"])))))')" >> "$GITHUB_OUTPUT"
+
+  shard:
+    needs: plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 350
+    strategy:
+      fail-fast: false
+      matrix:
+        k: ${{ fromJSON(needs.plan.outputs.shards) }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Tools
+        run: |
+          rustup toolchain install
+          cargo install --locked cargo-mutants@27.1.0
+      - name: Shard ${{ matrix.k }} of ${{ inputs.shards }}
+        # Its verdict is taken with the others' in the last job.
+        env:
+          SHARD: ${{ matrix.k }}/${{ inputs.shards }}
+          ARGS: ${{ inputs.args }}
+        run: python3 scripts/audit/mutants.py --run --shard "$SHARD" $ARGS || true
+      - uses: actions/upload-artifact@v7
+        with:
+          name: mutants-${{ matrix.k }}
+          path: out/mutants/mutants.out
+
+  verdict:
+    needs: shard
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: mutants-*
+          path: shards
+      - name: Tools
+        run: |
+          rustup toolchain install
+          cargo install --locked cargo-mutants@27.1.0
+      - name: Every shard's report, together
+        if: ${{ !inputs.patient }}
+        run: python3 scripts/audit/mutants.py --report shards/*
+      - name: The timeouts before any failed test, again under the patient timeout
+        if: ${{ inputs.patient }}
+        env:
+          ARGS: ${{ inputs.args }}
+        run: python3 scripts/audit/mutants.py --run --patient --from shards/* -- $ARGS

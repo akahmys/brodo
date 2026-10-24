@@ -68,6 +68,10 @@ break the rule once and watch the step fail (TESTING.md T3).
 | `scripts/hooks/commit-msg` | the commit message; `commit_msg_check.py` also requires English, and an ADR for a rule change (AGENTS.md) or a test removed from a `test-list.txt` (TESTING.md T2) |
 | the audit | the working tree and the whole history; with the personal rules also every commit message and author |
 
+**On GitHub Actions** (`.github/workflows/audit.yml`, started by hand) the gate skips the
+local list of forbidden sources and the personal rules, which stay on the owner's machine,
+and says so; the gate on that machine before every push runs them (ADR-0034).
+
 **Getting round the hooks.** The audit fails while `core.hooksPath` is not `scripts/hooks`.
 In Claude Code, [`.claude/settings.json`](.claude/settings.json) runs
 `scripts/hooks/claude_guard.py` before every shell command, which blocks skipping the

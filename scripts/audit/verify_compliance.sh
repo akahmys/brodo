@@ -12,6 +12,11 @@ unset CARGO_ENCODED_RUSTFLAGS CLIPPY_CONF_DIR RUSTDOCFLAGS
 
 ERROR=0
 fail() { echo "  FAIL: $*"; ERROR=1; }
+# On GitHub Actions the two checks that read files kept on the owner's machine alone, the
+# local list of forbidden sources and the personal rules, cannot run; each says so, and the
+# run before a push, on that machine, still runs them (ADR-0034).
+REMOTE=0
+[ "${GITHUB_ACTIONS:-}" = "true" ] && REMOTE=1
 # Each compiler error with its location, without the warnings around it.
 errors_only() { awk '/^error/ { e = $0; next } e && /^ *--> / { print e; print; e = "" }' | head -40; }
 for tool in cargo cargo-deny cargo-mutants betterleaks python3 git; do
@@ -159,7 +164,8 @@ if out=$(cargo deny check 2>&1); then echo "  PASS"
 else echo "$out" | grep -E "^error" | head -20; fail "cargo deny"; fi
 
 echo "[S1] The local list of forbidden sources the guard reads..."
-python3 scripts/hooks/provenance_guard.py --check || ERROR=1
+if [ $REMOTE -eq 1 ]; then echo "  SKIPPED on GitHub Actions: the list stays on the owner's machine"
+else python3 scripts/hooks/provenance_guard.py --check || ERROR=1; fi
 
 echo "[Rule 14] Secrets, personal data and paths outside the project..."
 ERROR_BEFORE=$ERROR; ERROR=0
@@ -171,7 +177,13 @@ betterleaks dir . --no-banner --redact >/dev/null 2>&1 \
     || fail "betterleaks: run 'betterleaks dir . --no-banner --redact'"
 out=$(python3 scripts/audit/paths.py) || { echo "$out"; ERROR=1; }
 PERSONAL="${PERSONAL_LEAKS:-$HOME/.config/betterleaks/personal.toml}"
-if [ ! -f "$PERSONAL" ]; then
+if [ $REMOTE -eq 1 ]; then
+    echo "  SKIPPED on GitHub Actions: the personal rules stay on the owner's machine"
+    if git rev-parse --verify -q HEAD >/dev/null; then
+        betterleaks git . --no-banner --redact >/dev/null 2>&1 \
+            || fail "a secret or a path outside the project in the history"
+    fi
+elif [ ! -f "$PERSONAL" ]; then
     fail "no personal rules at \$PERSONAL_LEAKS or the default (AUDITING.md §2)"
 else
     betterleaks dir . --no-banner --redact -c "$PERSONAL" >/dev/null 2>&1 \

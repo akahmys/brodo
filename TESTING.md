@@ -109,7 +109,12 @@ python3 scripts/audit/mutants.py --run -f crates/brodo/src/tree.rs      # one fi
 python3 scripts/audit/mutants.py --run --iterate                        # skip what was caught
 python3 scripts/audit/mutants.py --run --patient                        # the last run's timeouts, again
 python3 scripts/audit/mutants.py --report out/mutants/mutants.out       # judge a report again
+python3 scripts/audit/mutants.py --report shards/*                      # a sharded run's reports
+python3 scripts/audit/mutants.py --run --patient --from shards/*        # their timeouts, again
 ```
+
+On GitHub Actions, `.github/workflows/mutants.yml`, started by hand, runs the shards and
+takes their reports together (ADR-0034).
 
 ## 4. Before a change lands
 

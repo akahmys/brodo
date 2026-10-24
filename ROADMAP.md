@@ -143,6 +143,8 @@ Scheduled by the human on 2026-10-22, from a user's request (§4, R11).
 Scheduled by the human on 2026-10-23, before P5 changes colino's options and report: one
 review of what brodo and colino show, so that later additions break no user.
 
+- [ ] The first runs of `.github/workflows/audit.yml` and `mutants.yml` (ADR-0034), and
+      P4's mutation run on them if they hold
 - [ ] An ADR on the API's shape: `#[non_exhaustive]` on error enums and on structs that
       grow (`Options`, `Report`, `Limits`, `Mesh` and the like), with constructors; which
       of colino's parts (`bvh`, `winding`, `distance`, `intersect`) stay public
@@ -201,17 +203,26 @@ No spike is running. `spikes/remap/` answered B-001 and B-008, and `spikes/merge
   P1, for `piatto`: a GPU, window and GUI stack (B-013).
 - Before any distribution: confirm the licence terms for that form of distribution
   (ADR-0007).
-- Before the repository is made public, which the owner decides later (2026-10-24), each
-  of these done; readiness is kept up meanwhile:
-  - History: the two names of the owner's local list of forbidden sources that the first
-    commit carried, removed at `3928db9` (2026-10-20), are rewritten out of every commit
-    before it, by `git filter-repo --replace-text` with its table outside the repository,
-    the tool approved first; the gate run again, tags set again, and the force push left to
-    the owner. Checked 2026-10-24: every author and committer is the noreply address, no
-    path into a home directory is in the history, and the gate's history scans pass.
-  - Patents: whether the methods brodo implements from papers, the VDB tree among them,
-    are under patent, for the owner to look into, with advice if needed.
-  - CI: workflows started by hand only, none run for a pull request from a fork.
+- Making the repository public, which the owner decides later (2026-10-24). Readiness is
+  kept up meanwhile; checked 2026-10-24: every author and committer is the noreply
+  address, no path into a home directory is in the history, the gate's history scans
+  pass, and the workflows start by hand only (ADR-0034). Once the owner decides, in order:
+  1. Patents: whether the methods brodo implements from papers, the VDB tree among them,
+     are under patent, looked into by the owner, with advice if needed.
+  2. Licences: the terms confirmed for this form of distribution (ADR-0007); `cargo deny`
+     already holds every dependency to the allow-list.
+  3. History: the two names of the owner's local list of forbidden sources that the first
+     commits carried, removed at `3928db9` (2026-10-20), rewritten out of every commit
+     before it. `git filter-repo`, approved first, runs in a fresh clone with
+     `--replace-text` and its table kept outside the repository; a search of every
+     commit for the two names then finds none; the gate passes; the tags `v0.1.0` and
+     later are set again on the rewritten commits; the owner force-pushes `main` and the
+     tags, and any other clone is made afresh.
+  4. Settings on GitHub, by the owner: the visibility made public; `main` protected
+     against force pushes and deletion; workflows from forks' pull requests held for
+     approval.
+  5. CI: with standard runners free for a public repository, whether `audit.yml` also runs
+     on each push, decided then (ADR-0034).
 - Before registering on crates.io: `publish`, and each crate's description and keywords
   naming its function (sparse volume, VDB, SDF, level set, voxel). Both names were found
   unregistered on 2026-10-16, per the design.
