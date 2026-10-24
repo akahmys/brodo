@@ -189,7 +189,7 @@ implementation (PLANNING.md §2).
 | B-003 | Do level-set operations (CSG, redistancing) belong in brodo? | No, until shown to be general |
 | B-004 | Does a shared IR schema crate live in this repository? | Undecided; for brodo's users to agree, not for brodo to anticipate |
 | B-005 | What is the archive profile's default compressor, and is it pure Rust (CODING.md Rule 12)? | Zstd, LZ4 when decompression speed is asked for; whether a pure-Rust implementation suffices is to be measured |
-| B-006 | Does `vdb-rs` pass Rules 12 and 13 (no C, permissive licence) on every target? | To be checked before it is added |
+| B-006 | Does `vdb-rs` pass Rules 12 and 13 (no C, permissive licence) on every target, and is it written apart from OpenVDB's source rather than translated from it, which would carry MPL-2.0 (ADR-0007)? | To be checked before it is added |
 | B-013 | Which crates handle `piatto`'s window, input and GUI parts? | `winit` and `egui`, to be measured against Rules 12 and 13 (ADR-0018) |
 
 No spike is running. `spikes/remap/` answered B-001 and B-008, and `spikes/merge/` B-010

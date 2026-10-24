@@ -36,7 +36,7 @@ papers, public documentation and permissively licensed code (S1, S2) may appear 
 | `crates/brodo/src/view.rs` | ARCHITECTURE.md §4.6, ADR-0016, ADR-0032 only; `zerocopy`'s public API documentation (0.8.63) | `GridView`: checking a frozen grid whole, reading it in place, and walking its leaves and tiles |
 | `crates/brodo/src/slice.rs` | ARCHITECTURE.md §6.1, ADR-0018 only; `png`'s public API documentation (0.18.1) | a slice of a scalar field drawn and encoded as PNG |
 | `crates/brodo/src/vtk.rs` | ARCHITECTURE.md §6.1, ADR-0018 only; VTK's published XML file-format documentation, its `NumberOfComponents` and `Vectors` included; VTK_VOXEL's number from VTK's public Python API | a field, scalar or of three components, written as one ASCII `.vtu` of voxel cells |
-| `crates/brodo/src/tree.rs` | ARCHITECTURE.md §4.1, ADR-0013 only | the sparse tree: levels, masks, arenas, activation, tiles, their split and merge, iteration, compaction |
+| `crates/brodo/src/tree.rs` | ARCHITECTURE.md §4.1, ADR-0013; Museth 2013, for a shallow, wide tree of fixed levels with tiles | the sparse tree: levels, masks, arenas, activation, tiles, their split and merge, iteration, compaction |
 | `crates/colino/src/bvh.rs` | ARCHITECTURE.md §5.1, ADR-0027; a bounding volume hierarchy split at the median, as textbook material | a tree of axis-aligned boxes over a mesh's triangles, and the nearest triangle to a point |
 | `crates/colino/src/convert.rs` | ARCHITECTURE.md §5.1, ADR-0027 only | a mesh converted into a narrow-band signed distance field, with inside tiles |
 | `crates/colino/src/distance.rs` | ARCHITECTURE.md §5.1, ADR-0027; the nearest point of a triangle by its Voronoi regions, as textbook material | the nearest point of a segment and of a triangle |

@@ -62,3 +62,17 @@ Shown to fire: with a name in a list given by `$BRODO_FORBIDDEN_SOURCES`, a path
 was blocked, and passed without it; both names in the owner's list were blocked, and
 passed with no list; a path naming OpenVDB was blocked with no list; `--check` failed with
 no list and with an empty one, and passed with the owner's.
+
+## Amendment
+
+- **Date**: 2026-10-24
+
+The owner confirmed that OpenVDB is licensed under the Mozilla Public License 2.0, before
+and since the Academy Software Foundation took it on. MPL-2.0 is copyleft file by file: a
+modified file is distributed under it, while code that only links to OpenVDB need not be.
+brodo does not link to OpenVDB but implements the same ideas itself, so a translation or
+port of an OpenVDB file into brodo could be such a modification, and would bind that file
+of brodo to MPL-2.0, which MIT OR Apache-2.0 cannot hold. S1 stands for OpenVDB on that
+ground. MPL-2.0's patent grant covers users of OpenVDB's code, not an implementation drawn
+from the papers, so it gives brodo none.
+
