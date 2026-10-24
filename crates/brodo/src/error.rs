@@ -209,6 +209,14 @@ pub enum CacheError {
     /// A length does not fit the format's `u32` fields.
     #[error("the file is too large for its u32 fields")]
     TooLarge,
+    /// The file is longer than the reader's limit, and was not read (ADR-0036).
+    #[error("the file holds {length} bytes, more than the limit of {limit}")]
+    FileTooLarge {
+        /// The file's length.
+        length: u64,
+        /// The limit given.
+        limit: u64,
+    },
 }
 
 /// Which rule of the Hermite data format a set breaks (ADR-0032).

@@ -143,7 +143,7 @@ fn format_version_1_keeps_its_bytes_and_a_file_round_trips() {
     let t = build(&[[3, 3, 3]], &[]);
     let f = numbered(&t, 0.0_f64, f64::from);
     write(&path, &[CacheEntry::new(&meta("on disk", &[]), &t, &f).unwrap()]).unwrap();
-    let file = CacheFile::read(&path).unwrap();
+    let file = CacheFile::read(&path, u64::MAX).unwrap();
     assert_eq!(
         file.view::<f64>(0).unwrap().get([3, 3, 3]).unwrap().to_bits(),
         f.value_at(&t, [3, 3, 3]).unwrap().to_bits()
@@ -393,7 +393,7 @@ fn every_value_type_is_written_and_read_back() {
     let _absent = std::fs::remove_file(&path);
     write(&path, &entries).unwrap();
     assert_eq!(std::fs::read(&path).ok(), Some(to_bytes(&entries).unwrap()));
-    let file = CacheFile::read(&path).unwrap();
+    let file = CacheFile::read(&path, u64::MAX).unwrap();
     let codes: Vec<u32> = (0..6).map(|i| file.value_type(i).unwrap()).collect();
     assert_eq!(codes, [1, 2, 3, 4, 5, 6]);
     let (u8s, u32s, f64s) =
@@ -404,4 +404,23 @@ fn every_value_type_is_written_and_read_back() {
         let got = file.view::<f64>(1).unwrap().get(v).unwrap();
         assert_eq!(got.to_bits(), f64s.value_at(&t, v).unwrap().to_bits(), "at {v:?}");
     }
+}
+
+/// A file longer than the reader's limit is refused by its length, unread; one exactly at
+/// the limit is read (ADR-0036).
+#[test]
+fn a_file_beyond_the_read_limit_is_refused_unread() {
+    let path = tmp("limited.brdc");
+    let t = build(&[[0, 0, 0]], &[]);
+    write(
+        &path,
+        &[CacheEntry::new(&meta("small", &[]), &t, &numbered(&t, 0.0_f32, |k| k as f32)).unwrap()],
+    )
+    .unwrap();
+    let length = std::fs::metadata(&path).unwrap().len();
+    assert!(CacheFile::read(&path, length).is_ok());
+    assert!(matches!(
+        CacheFile::read(&path, length - 1),
+        Err(CacheError::FileTooLarge { length: l, limit }) if l == length && limit == length - 1
+    ));
 }

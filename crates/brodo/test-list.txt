@@ -60,6 +60,7 @@ lib brodo vtk::tests::an_empty_grid_has_no_cell
 lib brodo vtk::tests::an_infinity_is_refused_before_anything_is_written
 lib brodo vtk::tests::integers_are_written_as_they_are
 lib brodo vtk::tests::two_tiles_side_by_side_share_four_points
+test cache_format a_file_beyond_the_read_limit_is_refused_unread
 test cache_format a_file_reads_back_what_was_written
 test cache_format a_file_unfit_to_map_is_refused
 test cache_format a_grid_of_f64_vectors_reads_copied_and_mapped

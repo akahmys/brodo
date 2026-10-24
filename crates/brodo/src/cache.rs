@@ -359,8 +359,13 @@ fn zero(bytes: &[u8]) -> bool {
 }
 
 impl CacheFile {
-    /// Reads and checks a cache file.
-    pub fn read(path: &Path) -> Result<Self, CacheError> {
+    /// Reads and checks a cache file of at most `limit` bytes; a longer one is refused by
+    /// its length before any of it is read (ADR-0036).
+    pub fn read(path: &Path, limit: u64) -> Result<Self, CacheError> {
+        let length = std::fs::metadata(path)?.len();
+        if length > limit {
+            return Err(CacheError::FileTooLarge { length, limit });
+        }
         Self::from_bytes(&std::fs::read(path)?)
     }
 

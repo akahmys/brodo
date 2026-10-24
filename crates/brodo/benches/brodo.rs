@@ -217,7 +217,7 @@ impl Data {
             repeated(
                 "cache_read",
                 16,
-                Box::new(|| Ok(CacheFile::read(&self.file)?.grid_count() as f64)),
+                Box::new(|| Ok(CacheFile::read(&self.file, u64::MAX)?.grid_count() as f64)),
             ),
             repeated(
                 "cache_map",

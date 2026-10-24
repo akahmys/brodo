@@ -6,6 +6,8 @@ are recorded here when they change (V6).
 
 ## Unreleased
 
+- `CacheFile::read` takes a byte limit and refuses a longer file by its length before
+  reading it, with the new `CacheError::FileTooLarge` (ADR-0036).
 - brodo's features `slice-png` and `vtk` are off by default: a user drawing slices or
   writing VTK names them (ADR-0036). Mapping a cache file is behind the feature `mmap`, on
   by default.
