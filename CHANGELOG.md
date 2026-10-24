@@ -6,6 +6,10 @@ are recorded here when they change (V6).
 
 ## Unreleased
 
+- `docs/formats.md` states the bytes of the frozen layout, the cache profile and Hermite
+  data, the SDF convention, the media type names `application/vnd.brodo.cache` and
+  `application/vnd.brodo.hermite`, and the version policy; where it and the code differ,
+  the document is right (ADR-0037, ADR-0038, ADR-0041).
 - colino's SDFs carry `sdf.version` = `1` in `GridMeta::extra`, naming brodo's SDF
   convention (`brodo::meta::SDF_KEY`, ADR-0039); a cache file written from one gains the
   pair.

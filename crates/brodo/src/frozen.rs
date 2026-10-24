@@ -1,12 +1,7 @@
 //! The frozen layout (ARCHITECTURE.md §4.6, ADR-0016) and `freeze`, which packs a topology
 //! and a field into one 32-byte aligned buffer that a `GridView` reads in place.
 //!
-//! Layout version 1, every structure 32-byte aligned, in little-endian `u32` words, offsets
-//! in 32-byte units: the header; the root table, sorted by key; upper nodes, then lower
-//! nodes, each in the Morton order of its origin; leaf values in leaf-number order; tile
-//! values, root tiles first, then each upper node's, then each lower node's. A node's masks
-//! number its children's places in Morton order: a child is its node's first child plus
-//! the set bits below its place.
+//! Layout version 1's bytes are in `docs/formats.md` §2, which this code follows.
 
 use std::collections::BTreeMap;
 

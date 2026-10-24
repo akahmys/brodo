@@ -35,6 +35,7 @@ If a rule and the design seem to conflict, stop and ask the human.
 | [TESTING.md](TESTING.md) | What must pass before a change lands, and how is a version numbered? | Test results |
 | [AUDITING.md](AUDITING.md) | What is checked mechanically, and by what? | The rules being checked |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | What is the design **now**? | History, rules |
+| [docs/formats.md](docs/formats.md) | What are the bytes of each file brodo writes? | Why the formats are this shape |
 | [ROADMAP.md](ROADMAP.md) | Where is the work, what is next, what is open? | Rules, design |
 | [PROVENANCE.md](PROVENANCE.md) | What did each source file draw on? | Rules, design |
 | [CHANGELOG.md](CHANGELOG.md) | What changed in each version, and what breaks a user? | Plans |

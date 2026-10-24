@@ -192,12 +192,8 @@ fastest. A neighbour beyond the `i32` coordinate range is the background.
   `GridView<'a>` without copying, through `zerocopy`.
 - Links between nodes are offsets from the start, in 32-byte units. Every structure is
   32-byte aligned, little-endian, and laid out in `u32` words.
-- Layout version 1, in order: a header (magic number, layout version, value type, the
-  count and offset of each section, the buffer's length, the background in up to six
-  words); the root table, sorted by key; upper nodes, then lower nodes, each in the Morton
-  order of its origin;
-  leaf values in leaf-number order; tile values, root tiles first, then each upper node's,
-  then each lower node's, in node order.
+- Layout version 1: a header, the root table, upper nodes, lower nodes, leaf values and
+  tile values, in that order; its bytes are in [docs/formats.md](docs/formats.md) §2.
 - A node's masks number its children's places in Morton order, so that its children,
   being consecutive in that order, are found as its first child's number plus the set bits
   below the place; no list of child numbers is stored. Tile values follow the same rule.
@@ -222,13 +218,11 @@ fastest. A neighbour beyond the `i32` coordinate range is the background.
   does not interpret; the voxel size and unit are always present. The bounding box is
   worked out from the topology when a file is written; a grid with no leaf or tile has an
   empty one, a variant of its own.
-- The cache profile, format version 1, in 32-byte blocks: a file header (magic number,
-  format version, grid count); a directory with each grid's metadata and frozen buffer
-  (offset and length) and value type; each grid's metadata, little-endian, strings as a
-  length and UTF-8 bytes padded to four; each grid's frozen buffer (§4.6) on a block
-  boundary. A reader checks the whole file, every grid's buffer included, before it
-  answers, and accepts its own format version only and only the bytes its writer puts:
-  no gap, zero padding and unused words, nothing after the last grid (ADR-0016).
+- The cache profile, format version 1: a header, a directory, then each grid's metadata
+  and frozen buffer (§4.6) on block boundaries; its bytes are in
+  [docs/formats.md](docs/formats.md) §3. A reader checks the whole file, every grid's
+  buffer included, before it answers, and accepts only the bytes its writer puts: no gap,
+  zero padding and unused words, nothing after the last grid (ADR-0016).
 - A cache file is read by copying it into an aligned buffer (`CacheFile::read`) or by
   mapping it into memory without a copy (`CacheFile::map`); both go through one parser.
   Mapping is brodo's only unsafe code, in one module (ADR-0008); while a file is mapped,
@@ -266,11 +260,10 @@ are in ADR-0030.
   group 0, by bits; the signs' background is 0.
 - A set is checked whole when made and when read; a broken rule is a typed error naming
   the point, the axis and the rule.
-- In a cache file, a set is ten grids told apart by keys in `GridMeta::extra`:
-  `hermite.version` (1), `hermite.set` and `hermite.field`; the sign grid holds the group
-  table as `hermite.group.<id>`. The ten agree in voxel size, unit and transform. A reader
-  accepts its own version only and reads a set as ten `GridView`s, without a copy, the
-  shared topology checked by comparing their node sections.
+- In a cache file, a set is ten grids told apart by keys in `GridMeta::extra`, the sign
+  grid holding the group table ([docs/formats.md](docs/formats.md) §4). A reader reads a
+  set as ten `GridView`s, without a copy, the shared topology checked by comparing their
+  node sections.
 - A producer's own information, such as edges it found no surface for, is not in the
   format; it reports it beside the set.
 

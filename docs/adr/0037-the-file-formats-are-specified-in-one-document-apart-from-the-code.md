@@ -36,3 +36,25 @@ The owner chose, on 2026-10-25, the recommended option of each point:
 ## Consequences
 
 The document is written in P4 and checked as AGENTS.md's writing rules check the others.
+
+## Amendment
+
+- **Date**: 2026-10-25
+
+The document was written as decided, with the narrow-band SDF convention (ADR-0039), the
+media type names (ADR-0041) and the version policy (ADR-0038). The reader,
+`scripts/formats/read.py`, runs under `crates/brodo/tests/format_document.rs` in the gate's
+tests: on the four golden files it must print every grid's metadata, background, leaves,
+tiles, some voxels found by the document's lookup and each Hermite set's verdict as the
+crates read them; on 2942 damaged copies, four values in each of the words the test picks,
+it must accept and refuse as the crates do. Shown to fire: without the check of the
+buffer's length in blocks, or of the cache header's unused bytes, or of an edge whose
+signs agree holding no crossing, the damaged copies disagreed; with a leaf's voxels
+ordered y fastest, the golden files did. Before the voxels were printed, that last break
+passed, the leaves' bytes being compared whole.
+
+Writing it down found what a reader of version 1 does not check, now stated in the
+document: a frozen buffer's padding and the background's bytes beyond its size, the order
+of its nodes and whether every node and leaf is reached, and a cache file's bounds against
+its grid. Whether to check them is left to a later format version.
+

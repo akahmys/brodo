@@ -12,10 +12,8 @@
 //! set's table names. An edge with no crossing, every tile and the background hold
 //! `NO_CROSSING`, compared by bits; the signs' background is 0.
 //!
-//! In a cache file, `GridMeta::extra` tells a set's grids apart: `hermite.version`,
-//! `hermite.set` and `hermite.field`, one of `FIELDS`; the sign grid holds the group table
-//! as `hermite.group.<id>`, group 0, named `""`, omitted. The ten grids agree in voxel size,
-//! unit and transform; names and other keys are free.
+//! In a cache file, `GridMeta::extra` tells a set's grids apart and holds the group table,
+//! as `docs/formats.md` §4 states, which this code follows.
 
 use std::collections::{BTreeMap, BTreeSet};
 

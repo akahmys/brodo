@@ -3,10 +3,7 @@
 //! bytes: it is listed in `UNTRUSTED_INPUT`, indexes nothing (CODING.md Rule 3), checks the
 //! whole file before it answers, and is fuzzed (TESTING.md T6).
 //!
-//! Format version 1, in 32-byte blocks, little-endian: a header (magic number, version,
-//! grid count); a directory, one block per grid (its metadata's offset in blocks and length
-//! in bytes, its frozen buffer's offset and length in blocks, its value type); each grid's
-//! metadata; each grid's frozen buffer.
+//! Format version 1's bytes are in `docs/formats.md` §3, which this code follows.
 
 use std::path::Path;
 
