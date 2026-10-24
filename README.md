@@ -2,14 +2,16 @@
 
 Sparse volumes in pure Rust: a VDB-style sparse tree whose fields share one topology, a
 zero-copy frozen view and file format, and topology analysis. The repository holds two
-crates, and a third after P1:
+crates, and plans a third:
 
 - `brodo`: the sparse tree, fields, the frozen view `GridView`, file formats, topology
-  analysis, and output for checking a field by eye (a slice as PNG, VTK for ParaView).
-- `colino`: converts triangle meshes to narrow-band signed distance fields on brodo's tree,
-  and reports the topology changes the conversion may cause.
-- `piatto`, after P1: a viewer of brodo's grid files, as a library to embed and a small
-  windowed program.
+  analysis, Hermite data, and output for checking a field by eye (a slice as PNG, VTK for
+  ParaView). Its own [README](crates/brodo/README.md) shows it in use.
+- `colino`: converts triangle meshes to narrow-band signed distance fields and Hermite
+  data on brodo's tree, and reports the topology changes the conversion may cause. Its
+  own [README](crates/colino/README.md) shows it in use.
+- `piatto`, planned and not started: a viewer of brodo's grid files, as a library to embed
+  and a small windowed program.
 
 Licensed under either of [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your
 option.

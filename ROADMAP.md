@@ -201,6 +201,17 @@ No spike is running. `spikes/remap/` answered B-001 and B-008, and `spikes/merge
   P1, for `piatto`: a GPU, window and GUI stack (B-013).
 - Before any distribution: confirm the licence terms for that form of distribution
   (ADR-0007).
+- Before the repository is made public, which the owner decides later (2026-10-24), each
+  of these done; readiness is kept up meanwhile:
+  - History: the two names of the owner's local list of forbidden sources that the first
+    commit carried, removed at `3928db9` (2026-10-20), are rewritten out of every commit
+    before it, by `git filter-repo --replace-text` with its table outside the repository,
+    the tool approved first; the gate run again, tags set again, and the force push left to
+    the owner. Checked 2026-10-24: every author and committer is the noreply address, no
+    path into a home directory is in the history, and the gate's history scans pass.
+  - Patents: whether the methods brodo implements from papers, the VDB tree among them,
+    are under patent, for the owner to look into, with advice if needed.
+  - CI: workflows started by hand only, none run for a pull request from a fork.
 - Before registering on crates.io: `publish`, and each crate's description and keywords
   naming its function (sparse volume, VDB, SDF, level set, voxel). Both names were found
   unregistered on 2026-10-16, per the design.
