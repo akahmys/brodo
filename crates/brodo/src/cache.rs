@@ -216,7 +216,7 @@ fn decode_meta(bytes: &[u8]) -> Result<(GridMeta, Bounds), CacheError> {
 
 /// One grid of a read file.
 #[derive(Debug, Clone)]
-struct Entry {
+pub(crate) struct Entry {
     meta: GridMeta,
     bounds: Bounds,
     value_type: u32,
@@ -227,13 +227,13 @@ struct Entry {
 /// A cache file read into a 32-byte aligned buffer and checked whole.
 #[derive(Debug)]
 pub struct CacheFile {
-    storage: Storage,
-    grids: Vec<Entry>,
+    pub(crate) storage: Storage,
+    pub(crate) grids: Vec<Entry>,
 }
 
 /// Where a read file's bytes are: copied into an aligned buffer, or mapped.
 #[derive(Debug)]
-enum Storage {
+pub(crate) enum Storage {
     Copied(Vec<Block>),
     #[cfg(feature = "mmap")]
     Mapped(memmap2::Mmap),
@@ -309,7 +309,7 @@ fn header(c: &mut Cursor<'_>) -> Result<u32, CacheError> {
 /// Checks a cache file's bytes whole: header, directory, every grid's metadata and frozen
 /// buffer, each where the writer puts it, with no gap, padding of zeros, and nothing after
 /// the last grid (ADR-0016). The bytes start on a 32-byte boundary.
-fn index(all: &[u8]) -> Result<Vec<Entry>, CacheError> {
+pub(crate) fn index(all: &[u8]) -> Result<Vec<Entry>, CacheError> {
     if all.as_ptr().align_offset(BLOCK) != 0 {
         return Err(CacheError::Inconsistent("alignment"));
     }
@@ -377,21 +377,6 @@ impl CacheFile {
         let blocks = aligned(bytes);
         let grids = index(blocks.as_bytes())?;
         Ok(Self { storage: Storage::Copied(blocks), grids })
-    }
-
-    /// Maps a cache file into memory and checks it whole, without a copy. While the
-    /// returned value lives, the caller keeps the file unchanged: changing or truncating a
-    /// mapped file is undefined behaviour (ADR-0008). Behind the feature `mmap`.
-    #[cfg(feature = "mmap")]
-    pub fn map(path: &Path) -> Result<Self, CacheError> {
-        let file = std::fs::File::open(path)?;
-        let len = file.metadata()?.len();
-        if len == 0 || !len.is_multiple_of(BLOCK as u64) {
-            return Err(CacheError::Inconsistent("length"));
-        }
-        let map = crate::mapping::map(&file)?;
-        let grids = index(&map)?;
-        Ok(Self { storage: Storage::Mapped(map), grids })
     }
 
     fn entry(&self, i: usize) -> Result<&Entry, CacheError> {

@@ -6,6 +6,8 @@ are recorded here when they change (V6).
 
 ## Unreleased
 
+- `CacheFile::map` is an `unsafe fn`: its caller promises, in its own `unsafe` block, that
+  the file is not changed while mapped (ADR-0036).
 - `CacheFile::read` takes a byte limit and refuses a longer file by its length before
   reading it, with the new `CacheError::FileTooLarge` (ADR-0036).
 - brodo's features `slice-png` and `vtk` are off by default: a user drawing slices or

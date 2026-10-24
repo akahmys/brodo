@@ -7,6 +7,11 @@
 //! lies below it. The file items read and write through the operating system's page cache,
 //! which the harness's eviction buffer does not empty.
 
+#![expect(
+    unsafe_code,
+    reason = "mapping a cache file is unsafe: the benchmark keeps its files unchanged while mapped (ADR-0036)"
+)]
+
 use std::path::PathBuf;
 
 use brodo::accessor::ValueAccessor;
@@ -222,7 +227,13 @@ impl Data {
             repeated(
                 "cache_map",
                 256,
-                Box::new(|| Ok(CacheFile::map(&self.file)?.grid_count() as f64)),
+                Box::new(|| {
+                    Ok({
+                        // SAFETY: no process changes this benchmark's own files while they are mapped.
+                        unsafe { CacheFile::map(&self.file) }
+                    }?
+                    .grid_count() as f64)
+                }),
             ),
         ]
     }

@@ -31,7 +31,7 @@ grep -E '^echo "\[' scripts/audit/verify_compliance.sh
 | `cargo clippy --workspace --all-targets -- -D warnings`, with the lints in `Cargo.toml` and the bans in `clippy.toml` | 1, 4, 6, 7, 9, 10, 16, 17, 18, 19 |
 | `cargo clippy --all-targets -D warnings` per member with no default features and with each feature alone | 10 |
 | clippy's panic lints over `--lib --bins`, filtered by `scripts/audit/lint_filter.py` | 2 |
-| `scripts/audit/source.py`: asserts and recursion in production code; the lints an exception names, in every target; `unsafe` outside `UNSAFE_MODULES`, in every file | 2, 4, 15, 18, 19 |
+| `scripts/audit/source.py`: asserts and recursion in production code; the lints an exception names, in every target; `unsafe` outside `UNSAFE_MODULES`, in every file, but a call of `CacheFile::map` in `UNSAFE_CALLERS` | 2, 4, 15, 18, 19 |
 | clippy's `indexing_slicing` over the crate of each module in `UNTRUSTED_INPUT`, its findings kept to that module by `scripts/audit/lint_filter.py --under` | 3 |
 | grep for `String` and `anyhow` errors | 8 |
 | grep for `filter_map(Result::ok)` and its forms | 9 |

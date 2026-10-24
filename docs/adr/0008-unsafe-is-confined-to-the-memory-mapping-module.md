@@ -109,3 +109,20 @@ is unsafe. T7 named brodo's dependencies only. The human decided:
 
 It ran under Miri in 2 s with no report. Natively, the triangles' orientation flipped in
 the reader failed it.
+
+## Amendment
+
+- **Date**: 2026-10-25
+
+ADR-0036 made `CacheFile::map` an `unsafe fn`, its promise, that the file is not changed
+while mapped, stated under `# Safety` where the compiler asks the caller for it. The
+function moved into the mapping module, the one file allowed `unsafe`. Its callers then
+needed `unsafe` too: brodo's own test of mapping, `cache_format.rs`, and its benchmark.
+The human decided that the files `UNSAFE_CALLERS` lists in `project.py` may hold `unsafe`
+only as `unsafe { CacheFile::map(…) }`, under a `// SAFETY:` comment and the file's
+`#![expect(unsafe_code, …)]`, and `scripts/audit/source.py` holds them to that form; a
+user outside the workspace writes its own `unsafe`, as for any `unsafe fn`. Shown to
+fire: a call of `map` in another test file failed Rules 4 and 19; another `unsafe` in a
+listed file failed Rule 4; the listed file without its `#![expect]` failed rustc's
+`unsafe_code`.
+

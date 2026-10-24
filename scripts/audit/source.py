@@ -11,10 +11,12 @@ Production code is each `src/` file up to its `#[cfg(test)]` module, which clipp
 
 3. Rule 19: an `#[expect]`, in any target (tests, examples and benchmarks included), names
    only a lint CODING.md lets an exception cover, the print lints only in an application crate, and `unsafe_code` only in the file
-   `UNSAFE_MODULES` lists (`project.py`). clippy holds the rest of Rule 19 (`expect` rather
+   `UNSAFE_MODULES` lists or the files `UNSAFE_CALLERS` lists (`project.py`). clippy holds the rest of Rule 19 (`expect` rather
    than `allow`, and a reason).
-4. Rule 4: the word `unsafe` appears in code (comments aside) only in that file, in every
-   `.rs` file of every member, tests included, and `UNSAFE_MODULES` has at most one entry.
+4. Rule 4: the word `unsafe` appears in code (comments and strings aside) only in that
+   file, in every `.rs` file of every member, tests included, and `UNSAFE_MODULES` has at
+   most one entry; in a file `UNSAFE_CALLERS` lists, it appears only as
+   `unsafe { CacheFile::map(`, a call of the one `unsafe fn` brodo offers (ADR-0036).
    rustc's `unsafe_code = "deny"` holds the rest: unsafe code without the `#[expect]` fails.
 
 The call graph is built from names, so it is approximate. A call counts when it is a bare
@@ -27,7 +29,7 @@ import re
 import sys
 from pathlib import Path
 
-from project import APPLICATIONS, UNSAFE_MODULES
+from project import APPLICATIONS, UNSAFE_CALLERS, UNSAFE_MODULES
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -84,7 +86,8 @@ def exceptions(crate: Path, files: list[Path]) -> list[str]:
     for path in files:
         in_src = "src" in path.relative_to(crate).parts
         text = "\n".join(production(path) if in_src else path.read_text().split("\n"))
-        here = allowed | ({UNSAFE_LINT} if unsafe_allowed(path) else set())
+        may = unsafe_allowed(path) or caller(path)
+        here = allowed | ({UNSAFE_LINT} if may else set())
         for match in LINT_ATTRIBUTE.finditer(text):
             number = text.count("\n", 0, match.start()) + 1
             for part in match.group(1).split(","):
@@ -100,13 +103,24 @@ def unsafe_allowed(path: Path) -> bool:
     return str(path.relative_to(ROOT)) in UNSAFE_MODULES
 
 
+def caller(path: Path) -> bool:
+    return str(path.relative_to(ROOT)) in UNSAFE_CALLERS
+
+
+STRING = re.compile(r'"(?:\\.|[^"\\])*"')
+MAP_CALL = re.compile(r"\bunsafe \{ CacheFile::map\(")
+
+
 def unsafe_code(crate: Path) -> list[str]:
     out = []
     for path in sorted(crate.rglob("*.rs")):
         if "target" in path.relative_to(crate).parts or unsafe_allowed(path):
             continue
         for number, line in enumerate(path.read_text().split("\n"), 1):
-            if UNSAFE.search(line.split("//")[0]):
+            code = STRING.sub('""', line.split("//")[0])
+            if caller(path):
+                code = MAP_CALL.sub("", code)
+            if UNSAFE.search(code):
                 out.append(f"  {path.relative_to(ROOT)}:{number}: unsafe outside UNSAFE_MODULES (Rule 4)")
     return out
 

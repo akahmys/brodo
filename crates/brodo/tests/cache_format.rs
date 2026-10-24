@@ -3,6 +3,11 @@
 //! the bytes of a committed file (TESTING.md V6), and damaged files are refused, never read
 //! wrongly or with a panic.
 
+#![expect(
+    unsafe_code,
+    reason = "mapping a cache file is unsafe: the test keeps its files unchanged while mapped (ADR-0036)"
+)]
+
 use std::collections::BTreeMap;
 
 use brodo::cache::{CacheEntry, CacheFile, to_bytes, write};
@@ -291,7 +296,14 @@ fn a_mapped_file_reads_as_a_copied_one() {
     let bytes = golden();
     let path = tmp("golden_mapped.brdc");
     std::fs::write(&path, &bytes).unwrap();
-    let (mapped, copied) = (CacheFile::map(&path).unwrap(), CacheFile::from_bytes(&bytes).unwrap());
+    let (mapped, copied) = (
+        {
+            // SAFETY: no process changes this test's own files while they are mapped.
+            unsafe { CacheFile::map(&path) }
+        }
+        .unwrap(),
+        CacheFile::from_bytes(&bytes).unwrap(),
+    );
     assert_eq!(mapped.grid_count(), copied.grid_count());
     for i in 0..copied.grid_count() {
         assert_eq!(mapped.meta(i).unwrap(), copied.meta(i).unwrap());
@@ -327,7 +339,14 @@ fn a_grid_of_f64_vectors_reads_copied_and_mapped() {
     let path = tmp("f64_vectors.brdc");
     std::fs::write(&path, &bytes).unwrap();
     let bits = |x: [f64; 3]| x.map(f64::to_bits);
-    for file in [CacheFile::map(&path).unwrap(), CacheFile::from_bytes(&bytes).unwrap()] {
+    for file in [
+        {
+            // SAFETY: no process changes this test's own files while they are mapped.
+            unsafe { CacheFile::map(&path) }
+        }
+        .unwrap(),
+        CacheFile::from_bytes(&bytes).unwrap(),
+    ] {
         assert_eq!(file.value_type(1).unwrap(), 6);
         assert_eq!(file.meta(1).unwrap(), &meta("velocity", &[("precision", "double")]));
         let view = file.view::<[f64; 3]>(1).unwrap();
@@ -353,14 +372,38 @@ fn a_grid_of_f64_vectors_reads_copied_and_mapped() {
 fn a_file_unfit_to_map_is_refused() {
     let empty = tmp("empty.brdc");
     std::fs::write(&empty, []).unwrap();
-    assert!(matches!(CacheFile::map(&empty), Err(CacheError::Inconsistent("length"))));
+    assert!(matches!(
+        {
+            // SAFETY: no process changes this test's own files while they are mapped.
+            unsafe { CacheFile::map(&empty) }
+        },
+        Err(CacheError::Inconsistent("length"))
+    ));
     let odd = tmp("odd.brdc");
     std::fs::write(&odd, [0_u8; 33]).unwrap();
-    assert!(matches!(CacheFile::map(&odd), Err(CacheError::Inconsistent("length"))));
+    assert!(matches!(
+        {
+            // SAFETY: no process changes this test's own files while they are mapped.
+            unsafe { CacheFile::map(&odd) }
+        },
+        Err(CacheError::Inconsistent("length"))
+    ));
     let damaged = tmp("damaged.brdc");
     std::fs::write(&damaged, with_word(&golden(), 0, 9)).unwrap();
-    assert!(matches!(CacheFile::map(&damaged), Err(CacheError::BadMagic(9))));
-    assert!(matches!(CacheFile::map(&tmp("missing.brdc")), Err(CacheError::Io(_))));
+    assert!(matches!(
+        {
+            // SAFETY: no process changes this test's own files while they are mapped.
+            unsafe { CacheFile::map(&damaged) }
+        },
+        Err(CacheError::BadMagic(9))
+    ));
+    assert!(matches!(
+        {
+            // SAFETY: no process changes this test's own files while they are mapped.
+            unsafe { CacheFile::map(&tmp("missing.brdc")) }
+        },
+        Err(CacheError::Io(_))
+    ));
 }
 
 fn entries_u8(t: &Topology) -> Field<u8> {
