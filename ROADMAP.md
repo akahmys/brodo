@@ -150,7 +150,8 @@ review of what brodo and colino show, so that later additions break no user.
       held (2026-10-25); where P4's mutation run goes, there or on the owner's machine, is
       decided when it closes, a whole run there costing about $82 on a private repository
 - [x] An ADR on the API's shape (ADR-0035), the owner choosing every recommended option
-- [ ] The API reviewed for attack surface too, after Anthropic's article on it (2026):
+- [x] The API reviewed for attack surface too (ADR-0036), the owner choosing every
+      recommended option, after Anthropic's article on it (2026):
       colino's STL, OBJ and 3MF readers behind cargo features, 3MF's ZIP and XML parsing
       not built for those who do not read 3MF; brodo's `slice-png` and `vtk` off by default;
       a limit on the bytes `CacheFile::read` takes; `CacheFile::map`'s promise, that the

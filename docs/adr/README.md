@@ -63,3 +63,4 @@ A record is `Proposed` until the human accepts it.
 | [0033](0033-a-milestones-closing-checks-are-chosen-by-its-content-after-p4.md) | A milestone's closing checks are chosen by its content after P4 |
 | [0034](0034-the-gate-and-the-mutation-run-can-run-on-github-actions.md) | The gate and the mutation run can run on GitHub Actions |
 | [0035](0035-the-public-api-is-shaped-to-grow-without-breaking-users.md) | The public API is shaped to grow without breaking users |
+| [0036](0036-what-a-user-does-not-need-is-not-built-or-reached.md) | What a user does not need is not built or reached |
