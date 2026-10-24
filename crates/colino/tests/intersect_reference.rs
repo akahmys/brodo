@@ -260,3 +260,15 @@ fn a_tree_of_no_triangle_is_empty() {
     let one = Bvh::new(&common::sphere(0, 1.0, [0.0; 3])).unwrap();
     assert!(!one.is_empty() && one.len() == 8);
 }
+
+/// A crossing exactly at a segment's end, found by the property test on 2026-10-25: the
+/// paper's scaling by 1/D rounds 7 × 0.2 to just above 1.4 and puts it past the end; the
+/// range compared with det·D keeps it, at the end, as exact arithmetic does.
+#[test]
+fn a_crossing_exactly_at_the_end_is_kept() {
+    let (a, t) = ([-1_i64, -1, -4], [[-1_i64, -3, 3], [0, 0, 0], [-1, 4, -4]]);
+    assert_eq!(exact(a, 2, 5, t), Some((35, 35)));
+    let mut b = a;
+    b[2] += 5;
+    assert_eq!(crossing(point(a), point(b), t.map(point)), Some(1.0));
+}

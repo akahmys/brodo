@@ -49,9 +49,11 @@ pub fn crossing(a: Point, b: Point, t: [Point; 3]) -> Option<f64> {
     // triangle's winding for culling its back; both faces are hit here, and the swap would
     // only negate U, V, W and the determinant together, so it is left out.
     let (kx, ky) = ((kz + 1) % 3, (kz + 2) % 3);
-    let (sx, sy, sz) = (d[kx] / d[kz], d[ky] / d[kz], 1.0 / d[kz]);
+    let (sx, sy) = (d[kx] / d[kz], d[ky] / d[kz]);
     let [pa, pb, pc] = t.map(|p| sub(p, a));
-    let sheared = |p: Point| [p[kx] - sx * p[kz], p[ky] - sy * p[kz], sz * p[kz]];
+    // The paper scales the third coordinate by 1/D; it is kept unscaled here, and the range
+    // compared with det·D instead, so that a crossing exactly at an end is not rounded off.
+    let sheared = |p: Point| [p[kx] - sx * p[kz], p[ky] - sy * p[kz], p[kz]];
     let ([ax, ay, az], [bx, by, bz], [cx, cy, cz]) = (sheared(pa), sheared(pb), sheared(pc));
     let u = edge(cx, by, cy, bx);
     let v = edge(ax, cy, ay, cx);
@@ -63,12 +65,12 @@ pub fn crossing(a: Point, b: Point, t: [Point; 3]) -> Option<f64> {
     if det == 0.0 {
         return None;
     }
-    let along = u * az + v * bz + w * cz;
-    let (along, det) = if det < 0.0 { (-along, -det) } else { (along, det) };
-    if along < 0.0 || along > det {
+    let (along, limit) = (u * az + v * bz + w * cz, det * d[kz]);
+    let (along, limit) = if limit < 0.0 { (-along, -limit) } else { (along, limit) };
+    if along < 0.0 || along > limit {
         return None;
     }
-    Some(along / det)
+    Some(along / limit)
 }
 
 /// The fraction along the segment from `a` to `b` nearest `p`, the lowest of equals.

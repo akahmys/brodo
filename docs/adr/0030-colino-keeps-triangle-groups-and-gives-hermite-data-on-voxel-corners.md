@@ -196,3 +196,13 @@ its false surface's edges counted as unhit (2026-10-22). The human decided:
 - Adding leaves where the sign changes, which would change conversion (ADR-0027), and
   answering B-016 first were set aside.
 
+## Amendment
+
+- **Date**: 2026-10-25
+
+The gate's property test found a crossing exactly at a segment's end that the test missed
+and exact arithmetic kept: the paper scales the third coordinate by 1/D, and with D = 5,
+7 × 0.2 rounded to just above 1.4, putting the hit past the end. The third coordinate is
+now kept unscaled and compared with det·D, one division made at the end, which on integer
+coordinates agrees with exact arithmetic. A test holds that case.
+
