@@ -19,6 +19,21 @@ option.
 [ROADMAP.md](ROADMAP.md) says where the work is, and [ARCHITECTURE.md](ARCHITECTURE.md)
 what the design is. Contributors, human or agent, start with [AGENTS.md](AGENTS.md).
 
+## Depending on it
+
+Pin a release tag, not a branch or a revision:
+
+```toml
+[dependencies]
+brodo = { git = "https://github.com/akahmys/brodo", tag = "v0.4.0" }
+colino = { git = "https://github.com/akahmys/brodo", tag = "v0.4.0" }
+```
+
+Every crate in one process that uses brodo should pin the same tag: two pins of different
+revisions build two copies of brodo whose types do not mix. If you need a change before a
+release, ask for a small release rather than pinning a revision (ADR-0040). Releases and
+their breaking changes are in [CHANGELOG.md](CHANGELOG.md).
+
 ## Setting up a clone
 
 1. Install the commit hooks:

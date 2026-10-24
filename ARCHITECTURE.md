@@ -369,6 +369,8 @@ it would follow:
 ## 7. Compatibility
 
 - Before 1.0 the API may break; every break is in CHANGELOG.md (TESTING.md V3), and users
-  pin a git revision.
+  pin a release tag; a user needing a change before its milestone gets a small release
+  rather than a revision, so that crates sharing one process can agree on one tag
+  (ADR-0040).
 - The `GridView` layout and each file profile have their own format version (TESTING.md
-  V6).
+  V6); a release reads its own and the one before it (ADR-0038).

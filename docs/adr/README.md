@@ -64,3 +64,8 @@ A record is `Proposed` until the human accepts it.
 | [0034](0034-the-gate-and-the-mutation-run-can-run-on-github-actions.md) | The gate and the mutation run can run on GitHub Actions |
 | [0035](0035-the-public-api-is-shaped-to-grow-without-breaking-users.md) | The public API is shaped to grow without breaking users |
 | [0036](0036-what-a-user-does-not-need-is-not-built-or-reached.md) | What a user does not need is not built or reached |
+| [0037](0037-the-file-formats-are-specified-in-one-document-apart-from-the-code.md) | The file formats are specified in one document apart from the code |
+| [0038](0038-a-format-version-is-raised-so-that-producers-and-readers-can-move-in-turn.md) | A format version is raised so that producers and readers can move in turn |
+| [0039](0039-whether-the-narrow-band-sdf-conventions-are-a-public-convention.md) | Whether the narrow-band SDF's conventions are a public convention |
+| [0040](0040-users-pin-a-release-tag-and-small-releases-are-cut-on-request.md) | Users pin a release tag, and small releases are cut on request |
+| [0041](0041-whether-brodos-files-get-media-type-names.md) | Whether brodo's files get media type names |
