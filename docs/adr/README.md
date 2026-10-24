@@ -62,3 +62,4 @@ A record is `Proposed` until the human accepts it.
 | [0032](0032-hermite-data-is-a-brodo-format-any-producer-writes.md) | Hermite data is a brodo format that any producer writes |
 | [0033](0033-a-milestones-closing-checks-are-chosen-by-its-content-after-p4.md) | A milestone's closing checks are chosen by its content after P4 |
 | [0034](0034-the-gate-and-the-mutation-run-can-run-on-github-actions.md) | The gate and the mutation run can run on GitHub Actions |
+| [0035](0035-the-public-api-is-shaped-to-grow-without-breaking-users.md) | The public API is shaped to grow without breaking users |
