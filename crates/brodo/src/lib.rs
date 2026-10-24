@@ -13,6 +13,7 @@ pub mod gather;
 pub mod grid;
 pub mod hermite;
 pub mod manifest;
+#[cfg(feature = "mmap")]
 mod mapping;
 pub mod meta;
 pub mod morphology;

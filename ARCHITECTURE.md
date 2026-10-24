@@ -329,7 +329,7 @@ are in ADR-0030.
 
 In `brodo`, each behind a cargo feature:
 
-- **A slice as PNG** (`brodo::slice`, feature `slice-png`, on by default), along x, y or z
+- **A slice as PNG** (`brodo::slice`, feature `slice-png`, opted into, ADR-0036), along x, y or z
   at a given position, one voxel to a pixel. Signed distances take a diverging colour map
   centred on zero, with the zero contour drawn one pixel wide; other scalars a sequential
   one. The colour range is given by the caller, never inferred, and refused unless it is
@@ -339,7 +339,7 @@ In `brodo`, each behind a cargo feature:
   the same bytes. The encoder is `png`, pure Rust. The slices kept as golden images are
   written to `out/slices/` for a look by
   `cargo test -p brodo --test slice_images -- --ignored`.
-- **A field for ParaView** (`brodo::vtk`, feature `vtk`, on by default), written from the
+- **A field for ParaView** (`brodo::vtk`, feature `vtk`, opted into, ADR-0036), written from the
   published file-format documentation only, as one ASCII UnstructuredGrid (`.vtu`): a
   VTK_VOXEL cell per leaf voxel, a tile one cell of its region's size, in index space,
   points shared and `Float64`, values as cell data (ADR-0018, B-012): a scalar field as

@@ -235,6 +235,7 @@ pub struct CacheFile {
 #[derive(Debug)]
 enum Storage {
     Copied(Vec<Block>),
+    #[cfg(feature = "mmap")]
     Mapped(memmap2::Mmap),
 }
 
@@ -242,6 +243,7 @@ impl Storage {
     fn bytes(&self) -> &[u8] {
         match self {
             Storage::Copied(blocks) => blocks.as_bytes(),
+            #[cfg(feature = "mmap")]
             Storage::Mapped(map) => map,
         }
     }
@@ -374,7 +376,8 @@ impl CacheFile {
 
     /// Maps a cache file into memory and checks it whole, without a copy. While the
     /// returned value lives, the caller keeps the file unchanged: changing or truncating a
-    /// mapped file is undefined behaviour (ADR-0008).
+    /// mapped file is undefined behaviour (ADR-0008). Behind the feature `mmap`.
+    #[cfg(feature = "mmap")]
     pub fn map(path: &Path) -> Result<Self, CacheError> {
         let file = std::fs::File::open(path)?;
         let len = file.metadata()?.len();

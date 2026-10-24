@@ -9,19 +9,22 @@ publish.workspace = true
 readme = "README.md"
 
 [dependencies]
-memmap2.workspace = true
+memmap2 = { workspace = true, optional = true }
 png = { workspace = true, optional = true }
 rayon.workspace = true
 thiserror.workspace = true
 zerocopy.workspace = true
 
 [features]
-default = ["slice-png", "vtk"]
-# The checking output's slices as PNG (ARCHITECTURE.md §6.1, ADR-0018); on by default, so
-# that the gate's tests cover it.
+default = ["mmap"]
+# Reading a cache file by memory mapping (ARCHITECTURE.md §4.7, ADR-0008); on by default,
+# left out with the unsafe module by a user who never maps (ADR-0036).
+mmap = ["dep:memmap2"]
+# The checking output's slices as PNG (ARCHITECTURE.md §6.1, ADR-0018); opted into
+# (ADR-0036), the gate covering it with every feature.
 slice-png = ["dep:png"]
-# The checking output's field as one ASCII .vtu (ARCHITECTURE.md §6.1, ADR-0018); on by
-# default, so that the gate's tests cover it.
+# The checking output's field as one ASCII .vtu (ARCHITECTURE.md §6.1, ADR-0018); opted
+# into (ADR-0036).
 vtk = []
 
 [dev-dependencies]
@@ -39,7 +42,20 @@ test = true
 name = "spheres"
 test = true
 
+[[test]]
+name = "slice_images"
+required-features = ["slice-png"]
+
+[[test]]
+name = "vtk_reference"
+required-features = ["vtk"]
+
+[[test]]
+name = "cache_format"
+required-features = ["mmap"]
+
 # The Benchmark tier on brodo's own harness (TESTING.md §1, ADR-0019).
 [[bench]]
 name = "brodo"
 harness = false
+required-features = ["mmap"]

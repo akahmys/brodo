@@ -6,6 +6,11 @@ are recorded here when they change (V6).
 
 ## Unreleased
 
+- brodo's features `slice-png` and `vtk` are off by default: a user drawing slices or
+  writing VTK names them (ADR-0036). Mapping a cache file is behind the feature `mmap`, on
+  by default.
+- colino's readers are features, `stl`, `obj` and `threemf`, all on by default; with
+  `default-features = false`, a user names those it needs (ADR-0036).
 - Error enums, and enums that may gain variants (`Accuracy`, `ColorMap`, `Reference`,
   `Place`, `Rule`), are `#[non_exhaustive]`: a `match` over one outside its crate needs a
   wildcard arm (ADR-0035).

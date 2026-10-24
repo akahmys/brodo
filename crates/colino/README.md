@@ -3,9 +3,10 @@
 Converts triangle meshes into narrow-band signed distance fields on brodo's sparse volumes,
 and reports how the conversion may have changed the shape's topology. It reports; it does not repair a mesh or refine a grid.
 
-- **Reading**: binary and ASCII STL, Wavefront OBJ and 3MF, each under the limits the caller
-  sets on triangles, vertices and bytes. Badly oriented, holed and degenerate meshes are
-  read as they are.
+- **Reading**: binary and ASCII STL, Wavefront OBJ and 3MF, each under the limits the
+  caller sets on triangles, vertices and bytes. Badly oriented, holed and degenerate
+  meshes are read as they are. Each reader is a feature, `stl`, `obj` and `threemf`, all
+  on by default; a user who reads no 3MF can leave out its ZIP and XML parsing.
 - **Converting**: exact distances to the nearest triangle, signed by the generalised winding
   number (exact, or Barill et al.'s fast approximation), clamped to a band of ±N voxels.
   Leaves lie only in the band; inside regions become tiles; memory follows the band's

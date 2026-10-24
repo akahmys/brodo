@@ -15,12 +15,12 @@ on its tree.
   dilation and erosion, with 6- or 26-connectivity, tiles included.
 - **Files**: `freeze` packs a grid into one aligned buffer, read in place as a
   `GridView`; the cache profile stores several grids with their metadata, read by copy or
-  by memory mapping, every byte checked first.
+  by memory mapping (feature `mmap`, on by default), every byte checked first.
 - **Hermite data**: signs on a grid's voxel corners and, on each edge whose ends differ,
   where a surface crosses it, its normal and its group, as a format any producer writes
   and any reader checks.
 - **Checking output**: a slice as PNG (feature `slice-png`) and a field for ParaView
-  (feature `vtk`), both on by default.
+  (feature `vtk`), both opted into.
 
 ```rust
 use brodo::analysis::{Connectivity, label};

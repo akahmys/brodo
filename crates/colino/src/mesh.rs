@@ -61,6 +61,7 @@ impl Limits {
     }
 
     /// Refuses `len` bytes beyond the limit.
+    #[cfg(any(feature = "stl", feature = "obj", feature = "threemf"))]
     pub(crate) fn check_bytes(&self, len: u64) -> Result<(), crate::error::ReadError> {
         if len > self.bytes {
             return Err(crate::error::ReadError::TooLarge { what: "bytes", limit: self.bytes });
@@ -71,6 +72,7 @@ impl Limits {
 
 /// Groups as a reader meets them: each name numbered in the order a triangle first takes
 /// it, `""` always 0 (ADR-0030).
+#[cfg(any(feature = "stl", feature = "obj", feature = "threemf"))]
 #[derive(Debug, Default)]
 pub(crate) struct Grouping {
     ids: BTreeMap<String, u32>,
@@ -78,6 +80,7 @@ pub(crate) struct Grouping {
     groups: Vec<u32>,
 }
 
+#[cfg(any(feature = "stl", feature = "obj", feature = "threemf"))]
 impl Grouping {
     /// Puts the next `n` triangles in the group named `name`.
     pub(crate) fn take(&mut self, name: &str, n: usize) {

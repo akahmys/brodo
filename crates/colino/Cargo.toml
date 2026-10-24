@@ -10,18 +10,26 @@ readme = "README.md"
 
 [dependencies]
 brodo.workspace = true
-miniz_oxide.workspace = true
-quick-xml.workspace = true
-rawzip.workspace = true
+miniz_oxide = { workspace = true, optional = true }
+quick-xml = { workspace = true, optional = true }
+rawzip = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 thiserror.workspace = true
 
 [features]
+default = ["stl", "obj", "threemf"]
+# Each reader opted out of by a user who reads no file of its kind (ADR-0036); 3MF brings
+# ZIP, deflate and XML parsing.
+stl = []
+obj = []
+threemf = ["dep:rawzip", "dep:miniz_oxide", "dep:quick-xml"]
 # The topology report as plain data serialisable with serde (ARCHITECTURE.md §5.2,
 # ADR-0028); off by default.
 serde = ["dep:serde"]
 
 [dev-dependencies]
+# The examples and tests draw slices as PNG.
+brodo = { workspace = true, features = ["slice-png"] }
 proptest.workspace = true
 rayon.workspace = true
 serde_json.workspace = true
@@ -33,10 +41,27 @@ workspace = true
 [[example]]
 name = "torus"
 test = true
+required-features = ["stl", "obj", "threemf"]
 
 [[example]]
 name = "vent"
 test = true
+
+[[test]]
+name = "stl_format"
+required-features = ["stl"]
+
+[[test]]
+name = "obj_format"
+required-features = ["obj"]
+
+[[test]]
+name = "threemf_format"
+required-features = ["threemf"]
+
+[[test]]
+name = "miri_paths"
+required-features = ["threemf"]
 
 # The Benchmark tier on brodo's harness (TESTING.md §1, ADR-0019).
 [[bench]]

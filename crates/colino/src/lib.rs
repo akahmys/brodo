@@ -9,9 +9,12 @@ pub mod error;
 pub mod hermite;
 pub mod intersect;
 pub mod mesh;
+#[cfg(feature = "obj")]
 pub mod obj;
 pub mod report;
+#[cfg(feature = "stl")]
 pub mod stl;
 pub mod surface;
+#[cfg(feature = "threemf")]
 pub mod threemf;
 pub mod winding;
