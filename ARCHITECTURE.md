@@ -296,7 +296,9 @@ are in ADR-0030.
 - Output: leaves only in a band of ±N voxels around the surface (N = 3 by default), values
   signed distances clamped to ±N·h; negative tiles inside, each region classified once,
   from the root region down; the positive background outside. No dense grid: memory follows
-  the band's volume, at 3000³ resolution as well.
+  the band's volume, at 3000³ resolution as well. These are brodo's SDF convention, version
+  1, which the grid's `extra` names under the key `sdf.version` (`brodo::meta::SDF_KEY`,
+  ADR-0039) so that any producer can claim it.
 - Hermite data: a set in brodo's format (§4.9) on the conversion's topology, its signs
   the winding number's and its crossings found by a watertight edge test, with the count
   of crossed edges no triangle was hit on beside it (ADR-0030).

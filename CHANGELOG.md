@@ -6,6 +6,9 @@ are recorded here when they change (V6).
 
 ## Unreleased
 
+- colino's SDFs carry `sdf.version` = `1` in `GridMeta::extra`, naming brodo's SDF
+  convention (`brodo::meta::SDF_KEY`, ADR-0039); a cache file written from one gains the
+  pair.
 - `CacheFile::map` is an `unsafe fn`: its caller promises, in its own `unsafe` block, that
   the file is not changed while mapped (ADR-0036).
 - `CacheFile::read` takes a byte limit and refuses a longer file by its length before

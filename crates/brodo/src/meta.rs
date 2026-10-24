@@ -7,6 +7,15 @@ use crate::error::{MetaError, TreeError};
 use crate::topology::Topology;
 use crate::tree::Coord;
 
+/// The key in `GridMeta::extra` that marks a grid as a narrow-band SDF written to brodo's
+/// convention (ADR-0039): voxel v sampled at the image of v + ½, signed distances negative
+/// inside in the grid's unit, leaves in a band of N voxels with values clamped to ±N·h,
+/// inside tiles −N·h and the background +N·h. Its value is the convention's version.
+pub const SDF_KEY: &str = "sdf.version";
+
+/// The version of the SDF convention this brodo states.
+pub const SDF_VERSION: &str = "1";
+
 /// What a file stores of a grid beside its topology and values.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]

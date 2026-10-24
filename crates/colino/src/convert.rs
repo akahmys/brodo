@@ -18,7 +18,7 @@ use std::collections::BTreeSet;
 
 use brodo::error::FieldError;
 use brodo::field::{Field, uniform};
-use brodo::meta::GridMeta;
+use brodo::meta::{GridMeta, SDF_KEY, SDF_VERSION};
 use brodo::parallel::par_update;
 use brodo::topology::Topology;
 use brodo::tree::{Coord, TileLevel};
@@ -228,6 +228,7 @@ pub fn convert(mesh: &Mesh, o: &Options) -> Result<Converted, ConvertError> {
     for (row, origin) in meta.transform.iter_mut().zip(o.origin) {
         row[3] = origin;
     }
+    meta.extra.insert(SDF_KEY.to_owned(), SDF_VERSION.to_owned());
     meta.check()?;
     Ok(Converted { topology: t, field: f, meta })
 }

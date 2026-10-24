@@ -6,6 +6,7 @@
 
 use brodo::analysis::{Connectivity, Label, label};
 use brodo::euler::euler;
+use brodo::meta::{SDF_KEY, SDF_VERSION};
 use brodo::topology::Location;
 use brodo::tree::Coord;
 use colino::convert::{Converted, Options, convert};
@@ -156,6 +157,7 @@ fn a_sphere_converts_as_the_reference_says_everywhere() {
     check(&m, &o, &c, true, 1e-5).unwrap();
     assert_eq!(c.meta.unit, "millimeter");
     assert_eq!(c.meta.voxel_size.map(f64::to_bits), [1.0_f64; 3].map(f64::to_bits));
+    assert_eq!(c.meta.extra.get(SDF_KEY).map(String::as_str), Some(SDF_VERSION));
 }
 
 #[test]
