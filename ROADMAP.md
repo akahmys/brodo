@@ -146,11 +146,10 @@ Scheduled by the human on 2026-10-22, from a user's request (§4, R11).
 Scheduled by the human on 2026-10-23, before P5 changes colino's options and report: one
 review of what brodo and colino show, so that later additions break no user.
 
-- [ ] The first runs of `.github/workflows/audit.yml` and `mutants.yml` (ADR-0034), and
-      P4's mutation run on them if they hold
-- [ ] An ADR on the API's shape: `#[non_exhaustive]` on error enums and on structs that
-      grow (`Options`, `Report`, `Limits`, `Mesh` and the like), with constructors; which
-      of colino's parts (`bvh`, `winding`, `distance`, `intersect`) stay public
+- [x] The first runs of `.github/workflows/audit.yml` and `mutants.yml` (ADR-0034): both
+      held (2026-10-25); where P4's mutation run goes, there or on the owner's machine, is
+      decided when it closes, a whole run there costing about $82 on a private repository
+- [x] An ADR on the API's shape (ADR-0035), the owner choosing every recommended option
 - [ ] The API reviewed for attack surface too, after Anthropic's article on it (2026):
       colino's STL, OBJ and 3MF readers behind cargo features, 3MF's ZIP and XML parsing
       not built for those who do not read 3MF; brodo's `slice-png` and `vtk` off by default;

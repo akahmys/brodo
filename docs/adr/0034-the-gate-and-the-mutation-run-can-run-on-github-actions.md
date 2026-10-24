@@ -70,3 +70,16 @@ with `GITHUB_ACTIONS=true` and the two local files pointed at nothing, the gate 
 saying it skipped the list and the personal rules; without it, the same run failed at
 exactly those two checks.
 
+## Amendment
+
+- **Date**: 2026-10-25
+
+The first runs on GitHub held. `audit.yml` passed in 27 minutes, saying it skipped the two
+local checks, 211 tests passing. `mutants.yml`, over `mesh.rs` in two shards, caught all
+19 mutants in 57 minutes, the memory guard logging on Linux, and its last job took the two
+reports together and passed. A private repository's 2-core runner took about 5.3 minutes a
+mutant, against about 2 on the owner's machine at two jobs: a whole run of some 2950
+mutants would take about 260 runner hours, 15 600 minutes, some $82 beyond the free 2000
+at $0.006 a minute, and at least 45 shards to keep each within six hours, about 13 hours
+at 20 jobs at once. Where a milestone's run goes is decided when it closes.
+
