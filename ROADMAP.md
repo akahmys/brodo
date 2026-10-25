@@ -8,17 +8,15 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: P3 accepted by the human and closed as 0.4.0 (2026-10-25). Its mutation run
-  found a real defect, a crossing at a segment's very end rounded off, now fixed and held
-  by a test (ADR-0030); and the two looping `Winding::approximate` mutants are caught,
-  P2's misses having been a timeout just short of their 60 s test's failure.
-- **Next**: the owner's acceptance of P4, then 0.5.0. Every closing check held
-  (2026-10-25): no fuzz finding in 900 s per target, Miri passed, every benchmark within
-  its baseline, no refactoring found worth doing; the mutation run, 3000 mutants on GitHub
-  Actions in 60 shards, missed 155 and timed out on 16, all since caught: the 148 of
-  `slice.rs` and `vtk.rs` once the run took every feature, 7 of colino's Hermite data by
-  three new tests, the 16 under the patient timeout (ADR-0023). The retrospective added
-  B-022 and the load in the benchmark report (ADR-0019).
+- **Done**: P4 accepted by the human and closed as 0.5.0 (2026-10-25): the API's shape
+  (ADR-0035), shown by `api_growth.rs` to take a field or a variant without breaking a user;
+  readers and checking output behind features, a read limit, `map` an `unsafe fn`
+  (ADR-0036); `docs/formats.md` held by its reader (ADR-0037); the SDF convention's key
+  (ADR-0039). Its mutation run, the first on GitHub Actions, missed 148 mutants behind
+  opt-in features until the run took every feature (ADR-0023). The repository is public
+  (ADR-0034, ADR-0007).
+- **Next**: P5 (§2), each step a spike and an ADR before it is built; first the costs the
+  review of 2026-10-25 found, measured, and B-016's sign without orientation.
 - **Unresolved problems**: `cache_map_x256` runs 8 to 10 % behind its baseline of
   2026-10-17 at v0.3.0 and now alike, run in turn (2026-10-23); a first run straight after
   the fuzz round and Miri failed at +13 %. Machine drift is the likely cause, not shown. Miri's Stacked Borrows reports undefined behaviour in
@@ -193,9 +191,9 @@ review of what brodo and colino show, so that later additions break no user.
       pinning; breaking ones listed in CHANGELOG.md together
 - [x] Retrospective and refactoring; fuzz round; Miri run; benchmarks; mutation run
       (ADR-0023): all held (2026-10-25)
-- [ ] **Accepted when** adding a field or an error variant later breaks no code written
+- [x] **Accepted when** adding a field or an error variant later breaks no code written
       against the API, shown by a test outside the crate: `api_growth.rs` in each crate,
-      measured with a variant and a field added (ADR-0035); the owner's acceptance waits
+      measured with a variant and a field added (ADR-0035); accepted 2026-10-25
 
 ### P5 — Archives, quantisation, OpenVDB files, local risk, a sign without orientation
 

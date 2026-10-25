@@ -6,6 +6,12 @@ are recorded here when they change (V6).
 
 ## Unreleased
 
+## 0.5.0 (2026-10-25)
+
+Closes P4: the public API shaped to grow without breaking users, what a user does not need
+neither built nor reached, and the file formats specified in one document, held by a reader
+written from it alone.
+
 - `docs/formats.md` states the bytes of the frozen layout, the cache profile and Hermite
   data, the SDF convention, the media type names `application/vnd.brodo.cache` and
   `application/vnd.brodo.hermite`, and the version policy; where it and the code differ,
