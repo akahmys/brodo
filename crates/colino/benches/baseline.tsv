@@ -1,3 +1,6 @@
 name	fastest_ns	date	model
+convert_slab_320	186876125	2026-10-25	Apple M5
 convert_sphere_r50	324991542	2026-10-19	Apple M5
+hermite_holed_r50	409063875	2026-10-25	Apple M5
+hermite_sphere_r50	281773750	2026-10-25	Apple M5
 label_sphere_r50	164761375	2026-10-19	Apple M5
