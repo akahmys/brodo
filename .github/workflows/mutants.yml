@@ -1,8 +1,9 @@
 # The mutation run on GitHub Actions, in shards (TESTING.md T11, ADR-0023, ADR-0034).
 # Started by hand only. Each shard runs `mutants.py --run --shard k/n` behind the memory
-# guard and keeps its report; the last job takes the reports together, and, when asked,
-# runs the timeouts that came before any failed test again under the patient timeout.
-# A job may run six hours at most, so n is chosen to keep each shard below that.
+# guard and keeps its report; the last job takes the reports together and, unless told
+# not to, runs the timeouts that came before any failed test again under the patient
+# timeout. A job may run six hours at most: at 60 shards P4's heaviest, 50 mutants of the
+# 3MF reader, took over five hours, so 80 keep each near four.
 name: mutants
 
 on:
@@ -10,14 +11,14 @@ on:
     inputs:
       shards:
         description: "Shards, n (each at most six hours)"
-        default: "24"
+        default: "80"
       args:
         description: "Further arguments for cargo-mutants, such as -f 'crates/colino/src/**'"
         default: ""
       patient:
         description: "Run the timeouts before any failed test again, under 1800 s each"
         type: boolean
-        default: false
+        default: true
 
 permissions:
   contents: read

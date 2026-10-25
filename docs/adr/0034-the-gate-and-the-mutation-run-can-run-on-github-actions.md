@@ -96,3 +96,16 @@ runners being free for a public repository, the owner then decided that `audit.y
 on each push to `main` as well as by hand; no pull request starts it, so no fork's code
 runs on the repository's runners. `mutants.yml` still starts by hand only.
 
+## Amendment: the mutation run's defaults
+
+- **Date**: 2026-10-25
+
+P4's run, the first whole one here, at 60 shards of 50 mutants: the shards took 7 min to over
+five hours, the heaviest those of the 3MF reader, whose mutants each run colino's whole
+suite, near the jobs' 350 min limit; and 16 mutants timed out before any failed test, all
+caught when run again under the patient timeout on the owner's machine, the slowest in
+about 13 minutes (ADR-0023). The owner decided that `mutants.yml` defaults to 80 shards,
+about four hours for the heaviest, and to running the patient timeouts in its last job.
+Whether 1800 s suffices on GitHub's runners, slower than the owner's machine, the next
+run shows.
+
