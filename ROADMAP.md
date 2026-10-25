@@ -15,9 +15,8 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   (ADR-0039). Its mutation run, the first on GitHub Actions, missed 148 mutants behind
   opt-in features until the run took every feature (ADR-0023). The repository is public
   (ADR-0034, ADR-0007).
-- **Next**: P5 (§2), colino's milestone, split from the formats (P6) by the human
-  (2026-10-25): first the costs the review of 2026-10-25 found, each measured before
-  anything changes; then B-016's sign without orientation; then layer 3 (B-020).
+- **Next**: P5 (§2), colino's milestone: its costs measured and those that helped kept
+  (2026-10-25); next B-016's sign without orientation, by a spike, then layer 3 (B-020).
 - **Unresolved problems**: `cache_map_x256` runs 8 to 10 % behind its baseline of
   2026-10-17 at v0.3.0 and now alike, run in turn (2026-10-23); a first run straight after
   the fuzz round and Miri failed at +13 %. Machine drift is the likely cause, not shown. Miri's Stacked Borrows reports undefined behaviour in
@@ -31,8 +30,8 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   held the load average near 3 during runs (2026-10-20). Allocating and dropping its
   output field takes about a third of that item (1.04 of 3.3 ms, 2026-10-18, load 3.3),
   but the update alone varied as much, so it is not shown to cause the spread.
-  Labelling held about 440 MB for the 33 million leaf voxels of a sphere of radius 400,
-  near the 13 bytes a voxel estimated, and took 9.5 s on one thread (2026-10-20); it has
+  Labelling held about 436 MB for the 33 million leaf voxels of a sphere of radius 400,
+  near the 13 bytes a voxel estimated, and took 2.44 s on one thread (2026-10-25); it has
   a benchmark item. The gate's debug tests grew: `morphology_reference` takes 27 s at a
   load of 5 (2026-10-19).
 
@@ -202,7 +201,7 @@ Scheduled by the human on 2026-10-23, split from the formats (P6) and ordered on
 2026-10-25. Each step that answers an open question is a spike and an ADR before it is
 built.
 
-- [ ] Costs a review of 2026-10-25 found by reading, each measured on a workload that
+- [x] Costs a review of 2026-10-25 found by reading, each measured on a workload that
       reaches it before anything changes (TESTING.md T10), those that help kept, the others
       recorded as measured; first the two a user's mesh can reach:
   - [x] Hermite data's fallback, where no triangle is hit, scans every triangle for each
@@ -231,8 +230,8 @@ built.
         unchanged, took the peak resident size of converting the sphere of radius 200
         (8.3 million leaf voxels) and making its Hermite data from 788 to 613 MB, the
         conversion alone 140 MB (2026-10-25)
-  - [ ] `label`'s work buffers allocated per node and per call (ROADMAP §1's 9.5 s and
-        440 MB at r = 400), `LeafManifest::build`'s lookups from the root, and `freeze`'s
+  - [x] `label`'s work buffers allocated per node and per call (9.5 s and 440 MB at
+        r = 400, 2026-10-20), `LeafManifest::build`'s lookups from the root, and `freeze`'s
         plan rebuilt from sorted coordinates rather than from the tree. Kept for `label`:
         99 % of its time was walking the tree, 49 million of its 51 million
         classifications single voxels each found from the root, most of them in 19 million
@@ -241,7 +240,13 @@ built.
         sphere of radius 200 2.41 -> 0.63 s (2026-10-25). Kept for `LeafManifest::build`:
         87 to 95 % of `commit`, 26 lookups from the root a leaf; through the accessor's
         path, which keeps the last lower node, 1.27 -> 0.45 ms for 1037 leaves and 20.4 ->
-        9.0 ms for 16 307, `activation` 3.33 -> 1.59 ms (2026-10-25)
+        9.0 ms for 16 307, `activation` 3.33 -> 1.59 ms (2026-10-25). Kept for `freeze`'s
+        plan: 70 to 90 % of `freeze`, most of it each tile's number found again from the
+        root and every leaf's and tile's node key sorted; tiles now carry their number and
+        runs of equal keys are dropped before the sort, the bytes unchanged, `freeze_x8`
+        4.00 -> 1.65 ms and the sphere of radius 200 9.0 -> 2.3 ms (2026-10-25). The work
+        buffers themselves were not changed: walking the tree, not allocating, took the
+        time. At r = 400, labelling now takes 2.44 s and still about 436 MB (2026-10-25)
 - [ ] B-016: a sign that does not depend on orientation, by a spike on synthetic broken
       meshes (`spikes/sign/`), as an option of conversion and Hermite data
 - [ ] colino's layer 3, places thinner or gaps narrower than two voxels (B-020)

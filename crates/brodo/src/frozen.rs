@@ -10,7 +10,7 @@ use zerocopy::{FromBytes, FromZeros, Immutable, IntoBytes, KnownLayout};
 
 use crate::error::{FieldError, FreezeError};
 use crate::field::{Field, Value};
-use crate::topology::{Location, Topology, morton};
+use crate::topology::{Topology, morton};
 use crate::tree::{Coord, TileLevel};
 
 #[cfg(target_endian = "big")]
@@ -163,8 +163,11 @@ fn plan(t: &Topology) -> Result<Plan, FreezeError> {
         t.leaf_numbers().map(|n| t.leaf_origin(n)).collect::<Result<_, _>>()?;
     let tiles: Vec<(TileLevel, Coord)> =
         t.tile_numbers().map(|n| t.tile(n)).collect::<Result<_, _>>()?;
+    // Leaves and tiles are numbered in Morton order, so their nodes' keys come in runs:
+    // each run is kept once before the sort.
     let by_morton = |set: Vec<Coord>| -> Vec<Coord> {
         let mut v = set;
+        v.dedup();
         v.sort_by_cached_key(|o| morton(*o));
         v.dedup();
         v
@@ -187,7 +190,7 @@ fn plan(t: &Topology) -> Result<Plan, FreezeError> {
         lower_keys.iter().enumerate().map(|(i, k)| (*k, i)).collect();
     link_children(&mut uppers, &mut lowers, &leaves, &lower_keys, &upper_no, &lower_no)?;
     let roots = roots(&upper_keys, &tiles)?;
-    let order = tile_order(t, &tiles, &mut uppers, &mut lowers, &upper_no, &lower_no)?;
+    let order = tile_order(&tiles, &mut uppers, &mut lowers, &upper_no, &lower_no)?;
     Ok(Plan { roots, uppers, lowers, tiles: order })
 }
 
@@ -253,24 +256,21 @@ fn roots(
 /// The order of tile values: root tiles in table order, then each upper node's, then each
 /// lower node's, each node's in place order; marks every tile in its node.
 fn tile_order(
-    t: &Topology,
     tiles: &[(TileLevel, Coord)],
     uppers: &mut [UpperNode],
     lowers: &mut [LowerNode],
     upper_no: &BTreeMap<Coord, usize>,
     lower_no: &BTreeMap<Coord, usize>,
 ) -> Result<Vec<u32>, FreezeError> {
-    let number = |o: Coord| match t.locate(o) {
-        Location::Tile(n, _) => Ok(n.get()),
-        Location::Leaf(_) | Location::Background => Err(FreezeError::Inconsistent),
-    };
-    let mut root: Vec<Coord> =
-        tiles.iter().filter(|(l, _)| *l == TileLevel::Root).map(|(_, o)| *o).collect();
+    // `tiles` is in tile-number order.
+    let numbered = || tiles.iter().zip(0_u32..);
+    let mut root: Vec<(Coord, u32)> =
+        numbered().filter(|((l, _), _)| *l == TileLevel::Root).map(|((_, o), n)| (*o, n)).collect();
     root.sort_unstable();
-    let mut order: Vec<u32> = root.iter().map(|o| number(*o)).collect::<Result<_, _>>()?;
+    let mut order: Vec<u32> = root.iter().map(|(_, n)| *n).collect();
     for level in [TileLevel::Upper, TileLevel::Lower] {
-        let mut here: Vec<(usize, usize, Coord)> = Vec::new();
-        for (_, o) in tiles.iter().filter(|(l, _)| *l == level) {
+        let mut here: Vec<(usize, usize, u32)> = Vec::new();
+        for ((_, o), n) in numbered().filter(|((l, _), _)| *l == level) {
             let (node, p) = match level {
                 TileLevel::Upper => {
                     (upper_no[&origin(*o, TileLevel::Root)], place(local(*o, 7, 5), 5))
@@ -279,11 +279,11 @@ fn tile_order(
                     (lower_no[&origin(*o, TileLevel::Upper)], place(local(*o, 3, 4), 4))
                 }
             };
-            here.push((node, p, *o));
+            here.push((node, p, n));
         }
         here.sort_unstable_by_key(|(node, p, _)| (*node, *p));
         let mut last = usize::MAX;
-        for (node, p, o) in here {
+        for (node, p, n) in here {
             if node != last {
                 last = node;
                 let first = U32::new(to_u32(order.len())?);
@@ -296,7 +296,7 @@ fn tile_order(
                 TileLevel::Upper => set(&mut uppers[node].tiles, p),
                 TileLevel::Lower | TileLevel::Root => set(&mut lowers[node].tiles, p),
             }
-            order.push(number(o)?);
+            order.push(n);
         }
     }
     Ok(order)

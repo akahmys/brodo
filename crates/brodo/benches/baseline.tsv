@@ -3,7 +3,7 @@ activation	1613500	2026-10-25	Apple M5
 cache_map_x256	3857959	2026-10-17	Apple M5
 cache_read_x16	3981458	2026-10-17	Apple M5
 cache_write_x8	5414042	2026-10-17	Apple M5
-freeze_x8	4000250	2026-10-17	Apple M5
+freeze_x8	1666250	2026-10-25	Apple M5
 gather	3025250	2026-10-17	Apple M5
 gather_w3	4358416	2026-10-20	Apple M5
 leaf_parallel_update_x32	3009542	2026-10-17	Apple M5
