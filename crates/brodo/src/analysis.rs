@@ -431,7 +431,8 @@ impl Walk<'_> {
 #[derive(Debug, Clone)]
 pub struct Labels {
     stamp: u64,
-    labels: Vec<Label>,
+    /// Each unit's label, `EXCLUDED` or its component's number: 4 bytes a voxel.
+    labels: Vec<u32>,
     voxel_base: u32,
     tile_base: u32,
     empty: BTreeMap<(usize, Coord), u32>,
@@ -531,7 +532,7 @@ pub fn label<T: Value>(
     if walk.units.overflow {
         return Err(AnalysisError::TooLarge);
     }
-    let (labels, count) = number(&mut walk.units);
+    let (labels, count) = number(walk.units)?;
     Ok(Labels {
         stamp: t.stamp(),
         labels,
@@ -545,26 +546,36 @@ pub fn label<T: Value>(
     })
 }
 
-/// Numbers the components in the order of their first unit: a component's root is its
-/// smallest unit, so it is met first.
-fn number(units: &mut Units) -> (Vec<Label>, u32) {
-    let mut labels = Vec::with_capacity(units.parent.len());
+/// A unit's stored label when it does not meet the condition; a component's is its number.
+const EXCLUDED: u32 = u32::MAX;
+
+/// Numbers the components in the order of their first unit, writing each unit's label over
+/// its parent: a unit's parent is never a later unit, since a join links the larger root
+/// under the smaller and `find` only shortens paths, so the parent is numbered first and
+/// its label is the unit's. A component's root is its smallest unit, so it is met first.
+fn number(units: Units) -> Result<(Vec<u32>, u32), AnalysisError> {
+    let Units { parent: mut labels, meets, .. } = units;
     let mut count = 0;
-    for id in 0..units.len() {
-        let label = if !units.meets[id as usize] {
-            Label::Excluded
-        } else {
-            let r = units.find(id);
-            if r == id {
-                count += 1;
-                Label::Component(count - 1)
-            } else {
-                labels[r as usize]
+    for (id, meets) in meets.into_iter().enumerate() {
+        let parent = labels[id] as usize;
+        labels[id] = if !meets {
+            EXCLUDED
+        } else if parent == id {
+            if count == EXCLUDED {
+                return Err(AnalysisError::TooLarge);
             }
+            count += 1;
+            count - 1
+        } else {
+            labels[parent]
         };
-        labels.push(label);
     }
-    (labels, count)
+    Ok((labels, count))
+}
+
+/// A stored label as a `Label`.
+fn decode(stored: u32) -> Label {
+    if stored == EXCLUDED { Label::Excluded } else { Label::Component(stored) }
 }
 
 impl Labels {
@@ -602,12 +613,13 @@ impl Labels {
             return Err(AnalysisError::Field(FieldError::StaleField));
         }
         let u = self.unit_at(t, v).ok_or(AnalysisError::Unlabelled(v))?;
-        self.labels.get(u as usize).copied().ok_or(AnalysisError::Unlabelled(v))
+        self.labels.get(u as usize).map(|x| decode(*x)).ok_or(AnalysisError::Unlabelled(v))
     }
 
     /// Whether a component reaches the unbounded background outside the tree.
     pub fn reaches_outside(&self, label: Label) -> bool {
-        label != Label::Excluded && self.labels.get(self.outside as usize) == Some(&label)
+        label != Label::Excluded
+            && self.labels.get(self.outside as usize).map(|x| decode(*x)) == Some(label)
     }
 }
 

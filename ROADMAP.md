@@ -30,9 +30,9 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   held the load average near 3 during runs (2026-10-20). Allocating and dropping its
   output field takes about a third of that item (1.04 of 3.3 ms, 2026-10-18, load 3.3),
   but the update alone varied as much, so it is not shown to cause the spread.
-  Labelling held about 436 MB for the 33 million leaf voxels of a sphere of radius 400,
-  near the 13 bytes a voxel estimated, and took 2.44 s on one thread (2026-10-25); it has
-  a benchmark item. The gate's debug tests grew: `morphology_reference` takes 27 s at a
+  Labelling held about 161 MB for the 33 million leaf voxels of a sphere of radius 400,
+  near 5 bytes a voxel, and took 2.42 s on one thread (2026-10-26); it has a benchmark
+  item. The gate's debug tests grew: `morphology_reference` takes 27 s at a
   load of 5 (2026-10-19).
 
 ## 2. Milestones
@@ -246,7 +246,9 @@ built.
         runs of equal keys are dropped before the sort, the bytes unchanged, `freeze_x8`
         4.00 -> 1.65 ms and the sphere of radius 200 9.0 -> 2.3 ms (2026-10-25). The work
         buffers themselves were not changed: walking the tree, not allocating, took the
-        time. At r = 400, labelling now takes 2.44 s and still about 436 MB (2026-10-25)
+        time. At r = 400, labelling then took 2.44 s and still about 436 MB (2026-10-25);
+        labels stored as `u32` and written over the union-find's parents, chosen by the
+        human (2026-10-26), took that to 161 MB, the labels unchanged (2026-10-26)
 - [ ] B-016: a sign that does not depend on orientation, by a spike on synthetic broken
       meshes (`spikes/sign/`), as an option of conversion and Hermite data
 - [ ] colino's layer 3, places thinner or gaps narrower than two voxels (B-020)
