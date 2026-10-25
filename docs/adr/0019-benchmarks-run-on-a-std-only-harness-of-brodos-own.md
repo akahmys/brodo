@@ -123,3 +123,14 @@ Shown, at a load average of 2.5 to 2.6: with the name ignored, `--record gather_
 rewrote all ten rows; `--record nosuch` was refused and changed nothing; `--record
 gather_w3` changed its row alone, 4437000 to 4358416 ns, the other nine keeping
 2026-10-17.
+
+## Amendment: the load a run starts at
+
+- **Date**: 2026-10-25
+
+P4's retrospective found that whether a run was at rest was measured, the harness waiting
+while the one-minute load average was above `BUSY_LOAD`, but not kept. The owner decided
+that the report keeps it: `report.tsv`'s header names the load average the run started at,
+beside the hardware and the date, recorded only, the run still refused above
+`BUSY_LOAD`. Shown: colino's benchmark at rest wrote `load 2.93` in its header.
+

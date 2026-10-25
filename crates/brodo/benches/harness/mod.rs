@@ -96,13 +96,13 @@ pub fn run<D>(
     // The argument after `--record`, unless it is another flag, such as cargo's `--bench`.
     let only = at.and_then(|i| args.get(i + 1)).filter(|a| !a.starts_with("--")).cloned();
     std::fs::create_dir_all(&places.out)?;
-    wait_for_rest()?;
+    let load = wait_for_rest()?;
     let runs = [run_child(&places, 0)?, run_child(&places, 1)?];
     let model = hardware_model()?;
     if at.is_some() {
         record_baseline(&places, &runs, &model, only.as_deref())
     } else {
-        compare(&places, &runs, &model)
+        compare(&places, &runs, &model, load)
     }
 }
 
@@ -117,18 +117,19 @@ fn load_average() -> Result<f64, Failure> {
 }
 
 /// Waits until the load average is at most `BUSY_LOAD`, reading it again after each
-/// `LOAD_WAIT` up to `LOAD_RETRIES` times; refuses to run if it stays above.
-fn wait_for_rest() -> Result<(), Failure> {
+/// `LOAD_WAIT` up to `LOAD_RETRIES` times; refuses to run if it stays above. Returns the
+/// load the run starts at.
+fn wait_for_rest() -> Result<f64, Failure> {
     let mut load = load_average()?;
     for _ in 0..LOAD_RETRIES {
         if load <= BUSY_LOAD {
-            return Ok(());
+            return Ok(load);
         }
         std::thread::sleep(LOAD_WAIT);
         load = load_average()?;
     }
     if load <= BUSY_LOAD {
-        return Ok(());
+        return Ok(load);
     }
     Err(Failure(format!(
         "the one-minute load average stayed at {load} > {BUSY_LOAD} for {} s; stop other work and run again",
@@ -237,15 +238,18 @@ fn change(ns: u128, base: u128) -> f64 {
     (ns as f64 / base as f64 - 1.0) * 100.0
 }
 
-/// Writes the report and fails on every item more than `TOLERANCE` slower in both runs.
+/// Writes the report, its header naming the hardware, the date and the one-minute load
+/// average the run started at, and fails on every item more than `TOLERANCE` slower in both
+/// runs.
 fn compare(
     places: &Places,
     runs: &[BTreeMap<String, u128>; 2],
     model: &str,
+    load: f64,
 ) -> Result<(), Failure> {
     let baseline = read_baseline(places)?;
     let mut text = format!(
-        "name\trun1_ns\trun2_ns\tpair_spread_pct\tbaseline_ns\tbaseline_date\tchange1_pct\tchange2_pct\tverdict\t{model}\t{}\n",
+        "name\trun1_ns\trun2_ns\tpair_spread_pct\tbaseline_ns\tbaseline_date\tchange1_pct\tchange2_pct\tverdict\t{model}\t{}\tload {load}\n",
         today()?
     );
     let mut slower = Vec::new();

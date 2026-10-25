@@ -12,9 +12,11 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   found a real defect, a crossing at a segment's very end rounded off, now fixed and held
   by a test (ADR-0030); and the two looping `Winding::approximate` mutants are caught,
   P2's misses having been a timeout just short of their 60 s test's failure.
-- **Next**: P4's closing checks (ADR-0023): retrospective and refactoring, fuzz round,
-  Miri, benchmarks, mutation run, the owner deciding where the run goes; then the owner's
-  acceptance. P4's changes are in (2026-10-25): the API's shape, the features and limits,
+- **Next**: P4's mutation run, on GitHub Actions in 60 shards since 2026-10-25, the
+  repository being public; then the owner's acceptance. The other closing checks held on
+  2026-10-25: no fuzz finding in 900 s per target, Miri passed, every benchmark within its
+  baseline, no refactoring found worth doing; the retrospective added B-022 and the load in
+  the benchmark report (ADR-0019). P4's changes are in (2026-10-25): the API's shape, the features and limits,
   `docs/formats.md` held by its reader, the SDF convention's key, and `api_growth.rs` in
   each crate showing that a field or a variant added later breaks no user (ADR-0035).
 - **Unresolved problems**: `cache_map_x256` runs 8 to 10 % behind its baseline of
@@ -190,7 +192,7 @@ review of what brodo and colino show, so that later additions break no user.
       `docs/formats.md` with its Python reader, the SDF convention's key, the README's
       pinning; breaking ones listed in CHANGELOG.md together
 - [ ] Retrospective and refactoring; fuzz round; Miri run; benchmarks; mutation run
-      (ADR-0023)
+      (ADR-0023): all but the mutation run held (2026-10-25)
 - [ ] **Accepted when** adding a field or an error variant later breaks no code written
       against the API, shown by a test outside the crate: `api_growth.rs` in each crate,
       measured with a variant and a field added (ADR-0035); the owner's acceptance waits
@@ -224,6 +226,7 @@ implementation (PLANNING.md §2).
 
 | # | Question | Proposal so far |
 | :--- | :--- | :--- |
+| B-022 | Does a later version of the frozen layout and the cache profile check what version 1's readers leave unchecked: padding and the background's bytes beyond its size, the order of nodes, whether every node and leaf is reached, and a cache file's bounds against its grid (docs/formats.md §2.5, §3.4)? | Not yet: found writing the format document (ADR-0037); each check a reader adds refuses files version 1 accepts, so it waits for a version raised for another reason (ADR-0038) |
 | B-019 | Does `colino` move to a repository of its own? | Not now (owner, 2026-10-23; ADR-0012 keeps two crates in one repository): changes span both, as P3's Hermite format and producer did, and before 1.0 a split would turn each into two releases, duplicate the rules and their audit, and take colino's tests out of brodo's gate. Revisited when brodo's API and formats settle (1.0), both are on crates.io, colino needs what brodo's rules forbid, or others maintain it |
 | B-021 | Does brodo build `piatto`? | Not now (owner, 2026-10-24; ADR-0018): no user has asked for a viewer, the slice as PNG and VTK for ParaView serve checking, `.vdb` from P5 would open in common tools, and a GPU, window and GUI stack is costly. Revisited when a user asks for a viewer or for drawing to embed, grids too large for VTK and `.vdb` must be looked at, or P5 finds `.vdb` cannot be written |
 | B-018 | Does model checking with Kani join the closing checks? | Not now (owner, 2026-10-23): it fits only integer bit work and `view.rs`'s small helpers, already fuzzed and mutation-tested, and cannot reach rayon or the memory mapping; this milestone's defects were numeric and in design claims. Revisited by a spike if Miri-unreachable unsafe code grows, an integer coordinate bug escapes the tests, or before 1.0 |
