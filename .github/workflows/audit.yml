@@ -1,10 +1,12 @@
-# The gate on GitHub Actions (ADR-0034). Started by hand only, so that it spends nothing
-# until asked and runs for no pull request from a fork. The local list of forbidden sources
+# The gate on GitHub Actions (ADR-0034). Started by each push to `main` and by hand; never
+# by a pull request, so that no fork's code runs here. The local list of forbidden sources
 # and the personal rules stay on the owner's machine, so the gate skips those two checks
 # here and says so; the run before a push, on that machine, still holds them.
 name: audit
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:

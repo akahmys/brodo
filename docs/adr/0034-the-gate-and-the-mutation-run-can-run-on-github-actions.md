@@ -83,3 +83,16 @@ mutants would take about 260 runner hours, 15 600 minutes, some $82 beyond the f
 at $0.006 a minute, and at least 45 shards to keep each within six hours, about 13 hours
 at 20 jobs at once. Where a milestone's run goes is decided when it closes.
 
+## Amendment: the gate on every push
+
+- **Date**: 2026-10-25
+
+Before making the repository public, the owner had its history rewritten: the names of the
+projects in the local list of forbidden sources, and of one project's component, left
+every commit by `git filter-repo --replace-text`, the table kept outside the repository;
+`HEAD`'s tree and those of `v0.3.0` and `v0.4.0` stayed the same; the owner force-pushed
+`main` and the tags, and the two workflow runs on the old commits were deleted. Standard
+runners being free for a public repository, the owner then decided that `audit.yml` runs
+on each push to `main` as well as by hand; no pull request starts it, so no fork's code
+runs on the repository's runners. `mutants.yml` still starts by hand only.
+

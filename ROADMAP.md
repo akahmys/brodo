@@ -265,6 +265,12 @@ No spike is running. `spikes/remap/` answered B-001 and B-008, and `spikes/merge
      approval.
   5. CI: with standard runners free for a public repository, whether `audit.yml` also runs
      on each push, decided then (ADR-0034).
+
+  Done on 2026-10-25, the owner having decided to publish: step 3, the history rewritten
+  and force-pushed, the old workflow runs deleted; step 5, `audit.yml` on each push to
+  `main` (ADR-0034); the repository made public by the owner; step 4, `main` protected
+  against force pushes and deletion for everyone, and workflows from every outside
+  contributor's pull request held for approval. Waiting: steps 1 and 2, for the owner.
 - Before registering on crates.io: `publish`, and each crate's description and keywords
   naming its function (sparse volume, VDB, SDF, level set, voxel). Both names were found
   unregistered on 2026-10-16, per the design.
