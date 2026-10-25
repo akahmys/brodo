@@ -63,14 +63,15 @@ fn step(origin: Coord, d: [i32; 3]) -> Option<Coord> {
 
 impl LeafManifest {
     /// Builds the manifest of the leaves at `origins`, in leaf-number order, locating each
-    /// neighbour with `locate`. A neighbour beyond the `i32` range is the background.
-    pub(crate) fn build(origins: &[Coord], locate: impl Fn(Coord) -> Location) -> Self {
+    /// neighbour with `locate`, in turn, so that it may keep the path of the last. A
+    /// neighbour beyond the `i32` range is the background.
+    pub(crate) fn build(origins: &[Coord], mut locate: impl FnMut(Coord) -> Location) -> Self {
         let neighbours = origins
             .iter()
             .map(|o| {
                 let mut row = [Location::Background; DIRECTIONS];
                 for (cell, d) in row.iter_mut().zip(Offset::all()) {
-                    *cell = step(*o, d.delta()).map_or(Location::Background, &locate);
+                    *cell = step(*o, d.delta()).map_or(Location::Background, &mut locate);
                 }
                 row
             })

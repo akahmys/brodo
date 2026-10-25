@@ -238,7 +238,10 @@ built.
         classifications single voxels each found from the root, most of them in 19 million
         pairs across leaves pushed on the stack one by one; a leaf's voxels are now joined
         from its number, the labels unchanged, `label_sphere_r50` 165 -> 53 ms and the
-        sphere of radius 200 2.41 -> 0.63 s (2026-10-25)
+        sphere of radius 200 2.41 -> 0.63 s (2026-10-25). Kept for `LeafManifest::build`:
+        87 to 95 % of `commit`, 26 lookups from the root a leaf; through the accessor's
+        path, which keeps the last lower node, 1.27 -> 0.45 ms for 1037 leaves and 20.4 ->
+        9.0 ms for 16 307, `activation` 3.33 -> 1.59 ms (2026-10-25)
 - [ ] B-016: a sign that does not depend on orientation, by a spike on synthetic broken
       meshes (`spikes/sign/`), as an option of conversion and Hermite data
 - [ ] colino's layer 3, places thinner or gaps narrower than two voxels (B-020)

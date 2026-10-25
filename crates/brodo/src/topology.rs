@@ -136,7 +136,9 @@ impl Topology {
             tile_numbers,
             manifest: LeafManifest::default(),
         };
-        t.manifest = LeafManifest::build(&t.leaves, |v| t.locate(v));
+        // Neighbours in Morton order mostly share their lower node: a path keeps it.
+        let mut path = Path::default();
+        t.manifest = LeafManifest::build(&t.leaves, |v| t.locate_on(&mut path, v));
         Ok(t)
     }
 
