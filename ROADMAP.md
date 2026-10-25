@@ -211,13 +211,26 @@ built.
         Kept: the BVH's search, its answer the scan's to the bit, took
         `hermite_holed_r50` from 409 to 274–284 ms, as fast as the closed sphere
         (2026-10-25)
-  - [ ] Conversion's candidate cells test every leaf cell of a triangle's box
+  - [x] Conversion's candidate cells test every leaf cell of a triangle's box
         (`colino/src/convert.rs`): a large slanted triangle, a CAD mesh's floor or wall,
-        costs its box's volume rather than its area
-  - [ ] `hermite` builds the BVH twice, once itself and once inside `Winding::new`, and
-        conversion a third time
-  - [ ] Hermite data's search keeps three `Field<[f64; 3]>` over every leaf, the triangle
-        number carried as the bits of an `f64`, where crossings are few
+        costs its box's volume rather than its area. Not changed: on a slab 6 voxels
+        thick turned about two axes, twelve triangles, finding candidates took 1.8 ms of
+        a 220 ms conversion at 320 voxels a side, 86 ms of 2.59 s at 1280 and 496 ms of
+        10.0 s at 2560 (2.65 GB resident), so that removing it would gain under 10 %
+        below about 5000 voxels a side (2026-10-25)
+  - [x] `hermite` builds the BVH twice, once itself and once inside `Winding::new`, and
+        conversion a third time. Not changed: on the sphere of radius 50, 8192
+        triangles, the BVH took 2.3 to 3.3 ms and `Winding::new` 4.9 to 8.1 ms beside
+        Hermite data's 340 ms; at radius 400, 131 072 triangles, 28 and 66 ms beside a
+        33 s conversion (2026-10-25). `hermite` uses `Winding`'s tree rather than
+        building its own, chosen by the human (2026-10-26) to remove a duplicate, not for
+        speed; sharing conversion's would widen the API
+  - [x] Hermite data's search keeps a `Field<[f64; 3]>` over every leaf for each axis in
+        turn, the triangle number carried as the bits of an `f64`, where crossings are
+        few. Kept: each leaf's crossings gathered as a list by `par_reduce`, the bytes
+        unchanged, took the peak resident size of converting the sphere of radius 200
+        (8.3 million leaf voxels) and making its Hermite data from 788 to 613 MB, the
+        conversion alone 140 MB (2026-10-25)
   - [ ] `label`'s work buffers allocated per node and per call (ROADMAP §1's 9.5 s and
         440 MB at r = 400), `LeafManifest::build`'s lookups from the root, and `freeze`'s
         plan rebuilt from sorted coordinates rather than from the tree

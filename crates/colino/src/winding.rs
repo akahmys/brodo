@@ -180,6 +180,11 @@ impl Winding {
         Ok(Winding { bvh, expansions })
     }
 
+    /// The tree of boxes the winding number walks.
+    pub(crate) fn bvh(&self) -> &Bvh {
+        &self.bvh
+    }
+
     /// The mesh's triangles, by their corners.
     pub(crate) fn triangles(&self) -> &[[Point; 3]] {
         &self.bvh.corners

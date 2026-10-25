@@ -20,9 +20,9 @@
 //! an edge no leaf point owns, and the mesh is refused (ADR-0030, B-016).
 
 use brodo::error::{FieldError, Rule};
-use brodo::field::Field;
+use brodo::field::{Field, LEAF_VOXELS};
 use brodo::hermite::{Crossings, Hermite, NO_CROSSING};
-use brodo::parallel::par_update;
+use brodo::parallel::{par_reduce, par_update};
 use brodo::topology::{LeafNumber, Topology};
 use brodo::tree::Coord;
 
@@ -122,13 +122,15 @@ fn find(bvh: &Bvh, a: Point, b: Point, lower_inside: bool) -> Option<Found> {
 pub fn hermite(mesh: &Mesh, c: &Converted, accuracy: Accuracy) -> Result<Produced, HermiteError> {
     mesh.check_groups()?;
     let lattice = Lattice::of(c)?;
-    let bvh = Bvh::new(mesh)?;
+    // One tree of boxes serves the winding number, the crossings and the nearest triangles.
+    let winding = Winding::new(mesh)?;
+    let bvh = winding.bvh();
     let t = &c.topology;
-    let signs = signs(mesh, t, &lattice, &bvh, accuracy)?;
+    let signs = signs(t, &lattice, &winding, accuracy)?;
     let mut unhit = 0_u64;
     let mut axes = Vec::with_capacity(3);
     for axis in 0..3 {
-        let (crossings, missed) = crossings(mesh, t, &lattice, &bvh, &signs, axis)?;
+        let (crossings, missed) = crossings(mesh, t, &lattice, bvh, &signs, axis)?;
         unhit += missed;
         axes.push(crossings);
     }
@@ -149,13 +151,12 @@ fn on_mesh(bvh: &Bvh, p: Point) -> bool {
 
 /// Each leaf point's sign, tiles inside, the background outside.
 fn signs(
-    mesh: &Mesh,
     t: &Topology,
     lattice: &Lattice,
-    bvh: &Bvh,
+    winding: &Winding,
     accuracy: Accuracy,
 ) -> Result<Field<u8>, HermiteError> {
-    let winding = Winding::new(mesh)?;
+    let bvh = winding.bvh();
     let mut signs = Field::new(t, 0_u8);
     par_update(t, &mut signs, |n, values| {
         for (v, x) in voxels(t, n)?.zip(values) {
@@ -179,12 +180,11 @@ fn crossings(
     signs: &Field<u8>,
     axis: usize,
 ) -> Result<(Crossings, u64), HermiteError> {
-    // Each edge's fraction, its triangle's number as bits, and 1 where it was hit; a
-    // fraction of −1 where it has no crossing.
-    let mut found = Field::new(t, [-1.0_f64, 0.0, 0.0]);
-    par_update(t, &mut found, |n, values| {
-        let lower = signs.leaf(t, n)?;
-        for ((v, x), inside) in voxels(t, n)?.zip(values).zip(lower) {
+    // Each leaf's crossed edges, by voxel index, in leaf order: crossings are few beside the
+    // leaves' voxels, so none is kept for an edge with none.
+    let leaf = |n: LeafNumber, lower: &[u8; LEAF_VOXELS]| -> Result<Vec<_>, FieldError> {
+        let mut out = Vec::new();
+        for (i, (v, inside)) in voxels(t, n)?.zip(lower).enumerate() {
             let w = step(axis, v);
             if signs.value_at(t, w)? == *inside {
                 continue;
@@ -199,39 +199,36 @@ fn crossings(
             } else if !lower_inside && on_mesh(bvh, b) {
                 (f.fraction, f.hit) = (1.0, true);
             }
-            let hit = if f.hit { 1.0 } else { 0.0 };
-            *x = [f.fraction, f64::from_bits(u64::from(f.triangle)), hit];
+            out.push((n, i, f));
         }
-        Ok::<(), FieldError>(())
-    })?;
+        Ok(out)
+    };
+    let found = par_reduce(t, signs, Ok(Vec::new()), leaf, |all, mine| {
+        let (mut all, mine) = (all?, mine?);
+        all.extend(mine);
+        Ok::<_, FieldError>(all)
+    })??;
     let mut c = Crossings {
         fraction: Field::new(t, NO_CROSSING.0),
         normal: Field::new(t, NO_CROSSING.1),
         group: Field::new(t, NO_CROSSING.2),
     };
     let mut unhit = 0_u64;
-    for n in t.leaf_numbers() {
-        let (lower, found) = (signs.leaf(t, n)?, found.leaf(t, n)?);
-        for (i, ([fraction, triangle, hit], inside)) in found.iter().zip(lower).enumerate() {
-            if *fraction < 0.0 {
-                continue;
-            }
-            let triangle = u32::try_from(triangle.to_bits()).unwrap_or(u32::MAX);
-            let mut m = bvh.corners(triangle).map_or([0.0; 3], normal);
-            // Out of the inside end: along +axis when the lower end is inside.
-            let inward = if *inside == 1 { m[axis] < 0.0 } else { m[axis] > 0.0 };
-            if inward {
-                m = m.map(|x| -x);
-            }
-            unhit += u64::from(*hit == 0.0);
-            #[expect(clippy::cast_possible_truncation, reason = "stored as f32 (ADR-0030)")]
-            {
-                c.fraction.leaf_mut(t, n)?[i] = *fraction as f32;
-                c.normal.leaf_mut(t, n)?[i] = m.map(|x| x as f32);
-            }
-            let group = mesh.group(usize::try_from(triangle).unwrap_or(usize::MAX));
-            c.group.leaf_mut(t, n)?[i] = group;
+    for (n, i, f) in found {
+        let inside = signs.leaf(t, n)?.get(i).copied().unwrap_or(0);
+        let mut m = bvh.corners(f.triangle).map_or([0.0; 3], normal);
+        // Out of the inside end: along +axis when the lower end is inside.
+        let inward = if inside == 1 { m[axis] < 0.0 } else { m[axis] > 0.0 };
+        if inward {
+            m = m.map(|x| -x);
         }
+        unhit += u64::from(!f.hit);
+        #[expect(clippy::cast_possible_truncation, reason = "stored as f32 (ADR-0030)")]
+        {
+            c.fraction.leaf_mut(t, n)?[i] = f.fraction as f32;
+            c.normal.leaf_mut(t, n)?[i] = m.map(|x| x as f32);
+        }
+        c.group.leaf_mut(t, n)?[i] = mesh.group(usize::try_from(f.triangle).unwrap_or(usize::MAX));
     }
     Ok((c, unhit))
 }
