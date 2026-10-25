@@ -210,6 +210,22 @@ spike and an ADR before it is built.
 - [ ] Value quantisation in the archive, 16-bit float and 8-bit range, with byte shuffling
 - [ ] `.vdb`: B-006 for reading through `vdb-rs`; writing only if the format can be learnt
       within AGENTS.md S1, as the human decides
+- [ ] Costs a review of 2026-10-25 found by reading, each measured on a workload that
+      reaches it before anything changes (TESTING.md T10), those that help kept, the others
+      recorded as measured; first the two a user's mesh can reach:
+  - [ ] Hermite data's fallback, where no triangle is hit, scans every triangle for each
+        such edge (`colino/src/hermite.rs`): a mesh with holes or overlaps costs
+        unhit edges × triangles; a nearest-triangle search through the BVH would not
+  - [ ] Conversion's candidate cells test every leaf cell of a triangle's box
+        (`colino/src/convert.rs`): a large slanted triangle, a CAD mesh's floor or wall,
+        costs its box's volume rather than its area
+  - [ ] `hermite` builds the BVH twice, once itself and once inside `Winding::new`, and
+        conversion a third time
+  - [ ] Hermite data's search keeps three `Field<[f64; 3]>` over every leaf, the triangle
+        number carried as the bits of an `f64`, where crossings are few
+  - [ ] `label`'s work buffers allocated per node and per call (ROADMAP §1's 9.5 s and
+        440 MB at r = 400), `LeafManifest::build`'s lookups from the root, and `freeze`'s
+        plan rebuilt from sorted coordinates rather than from the tree
 - [ ] Retrospective and refactoring; fuzz round, the new readers included; Miri run;
       benchmarks, the archive's with baselines; mutation run (ADR-0023)
 - [ ] **Accepted when** a badly oriented mesh converts with the new sign, layer 3 finds
@@ -226,7 +242,7 @@ implementation (PLANNING.md §2).
 
 | # | Question | Proposal so far |
 | :--- | :--- | :--- |
-| B-022 | Does a later version of the frozen layout and the cache profile check what version 1's readers leave unchecked: padding and the background's bytes beyond its size, the order of nodes, whether every node and leaf is reached, and a cache file's bounds against its grid (docs/formats.md §2.5, §3.4)? | Not yet: found writing the format document (ADR-0037); each check a reader adds refuses files version 1 accepts, so it waits for a version raised for another reason (ADR-0038) |
+| B-022 | Does a later version of the frozen layout and the cache profile check what version 1's readers leave unchecked: padding and the background's bytes beyond its size, the order of nodes, whether every node and leaf is reached, and a cache file's bounds against its grid (docs/formats.md §2.5, §3.4)? | Not yet: found writing the format document (ADR-0037); each check a reader adds refuses files version 1 accepts, so it waits for a version raised for another reason (ADR-0038). For the links, one pass would do: each node's `first_child` and `first_tile`, where it has children or tiles, the end of the previous such node's, the last end the count, so that no child is shared or unreached |
 | B-019 | Does `colino` move to a repository of its own? | Not now (owner, 2026-10-23; ADR-0012 keeps two crates in one repository): changes span both, as P3's Hermite format and producer did, and before 1.0 a split would turn each into two releases, duplicate the rules and their audit, and take colino's tests out of brodo's gate. Revisited when brodo's API and formats settle (1.0), both are on crates.io, colino needs what brodo's rules forbid, or others maintain it |
 | B-021 | Does brodo build `piatto`? | Not now (owner, 2026-10-24; ADR-0018): no user has asked for a viewer, the slice as PNG and VTK for ParaView serve checking, `.vdb` from P5 would open in common tools, and a GPU, window and GUI stack is costly. Revisited when a user asks for a viewer or for drawing to embed, grids too large for VTK and `.vdb` must be looked at, or P5 finds `.vdb` cannot be written |
 | B-018 | Does model checking with Kani join the closing checks? | Not now (owner, 2026-10-23): it fits only integer bit work and `view.rs`'s small helpers, already fuzzed and mutation-tested, and cannot reach rayon or the memory mapping; this milestone's defects were numeric and in design claims. Revisited by a spike if Miri-unreachable unsafe code grows, an integer coordinate bug escapes the tests, or before 1.0 |

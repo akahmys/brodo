@@ -34,7 +34,8 @@ PRESENT_TENSE = ["ARCHITECTURE.md", "AGENTS.md"]
 DATE = re.compile(r"\b20\d\d-\d\d-\d\d\b")
 PAST = re.compile(r"\b(was|were|had|used to|became|no longer|turned out)\b")
 JAPANESE = re.compile("[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uff66-\uff9f]")
-SECTION = re.compile(r"\b([A-Z][A-Z_]*\.md)\)? §(\d+(?:\.\d+)*)")
+# `NAME.md §N`, a root document's or `docs/`'s, its name in a link or in backquotes or bare.
+SECTION = re.compile(r"\b((?:docs/)?[A-Za-z][A-Za-z_]*\.md)[)`]? §(\d+(?:\.\d+)*)")
 LINK = re.compile(r"\]\(([^)#:\s][^)\s#]*)(#[^)]*)?\)")
 
 
@@ -83,9 +84,10 @@ def links(paths: list[Path]) -> list[str]:
 
 def sections(paths: list[Path]) -> list[str]:
     headings = {}
-    for doc in ROOT.glob("*.md"):
-        found = re.findall(r"^#+ (\d+(?:\.\d+)*)\.? ", doc.read_text(), re.MULTILINE)
-        headings[doc.name] = set(found)
+    for doc in [*ROOT.glob("*.md"), *(ROOT / "docs").glob("*.md")]:
+        found = set(re.findall(r"^#+ (\d+(?:\.\d+)*)\.? ", doc.read_text(), re.MULTILINE))
+        headings[doc.name] = found
+        headings[str(doc.relative_to(ROOT))] = found
     out = []
     for path in paths:
         if path.suffix not in {".md", ".rs"}:

@@ -5,7 +5,7 @@ document and the code differ, this document is right and the code is corrected; 
 difference found is a defect of the format's version. The design behind the formats is in
 ARCHITECTURE.md §4.6, §4.7 and §4.9.
 
-`scripts/formats/read.py` is a reader written from this document alone. The gate runs it on
+`scripts/audit/formats.py` is a reader written from this document alone. The gate runs it on
 the golden files and on damaged copies of them, through
 `crates/brodo/tests/format_document.rs`, and fails where it reads a value other than the
 crates read, or accepts what they refuse, or refuses what they accept.

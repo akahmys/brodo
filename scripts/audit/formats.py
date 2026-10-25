@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """A reader of brodo's files written from docs/formats.md alone (ADR-0037).
 
-    read.py [--brief] FILE...
-    read.py --patch FILE < PATCHES
+    formats.py [--brief] FILE...
+    formats.py --patch FILE < PATCHES
 
 For each file it prints `file PATH`, then either `refused REASON` or what it read: the
 grids, each with its metadata, background, leaves, some of their voxels found as §2.4

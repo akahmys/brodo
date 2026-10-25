@@ -1,4 +1,4 @@
-//! Format tier (TESTING.md §1) for the format document (ADR-0037): `scripts/formats/read.py`,
+//! Format tier (TESTING.md §1) for the format document (ADR-0037): `scripts/audit/formats.py`,
 //! a reader written from `docs/formats.md` alone, reads every golden file as the crates
 //! read it, value for value, and accepts or refuses each damaged copy of them as the
 //! crates do. A difference means the document leaves out or misstates what a reader needs.
@@ -35,7 +35,7 @@ fn data(name: &str) -> PathBuf {
 /// The document's reader, run with `args`, `input` on its standard input.
 fn reader(args: &[&str], input: &str) -> String {
     use std::io::Write;
-    let script = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../scripts/formats/read.py");
+    let script = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../scripts/audit/formats.py");
     let mut child = Command::new("python3")
         .arg("-I")
         .arg(script)

@@ -58,3 +58,16 @@ document: a frozen buffer's padding and the background's bytes beyond its size, 
 of its nodes and whether every node and leaf is reached, and a cache file's bounds against
 its grid. Whether to check them is left to a later format version.
 
+## Amendment: where the reader lives, and references to the document
+
+- **Date**: 2026-10-25
+
+A review found two gaps the first commit left. The reader was put in `scripts/formats/`,
+where CODING.md Rule L4 allows no script; the owner had it moved to
+`scripts/audit/formats.py`, among the checks, since the gate's tests run it. And
+`scripts/audit/documents.py` checked `NAME.md §N` references to root documents only, so
+the references to `docs/formats.md §N` went unchecked; it now reads the headings of
+`docs/*.md` too, and takes a name in backquotes as well as in a link or bare. Shown to
+fire: a reference to a section the document lacks failed the check with the name in
+backquotes, after a link, and bare.
+
