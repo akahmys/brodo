@@ -348,7 +348,7 @@ In `brodo`, each behind a cargo feature:
 
 ### 6.2 `piatto`
 
-Not built until a user asks for a viewer or for drawing to embed, grids too large for VTK and `.vdb` must be looked at, or P5 finds `.vdb` cannot be written (ADR-0018); the slice as PNG and VTK serve meanwhile. The design
+Not built until a user asks for a viewer or for drawing to embed, grids too large for VTK and `.vdb` must be looked at, or P6 finds `.vdb` cannot be written (ADR-0018); the slice as PNG and VTK serve meanwhile. The design
 it would follow:
 
 - Reads a cache-profile file (§4.7) by memory mapping.

@@ -15,8 +15,9 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   (ADR-0039). Its mutation run, the first on GitHub Actions, missed 148 mutants behind
   opt-in features until the run took every feature (ADR-0023). The repository is public
   (ADR-0034, ADR-0007).
-- **Next**: P5 (§2), each step a spike and an ADR before it is built; first the costs the
-  review of 2026-10-25 found, measured, and B-016's sign without orientation.
+- **Next**: P5 (§2), colino's milestone, split from the formats (P6) by the human
+  (2026-10-25): first the costs the review of 2026-10-25 found, each measured before
+  anything changes; then B-016's sign without orientation; then layer 3 (B-020).
 - **Unresolved problems**: `cache_map_x256` runs 8 to 10 % behind its baseline of
   2026-10-17 at v0.3.0 and now alike, run in turn (2026-10-23); a first run straight after
   the fuzz round and Miri failed at +13 %. Machine drift is the likely cause, not shown. Miri's Stacked Borrows reports undefined behaviour in
@@ -195,19 +196,12 @@ review of what brodo and colino show, so that later additions break no user.
       against the API, shown by a test outside the crate: `api_growth.rs` in each crate,
       measured with a variant and a field added (ADR-0035); accepted 2026-10-25
 
-### P5 — Archives, quantisation, OpenVDB files, local risk, a sign without orientation
+### P5 — colino: a sign without orientation, thin places, costs
 
-Scheduled by the human on 2026-10-23: what was left after P3, with B-016. Each step is a
-spike and an ADR before it is built.
+Scheduled by the human on 2026-10-23, split from the formats (P6) and ordered on
+2026-10-25. Each step that answers an open question is a spike and an ADR before it is
+built.
 
-- [ ] B-016: a sign that does not depend on orientation, by a spike on synthetic broken
-      meshes (`spikes/sign/`), as an option of conversion and Hermite data
-- [ ] colino's layer 3, places thinner or gaps narrower than two voxels (B-020)
-- [ ] B-005: the archive's compressor, pure Rust, its dependency approved
-- [ ] The archive profile (ARCHITECTURE.md §4.7), its reader in `UNTRUSTED_INPUT` and fuzzed
-- [ ] Value quantisation in the archive, 16-bit float and 8-bit range, with byte shuffling
-- [ ] `.vdb`: B-006 for reading through `vdb-rs`; writing only if the format can be learnt
-      within AGENTS.md S1, as the human decides
 - [ ] Costs a review of 2026-10-25 found by reading, each measured on a workload that
       reaches it before anything changes (TESTING.md T10), those that help kept, the others
       recorded as measured; first the two a user's mesh can reach:
@@ -224,12 +218,32 @@ spike and an ADR before it is built.
   - [ ] `label`'s work buffers allocated per node and per call (ROADMAP §1's 9.5 s and
         440 MB at r = 400), `LeafManifest::build`'s lookups from the root, and `freeze`'s
         plan rebuilt from sorted coordinates rather than from the tree
-- [ ] Retrospective and refactoring; fuzz round, the new readers included; Miri run;
-      benchmarks, the archive's with baselines; mutation run (ADR-0023)
+- [ ] B-016: a sign that does not depend on orientation, by a spike on synthetic broken
+      meshes (`spikes/sign/`), as an option of conversion and Hermite data
+- [ ] colino's layer 3, places thinner or gaps narrower than two voxels (B-020)
+- [ ] Retrospective and refactoring; benchmarks; mutation run (ADR-0023). Chosen by the
+      human for this content (ADR-0033): no fuzz round or Miri run, unless a step adds a
+      reader of untrusted bytes or unsafe code
 - [ ] **Accepted when** a badly oriented mesh converts with the new sign, layer 3 finds
-      thin walls and narrow gaps, and archives round-trip within their stated error
+      thin walls and narrow gaps, and each cost above is measured, kept where it helps
 
-### After P5
+### P6 — brodo: archives, quantisation, OpenVDB files
+
+Split from P5 by the human on 2026-10-25. Each step is a spike and an ADR before it is
+built.
+
+- [ ] B-005: the archive's compressor, pure Rust, its dependency approved
+- [ ] The archive profile (ARCHITECTURE.md §4.7), its reader in `UNTRUSTED_INPUT` and fuzzed
+- [ ] Value quantisation in the archive, 16-bit float and 8-bit range, with byte shuffling
+- [ ] `.vdb`: B-006 for reading through `vdb-rs`; writing only if the format can be learnt
+      within AGENTS.md S1, as the human decides
+- [ ] Retrospective and refactoring; fuzz round, the new readers included; Miri run;
+      benchmarks, the archive's with baselines; mutation run (ADR-0023), as the human
+      chooses (ADR-0033)
+- [ ] **Accepted when** archives round-trip within their stated error, and `.vdb` files
+      are read as B-006 decides
+
+### After P6
 
 STEP is not read (ADR-0031). `piatto` is held (§2, B-021).
 
@@ -242,7 +256,7 @@ implementation (PLANNING.md §2).
 | :--- | :--- | :--- |
 | B-022 | Does a later version of the frozen layout and the cache profile check what version 1's readers leave unchecked: padding and the background's bytes beyond its size, the order of nodes, whether every node and leaf is reached, and a cache file's bounds against its grid (docs/formats.md §2.5, §3.4)? | Not yet: found writing the format document (ADR-0037); each check a reader adds refuses files version 1 accepts, so it waits for a version raised for another reason (ADR-0038). For the links, one pass would do: each node's `first_child` and `first_tile`, where it has children or tiles, the end of the previous such node's, the last end the count, so that no child is shared or unreached |
 | B-019 | Does `colino` move to a repository of its own? | Not now (owner, 2026-10-23; ADR-0012 keeps two crates in one repository): changes span both, as P3's Hermite format and producer did, and before 1.0 a split would turn each into two releases, duplicate the rules and their audit, and take colino's tests out of brodo's gate. Revisited when brodo's API and formats settle (1.0), both are on crates.io, colino needs what brodo's rules forbid, or others maintain it |
-| B-021 | Does brodo build `piatto`? | Not now (owner, 2026-10-24; ADR-0018): no user has asked for a viewer, the slice as PNG and VTK for ParaView serve checking, `.vdb` from P5 would open in common tools, and a GPU, window and GUI stack is costly. Revisited when a user asks for a viewer or for drawing to embed, grids too large for VTK and `.vdb` must be looked at, or P5 finds `.vdb` cannot be written |
+| B-021 | Does brodo build `piatto`? | Not now (owner, 2026-10-24; ADR-0018): no user has asked for a viewer, the slice as PNG and VTK for ParaView serve checking, `.vdb` from P6 would open in common tools, and a GPU, window and GUI stack is costly. Revisited when a user asks for a viewer or for drawing to embed, grids too large for VTK and `.vdb` must be looked at, or P6 finds `.vdb` cannot be written |
 | B-018 | Does model checking with Kani join the closing checks? | Not now (owner, 2026-10-23): it fits only integer bit work and `view.rs`'s small helpers, already fuzzed and mutation-tested, and cannot reach rayon or the memory mapping; this milestone's defects were numeric and in design claims. Revisited by a spike if Miri-unreachable unsafe code grows, an integer coordinate bug escapes the tests, or before 1.0 |
 | B-017 | Is `Value` sealed, so that only brodo assigns type codes? | Not yet: a type outside brodo is refused by every other build's reader, and sealing would forbid types used in memory only (ADR-0029) |
 | B-020 | How does colino's layer 3 find places thinner, or gaps narrower, than two voxels before conversion, and check them by a local reconversion at h/2 (ARCHITECTURE.md §5.2)? | None yet; to be read from papers and answered by a spike in P5 |
