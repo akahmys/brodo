@@ -205,9 +205,12 @@ built.
 - [ ] Costs a review of 2026-10-25 found by reading, each measured on a workload that
       reaches it before anything changes (TESTING.md T10), those that help kept, the others
       recorded as measured; first the two a user's mesh can reach:
-  - [ ] Hermite data's fallback, where no triangle is hit, scans every triangle for each
+  - [x] Hermite data's fallback, where no triangle is hit, scans every triangle for each
         such edge (`colino/src/hermite.rs`): a mesh with holes or overlaps costs
-        unhit edges × triangles; a nearest-triangle search through the BVH would not
+        unhit edges × triangles; a nearest-triangle search through the BVH would not.
+        Kept: the BVH's search, its answer the scan's to the bit, took
+        `hermite_holed_r50` from 409 to 274–284 ms, as fast as the closed sphere
+        (2026-10-25)
   - [ ] Conversion's candidate cells test every leaf cell of a triangle's box
         (`colino/src/convert.rs`): a large slanted triangle, a CAD mesh's floor or wall,
         costs its box's volume rather than its area

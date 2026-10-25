@@ -30,7 +30,7 @@ use crate::bvh::Bvh;
 use crate::convert::Converted;
 use crate::distance::{Point, cross, dot, sub};
 use crate::error::HermiteError;
-use crate::intersect::{crossing, nearest};
+use crate::intersect::crossing;
 use crate::mesh::Mesh;
 use crate::winding::{Accuracy, Winding};
 
@@ -114,14 +114,7 @@ fn find(bvh: &Bvh, a: Point, b: Point, lower_inside: bool) -> Option<Found> {
         return Some(Found { fraction, triangle, hit: true });
     }
     // None hit: the triangle with area nearest the edge, the lowest of equals.
-    let mut near: Option<(f64, f64, u32)> = None;
-    for i in 0..bvh.len() {
-        let Some(t) = bvh.corners(i).filter(|t| has_area(*t)) else { continue };
-        let (s, d) = nearest(a, b, t);
-        if near.is_none_or(|(_, e, _)| d < e) {
-            near = Some((s, d, i));
-        }
-    }
+    let near = bvh.nearest_segment(a, b, has_area);
     near.map(|(fraction, _, triangle)| Found { fraction, triangle, hit: false })
 }
 

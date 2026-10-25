@@ -2,10 +2,11 @@
 //! for the triangle nearest a point. A node's triangles are split in two at the median of
 //! their centres along the box's longest side, down to a few a leaf; building and walking
 //! use an explicit stack. Of triangles at one distance, the lowest-numbered is nearest, so
-//! that the answer does not depend on the walk.
+//! that the answer does not depend on the walk; so too for the triangle nearest a segment.
 
 use crate::distance::{Point, on_triangle, squared};
 use crate::error::MeshError;
+use crate::intersect::nearest;
 use crate::mesh::Mesh;
 
 /// The most triangles a leaf holds.
@@ -224,6 +225,63 @@ impl Bvh {
         out
     }
 
+    /// Of the triangles `keep` accepts, the one nearest the segment from `a` to `b` by
+    /// `intersect::nearest`: the fraction of the segment's point nearest it, their squared
+    /// distance, and its number, the lowest-numbered of equal distances, as a scan of every
+    /// triangle in ascending order finds. A node is passed only when its box lies farther
+    /// from the segment's box than the best distance so far by more than the rounding of
+    /// distances at the tree's size, so that no triangle the scan would choose is left out.
+    pub(crate) fn nearest_segment(
+        &self,
+        a: Point,
+        b: Point,
+        keep: impl Fn([Point; 3]) -> bool,
+    ) -> Option<(f64, f64, u32)> {
+        let root = self.nodes.first().map_or(Aabb::EMPTY, |n| n.bounds);
+        let reach = root
+            .lo
+            .iter()
+            .chain(&root.hi)
+            .chain(&a)
+            .chain(&b)
+            .fold(0.0_f64, |m, c| if c.is_finite() { m.max(c.abs()) } else { m });
+        let margin = 64.0 * f64::EPSILON * reach;
+        let segment = Aabb::EMPTY.grow(a).grow(b);
+        // The distance between two boxes, zero where they meet.
+        let gap = |x: &Aabb| {
+            let g = |k: usize| (x.lo[k] - segment.hi[k]).max(segment.lo[k] - x.hi[k]).max(0.0);
+            let [p, q, r] = [g(0), g(1), g(2)];
+            (p * p + q * q + r * r).sqrt()
+        };
+        let mut best: Option<(f64, f64, u32)> = None;
+        let mut stack = vec![0_usize];
+        while let Some(id) = stack.pop() {
+            let Some(node) = self.nodes.get(id) else { continue };
+            if best.is_some_and(|(_, d, _)| gap(&node.bounds) > d.sqrt() + margin) {
+                continue;
+            }
+            if node.children == 0 {
+                for i in self.order.get(node.first..node.first + node.count).unwrap_or(&[]) {
+                    let Some(t) = self.corners(*i).filter(|t| keep(*t)) else { continue };
+                    let (s, d) = nearest(a, b, t);
+                    if best.is_none_or(|(_, e, j)| d.total_cmp(&e).then(i.cmp(&j)).is_lt()) {
+                        best = Some((s, d, *i));
+                    }
+                }
+                continue;
+            }
+            // The nearer child last, so that it is walked first.
+            let (l, r) = (node.children, node.children + 1);
+            let near = |c: usize| self.nodes.get(c).map_or(f64::INFINITY, |n| gap(&n.bounds));
+            if near(l) <= near(r) {
+                stack.extend([r, l]);
+            } else {
+                stack.extend([l, r]);
+            }
+        }
+        best
+    }
+
     /// Triangle `i`'s corners.
     pub fn corners(&self, i: u32) -> Option<[Point; 3]> {
         self.corners.get(usize::try_from(i).ok()?).copied()
@@ -243,6 +301,69 @@ impl Bvh {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A fixed linear congruential sequence of values in [−20, 20).
+    fn sequence() -> impl FnMut() -> f64 {
+        let mut g = 0x9e37_79b9_7f4a_7c15_u64;
+        move || {
+            g = g.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1_442_695_040_888_963_407);
+            f64::from(u32::try_from(g >> 40).unwrap_or(0)) / f64::from(1_u32 << 24) * 40.0 - 20.0
+        }
+    }
+
+    /// Scattered triangles, every seventh repeated so that distances tie, every
+    /// seventeenth with no area.
+    fn scattered(next: &mut impl FnMut() -> f64) -> Mesh {
+        let (mut vertices, mut triangles) = (Vec::new(), Vec::new());
+        for i in 0..300_u32 {
+            let c = [next(), next(), next()];
+            let corner = |d: [f64; 3]| [c[0] + d[0], c[1] + d[1], c[2] + d[2]];
+            let far = if i % 17 == 0 { [2.0, 0.0, 0.0] } else { [0.0, 1.5, 0.5] };
+            vertices.extend([c, corner([1.0, 0.0, 0.0]), corner(far)]);
+            triangles.push([3 * i, 3 * i + 1, 3 * i + 2]);
+            if i % 7 == 0 {
+                triangles.push([3 * i, 3 * i + 1, 3 * i + 2]);
+            }
+        }
+        Mesh { vertices, triangles, ..Mesh::default() }
+    }
+
+    fn has_area(t: [Point; 3]) -> bool {
+        let (u, v) = ([0, 1, 2].map(|k| t[1][k] - t[0][k]), [0, 1, 2].map(|k| t[2][k] - t[0][k]));
+        let n = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
+        n.iter().any(|x| *x != 0.0)
+    }
+
+    /// The tree's nearest triangle to a segment is the one a scan of every triangle in
+    /// ascending order finds, ties and triangles `keep` refuses among them, for segments
+    /// near and far.
+    #[test]
+    fn the_nearest_to_a_segment_is_the_scans() {
+        let mut next = sequence();
+        let bvh = Bvh::new(&scattered(&mut next)).unwrap();
+        let bits = |(s, d, i): (f64, f64, u32)| (s.to_bits(), d.to_bits(), i);
+        let mut ties = 0;
+        for _ in 0..400 {
+            let a = [next(), next(), next()].map(|x| x * 1.5);
+            let b = [0, 1, 2].map(|k| a[k] + next() / 10.0);
+            let mut scan: Option<(f64, f64, u32)> = None;
+            for i in 0..bvh.len() {
+                let Some(t) = bvh.corners(i).filter(|t| has_area(*t)) else { continue };
+                let (s, d) = nearest(a, b, t);
+                if scan.is_none_or(|(_, e, _)| d < e) {
+                    scan = Some((s, d, i));
+                }
+            }
+            let found = bvh.nearest_segment(a, b, has_area);
+            assert_eq!(found.map(bits), scan.map(bits), "{a:?} {b:?}");
+            let (_, d, i) = found.unwrap();
+            ties += usize::from((0..bvh.len()).any(|j| {
+                let equal = |t: [Point; 3]| nearest(a, b, t).1.to_bits() == d.to_bits();
+                j != i && bvh.corners(j).is_some_and(|t| has_area(t) && equal(t))
+            }));
+        }
+        assert!(ties > 0, "no tie was decided");
+    }
 
     /// Searching a small tree ends: a mutant that makes the walk loop for ever fails here
     /// within a minute, in the first test binary, before the tests that would only wait
