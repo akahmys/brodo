@@ -1,0 +1,13 @@
+# Throwaway spike for B-016 (ROADMAP.md §3). Never imported by `crates/` (PLANNING.md §3);
+# its own workspace, so cargo does not look for it in the one above.
+[package]
+name = "sign-spike"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+colino = { path = "../../crates/colino", default-features = false }
+
+[workspace]
+members = ["."]

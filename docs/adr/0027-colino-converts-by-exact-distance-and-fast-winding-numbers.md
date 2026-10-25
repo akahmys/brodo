@@ -1,6 +1,6 @@
 # ADR-0027: colino converts by exact distance and fast winding numbers, into a band
 
-- **Status**: Accepted
+- **Status**: Amended
 - **Date**: 2026-10-20
 
 ## Context
@@ -46,3 +46,37 @@ The human decided, on 2026-10-20:
 
 Memory follows the band, plus one tile per inside region. Conversion comes in three
 units: distance and the tree, the winding number, then the band.
+
+## Amendment
+
+- **Date**: 2026-10-26
+
+B-016 asked which sign colino offers beside the winding number's that does not depend on
+orientation. `spikes/sign/` signed dense grids of broken meshes by six methods against
+the intended mesh's exact winding number (its REPORT.md): no method held on every defect.
+The winding number fails on turned faces; a flood from outside leaks through a hole of
+one triangle and fills cavities; ray stabbing (Nooruddin and Turk, 2003, *Simplification
+and Repair of Polygonal Models Using Volumetric Techniques*, IEEE TVCG 9(2), §3.2) fills
+cavities; parity counting along lines in three axis directions with a majority vote, a
+line with an odd count not voting and a tie outside (§3.1), held on turned faces, holes
+and cavities, and mixes of them, but fails where parts pass into each other or walls are
+doubled, where the winding number holds. colino's `crossing` hits both triangles of an
+edge a line passes exactly on, so parity needs a crossing counted once there. The human
+decided:
+
+- The orientation-independent option is the parity count in the three axis directions;
+  the winding number stays the default. Ray stabbing and the others are not offered.
+- Conversion and Hermite data take the same choice of sign, Hermite data's signs on the
+  voxels' corners counted as conversion's are on their centres (ADR-0030).
+- How a line exactly on a shared edge or corner counts once is measured before the option
+  is built, between moving the lines off the lattice by a fixed offset and a half-open
+  rule on the edge functions, and recorded here.
+
+The spike then measured both (REPORT.md, "A line on an edge"). An edge function exactly 0
+taking the sign it has with the line moved by (ε, ε²) across itself, each product's sign
+exact, counted every line on an edge or a corner once, on a cube's split faces and on an
+octahedron with its vertices on the lines, and changed no other sign. A fixed offset of
+the lines signed the moved point rather than the voxel's centre and missed 20 voxels
+nearest each sphere. The human chose the perturbation (2026-10-26): parity counts with an
+edge test of its own beside `crossing`, which keeps hitting both triangles of an edge for
+Hermite data's crossings.
