@@ -281,6 +281,21 @@ impl Walk<'_> {
         u
     }
 
+    /// The unit of the voxel at child `c` of the leaf at `r`, whose first voxel's unit is
+    /// `base`: a leaf's voxels are found from its number once, not each from the root.
+    fn voxel(base: u32, r: Coord, c: [i32; 3]) -> u32 {
+        base + leaf_place(child(r, 2, c))
+    }
+
+    /// The unit of the first voxel of the leaf at `r`, which classifying it at level 2
+    /// found split.
+    fn leaf_base(&self, r: Coord) -> u32 {
+        match self.t.locate(r) {
+            Location::Leaf(n) => self.voxel_base + n.get() * 512,
+            Location::Tile(..) | Location::Background => 0,
+        }
+    }
+
     fn classify(&mut self, r: Coord, level: usize) -> Kind {
         match (level, self.t.locate(r)) {
             (3, Location::Leaf(n)) => {
@@ -303,6 +318,12 @@ impl Walk<'_> {
                 Work::Pair(a, b, l, e) => self.pair(a, b, l, e),
                 Work::Mixed(r, l, u, e) => match self.classify(r, l) {
                     Kind::Uniform(x) => self.units.join(x, u),
+                    Kind::Split if l == 2 => {
+                        let base = self.leaf_base(r);
+                        for c in children(l).filter(|c| on_side(*c, e, per_axis(l))) {
+                            self.units.join(Self::voxel(base, r, c), u);
+                        }
+                    }
                     Kind::Split => {
                         let n = per_axis(l);
                         for c in children(l).filter(|c| on_side(*c, e, n)) {
@@ -317,6 +338,10 @@ impl Walk<'_> {
     /// Every child's kind, x fastest. An upper node's are read from its masks, looking up
     /// only its tiles, since most of its places are usually empty.
     fn kinds(&mut self, r: Coord, l: usize) -> Vec<Kind> {
+        if l == 2 {
+            let base = self.leaf_base(r);
+            return children(l).map(|c| Kind::Uniform(Self::voxel(base, r, c))).collect();
+        }
         if l > 0 {
             return children(l).map(|c| self.classify(child(r, l, c), l + 1)).collect();
         }
@@ -376,6 +401,17 @@ impl Walk<'_> {
             (Kind::Uniform(x), Kind::Uniform(y)) => self.units.join(x, y),
             (Kind::Split, Kind::Uniform(y)) => self.stack.push(Work::Mixed(a, l, y, e)),
             (Kind::Uniform(x), Kind::Split) => self.stack.push(Work::Mixed(b, l, x, e.map(|c| -c))),
+            (Kind::Split, Kind::Split) if l == 2 => {
+                let (ba, bb, n) = (self.leaf_base(a), self.leaf_base(b), per_axis(l));
+                for c in children(l).filter(|c| on_side(*c, e, n)) {
+                    for f in &self.offsets {
+                        let t = [0, 1, 2].map(|k| c[k] + f[k] - e[k] * n);
+                        if t.iter().all(|x| (0..n).contains(x)) {
+                            self.units.join(Self::voxel(ba, a, c), Self::voxel(bb, b, t));
+                        }
+                    }
+                }
+            }
             (Kind::Split, Kind::Split) => {
                 let n = per_axis(l);
                 for c in children(l).filter(|c| on_side(*c, e, n)) {

@@ -233,7 +233,12 @@ built.
         conversion alone 140 MB (2026-10-25)
   - [ ] `label`'s work buffers allocated per node and per call (ROADMAP §1's 9.5 s and
         440 MB at r = 400), `LeafManifest::build`'s lookups from the root, and `freeze`'s
-        plan rebuilt from sorted coordinates rather than from the tree
+        plan rebuilt from sorted coordinates rather than from the tree. Kept for `label`:
+        99 % of its time was walking the tree, 49 million of its 51 million
+        classifications single voxels each found from the root, most of them in 19 million
+        pairs across leaves pushed on the stack one by one; a leaf's voxels are now joined
+        from its number, the labels unchanged, `label_sphere_r50` 165 -> 53 ms and the
+        sphere of radius 200 2.41 -> 0.63 s (2026-10-25)
 - [ ] B-016: a sign that does not depend on orientation, by a spike on synthetic broken
       meshes (`spikes/sign/`), as an option of conversion and Hermite data
 - [ ] colino's layer 3, places thinner or gaps narrower than two voxels (B-020)
