@@ -3,7 +3,10 @@
 //! meets the edge, to `f32` rounding, with its face's normal and group; a closed mesh gives
 //! the same bytes at one and at eight threads; a torus's crossed edges are all hit; every
 //! set keeps to brodo's format, whose check covers each crossed edge's owner being a leaf
-//! point, at bands of 1 to 3; an open mesh counts its edges with no triangle hit.
+//! point, at bands of 1 to 3; an open mesh counts its edges with no triangle hit; of the
+//! hits on an edge, the one nearest its inside end is kept, whichever end that is; a
+//! triangle with no area never gives an unhit edge its data; a normal perpendicular to its
+//! edge keeps its triangle's side.
 
 mod common;
 
@@ -407,4 +410,107 @@ fn a_face_turned_in_is_refused_beyond_the_band_and_counted_within_it() {
     assert!(matches!(run(3), Err(colino::error::HermiteError::SignOutsideBand(_))));
     let wide = run(6);
     assert!(wide.as_ref().is_ok_and(|p| p.unhit > 0), "{:?}", wide.map(|p| p.unhit));
+}
+
+/// The value index of point `v` in its leaf, which must exist.
+fn place(t: &brodo::topology::Topology, v: [i32; 3]) -> (brodo::topology::LeafNumber, usize) {
+    let n = match t.locate(v) {
+        brodo::topology::Location::Leaf(n) => n,
+        other @ (brodo::topology::Location::Tile(..) | brodo::topology::Location::Background) => {
+            panic!("{v:?}: {other:?}")
+        }
+    };
+    (n, t.leaf_voxels(n).unwrap().position(|w| w == v).unwrap())
+}
+
+#[test]
+fn a_triangle_with_no_area_never_gives_an_unhit_edge_its_data() {
+    use colino::intersect::{crossing, nearest};
+    // A sphere holed at the top, a triangle with no area across the hole, nearer some of
+    // its unhit edges than any triangle with area. With it taken, its zero normal would
+    // break the format and the set be refused.
+    let closed = common::sphere(3, 20.0, [0.0; 3]);
+    let mut m = closed.clone();
+    let middle_z =
+        |t: &[u32; 3]| t.iter().map(|i| closed.vertices[*i as usize][2]).sum::<f64>() / 3.0;
+    m.triangles.retain(|t| middle_z(t) <= 17.0);
+    let flat = [[-9.0, 0.4, 18.5], [0.0, 0.4, 18.5], [9.0, 0.4, 18.5]];
+    let base = u32::try_from(m.vertices.len()).unwrap();
+    m.vertices.extend(flat);
+    m.triangles.push([base, base + 1, base + 2]);
+    let p = made(&m, &Options::new(1.0));
+    assert!(p.unhit > 0);
+    let corners: Vec<[Point; 3]> =
+        m.triangles.iter().map(|t| t.map(|i| m.vertices[i as usize])).collect();
+    let (with_area, _) = corners.split_at(corners.len() - 1);
+    let t = p.set.topology();
+    let mut nearer = 0;
+    for n in t.leaf_numbers() {
+        for (axis, c) in p.set.axes().iter().enumerate() {
+            for (i, v) in t.leaf_voxels(n).unwrap().enumerate() {
+                if c.fraction.leaf(t, n).unwrap()[i] < 0.0 {
+                    continue;
+                }
+                let a = v.map(f64::from);
+                let mut b = a;
+                b[axis] += 1.0;
+                if corners.iter().any(|tri| crossing(a, b, *tri).is_some()) {
+                    continue;
+                }
+                let best =
+                    with_area.iter().map(|tri| nearest(a, b, *tri).1).fold(f64::MAX, f64::min);
+                nearer += usize::from(nearest(a, b, flat).1 < best);
+            }
+        }
+    }
+    assert!(nearer > 0, "the flat triangle is nearest no unhit edge");
+}
+
+#[test]
+fn of_an_edge_whose_lower_end_is_outside_the_crossing_nearest_its_upper_end_is_kept() {
+    // As above, the edge from -5.1 to -4.1 along x: outside at its lower end, it crosses
+    // the wall at -5 and -4.4 and both solids at -4.3; the last, nearest its inside end,
+    // from the first solid, is kept.
+    let m = boxes(&[
+        ([-5.0; 3], [5.0; 3], false),
+        ([-4.4; 3], [4.4; 3], true),
+        ([-4.3; 3], [4.3; 3], false),
+        ([-4.3; 3], [4.3; 3], false),
+    ]);
+    let o = Options::new(1.0).with_origin([-0.1, 0.25, 0.25]);
+    let p = made(&m, &o);
+    let t = p.set.topology();
+    let v = [-5, 0, 0];
+    assert_eq!(p.set.signs().value_at(t, v).unwrap(), 0);
+    assert_eq!(p.set.signs().value_at(t, [-4, 0, 0]).unwrap(), 1);
+    let (n, i) = place(t, v);
+    let x = &p.set.axes()[0];
+    assert!(
+        (f64::from(x.fraction.leaf(t, n).unwrap()[i]) - 0.8).abs() <= FRACTION_TOLERANCE * 10.0
+    );
+    assert_eq!(x.group.leaf(t, n).unwrap()[i], 3);
+    assert_eq!(
+        x.normal.leaf(t, n).unwrap()[i].map(f32::to_bits),
+        [-1.0_f32, 0.0, 0.0].map(f32::to_bits)
+    );
+}
+
+#[test]
+fn a_normal_perpendicular_to_its_edge_keeps_its_triangle_s_side() {
+    // A flat rectangle facing +z, open: points on it are inside, points beside it in its
+    // plane outside. The x edges into and out of it lie in its plane and hit nothing; their
+    // crossings are at the ends on it, their normals the rectangle's, along neither edge.
+    let vertices = vec![[0.5, 0.5, 0.0], [2.5, 0.5, 0.0], [2.5, 3.5, 0.0], [0.5, 3.5, 0.0]];
+    let m = Mesh::new(vertices, vec![[0, 1, 2], [0, 2, 3]]).with_unit(Some("millimeter".into()));
+    let o = Options::new(1.0).with_accuracy(Accuracy::Exact);
+    let p = made(&m, &o);
+    let t = p.set.topology();
+    let x = &p.set.axes()[0];
+    // Into it, from outside, and out of it, from inside.
+    for (v, inside) in [([0, 1, 0], 0), ([2, 1, 0], 1)] {
+        assert_eq!(p.set.signs().value_at(t, v).unwrap(), inside, "{v:?}");
+        let (n, i) = place(t, v);
+        assert!(x.fraction.leaf(t, n).unwrap()[i] >= 0.0, "{v:?} has no crossing");
+        assert_eq!(x.normal.leaf(t, n).unwrap()[i][2].to_bits(), 1.0_f32.to_bits(), "{v:?}");
+    }
 }

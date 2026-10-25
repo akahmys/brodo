@@ -49,6 +49,9 @@ TIMEOUT_MULTIPLIER = "2.0"
 # a bounding-volume test that never prunes, to finish the suite (ADR-0023).
 PATIENT_TIMEOUT = "1800"
 PATIENT_OUT = ROOT / "out" / "mutants" / "patient"
+# Every feature, as the gate's `cargo test` builds: code behind an opt-in feature is
+# mutated whatever the features, and its tests run only with them (ADR-0023).
+FEATURES = "--all-features"
 
 
 def patterns() -> tuple[list[str], list[str]]:
@@ -120,8 +123,8 @@ def mutants(args: list[str], out: Path) -> None:
     env["RSS_GUARD_MIB"] = str(GUARD_MIB)
     env["RSS_GUARD_LOG"] = str(log)
     env["TMPDIR"] = str(tmp)
-    subprocess.run(["cargo", "mutants", "--workspace", "-j", str(JOBS), "-o", str(out), *args],
-                   cwd=ROOT, env=env, check=False)
+    subprocess.run(["cargo", "mutants", "--workspace", FEATURES, "-j", str(JOBS), "-o", str(out),
+                    *args], cwd=ROOT, env=env, check=False)
 
 
 def guarded(out: Path) -> list[str]:

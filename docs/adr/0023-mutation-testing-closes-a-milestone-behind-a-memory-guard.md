@@ -109,3 +109,23 @@ denominator left out by the range check. A mutant's kill by a property test is o
 sound as that test is steady: a run follows a gate in which every test passes, and a
 property test that fails in a run is investigated before the run is trusted.
 
+## Amendment: every feature
+
+- **Date**: 2026-10-25
+
+P4's run, on GitHub Actions in 60 shards at `63fcbe1`, missed 89 mutants in
+`brodo/src/slice.rs` and 59 in `brodo/src/vtk.rs`: ADR-0036 had made `slice-png` and
+`vtk` opt-in, and cargo-mutants, run with the default features, still mutated that code but
+no longer built the tests behind those features. The gate's tests ran with every feature;
+the run did not. The owner decided that `mutants.py` passes `--all-features`, as the gate's
+`cargo test` builds, and TESTING.md T11 says so. Shown to fire: without it, the 148 were
+missed; with it, run again on the owner's machine, 146 were caught and 2 were unviable.
+
+The same run missed 7 mutants of `colino/src/hermite.rs` that no test reached: a triangle
+with no area nearest an unhit edge, an edge outside at its lower end crossed more than once,
+and a normal perpendicular to its edge. Three tests in `hermite_reference.rs` now build
+each case, and caught all 7. Its 16 timeouts before any failed test, in `winding.rs` and
+`bvh.rs`, ran again under 1800 s on the owner's machine and were all caught, the slowest
+of them in about 13 minutes: GitHub's runners had made them outrun twice the unmutated
+suite's time.
+
