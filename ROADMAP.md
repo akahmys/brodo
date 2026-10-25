@@ -270,7 +270,8 @@ No spike is running. `spikes/remap/` answered B-001 and B-008, and `spikes/merge
   and force-pushed, the old workflow runs deleted; step 5, `audit.yml` on each push to
   `main` (ADR-0034); the repository made public by the owner; step 4, `main` protected
   against force pushes and deletion for everyone, and workflows from every outside
-  contributor's pull request held for approval. Waiting: steps 1 and 2, for the owner.
+  contributor's pull request held for approval. Steps 1 and 2, patents and licences, judged by the owner on a
+  preliminary search (ADR-0007); asked again when the form of distribution changes.
 - Before registering on crates.io: `publish`, and each crate's description and keywords
   naming its function (sparse volume, VDB, SDF, level set, voxel). Both names were found
   unregistered on 2026-10-16, per the design.

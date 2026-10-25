@@ -76,3 +76,32 @@ of brodo to MPL-2.0, which MIT OR Apache-2.0 cannot hold. S1 stands for OpenVDB 
 ground. MPL-2.0's patent grant covers users of OpenVDB's code, not an implementation drawn
 from the papers, so it gives brodo none.
 
+## Amendment: publication
+
+- **Date**: 2026-10-25
+
+Before the repository was made public, the owner weighed patents and the licence terms for
+distributing the source on GitHub, on a preliminary search the agent made of Google
+Patents by phrase and inventor (2026-10-25), not a freedom-to-operate study:
+
+- The VDB tree (Museth 2013): of nine filings naming Museth, the one near brodo's design,
+  US20100114909A1 (Digital Domain, filed 2008), claimed blocks of values with a bit mask of
+  the non-zero ones; Google Patents listed it as abandoned, with no granted family member.
+- Generalised and fast winding numbers (Jacobson et al. 2013, Barill et al. 2018): no
+  filing named Barill; the one naming Jacobson with "winding number", Adobe's
+  US11810255B2, concerned swept volumes. Filings found by the phrases used winding numbers
+  as a part, none claimed computing them.
+- The watertight segment–triangle test (Woop et al. 2013): NVIDIA's family "Watertight ray
+  triangle intersection" (priority 2018, expected to expire 2038; US10825230B2,
+  US11704863B2, US12067669B2 granted, US20240355039A1 pending) claimed hardware circuitry
+  or a traversal unit in every independent claim read, and cited Woop et al. as prior art
+  for software on a CPU; colino is software on a CPU.
+- Licences: the source is distributed under MIT OR Apache-2.0, every dependency held to
+  `deny.toml`'s allow-list by `cargo deny`, and no copyleft source read (S1), each source
+  file's papers recorded in PROVENANCE.md.
+
+The owner judged nothing found to stand in the way of publishing the source, and decided
+that the question is asked again when the form of distribution changes, such as
+registration on crates.io or an implementation in hardware, or when the pending
+application is granted with claims beyond hardware.
+
