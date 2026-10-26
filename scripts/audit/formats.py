@@ -164,26 +164,39 @@ class Grid:
         return self.background
 
     def regions(self):
-        """Every leaf's origin by number, and every tile's (level, origin, place)."""
+        """Every leaf's origin by number, and every tile's (level, origin, place); §4.2
+        rule 11: no node, leaf or tile value reached twice."""
         leaves, tiles = [None] * self.nleaves, []
+        seen = set()
+
+        def once(what, i):
+            need((what, i) not in seen, "shared " + what)
+            seen.add((what, i))
+
         for key, kind, index in self.roots:
             if kind == 0:
+                once("tile", index)
                 tiles.append(("root", key, index))
                 continue
+            once("upper", index)
             children, utiles, fc, ft = self.uppers[index]
             for p in range(32 ** 3):
                 if not (bit(children, p) or bit(utiles, p)):
                     continue
                 at = [key[k] + 128 * c for k, c in enumerate(unplace(p, 5))]
                 if bit(utiles, p):
+                    once("tile", ft + below(utiles, p))
                     tiles.append(("upper", at, ft + below(utiles, p)))
                     continue
+                once("lower", fc + below(children, p))
                 lch, ltiles, lfc, lft = self.lowers[fc + below(children, p)]
                 for q in range(16 ** 3):
                     leaf_at = [at[k] + 8 * c for k, c in enumerate(unplace(q, 4))]
                     if bit(ltiles, q):
+                        once("tile", lft + below(ltiles, q))
                         tiles.append(("lower", leaf_at, lft + below(ltiles, q)))
                     if bit(lch, q):
+                        once("leaf", lfc + below(lch, q))
                         leaves[lfc + below(lch, q)] = leaf_at
         return leaves, tiles
 

@@ -50,6 +50,7 @@ lib brodo tree::tests::negative_coordinates_round_down
 lib brodo tree::tests::only_a_tile_splits
 lib brodo tree::tests::splitting_a_root_tile_leaves_its_siblings_as_tiles
 lib brodo tree::tests::tree_matches_the_model
+lib brodo view::tests::a_node_or_tile_value_two_root_entries_share_is_refused_by_the_walk
 lib brodo view::tests::views_of_one_topology_share_it_whatever_their_type
 lib brodo view::tests::walking_a_view_finds_the_topologys_leaves_and_tiles
 lib brodo vtk::tests::a_name_needing_escapes_or_empty_is_refused

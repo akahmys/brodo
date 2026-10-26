@@ -75,6 +75,7 @@ fn format_error(e: &FormatError) -> &'static str {
         FormatError::UnsupportedVersion(..) => "UnsupportedVersion",
         FormatError::WrongValueType { .. } => "WrongValueType",
         FormatError::Inconsistent(..) => "Inconsistent",
+        FormatError::Shared => "Shared",
         _ => "later",
     }
 }

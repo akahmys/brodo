@@ -1,6 +1,6 @@
 # ADR-0038: A format version is raised so that producers and readers can move in turn
 
-- **Status**: Accepted
+- **Status**: Amended
 - **Date**: 2026-10-25
 
 ## Context
@@ -32,3 +32,19 @@ of one previous reader at a time, each kept fuzzed and tested on its golden file
 
 Whatever is chosen is stated in the format document (ADR-0037) and in TESTING.md V6, and
 held by a Format-tier test reading each version the policy keeps.
+
+## Amendment: a Hermite set's shared nodes
+
+- **Date**: 2026-10-27
+
+P5's review found that version 1's reader leaves nodes shared between entries unchecked
+(docs/formats.md §2.5): two root entries naming one upper node, or nodes whose children's
+or tiles' ranges overlap. A reader walking the whole tree, as checking a Hermite set does,
+then walks the shared nodes once per entry: a file of a few megabytes asked for tens of
+gigabytes, and a leaf reached twice was checked at one of its origins only. B-022 had left
+such checks for a version raised for another reason. The human decided that a Hermite set
+is refused when the walk from its sign grid's root table reaches a node, a leaf or a tile
+value twice (§4.2, rule 11, `FormatError::Shared`), at version 1: brodo writes no such
+set, and waiting would leave the reader to such files. A frozen grid read voxel by voxel,
+whose cost sharing does not raise, keeps version 1's checks.
+

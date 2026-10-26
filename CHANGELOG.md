@@ -31,6 +31,11 @@ are recorded here when they change (V6).
 - `CacheFile::read` reads no more than its limit and one byte: a device, a pipe or a file
   growing after its length was read had passed the length's check and been read whole,
   `/dev/zero` until memory ran out.
+- A Hermite set whose sign grid shares a node, a leaf or a tile value between entries is
+  refused, `FormatError::Shared` (docs/formats.md §4.2, rule 11): checking such a set
+  walked the shared nodes once per entry, a small file asking for much work, and checked
+  a shared leaf at one origin only. This refuses files version 1 accepted; brodo writes
+  none (ADR-0038).
 
 ### Breaking
 

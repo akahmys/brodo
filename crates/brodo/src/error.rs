@@ -147,6 +147,10 @@ pub enum FormatError {
     /// A count, offset or index points outside its section, or contradicts another.
     #[error("the {0} section is inconsistent")]
     Inconsistent(&'static str),
+    /// Walking the nodes from the root table reaches a node, a leaf or a tile value twice,
+    /// which a reader walking the whole tree refuses (docs/formats.md §4.2, rule 11).
+    #[error("a node, leaf or tile value is reached twice from the root table")]
+    Shared,
 }
 
 /// Why a grid's metadata was refused.

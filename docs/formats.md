@@ -251,9 +251,13 @@ unless:
    in [0, 1], its normal's length, worked in `f64`, is within 10⁻⁶ of 1, its component
    along a is not negative when v is inside and not positive when v is outside, and its
    group is below the table's length, or is 0 when the table is empty;
-10. for every leaf point v and axis a, the point u = v − â, when in no leaf, has v's sign.
+10. for every leaf point v and axis a, the point u = v − â, when in no leaf, has v's sign;
+11. walking the sign grid's nodes from its root table, as §2.4 does, reaches every leaf, and
+    no upper node, lower node, leaf or tile value twice.
 
-Rules 8 and 10 hold that only a leaf point owns an edge whose ends differ.
+Rules 8 and 10 hold that only a leaf point owns an edge whose ends differ. Rule 11 refuses
+what §2.5 leaves unchecked, nodes shared between entries, so that checking a set costs what
+its bytes hold (ADR-0038).
 
 ## 5. The narrow-band SDF convention, version 1
 
