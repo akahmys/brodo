@@ -346,6 +346,13 @@ impl Bvh {
         best
     }
 
+    /// The box holding every triangle, its least and greatest corner; nothing for a mesh
+    /// with none.
+    pub(crate) fn bounds(&self) -> Option<(Point, Point)> {
+        let root = self.nodes.first().filter(|n| n.count > 0)?;
+        Some((root.bounds.lo, root.bounds.hi))
+    }
+
     /// Triangle `i`'s corners.
     pub fn corners(&self, i: u32) -> Option<[Point; 3]> {
         self.corners.get(usize::try_from(i).ok()?).copied()

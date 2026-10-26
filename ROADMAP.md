@@ -31,6 +31,9 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   held the load average near 3 during runs (2026-10-20). Allocating and dropping its
   output field takes about a third of that item (1.04 of 3.3 ms, 2026-10-18, load 3.3),
   but the update alone varied as much, so it is not shown to cause the spread.
+  `cache_write_x8` ran 169 to 214 % slow in the first child of a pair, the second within
+  1 %, twice (2026-10-25, 2026-10-26); the first file write of a run is the likely cause,
+  not shown.
   Labelling held about 161 MB for the 33 million leaf voxels of a sphere of radius 400,
   near 5 bytes a voxel, and took 2.42 s on one thread (2026-10-26); it has a benchmark
   item. The gate's debug tests grew: `morphology_reference` takes 27 s at a
@@ -264,6 +267,11 @@ built.
 - [ ] Retrospective and refactoring; benchmarks; mutation run (ADR-0023). Chosen by the
       human for this content (ADR-0033): no fuzz round or Miri run, unless a step adds a
       reader of untrusted bytes or unsafe code
+  - [x] Retrospective, its proposals decided by the human (2026-10-26); refactoring:
+        colino's vector helpers in `distance.rs`, the tree's box in `Bvh::bounds`
+  - [x] Benchmarks within their baselines, both crates, at loads of 1.7 and 1.5
+        (2026-10-26)
+  - [ ] Mutation run
 - [ ] **Accepted when** a badly oriented mesh converts with the new sign, layer 3 finds
       thin walls and narrow gaps, and each cost above is measured, kept where it helps
 
@@ -341,6 +349,8 @@ implementation (PLANNING.md §2).
   against force pushes and deletion for everyone, and workflows from every outside
   contributor's pull request held for approval. Steps 1 and 2, patents and licences, judged by the owner on a
   preliminary search (ADR-0007); asked again when the form of distribution changes.
+- At the next version that breaks users: remove `FreezeError::Inconsistent`, which nothing
+  returns since `freeze`'s plan takes tiles' numbers from the topology's list (2026-10-26).
 - Before registering on crates.io: `publish`, and each crate's description and keywords
   naming its function (sparse volume, VDB, SDF, level set, voxel). Both names were found
   unregistered on 2026-10-16, per the design.

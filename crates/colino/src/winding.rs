@@ -198,8 +198,7 @@ impl Winding {
     /// The box holding every triangle, its least and greatest corner; nothing for a mesh
     /// with none.
     pub(crate) fn bounds(&self) -> Option<(Point, Point)> {
-        let root = self.bvh.nodes.first().filter(|n| n.count > 0)?;
-        Some((root.bounds.lo, root.bounds.hi))
+        self.bvh.bounds()
     }
 
     /// The winding number at `q`.

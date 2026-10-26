@@ -64,8 +64,8 @@ fn height(p: Point, k: usize, t: [Point; 3]) -> Option<f64> {
 
 /// The mesh's box grown by 1 on every side, or nothing for a mesh with no triangle.
 fn reach(bvh: &Bvh) -> Option<(Point, Point)> {
-    let root = bvh.nodes.first().filter(|n| n.count > 0)?;
-    Some((root.bounds.lo.map(|c| c - 1.0), root.bounds.hi.map(|c| c + 1.0)))
+    let (lo, hi) = bvh.bounds()?;
+    Some((lo.map(|c| c - 1.0), hi.map(|c| c + 1.0)))
 }
 
 /// Whether `p` is inside the mesh `bvh` holds, by the parity count along the three axes.

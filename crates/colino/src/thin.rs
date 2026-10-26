@@ -27,7 +27,7 @@ use rayon::prelude::*;
 
 use crate::bvh::Bvh;
 use crate::convert::Inside;
-use crate::distance::{Point, cross, dot, sub};
+use crate::distance::{Point, add, cross, dot, length, scale, sub};
 use brodo::analysis::{AnalysisError, Connectivity, label};
 use brodo::error::FieldError;
 use brodo::euler::euler;
@@ -45,18 +45,6 @@ struct Found {
     kind: ThinKind,
     at: Point,
     measure: f64,
-}
-
-fn add(a: Point, b: Point) -> Point {
-    [a[0] + b[0], a[1] + b[1], a[2] + b[2]]
-}
-
-fn scale(a: Point, s: f64) -> Point {
-    a.map(|x| x * s)
-}
-
-fn length(a: Point) -> f64 {
-    dot(a, a).sqrt()
 }
 
 /// Corners in their coordinates' order, x first.
@@ -217,8 +205,8 @@ fn places(points: &[Found], kind: ThinKind, reach: f64) -> Vec<Thin> {
 /// The thin walls, then the narrow gaps, of the mesh `bvh` holds, sides found by `inside`,
 /// at voxel size `h`.
 pub(crate) fn thin(bvh: &Bvh, inside: &Inside<'_>, h: f64) -> Vec<Thin> {
-    let Some(root) = bvh.nodes.first().filter(|n| n.count > 0) else { return Vec::new() };
-    let reach = 2.0 * length(sub(root.bounds.hi, root.bounds.lo)) + 2.0 * h;
+    let Some((lo, hi)) = bvh.bounds() else { return Vec::new() };
+    let reach = 2.0 * length(sub(hi, lo)) + 2.0 * h;
     let found: Vec<Found> = (0..bvh.len())
         .into_par_iter()
         .map(|own| measure(bvh, inside, own, h, reach))

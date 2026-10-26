@@ -18,6 +18,18 @@ pub(crate) fn cross(a: Point, b: Point) -> Point {
     [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
 }
 
+pub(crate) fn add(a: Point, b: Point) -> Point {
+    [a[0] + b[0], a[1] + b[1], a[2] + b[2]]
+}
+
+pub(crate) fn scale(a: Point, s: f64) -> Point {
+    a.map(|x| x * s)
+}
+
+pub(crate) fn length(a: Point) -> f64 {
+    dot(a, a).sqrt()
+}
+
 /// `a + s (b − a)`.
 pub(crate) fn along(a: Point, b: Point, s: f64) -> Point {
     [a[0] + s * (b[0] - a[0]), a[1] + s * (b[1] - a[1]), a[2] + s * (b[2] - a[2])]
