@@ -467,3 +467,34 @@ fn a_file_beyond_the_read_limit_is_refused_unread() {
         Err(CacheError::FileTooLarge { length: l, limit }) if l == length && limit == length - 1
     ));
 }
+
+/// A file longer than the limit is refused by the bytes read, whatever length it reports:
+/// a named pipe reports none, as `/dev/zero` does, and a file can grow after its length is
+/// read (ADR-0036).
+#[cfg(unix)]
+#[test]
+fn a_file_longer_than_the_limit_is_refused_whatever_length_it_reports() {
+    use std::io::Write;
+    let path = tmp("longer_than_its_length.fifo");
+    std::fs::remove_file(&path).unwrap_or(());
+    let made = std::process::Command::new("mkfifo").arg(&path).status().unwrap();
+    assert!(made.success());
+    assert_eq!(std::fs::metadata(&path).unwrap().len(), 0);
+    let writer = {
+        let path = path.clone();
+        std::thread::spawn(move || {
+            let mut pipe = std::fs::OpenOptions::new().write(true).open(&path).unwrap();
+            // The reader stops at its limit and closes the pipe: the rest is refused.
+            pipe.write_all(&vec![0_u8; 1 << 20]).unwrap_or(());
+        })
+    };
+    let read = CacheFile::read(&path, 1024);
+    writer.join().unwrap();
+    std::fs::remove_file(&path).unwrap_or(());
+    assert!(matches!(read, Err(CacheError::FileTooLarge { limit: 1024, .. })), "{read:?}");
+    let zero = CacheFile::read(std::path::Path::new("/dev/zero"), 1024);
+    assert!(
+        matches!(zero, Err(CacheError::FileTooLarge { length: 1025, limit: 1024 })),
+        "{zero:?}"
+    );
+}

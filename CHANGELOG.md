@@ -28,6 +28,9 @@ are recorded here when they change (V6).
 - colino's 3MF reader refuses a component naming the object it belongs to, as naming no
   object defined before it (`ReadError::NoObject`); such a file made the reader run for
   ever, or until memory ran out.
+- `CacheFile::read` reads no more than its limit and one byte: a device, a pipe or a file
+  growing after its length was read had passed the length's check and been read whole,
+  `/dev/zero` until memory ran out.
 
 ### Breaking
 

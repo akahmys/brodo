@@ -5,6 +5,7 @@
 //!
 //! Format version 1's bytes are in `docs/formats.md` §3, which this code follows.
 
+use std::io::Read;
 use std::path::Path;
 
 use zerocopy::IntoBytes;
@@ -357,13 +358,22 @@ fn zero(bytes: &[u8]) -> bool {
 
 impl CacheFile {
     /// Reads and checks a cache file of at most `limit` bytes; a longer one is refused by
-    /// its length before any of it is read (ADR-0036).
+    /// its length before any of it is read, and by the bytes read where its length says
+    /// less than it holds, as a device's, a pipe's or a growing file's can: no more than
+    /// `limit` + 1 bytes are read (ADR-0036).
     pub fn read(path: &Path, limit: u64) -> Result<Self, CacheError> {
-        let length = std::fs::metadata(path)?.len();
+        let file = std::fs::File::open(path)?;
+        let length = file.metadata()?.len();
         if length > limit {
             return Err(CacheError::FileTooLarge { length, limit });
         }
-        Self::from_bytes(&std::fs::read(path)?)
+        let mut bytes = Vec::with_capacity(usize::try_from(length).unwrap_or(0));
+        file.take(limit.saturating_add(1)).read_to_end(&mut bytes)?;
+        let read = u64::try_from(bytes.len()).unwrap_or(u64::MAX);
+        if read > limit {
+            return Err(CacheError::FileTooLarge { length: read, limit });
+        }
+        Self::from_bytes(&bytes)
     }
 
     /// Checks bytes whole as a cache file, copying them to an aligned buffer.
