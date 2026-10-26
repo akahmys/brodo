@@ -10,7 +10,7 @@ use colino::convert::{Options, Sign, convert};
 use colino::error::{ConvertError, HermiteError, MeshError, ReadError, ReportError};
 use colino::hermite::hermite;
 use colino::mesh::{Limits, Mesh};
-use colino::report::{Place, Reference, ThinKind, report};
+use colino::report::{Check, Place, Reference, ThinKind, report};
 use colino::surface::Surface;
 use colino::winding::Accuracy;
 
@@ -116,6 +116,24 @@ fn thin_kind(e: &ThinKind) -> &'static str {
     }
 }
 
+fn check(e: &Check) -> &'static str {
+    match e {
+        Check::Same(i) => {
+            assert!(i.euler <= i.solid + i.complement);
+            "Same"
+        }
+        Check::Changed { coarse, fine } => {
+            assert_ne!(
+                (coarse.euler, coarse.solid, coarse.complement),
+                (fine.euler, fine.solid, fine.complement)
+            );
+            "Changed"
+        }
+        Check::Unchecked => "Unchecked",
+        _ => "later",
+    }
+}
+
 fn sign(e: &Sign) -> &'static str {
     match e {
         Sign::Winding => "Winding",
@@ -142,6 +160,7 @@ fn every_enum_that_may_grow_is_matched_with_a_wildcard() {
     assert_eq!(accuracy(&Accuracy::Exact), "Exact");
     assert_eq!(sign(&Sign::Parity), "Parity");
     assert_eq!(thin_kind(&ThinKind::Gap), "Gap");
+    assert_eq!(check(&Check::Unchecked), "Unchecked");
     let mesh = tetrahedron().with_unit(Some("mm".to_owned()));
     let c = convert(&mesh, &Options::new(0.25)).unwrap();
     let r = report(&mesh, &c, &[("inside".to_owned(), [0.2, 0.2, 0.2])]).unwrap();
@@ -171,6 +190,7 @@ fn every_struct_is_built_by_its_constructor_set_by_assignment_and_read_by_its_fi
     assert!(r.located);
     for t in &r.thin {
         assert!(t.least < 0.5 && t.points > 0 && t.lo[0] <= t.hi[0], "{:?}", t.kind);
+        assert_ne!(check(&t.check), "later");
     }
     let surface = Surface::of(&mesh).unwrap();
     assert_eq!((surface.vertices, surface.edges, surface.faces, surface.open_edges), (4, 6, 4, 0));

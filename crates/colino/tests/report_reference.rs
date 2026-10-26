@@ -149,6 +149,13 @@ fn a_wall_thinner_than_a_voxel_shows_a_change() {
     let wall = coarse.thin[0];
     assert_eq!(wall.kind, colino::report::ThinKind::Wall);
     assert!(wall.least > 0.9 && wall.least <= 1.0, "{}", wall.least);
+    // At h/2, 1 voxel, the shell is whole: one solid round a cavity.
+    assert!(
+        matches!(wall.check, colino::report::Check::Changed { fine, .. }
+            if (fine.euler, fine.solid, fine.complement) == (2, 1, 2)),
+        "{:?}",
+        wall.check
+    );
 }
 
 #[test]

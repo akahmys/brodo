@@ -21,7 +21,8 @@
 //! Layer 3, local risk: places thinner, or gaps narrower, than two voxels, found from the
 //! mesh along its triangles' normals (`colino::thin`), each with its box; there a
 //! conversion may have opened a wall or closed a gap. Sides are found by the conversion's
-//! sign, the winding number's at Barill et al.'s β = 2.
+//! sign, the winding number's at Barill et al.'s β = 2. Each place is checked by its box's
+//! invariants at h and at h/2, sampled by that sign.
 
 use brodo::analysis::{Connectivity, Label, Labels, label};
 use brodo::euler::euler;
@@ -32,7 +33,7 @@ use crate::distance::Point;
 use crate::error::ReportError;
 use crate::mesh::Mesh;
 use crate::surface::Surface;
-use crate::thin::thin;
+use crate::thin::{check, thin};
 use crate::winding::{Accuracy, Winding};
 
 /// Betti numbers: components, tunnels and cavities.
@@ -110,6 +111,38 @@ pub enum ThinKind {
     Gap,
 }
 
+/// Invariants of the solid in a place's box: its χ, its components under 26-connectivity,
+/// and the components of the rest, the space beyond the box with it, under 6.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
+pub struct Invariants {
+    /// χ of the union of the solid's closed voxels.
+    pub euler: i64,
+    /// The solid's components.
+    pub solid: i64,
+    /// The rest's components.
+    pub complement: i64,
+}
+
+/// What reconverting a place at h/2 says (ADR-0028).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
+pub enum Check {
+    /// The invariants at h are those at h/2.
+    Same(Invariants),
+    /// They differ: the conversion has changed the topology there.
+    Changed {
+        /// At h, the conversion's.
+        coarse: Invariants,
+        /// At h/2.
+        fine: Invariants,
+    },
+    /// The place's box holds more voxels at h/2 than are checked.
+    Unchecked,
+}
+
 /// A place thinner, or a gap narrower, than two voxels.
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -125,6 +158,8 @@ pub struct Thin {
     pub least: f64,
     /// The thin points it holds, of those sampled h/2 apart.
     pub points: u64,
+    /// Whether the conversion changed the topology there.
+    pub check: Check,
 }
 
 /// The topology report's three layers.
@@ -279,7 +314,10 @@ pub fn report(
     let [together, apart] = pairs(&regions);
     let winding = Winding::new(mesh)?;
     let inside = Inside::new(&winding, converted.sign, Accuracy::Approximate { beta: 2.0 });
-    let thin = thin(winding.bvh(), &inside, voxel_size(converted)?);
+    let mut thin = thin(winding.bvh(), &inside, voxel_size(converted)?);
+    for place in &mut thin {
+        place.check = check(converted, &inside, place)?;
+    }
     Ok(Report {
         solid: Betti { components, tunnels, cavities },
         complement: Betti {

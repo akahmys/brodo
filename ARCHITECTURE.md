@@ -315,8 +315,8 @@ are in ADR-0030.
   under this pairing each lattice vertex adds as much to the complement's χ as to the
   solid's (ADR-0028).
 - Reference for layer 1: the input's V − E + F when, welded, it is a closed 2-manifold,
-  the solid's χ being half the surface's; otherwise, in P2, none, the report saying why;
-  later, a local reconversion of the risky places at h/2, whose invariants must agree.
+  the solid's χ being half the surface's; otherwise none, the report saying why. Layer 3's
+  check stands in for it where it is thin, for any input.
 - Layer 2's regions are named points in world coordinates, each answered with its
   complement component, whether that reaches the outside, or the solid.
 - Layer 3 samples points h/2 apart on every triangle and measures, along the triangle's
@@ -325,7 +325,11 @@ are in ADR-0030.
   below 2h, of one kind and within 2h of each other, are one place, reported with its
   kind, its box, its least thickness or width and its count of points (ADR-0028). It
   samples, so a thin place between samples, or whose sides do not face along the normal,
-  can be missed. Checking the places by reconverting them at h/2 is open (B-020).
+  can be missed. Each place is checked in its box, grown by 2h and aligned to the voxels:
+  the solid at h, the conversion's, and at h/2, the voxel centres the conversion's sign puts
+  inside, compared by χ and by the solid's and the rest's components; differing, the
+  conversion changed the topology there. A box of more than 2²⁶ voxels at h/2 is not
+  checked, and says so (ADR-0028).
 - The report is a structure serialisable with `serde` behind the feature `serde`: what may
   have changed, where it may lie (layer 3), and by how much.
 

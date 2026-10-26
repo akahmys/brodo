@@ -113,3 +113,12 @@ was wrong otherwise than h. The cost follows the box's volume. The human decided
 - A place whose box holds more than 2²⁶ voxels at h/2 is not checked, and says so.
 - Each place reports its check: the same invariants, both sets where they differ, or
   unchecked.
+
+Building the check changed how points are sampled, twice. The spike's centroids of a
+k-fold split put k² points on a sliver of a triangle: a rod's 16 triangles 370 long took
+16 s. Points on a square grid in each triangle's plane, kept h/8 off its edges, missed
+the narrow half of a sliver; and points nearer an edge than rounding let a ray along the
+normal of a turned face graze its neighbour and measure walls of 0.01. Points are now
+taken at every h/2 along the longest edge, each section of the triangle split into parts
+no longer than h/2, at each part's middle: about area / (h/2)² + length / (h/2) points,
+inside their sections, the same for a triangle turned over (2026-10-26).

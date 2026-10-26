@@ -16,8 +16,8 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   opt-in features until the run took every feature (ADR-0023). The repository is public
   (ADR-0034, ADR-0007).
 - **Next**: P5 (§2), colino's milestone: its costs measured and those that helped kept
-  (2026-10-25), and B-016's sign without orientation built (2026-10-26); next layer 3
-  (B-020).
+  (2026-10-25), B-016's sign without orientation and layer 3 (B-020) built
+  (2026-10-26); next its closing checks.
 - **Unresolved problems**: `cache_map_x256` runs 8 to 10 % behind its baseline of
   2026-10-17 at v0.3.0 and now alike, run in turn (2026-10-23); a first run straight after
   the fuzz round and Miri failed at +13 %. Machine drift is the likely cause, not shown. Miri's Stacked Borrows reports undefined behaviour in
@@ -255,12 +255,12 @@ built.
       count along the axes, `Sign::Parity` (ADR-0027). On the sphere of radius 50 it
       converted in 165 to 187 ms and made Hermite data in 207 to 217 ms, beside the winding
       number's 300 to 382 and 320 to 369 ms, at a load near 6 (2026-10-26)
-- [ ] colino's layer 3, places thinner or gaps narrower than two voxels (B-020)
+- [x] colino's layer 3, places thinner or gaps narrower than two voxels (B-020)
   - [x] Finding them, by rays along each sampled point's normal (ADR-0028): the report of
-        the sphere of radius 50 took 130 ms with it, 84 without; of radius 200, 2.33 s and
-        1.69 s; of radius 400, 10.5 s, at loads of 4 to 6 (2026-10-26)
-  - [ ] Checking them by a local reconversion at h/2: answered by `spikes/recheck/`
-        (ADR-0028), the three invariants of each place's box at h and at h/2
+        the sphere of radius 50 took 117 ms with it, 84 without; of radius 200, 2.16 s and
+        1.69 s; of radius 400, 9.5 s, at loads near 3 (2026-10-26)
+  - [x] Checking them by a local reconversion at h/2 (ADR-0028): the three invariants of
+        each place's box at h and at h/2, a box beyond 2²⁶ voxels at h/2 unchecked
 - [ ] Retrospective and refactoring; benchmarks; mutation run (ADR-0023). Chosen by the
       human for this content (ADR-0033): no fuzz round or Miri run, unless a step adds a
       reader of untrusted bytes or unsafe code
