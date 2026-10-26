@@ -15,7 +15,9 @@ and reports how the conversion may have changed the shape's topology. It reports
   volume, not the grid's.
 - **Reporting**: the solid's and its complement's Betti numbers, the Euler characteristic
   against the input's when the input is a closed 2-manifold, and which named points share a
-  component of the space around the solid. With the feature `serde`, the report serialises.
+  component of the space around the solid, and the places thinner, or gaps narrower, than
+  two voxels, where a conversion may have opened a wall or closed a gap. With the feature
+  `serde`, the report serialises.
 - **Hermite data**: on the corners of a conversion's voxels, signs and, on each edge whose
   ends differ, where the mesh crosses it, its normal and its triangle's group, in brodo's
   format (`colino::hermite`).

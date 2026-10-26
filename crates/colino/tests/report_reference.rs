@@ -2,7 +2,8 @@
 //! shapes whose Betti numbers are known, a sphere, a shell, a torus and a double torus,
 //! report them, with the complement's components one more than the solid's cavities and
 //! the grid's χ the input's; named points find the cavity, the outside and the wall; a wall
-//! thinner than a voxel shows a change; an open input has no reference.
+//! thinner than a voxel shows a change, which the third layer finds; an open input has no
+//! reference.
 
 use colino::convert::{Options, convert};
 use colino::error::ReportError;
@@ -97,7 +98,7 @@ fn known_shapes_report_their_betti_numbers() {
             "{name}"
         );
         assert_eq!(r.euler_change, Some(0), "{name}");
-        assert!(!r.located, "{name}");
+        assert!(r.located && r.thin.is_empty(), "{name}: {:?}", r.thin);
     }
 }
 
@@ -142,6 +143,12 @@ fn a_wall_thinner_than_a_voxel_shows_a_change() {
     let coarse = reported(&shell(19.0), 2.0, &[]);
     assert_eq!((coarse.solid, coarse.euler), (betti([13, 107, 0]), -94));
     assert_eq!(coarse.euler_change, Some(-96));
+    // The third layer finds the wall, 1 thick, below 2h at h = 2 and not at h = 0.25.
+    assert_eq!(fine.thin, Vec::new());
+    assert_eq!(coarse.thin.len(), 1, "{:?}", coarse.thin);
+    let wall = coarse.thin[0];
+    assert_eq!(wall.kind, colino::report::ThinKind::Wall);
+    assert!(wall.least > 0.9 && wall.least <= 1.0, "{}", wall.least);
 }
 
 #[test]

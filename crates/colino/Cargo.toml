@@ -13,6 +13,9 @@ brodo.workspace = true
 miniz_oxide = { workspace = true, optional = true }
 quick-xml = { workspace = true, optional = true }
 rawzip = { workspace = true, optional = true }
+# The topology report's third layer measures its sampled points in parallel, in the
+# caller's pool (ADR-0015, ADR-0028).
+rayon.workspace = true
 serde = { workspace = true, optional = true }
 thiserror.workspace = true
 
@@ -31,7 +34,6 @@ serde = ["dep:serde"]
 # The examples and tests draw slices as PNG.
 brodo = { workspace = true, features = ["slice-png"] }
 proptest.workspace = true
-rayon.workspace = true
 serde_json.workspace = true
 
 [lints]

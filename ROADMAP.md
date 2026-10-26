@@ -256,6 +256,10 @@ built.
       converted in 165 to 187 ms and made Hermite data in 207 to 217 ms, beside the winding
       number's 300 to 382 and 320 to 369 ms, at a load near 6 (2026-10-26)
 - [ ] colino's layer 3, places thinner or gaps narrower than two voxels (B-020)
+  - [x] Finding them, by rays along each sampled point's normal (ADR-0028): the report of
+        the sphere of radius 50 took 130 ms with it, 84 without; of radius 200, 2.33 s and
+        1.69 s; of radius 400, 10.5 s, at loads of 4 to 6 (2026-10-26)
+  - [ ] Checking them by a local reconversion at h/2, by a spike and its ADR
 - [ ] Retrospective and refactoring; benchmarks; mutation run (ADR-0023). Chosen by the
       human for this content (ADR-0033): no fuzz round or Miri run, unless a step adds a
       reader of untrusted bytes or unsafe code

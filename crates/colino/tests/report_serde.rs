@@ -38,7 +38,8 @@ fn a_report_is_read_back_as_it_was_written() {
     let json = round_trip(&report(&m, &c, &points).unwrap());
     assert_eq!(json["solid"], serde_json::json!({"components": 1, "tunnels": 0, "cavities": 1}));
     assert_eq!(json["euler_change"], 0);
-    assert_eq!(json["located"], false);
+    assert_eq!(json["located"], true);
+    assert_eq!(json["thin"], serde_json::json!([]));
     assert_eq!(json["reference"]["Closed"]["solid_euler"], 2);
     assert_eq!(json["regions"][1]["place"], "Solid");
     assert_eq!(json["regions"][2]["place"]["Complement"]["outside"], true);

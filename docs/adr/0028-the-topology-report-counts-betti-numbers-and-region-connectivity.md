@@ -91,7 +91,10 @@ tetrahedrization. The human decided:
   other triangle along its normal, both ways. A side whose midpoint is inside, by the
   conversion's sign as Hermite data's points are, is a wall that thick; otherwise a gap
   that wide. Below 2h, the point is thin.
-- Thin points within h of each other are one place, reported with its kind, its box in
-  world coordinates, its least thickness or width, and its count of points.
+- Thin points of one kind within 2h of each other are one place, reported with its kind,
+  its box in world coordinates, its least thickness or width, and its count of points.
+  The human first chose h; building it showed a wall between h and 2h thick reported as
+  two places, its sides, and the human chose 2h, within which a thin wall's sides always
+  lie (2026-10-26).
 - Checking a place by reconverting it at h/2 is measured apart, before it is built, and
   recorded here.

@@ -308,7 +308,7 @@ are in ADR-0030.
 | :--- | :--- | :--- |
 | 1. Global invariants | β₀, β₁, β₂ of the solid (φ < 0) and of its complement (φ ≥ 0) in the 3-sphere | β₀: components; β₂: complement components not reaching the outside; β₁ = β₀ + β₂ − χ |
 | 2. Labelled connectivity | whether user-labelled regions lie in one complement component | flood fill |
-| 3. Local risk | places thinner, or gaps narrower, than two voxels | predicted from the input before conversion, as coordinates and extents |
+| 3. Local risk | places thinner, or gaps narrower, than two voxels | from the mesh: a ray along each sampled point's normal, both ways; places with their boxes |
 
 - Connectivity: the solid 26, its complement 6. The complement's β₀ is counted and held
   by tests to duality with the solid's β₂; its β₁ and β₂ are the solid's by duality, since
@@ -318,10 +318,16 @@ are in ADR-0030.
   the solid's χ being half the surface's; otherwise, in P2, none, the report saying why;
   later, a local reconversion of the risky places at h/2, whose invariants must agree.
 - Layer 2's regions are named points in world coordinates, each answered with its
-  complement component, whether that reaches the outside, or the solid. Where a change
-  lies is not reported until layer 3, and the report says so.
+  complement component, whether that reaches the outside, or the solid.
+- Layer 3 samples points h/2 apart on every triangle and measures, along the triangle's
+  normal both ways, the distance to the nearest other triangle: a side whose midpoint is
+  inside by the conversion's sign is a wall that thick, otherwise a gap that wide. Points
+  below 2h, of one kind and within 2h of each other, are one place, reported with its
+  kind, its box, its least thickness or width and its count of points (ADR-0028). It
+  samples, so a thin place between samples, or whose sides do not face along the normal,
+  can be missed. Checking the places by reconverting them at h/2 is open (B-020).
 - The report is a structure serialisable with `serde` behind the feature `serde`: what may
-  have changed, where (from layer 3), and by how much.
+  have changed, where it may lie (layer 3), and by how much.
 
 ## 6. Visualisation (ADR-0018)
 

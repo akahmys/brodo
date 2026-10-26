@@ -6,6 +6,11 @@ are recorded here when they change (V6).
 
 ## Unreleased
 
+- colino's topology report has its third layer: `Report::thin`, the places thinner, or
+  gaps narrower, than two voxels, each a `Thin` with its kind (`ThinKind::Wall` or `Gap`),
+  box, least thickness or width and count of points, found from the mesh along its
+  triangles' normals (ADR-0028). `Report::located` is now true. colino depends on `rayon`
+  outside its tests, for the layer's points.
 - colino converts, and gives Hermite data, by a sign that does not depend on the
   triangles' orientation as an option: `Options::with_sign(Sign::Parity)`, a parity count
   along the three axes; the winding number stays the default (`Sign::Winding`). `Options`

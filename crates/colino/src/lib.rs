@@ -16,6 +16,7 @@ pub mod report;
 #[cfg(feature = "stl")]
 pub mod stl;
 pub mod surface;
+mod thin;
 #[cfg(feature = "threemf")]
 pub mod threemf;
 pub mod winding;

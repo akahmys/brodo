@@ -1,4 +1,4 @@
-//! The topology report's first two layers (ARCHITECTURE.md §5.2, ADR-0028).
+//! The topology report's three layers (ARCHITECTURE.md §5.2, ADR-0028).
 //!
 //! Layer 1, global invariants: the solid is φ < 0 under 26-connectivity, its complement
 //! φ ≥ 0 under 6. The solid's β₀ counts its components, β₂ the complement's components that
@@ -18,17 +18,22 @@
 //! component of the voxel holding it, or the solid; pairs of points in one component and
 //! pairs apart are listed. A point beyond the tree lies outside.
 //!
-//! Where a change lies is not known to these layers: `located` is false until the third.
+//! Layer 3, local risk: places thinner, or gaps narrower, than two voxels, found from the
+//! mesh along its triangles' normals (`colino::thin`), each with its box; there a
+//! conversion may have opened a wall or closed a gap. Sides are found by the conversion's
+//! sign, the winding number's at Barill et al.'s β = 2.
 
 use brodo::analysis::{Connectivity, Label, Labels, label};
 use brodo::euler::euler;
 use brodo::tree::Coord;
 
-use crate::convert::Converted;
+use crate::convert::{Converted, Inside};
 use crate::distance::Point;
 use crate::error::ReportError;
 use crate::mesh::Mesh;
 use crate::surface::Surface;
+use crate::thin::thin;
+use crate::winding::{Accuracy, Winding};
 
 /// Betti numbers: components, tunnels and cavities.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -93,7 +98,36 @@ pub struct Region {
     pub place: Place,
 }
 
-/// The topology report's first two layers.
+/// What a thin place is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
+pub enum ThinKind {
+    /// The solid is thinner there than two voxels: a conversion may open a hole in it.
+    Wall,
+    /// The space between the mesh's sides is narrower there than two voxels: a conversion
+    /// may close it.
+    Gap,
+}
+
+/// A place thinner, or a gap narrower, than two voxels.
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
+pub struct Thin {
+    /// A wall or a gap.
+    pub kind: ThinKind,
+    /// The least corner of the box holding its thin points, in world coordinates.
+    pub lo: Point,
+    /// The greatest corner.
+    pub hi: Point,
+    /// Its least thickness or width, in the mesh's unit.
+    pub least: f64,
+    /// The thin points it holds, of those sampled h/2 apart.
+    pub points: u64,
+}
+
+/// The topology report's three layers.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
@@ -115,8 +149,24 @@ pub struct Report {
     pub together: Vec<Pair>,
     /// Pairs of regions in the complement, in different components.
     pub apart: Vec<Pair>,
-    /// Whether changes are located; not until the third layer.
+    /// The thin walls, then the narrow gaps, each in the order the mesh's triangles first
+    /// reach it.
+    pub thin: Vec<Thin>,
+    /// Whether places where a change may lie are located: true since the third layer.
     pub located: bool,
+}
+
+/// The grid's voxel size, the least of its axes'.
+fn voxel_size(c: &Converted) -> Result<f64, ReportError> {
+    let mut h = f64::INFINITY;
+    for (k, row) in c.meta.transform.iter().take(3).enumerate() {
+        let x = row.get(k).copied().unwrap_or(0.0);
+        if x.is_nan() || x <= 0.0 {
+            return Err(ReportError::Transform);
+        }
+        h = h.min(x);
+    }
+    Ok(h)
 }
 
 fn solid(v: f32) -> bool {
@@ -227,6 +277,9 @@ pub fn report(
         })
         .collect::<Result<Vec<_>, ReportError>>()?;
     let [together, apart] = pairs(&regions);
+    let winding = Winding::new(mesh)?;
+    let inside = Inside::new(&winding, converted.sign, Accuracy::Approximate { beta: 2.0 });
+    let thin = thin(winding.bvh(), &inside, voxel_size(converted)?);
     Ok(Report {
         solid: Betti { components, tunnels, cavities },
         complement: Betti {
@@ -240,6 +293,7 @@ pub fn report(
         regions,
         together,
         apart,
-        located: false,
+        thin,
+        located: true,
     })
 }

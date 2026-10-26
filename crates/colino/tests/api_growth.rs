@@ -10,7 +10,7 @@ use colino::convert::{Options, Sign, convert};
 use colino::error::{ConvertError, HermiteError, MeshError, ReadError, ReportError};
 use colino::hermite::hermite;
 use colino::mesh::{Limits, Mesh};
-use colino::report::{Place, Reference, report};
+use colino::report::{Place, Reference, ThinKind, report};
 use colino::surface::Surface;
 use colino::winding::Accuracy;
 
@@ -108,6 +108,14 @@ fn accuracy(e: &Accuracy) -> &'static str {
     }
 }
 
+fn thin_kind(e: &ThinKind) -> &'static str {
+    match e {
+        ThinKind::Wall => "Wall",
+        ThinKind::Gap => "Gap",
+        _ => "later",
+    }
+}
+
 fn sign(e: &Sign) -> &'static str {
     match e {
         Sign::Winding => "Winding",
@@ -133,6 +141,7 @@ fn every_enum_that_may_grow_is_matched_with_a_wildcard() {
     assert_eq!(report_error(&ReportError::Transform), "Transform");
     assert_eq!(accuracy(&Accuracy::Exact), "Exact");
     assert_eq!(sign(&Sign::Parity), "Parity");
+    assert_eq!(thin_kind(&ThinKind::Gap), "Gap");
     let mesh = tetrahedron().with_unit(Some("mm".to_owned()));
     let c = convert(&mesh, &Options::new(0.25)).unwrap();
     let r = report(&mesh, &c, &[("inside".to_owned(), [0.2, 0.2, 0.2])]).unwrap();
@@ -159,6 +168,10 @@ fn every_struct_is_built_by_its_constructor_set_by_assignment_and_read_by_its_fi
     assert_eq!((produced.unhit, produced.set.group_names().len()), (0, 0));
     let r = report(&mesh, &c, &[("inside".to_owned(), [0.2, 0.2, 0.2])]).unwrap();
     assert_eq!((r.solid.components, r.euler, r.regions[0].name.as_str()), (1, 1, "inside"));
+    assert!(r.located);
+    for t in &r.thin {
+        assert!(t.least < 0.5 && t.points > 0 && t.lo[0] <= t.hi[0], "{:?}", t.kind);
+    }
     let surface = Surface::of(&mesh).unwrap();
     assert_eq!((surface.vertices, surface.edges, surface.faces, surface.open_edges), (4, 6, 4, 0));
 }

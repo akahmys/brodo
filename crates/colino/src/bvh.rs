@@ -6,7 +6,7 @@
 
 use crate::distance::{Point, on_triangle, squared};
 use crate::error::MeshError;
-use crate::intersect::nearest;
+use crate::intersect::{crossing, nearest};
 use crate::mesh::Mesh;
 
 /// The most triangles a leaf holds.
@@ -100,6 +100,26 @@ fn longest(b: &Aabb) -> usize {
     }
 }
 
+/// Where the segment from `a` to `b` enters box `x` widened by `margin`, as a fraction, if
+/// it meets it within [0, 1].
+fn entry(x: &Aabb, a: Point, b: Point, margin: f64) -> Option<f64> {
+    let (mut first, mut last) = (0.0_f64, 1.0_f64);
+    for k in 0..3 {
+        let (lo, hi) = (x.lo[k] - margin, x.hi[k] + margin);
+        let d = b[k] - a[k];
+        if d == 0.0 {
+            if a[k] < lo || a[k] > hi {
+                return None;
+            }
+            continue;
+        }
+        let (s, t) = ((lo - a[k]) / d, (hi - a[k]) / d);
+        first = first.max(s.min(t));
+        last = last.min(s.max(t));
+    }
+    (first <= last).then_some(first)
+}
+
 impl Bvh {
     /// The tree over `mesh`'s triangles; a triangle naming a vertex the mesh lacks is
     /// refused.
@@ -185,10 +205,9 @@ impl Bvh {
         best.map(|(d, i)| (d.sqrt(), i))
     }
 
-    /// The triangles whose boxes meet the box of the segment from `a` to `b`, in ascending
-    /// order. The box is widened by twice the rounding of moving a corner by `a`, as the
-    /// crossing test does, so that no triangle it would hit is left out (ADR-0030).
-    pub fn near_segment(&self, a: Point, b: Point) -> Vec<u32> {
+    /// Twice the rounding of moving a corner by `a` or `b`, as the crossing test does: the
+    /// margin a segment's query widens boxes by.
+    fn margin(&self, a: Point, b: Point) -> f64 {
         let root = self.nodes.first().map_or(Aabb::EMPTY, |n| n.bounds);
         let reach = root
             .lo
@@ -197,7 +216,14 @@ impl Bvh {
             .chain(&a)
             .chain(&b)
             .fold(0.0_f64, |m, c| if c.is_finite() { m.max(c.abs()) } else { m });
-        let margin = 4.0 * f64::EPSILON * reach;
+        4.0 * f64::EPSILON * reach
+    }
+
+    /// The triangles whose boxes meet the box of the segment from `a` to `b`, in ascending
+    /// order. The box is widened by twice the rounding of moving a corner by `a`, as the
+    /// crossing test does, so that no triangle it would hit is left out (ADR-0030).
+    pub fn near_segment(&self, a: Point, b: Point) -> Vec<u32> {
+        let margin = self.margin(a, b);
         let query = Aabb::EMPTY.grow(a).grow(b);
         let query = Aabb { lo: query.lo.map(|c| c - margin), hi: query.hi.map(|c| c + margin) };
         let meets = |x: &Aabb| (0..3).all(|k| x.lo[k] <= query.hi[k] && query.lo[k] <= x.hi[k]);
@@ -273,6 +299,44 @@ impl Bvh {
             // The nearer child last, so that it is walked first.
             let (l, r) = (node.children, node.children + 1);
             let near = |c: usize| self.nodes.get(c).map_or(f64::INFINITY, |n| gap(&n.bounds));
+            if near(l) <= near(r) {
+                stack.extend([r, l]);
+            } else {
+                stack.extend([l, r]);
+            }
+        }
+        best
+    }
+
+    /// The least fraction along the segment from `a` to `b` at which it crosses a triangle,
+    /// by the watertight test (`intersect::crossing`), as a scan of every triangle finds.
+    /// The tree is walked nearest box first, each box widened as `near_segment`'s query is,
+    /// and a box the segment enters beyond the best crossing so far is passed.
+    pub(crate) fn first_crossing(&self, a: Point, b: Point) -> Option<f64> {
+        let margin = self.margin(a, b);
+        let enters = |x: &Aabb| entry(x, a, b, margin);
+        let mut best: Option<f64> = None;
+        let mut stack = vec![0_usize];
+        while let Some(id) = stack.pop() {
+            let Some(node) = self.nodes.get(id) else { continue };
+            let Some(at) = enters(&node.bounds) else { continue };
+            if best.is_some_and(|s| at > s) {
+                continue;
+            }
+            if node.children == 0 {
+                for i in self.order.get(node.first..node.first + node.count).unwrap_or(&[]) {
+                    let Some(t) = self.corners(*i) else { continue };
+                    if let Some(s) = crossing(a, b, t) {
+                        best = Some(best.map_or(s, |x| x.min(s)));
+                    }
+                }
+                continue;
+            }
+            // The nearer child last, so that it is walked first.
+            let (l, r) = (node.children, node.children + 1);
+            let near = |c: usize| {
+                self.nodes.get(c).and_then(|n| enters(&n.bounds)).unwrap_or(f64::INFINITY)
+            };
             if near(l) <= near(r) {
                 stack.extend([r, l]);
             } else {
@@ -363,6 +427,67 @@ mod tests {
             }));
         }
         assert!(ties > 0, "no tie was decided");
+    }
+
+    /// The tree's first crossing of a segment is the least a scan of every triangle finds:
+    /// for segments at random, most crossing nothing, and for segments through a
+    /// triangle's centroid and on beyond it.
+    #[test]
+    fn the_first_crossing_of_a_segment_is_the_scans() {
+        let mut next = sequence();
+        let bvh = Bvh::new(&scattered(&mut next)).unwrap();
+        let mut crossed = 0;
+        for i in 0..2000_u32 {
+            let a = [next(), next(), next()];
+            let b = if i % 2 == 0 {
+                [0, 1, 2].map(|k| a[k] + next() / 5.0)
+            } else {
+                let t = bvh.corners(i % bvh.len()).unwrap();
+                let c = [0, 1, 2].map(|k| (t[0][k] + t[1][k] + t[2][k]) / 3.0);
+                [0, 1, 2].map(|k| a[k] + 1.5 * (c[k] - a[k]))
+            };
+            let scan = (0..bvh.len())
+                .filter_map(|j| bvh.corners(j).and_then(|t| crossing(a, b, t)))
+                .fold(None, |m: Option<f64>, s| Some(m.map_or(s, |m| m.min(s))));
+            let found = bvh.first_crossing(a, b);
+            assert_eq!(found.map(f64::to_bits), scan.map(f64::to_bits), "{a:?} {b:?}");
+            crossed += usize::from(found.is_some());
+        }
+        assert!(crossed > 900 && crossed < 1900, "{crossed} of 2000 crossed");
+    }
+
+    /// A box entered first may hold only a later crossing: a large slanted triangle whose box
+    /// holds the segment's start crosses it at 0.9 and is found first, its centre the
+    /// lower; a small one in another leaf crosses at 0.7, and the walk must still visit it.
+    #[test]
+    fn a_box_entered_first_does_not_hide_a_nearer_crossing() {
+        let mut vertices = vec![
+            // On the plane x + y + z = 9, holding (9, 0, 0).
+            [0.0, 9.0, 0.0],
+            [0.0, 0.0, 9.0],
+            [18.0, -4.5, -4.5],
+            // Across the x axis at x = 7.
+            [7.0, -1.0, -1.0],
+            [7.0, 1.0, -1.0],
+            [7.0, 0.0, 1.0],
+        ];
+        let mut triangles = vec![[0, 1, 2], [3, 4, 5]];
+        // Three far triangles each side, so that the two lie in different leaves.
+        for x in [-100.0, -101.0, -102.0, 100.0, 101.0, 102.0] {
+            let base = u32::try_from(vertices.len()).unwrap();
+            vertices.extend([[x, 50.0, 50.0], [x, 51.0, 50.0], [x, 50.0, 51.0]]);
+            triangles.push([base, base + 1, base + 2]);
+        }
+        let bvh = Bvh::new(&Mesh { vertices, triangles, ..Mesh::default() }).unwrap();
+        let leaf_of = |t: u32| {
+            bvh.nodes.iter().position(|n| {
+                n.children == 0
+                    && bvh.order.get(n.first..n.first + n.count).is_some_and(|o| o.contains(&t))
+            })
+        };
+        assert_ne!(leaf_of(0), leaf_of(1));
+        let found = bvh.first_crossing([0.0; 3], [10.0, 0.0, 0.0]);
+        assert_eq!(found.map(f64::to_bits), Some(0.7_f64.to_bits()));
     }
 
     /// Searching a small tree ends: a mutant that makes the walk loop for ever fails here
