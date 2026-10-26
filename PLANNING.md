@@ -30,14 +30,17 @@ can be counted) are established by running something before the human decides, a
 AGENTS.md's "Measurement outranks documentation" asks; a claim found wrong while
 implementing goes back to the human as an amendment before the work lands. A claim that
 holds for every input is measured on each kind of input the design accepts, such as a
-badly oriented, holed or degenerate mesh (ADR-0026), not only on well-made ones. Held by
-review alone (ADR-0001).
+badly oriented, holed or degenerate mesh (ADR-0026), not only on well-made ones. A number
+an ADR sets, a distance, a threshold or a bound, is tried on the case at its edge before
+it is proposed. Held by review alone (ADR-0001).
 
 ## 3. Spikes
 
 A spike is a throwaway prototype that answers an open question by measurement. It is run
 only when the human asks, lives in `spikes/`, and is never imported by `crates/`. Its
-deliverables are a measurement report and the ADR built on it.
+deliverables are a measurement report and the ADR built on it. A report that weighs a
+method's cost measures it at the size and on the shapes the method will meet: for a mesh,
+one of about 10⁵ triangles and one of slivers. Held by review alone (ADR-0001).
 
 ## 4. Keeping it small
 

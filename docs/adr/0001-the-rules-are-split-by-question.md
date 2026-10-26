@@ -100,3 +100,17 @@ README.md and for the `include_str!` in its `lib.rs` that reads it in. Shown to 
 with brodo's `lib.rs` line removed, and with colino's README moved away, the check failed
 naming each; restored, it passed.
 
+
+## Amendment
+
+- **Date**: 2026-10-26
+
+P5's retrospective found two costs that spikes missed and building found: the third
+layer's rays tested every triangle in a long ray's box, which took a report from 1.69 s to
+92 s on 32 768 triangles, and its k-fold sampling put k² points on a sliver, a test taking
+378 s; the spike's meshes had few triangles, none of them slivers. It also found a bound
+proposed untried at its edge: joining thin points within h split a wall between h and 2h
+thick into two places. The human decided that a spike weighing a method's cost measures
+it at the size and on the shapes the method will meet, for a mesh about 10⁵ triangles and
+slivers (PLANNING.md §3), and that a number an ADR sets is tried on the case at its edge
+before it is proposed (PLANNING.md §2). Held by review alone.

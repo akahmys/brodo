@@ -134,3 +134,18 @@ that the report keeps it: `report.tsv`'s header names the load average the run s
 beside the hardware and the date, recorded only, the run still refused above
 `BUSY_LOAD`. Shown: colino's benchmark at rest wrote `load 2.93` in its header.
 
+
+## Amendment: the five-minute load
+
+- **Date**: 2026-10-26
+
+P5's retrospective found runs that started at rest by the one-minute load average while the
+five-minute stayed high, after a build, when the system's own scans of the new binaries
+held the machine busy for minutes: at 2.48 and 10.12 a pair disagreed by 16.9 %; at 2.43
+and 3.46, Hermite data's items read 8 to 13 % slow, which back-to-back runs at 2.34 and 4.40,
+and 1.93 and 3.92, put down to the machine; P5's closing runs, at 1.72 and 3.83 and at 1.50
+and 3.16, agreed within 7.8 %. The owner decided that the harness waits while the
+five-minute load average is above 4.0 as well, `SETTLED_LOAD`, for up to ten minutes rather
+than two, the report's header naming both loads, and that its documentation says dates are
+UTC. A five-minute load of 4.0 would not have held back the run at 3.46. Shown to fire:
+with `SETTLED_LOAD` at 0.5, a run at loads of 2.51 and 4.13 was refused, naming both.

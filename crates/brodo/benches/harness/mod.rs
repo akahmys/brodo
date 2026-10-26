@@ -14,9 +14,10 @@
 //! added later gains a baseline without the rest losing theirs.
 //!
 //! Run and record on a machine doing nothing else; a run waits, then refuses, while the
-//! load average says otherwise. With other work running, brodo's leaf-parallel update once
-//! failed its baseline at +21 to +27 % with no change to the code; at rest it stayed
-//! within 12 % (ADR-0019).
+//! one-minute or the five-minute load average says otherwise. With other work running,
+//! brodo's leaf-parallel update once failed its baseline at +21 to +27 % with no change to
+//! the code; at rest it stayed within 12 % (ADR-0019). Dates, in the baseline and the
+//! report, are UTC.
 //!
 //! Nothing here prints (CODING.md Rule 18): results go to files, and a failure is the error
 //! `main` returns.
@@ -40,10 +41,15 @@ const TOLERANCE: f64 = 0.10;
 /// The one-minute load average above which the machine is taken to be busy: at rest an
 /// Apple M5 read 1.53 to 2.13, and 3.86 just after a build and the tests (ADR-0019).
 const BUSY_LOAD: f64 = 3.0;
-/// While busy, the load average is read again after each wait, at most this many times,
-/// so that a build just before the run can settle: two minutes in all.
+/// The five-minute load average above which the machine is taken to be still settling:
+/// after a build, the system's own scans of the new binaries held it near 3.5 to 10 while
+/// the one-minute fell below `BUSY_LOAD`, and a pair then disagreed by up to 17 %; at rest
+/// it read 1.6 to 3.8 (ADR-0019).
+const SETTLED_LOAD: f64 = 4.0;
+/// While busy, the load averages are read again after each wait, at most this many times,
+/// so that a build just before the run can settle: ten minutes in all.
 const LOAD_WAIT: Duration = Duration::from_secs(10);
-const LOAD_RETRIES: u32 = 12;
+const LOAD_RETRIES: u32 = 60;
 /// A failure, shown by `main`'s return as its message alone.
 pub struct Failure(String);
 
@@ -106,33 +112,40 @@ pub fn run<D>(
     }
 }
 
-/// The one-minute load average: `vm.loadavg` on macOS, `/proc/loadavg` on Linux.
-fn load_average() -> Result<f64, Failure> {
+/// The one-minute and five-minute load averages: `vm.loadavg` on macOS, `/proc/loadavg`
+/// on Linux.
+fn load_averages() -> Result<(f64, f64), Failure> {
     let text = match Command::new("sysctl").args(["-n", "vm.loadavg"]).output() {
         Ok(out) if out.status.success() => String::from_utf8_lossy(&out.stdout).into_owned(),
         _ => std::fs::read_to_string("/proc/loadavg")?,
     };
-    let first = text.split_whitespace().find(|w| *w != "{");
-    Ok(first.ok_or(Failure(format!("no load average in {text:?}")))?.parse()?)
+    let mut words = text.split_whitespace().filter(|w| *w != "{");
+    let missing = || Failure(format!("no load average in {text:?}"));
+    let one = words.next().ok_or_else(missing)?.parse()?;
+    let five = words.next().ok_or_else(missing)?.parse()?;
+    Ok((one, five))
 }
 
-/// Waits until the load average is at most `BUSY_LOAD`, reading it again after each
-/// `LOAD_WAIT` up to `LOAD_RETRIES` times; refuses to run if it stays above. Returns the
-/// load the run starts at.
-fn wait_for_rest() -> Result<f64, Failure> {
-    let mut load = load_average()?;
+/// Waits until the one-minute load average is at most `BUSY_LOAD` and the five-minute at
+/// most `SETTLED_LOAD`, reading them again after each `LOAD_WAIT` up to `LOAD_RETRIES`
+/// times; refuses to run if they stay above. Returns the loads the run starts at.
+fn wait_for_rest() -> Result<(f64, f64), Failure> {
+    let rested = |(one, five): (f64, f64)| one <= BUSY_LOAD && five <= SETTLED_LOAD;
+    let mut load = load_averages()?;
     for _ in 0..LOAD_RETRIES {
-        if load <= BUSY_LOAD {
+        if rested(load) {
             return Ok(load);
         }
         std::thread::sleep(LOAD_WAIT);
-        load = load_average()?;
+        load = load_averages()?;
     }
-    if load <= BUSY_LOAD {
+    if rested(load) {
         return Ok(load);
     }
     Err(Failure(format!(
-        "the one-minute load average stayed at {load} > {BUSY_LOAD} for {} s; stop other work and run again",
+        "the load averages stayed at {} and {} (one and five minutes) above {BUSY_LOAD} or {SETTLED_LOAD} for {} s; stop other work and run again",
+        load.0,
+        load.1,
         LOAD_WAIT.as_secs() * u64::from(LOAD_RETRIES)
     )))
 }
@@ -238,19 +251,21 @@ fn change(ns: u128, base: u128) -> f64 {
     (ns as f64 / base as f64 - 1.0) * 100.0
 }
 
-/// Writes the report, its header naming the hardware, the date and the one-minute load
-/// average the run started at, and fails on every item more than `TOLERANCE` slower in both
-/// runs.
+/// Writes the report, its header naming the hardware, the date and the one-minute and
+/// five-minute load averages the run started at, and fails on every item more than
+/// `TOLERANCE` slower in both runs.
 fn compare(
     places: &Places,
     runs: &[BTreeMap<String, u128>; 2],
     model: &str,
-    load: f64,
+    load: (f64, f64),
 ) -> Result<(), Failure> {
     let baseline = read_baseline(places)?;
     let mut text = format!(
-        "name\trun1_ns\trun2_ns\tpair_spread_pct\tbaseline_ns\tbaseline_date\tchange1_pct\tchange2_pct\tverdict\t{model}\t{}\tload {load}\n",
-        today()?
+        "name\trun1_ns\trun2_ns\tpair_spread_pct\tbaseline_ns\tbaseline_date\tchange1_pct\tchange2_pct\tverdict\t{model}\t{}\tload {} {}\n",
+        today()?,
+        load.0,
+        load.1
     );
     let mut slower = Vec::new();
     for (name, a) in &runs[0] {
