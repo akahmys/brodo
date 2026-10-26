@@ -277,9 +277,12 @@ impl<'a, T: Stored> GridView<'a, T> {
     }
 
     /// Whether `other` holds the same tree: its root table and nodes are the same bytes,
-    /// which do not depend on the value type (ADR-0032).
+    /// which do not depend on the value type (ADR-0032), and it holds as many leaves and
+    /// tiles, so that neither holds values its nodes do not reach (ADR-0038).
     pub(crate) fn same_topology<U: Stored>(&self, other: &GridView<'_, U>) -> bool {
-        self.roots.as_bytes() == other.roots.as_bytes()
+        self.leaves.len() == other.leaves.len()
+            && self.tiles.len() == other.tiles.len()
+            && self.roots.as_bytes() == other.roots.as_bytes()
             && self.uppers.as_bytes() == other.uppers.as_bytes()
             && self.lowers.as_bytes() == other.lowers.as_bytes()
     }

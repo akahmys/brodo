@@ -100,7 +100,13 @@ class Grid:
             at = end
         (r, nr), (u, nu), (lo, nl), (lv, self.nleaves), (t, self.ntiles) = sections
         self.b, self.leaf_at, self.tile_at = b, lv, t
-        self.tree = (b[r : r + 32 * nr], b[u : u + UPPER_NODE * nu], b[lo : lo + LOWER_NODE * nl])
+        self.tree = (
+            b[r : r + 32 * nr],
+            b[u : u + UPPER_NODE * nu],
+            b[lo : lo + LOWER_NODE * nl],
+            self.nleaves,
+            self.ntiles,
+        )
         self.roots = []
         for i in range(nr):
             key = list(struct.unpack_from("<3i", b, r + 32 * i))

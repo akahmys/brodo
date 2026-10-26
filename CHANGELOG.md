@@ -46,6 +46,10 @@ are recorded here when they change (V6).
   a long name over many faces took time following their product.
 - colino's OBJ reader takes its statements one at a time: it held them all, about 49 bytes
   for each byte read, 3.3 GB for 64 MB of empty lines.
+- A Hermite set whose fields hold more leaves or tiles than its signs is refused,
+  `HermiteError::OtherTopology` (docs/formats.md §4.2, rule 3): the values beyond the
+  signs' were reached by no node and checked by nothing. This refuses files version 1
+  accepted; brodo writes none (ADR-0038).
 
 ### Breaking
 

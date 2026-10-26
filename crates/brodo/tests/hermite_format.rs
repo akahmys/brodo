@@ -574,6 +574,34 @@ fn a_file_with_a_broken_rule_or_another_topology_is_refused() {
     ));
 }
 
+/// The bytes of a file of `entries` whose last grid holds one tile value more, reached by
+/// no node: its frozen buffer grown by a block (docs/formats.md §2.1, §3.2).
+fn with_a_tile_more(entries: &[CacheEntry]) -> Vec<u8> {
+    let mut b = to_bytes(entries).unwrap();
+    let word = |b: &[u8], at: usize| u32::from_le_bytes(b[at..at + 4].try_into().unwrap());
+    let put = |b: &mut [u8], at: usize, v: u32| b[at..at + 4].copy_from_slice(&v.to_le_bytes());
+    let entry = 32 * entries.len();
+    let frozen = 32 * word(&b, entry + 8) as usize;
+    let blocks = word(&b, frozen + 56);
+    assert_eq!(word(&b, frozen + 32), 0, "a grid with no tile");
+    put(&mut b, frozen + 32, 1);
+    put(&mut b, frozen + 52, blocks);
+    put(&mut b, frozen + 56, blocks + 1);
+    put(&mut b, entry + 12, blocks + 1);
+    b.extend([0; 32]);
+    b
+}
+
+#[test]
+fn a_field_holding_values_no_node_reaches_is_refused() {
+    // The z groups hold a tile value more than the signs: the same nodes, another tree.
+    let set = parts(1, None, 2, 6).make().unwrap();
+    let entries = set.entries("s", &meta("s")).unwrap();
+    assert_eq!(FIELDS.last(), Some(&"z.group"));
+    let f = CacheFile::from_bytes(&with_a_tile_more(&entries)).unwrap();
+    assert!(matches!(HermiteView::find(&f, "s"), Err(HermiteError::OtherTopology("z.group"))));
+}
+
 /// The committed file: the one-leaf set inside [2, 6)³.
 fn golden() -> Vec<u8> {
     let set = parts(1, None, 2, 6).make().unwrap();

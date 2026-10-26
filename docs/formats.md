@@ -238,7 +238,8 @@ unless:
 1. each has `hermite.version` 1 and a `hermite.field` of the table, each field once, all
    ten present, each of its type;
 2. the ten agree in voxel size and transform, as bits, and unit;
-3. the ten root tables, upper nodes and lower nodes are the same bytes;
+3. the ten root tables, upper nodes and lower nodes are the same bytes, and the ten hold
+   as many leaves and as many tiles;
 4. the group table's keys are as §4.1 says, the names not empty and none twice;
 5. the signs' background is 0, and the three axes' backgrounds hold no crossing;
 6. every tile's sign is 0 or 1 and its crossings no crossing;

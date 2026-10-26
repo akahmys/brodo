@@ -48,3 +48,14 @@ value twice (§4.2, rule 11, `FormatError::Shared`), at version 1: brodo writes 
 set, and waiting would leave the reader to such files. A frozen grid read voxel by voxel,
 whose cost sharing does not raise, keeps version 1's checks.
 
+
+## Amendment: a Hermite set's unreached values
+
+- **Date**: 2026-10-27
+
+P5's review also found that the nine fields beside a Hermite set's signs could hold more
+leaves or tiles than the signs, their nodes being the same bytes: the values beyond were
+reached by no node and checked by nothing. The human decided that such a set is refused,
+the ten fields holding as many leaves and as many tiles (§4.2, rule 3,
+`HermiteError::OtherTopology`), at version 1, as for shared nodes: brodo writes no such
+set.
