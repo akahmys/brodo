@@ -23,6 +23,12 @@ are recorded here when they change (V6).
   manifest and `freeze`; Hermite data holds no work field over every leaf (ROADMAP.md §2,
   P5's costs).
 
+### Fixed
+
+- colino's 3MF reader refuses a component naming the object it belongs to, as naming no
+  object defined before it (`ReadError::NoObject`); such a file made the reader run for
+  ever, or until memory ran out.
+
 ### Breaking
 
 - `Value` no longer carries `TYPE_CODE`: a type of a user's own implements `Value` with

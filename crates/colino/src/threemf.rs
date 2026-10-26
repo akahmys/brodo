@@ -442,12 +442,13 @@ impl Reading {
         Ok(())
     }
 
-    /// The object named by an `objectid`, which must be defined before.
-    fn named(&self, attrs: &[(String, String)], at: u64) -> Result<usize, ReadError> {
+    /// The object named by an `objectid`, which must be defined before, and the id.
+    fn named(&self, attrs: &[(String, String)], at: u64) -> Result<(usize, u64), ReadError> {
         let id: u64 = attr(attrs, "objectid")
             .and_then(|v| v.trim().parse().ok())
             .ok_or(ReadError::Model { at, reason: "an object id missing or not a number" })?;
-        self.ids.get(&id).copied().ok_or(ReadError::NoObject { at, id })
+        let object = self.ids.get(&id).copied().ok_or(ReadError::NoObject { at, id })?;
+        Ok((object, id))
     }
 
     fn open(&mut self, name: &str, attrs: &[(String, String)], at: u64) -> Result<(), ReadError> {
@@ -468,14 +469,21 @@ impl Reading {
             "vertex" => self.vertex(attrs, at),
             "triangle" => self.triangle(attrs, at),
             "component" => {
-                let child = (self.named(attrs, at)?, transform(attrs, at)?);
+                let (named, id) = self.named(attrs, at)?;
+                // An object's id is known from its element's start, so its own components
+                // could name it: it is not defined before them, and expanding it would
+                // never end.
+                if named + 1 == self.objects.len() {
+                    return Err(ReadError::NoObject { at, id });
+                }
+                let child = (named, transform(attrs, at)?);
                 if let Some(Object { body: Body::Components(c), .. }) = self.objects.last_mut() {
                     c.push(child);
                 }
                 Ok(())
             }
             "item" => {
-                let item = (self.named(attrs, at)?, transform(attrs, at)?);
+                let item = (self.named(attrs, at)?.0, transform(attrs, at)?);
                 self.items.push(item);
                 Ok(())
             }

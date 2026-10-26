@@ -328,6 +328,30 @@ fn each_break_of_the_model_is_its_own_error() {
 }
 
 #[test]
+fn an_object_naming_itself_as_a_component_is_refused_in_time() {
+    // Its id is known from its own element's start, so its component would resolve to the
+    // object still being read: expanded, it never ends (once named) or doubles on every
+    // pass (twice). Such a component names no object defined before it.
+    let m = |body: &str| format!("<model xmlns=\"{CORE}\">{body}</model>");
+    for components in
+        ["<component objectid=\"1\"/>", "<component objectid=\"1\"/><component objectid=\"1\"/>"]
+    {
+        let text = m(&format!(
+            "<resources><object id=\"1\"><components>{components}</components></object></resources><build><item objectid=\"1\"/></build>"
+        ));
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            tx.send(read(&package(text.into_bytes()), ROOMY)).unwrap_or(());
+        });
+        let read = rx.recv_timeout(std::time::Duration::from_secs(60));
+        assert!(
+            matches!(read, Ok(Err(ReadError::NoObject { id: 1, .. }))),
+            "{components}: {read:?}"
+        );
+    }
+}
+
+#[test]
 fn each_break_of_the_package_is_its_own_error() {
     let m = model("", "<resources/><build/>");
     let rels = |target: &str| RELS.replace("/3D/3dmodel.model", target);
