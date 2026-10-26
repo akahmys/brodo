@@ -12,7 +12,7 @@ use std::collections::BTreeMap;
 
 use brodo::cache::{CacheEntry, CacheFile, to_bytes, write};
 use brodo::error::{CacheError, FormatError, MetaError};
-use brodo::field::{Field, Value};
+use brodo::field::{Field, Stored, Value};
 use brodo::meta::{Bounds, GridMeta};
 use brodo::topology::Topology;
 use brodo::tree::{Coord, TileLevel};

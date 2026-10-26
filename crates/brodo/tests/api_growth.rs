@@ -228,3 +228,49 @@ fn every_struct_a_user_builds_is_built_by_its_constructor_and_set_by_assignment(
         assert_eq!((image.width, image.height, image.rgba.len()), (1, 1, 4));
     }
 }
+
+/// A value type of a user's own, two `u16`, as `spikes/value/` used one.
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
+#[repr(C)]
+struct Material {
+    id: u16,
+    flags: u16,
+}
+
+impl brodo::field::Value for Material {
+    fn same_bits(&self, other: &Self) -> bool {
+        self == other
+    }
+}
+
+#[test]
+fn a_value_type_of_a_users_own_serves_in_memory() {
+    // `Value` is open: a field of it is made, updated in parallel and labelled; only a
+    // `Stored` type, brodo's, goes into a frozen grid or a file (ADR-0029).
+    let empty = brodo::topology::Topology::new();
+    let mut e = empty.edit();
+    e.activate([0, 0, 0]).unwrap();
+    e.activate([16, 0, 0]).unwrap();
+    let (t, _) = e.commit().unwrap();
+    let mut f = brodo::field::Field::new(&t, Material { id: 0, flags: 0 });
+    brodo::parallel::par_update(&t, &mut f, |n, values| {
+        let id = u16::try_from(n.get()).unwrap() + 1;
+        values.fill(Material { id, flags: 1 });
+        Ok::<(), FieldError>(())
+    })
+    .unwrap();
+    assert_eq!(f.value_at(&t, [17, 1, 1]).unwrap(), Material { id: 2, flags: 1 });
+    let labels =
+        brodo::analysis::label(&t, &f, |m| m.flags == 1, brodo::analysis::Connectivity::TwentySix)
+            .unwrap();
+    assert_eq!(labels.count(), 2);
+}

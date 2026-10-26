@@ -4,7 +4,7 @@
 //! with a panic.
 
 use brodo::error::FormatError;
-use brodo::field::{Field, Value};
+use brodo::field::{Field, Stored, Value};
 use brodo::frozen::{FrozenGrid, freeze};
 use brodo::topology::{Location, Topology};
 use brodo::tree::{Coord, TileLevel};
@@ -114,7 +114,7 @@ fn probes(t: &Topology) -> Vec<Coord> {
     out
 }
 
-fn same<T: Value>(
+fn same<T: Stored>(
     view: &GridView<'_, T>,
     t: &Topology,
     f: &Field<T>,

@@ -10,7 +10,7 @@ use std::path::Path;
 use zerocopy::IntoBytes;
 
 use crate::error::{CacheError, FormatError};
-use crate::field::{Field, Value};
+use crate::field::{Field, Stored};
 use crate::frozen::{BLOCK, Block, FrozenGrid, aligned, freeze};
 use crate::meta::{Bounds, GridMeta};
 use crate::topology::Topology;
@@ -32,7 +32,7 @@ pub struct CacheEntry {
 
 impl CacheEntry {
     /// Freezes a topology and a field on it, with its metadata, for a cache file.
-    pub fn new<T: Value>(meta: &GridMeta, t: &Topology, f: &Field<T>) -> Result<Self, CacheError> {
+    pub fn new<T: Stored>(meta: &GridMeta, t: &Topology, f: &Field<T>) -> Result<Self, CacheError> {
         meta.check()?;
         Ok(Self {
             meta: meta.clone(),
@@ -248,7 +248,7 @@ impl Storage {
 
 /// Checks a grid's frozen buffer with the type its directory names.
 fn check_grid(bytes: &[u8], value_type: u32) -> Result<(), FormatError> {
-    fn view<T: Value>(b: &[u8]) -> Result<(), FormatError> {
+    fn view<T: Stored>(b: &[u8]) -> Result<(), FormatError> {
         GridView::<T>::new(b).map(|_| ())
     }
     match value_type {
@@ -395,13 +395,13 @@ impl CacheFile {
         Ok(self.entry(i)?.bounds)
     }
 
-    /// The type code of a grid's values (`Value::TYPE_CODE`).
+    /// The type code of a grid's values (`Stored::TYPE_CODE`).
     pub fn value_type(&self, i: usize) -> Result<u32, CacheError> {
         Ok(self.entry(i)?.value_type)
     }
 
     /// A view of a grid's values of type `T`.
-    pub fn view<T: Value>(&self, i: usize) -> Result<GridView<'_, T>, CacheError> {
+    pub fn view<T: Stored>(&self, i: usize) -> Result<GridView<'_, T>, CacheError> {
         let e = self.entry(i)?;
         let bytes =
             self.storage.bytes().get(e.grid.clone()).ok_or(CacheError::Truncated("grid"))?;

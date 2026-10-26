@@ -9,7 +9,7 @@ use zerocopy::little_endian::{I32, U32};
 use zerocopy::{FromBytes, FromZeros, Immutable, IntoBytes, KnownLayout};
 
 use crate::error::{FieldError, FreezeError};
-use crate::field::{Field, Value};
+use crate::field::{Field, Stored};
 use crate::topology::{Topology, morton};
 use crate::tree::{Coord, TileLevel};
 
@@ -111,7 +111,7 @@ impl FrozenGrid {
     }
 
     /// A view of this grid's values of type `T`.
-    pub fn view<T: Value>(
+    pub fn view<T: Stored>(
         &self,
     ) -> Result<crate::view::GridView<'_, T>, crate::error::FormatError> {
         crate::view::GridView::new(self.as_bytes())
@@ -309,7 +309,7 @@ fn blocks(bytes: usize) -> usize {
 
 /// Packs a topology and a field on it into a frozen grid (ARCHITECTURE.md §4.6). The bytes
 /// depend only on the topology and the values.
-pub fn freeze<T: Value>(t: &Topology, f: &Field<T>) -> Result<FrozenGrid, FreezeError> {
+pub fn freeze<T: Stored>(t: &Topology, f: &Field<T>) -> Result<FrozenGrid, FreezeError> {
     f.belongs_to(t)?;
     let plan = plan(t)?;
     let leaf_bytes = f.leaves(t)?.as_bytes();
@@ -345,7 +345,7 @@ pub fn freeze<T: Value>(t: &Topology, f: &Field<T>) -> Result<FrozenGrid, Freeze
     Ok(FrozenGrid { blocks: buf })
 }
 
-fn header<T: Value>(
+fn header<T: Stored>(
     plan: &Plan,
     f: &Field<T>,
     offsets: &[usize; 5],

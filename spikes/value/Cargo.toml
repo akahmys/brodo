@@ -1,0 +1,14 @@
+# Throwaway spike for B-017 (ROADMAP.md §3). Never imported by `crates/` (PLANNING.md §3);
+# its own workspace, so cargo does not look for it in the one above.
+[package]
+name = "value-spike"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+brodo = { path = "../../crates/brodo" }
+zerocopy = { version = "0.8.63", features = ["derive"] }
+
+[workspace]
+members = ["."]

@@ -16,64 +16,106 @@ use crate::tree::Coord;
 pub const LEAF_VOXELS: usize = 512;
 
 /// A value a field holds (ARCHITECTURE.md §4.8): plain bytes, so that `freeze` can lay
-/// it out and a view read it in place.
+/// it out and a view read it in place. Open to types outside brodo, which a field, its
+/// parallel update, gathers and analyses take in memory; only a [`Stored`] type goes into a
+/// frozen grid or a file (ADR-0029).
 pub trait Value:
     Copy + Send + Sync + 'static + FromBytes + IntoBytes + Immutable + KnownLayout
 {
-    /// The number naming the type in a frozen grid's header.
-    const TYPE_CODE: u32;
-
     /// Whether two values have the same bits.
     fn same_bits(&self, other: &Self) -> bool;
 }
 
-impl Value for f32 {
-    const TYPE_CODE: u32 = 1;
+mod sealed {
+    /// Keeps [`super::Stored`] to the types brodo names in its files.
+    pub trait Sealed {}
+    impl Sealed for f32 {}
+    impl Sealed for f64 {}
+    impl Sealed for u8 {}
+    impl Sealed for u32 {}
+    impl Sealed for [f32; 3] {}
+    impl Sealed for [f64; 3] {}
+}
 
+/// A value type brodo's frozen grids and files hold, named by a code brodo assigns
+/// (docs/formats.md §1.1). Sealed, so that a file holds only codes every build reads, and
+/// no other type takes one of them (ADR-0029).
+///
+/// ```compile_fail
+/// #[derive(Clone, Copy, zerocopy::FromBytes, zerocopy::IntoBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
+/// #[repr(transparent)]
+/// struct Count(i32);
+/// impl brodo::field::Value for Count {
+///     fn same_bits(&self, other: &Self) -> bool { self.0 == other.0 }
+/// }
+/// impl brodo::field::Stored for Count {
+///     const TYPE_CODE: u32 = 1;
+/// }
+/// ```
+pub trait Stored: Value + sealed::Sealed {
+    /// The number naming the type in a frozen grid's header and a cache file's directory.
+    const TYPE_CODE: u32;
+}
+
+impl Value for f32 {
     fn same_bits(&self, other: &Self) -> bool {
         self.to_bits() == other.to_bits()
     }
+}
+
+impl Stored for f32 {
+    const TYPE_CODE: u32 = 1;
 }
 
 impl Value for f64 {
-    const TYPE_CODE: u32 = 2;
-
     fn same_bits(&self, other: &Self) -> bool {
         self.to_bits() == other.to_bits()
     }
 }
 
-impl Value for u8 {
-    const TYPE_CODE: u32 = 3;
+impl Stored for f64 {
+    const TYPE_CODE: u32 = 2;
+}
 
+impl Value for u8 {
     fn same_bits(&self, other: &Self) -> bool {
         self == other
     }
+}
+
+impl Stored for u8 {
+    const TYPE_CODE: u32 = 3;
 }
 
 impl Value for u32 {
-    const TYPE_CODE: u32 = 4;
-
     fn same_bits(&self, other: &Self) -> bool {
         self == other
     }
 }
 
-impl Value for [f32; 3] {
-    const TYPE_CODE: u32 = 5;
+impl Stored for u32 {
+    const TYPE_CODE: u32 = 4;
+}
 
+impl Value for [f32; 3] {
+    fn same_bits(&self, other: &Self) -> bool {
+        self.iter().zip(other).all(|(a, b)| a.to_bits() == b.to_bits())
+    }
+}
+
+impl Stored for [f32; 3] {
+    const TYPE_CODE: u32 = 5;
+}
+
+impl Value for [f64; 3] {
     fn same_bits(&self, other: &Self) -> bool {
         self.iter().zip(other).all(|(a, b)| a.to_bits() == b.to_bits())
     }
 }
 
 /// Read by brodo from 0.3.0 on; 0.2.0 refuses its code by name (ADR-0029).
-impl Value for [f64; 3] {
+impl Stored for [f64; 3] {
     const TYPE_CODE: u32 = 6;
-
-    fn same_bits(&self, other: &Self) -> bool {
-        self.iter().zip(other).all(|(a, b)| a.to_bits() == b.to_bits())
-    }
 }
 
 /// How a merged tile's value comes from the values it covers, each with the number of

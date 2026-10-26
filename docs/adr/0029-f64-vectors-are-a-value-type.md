@@ -1,6 +1,6 @@
 # ADR-0029: `[f64; 3]` is a value type
 
-- **Status**: Accepted
+- **Status**: Amended
 - **Date**: 2026-10-20
 
 ## Context
@@ -35,3 +35,22 @@ The human decided, on 2026-10-20:
 
 The Format tier keeps a committed `[f64; 3]` grid's bytes, beside the `f32` one. A cache
 file holding a `[f64; 3]` grid is refused by brodo 0.2.0 and read from the next version.
+
+## Amendment: a value type for files is brodo's
+
+- **Date**: 2026-10-26
+
+B-017 asked whether `Value` is sealed. `spikes/value/` gave two types of a user's own a
+field, a frozen view and a cache file (its REPORT.md): both served in memory and in a view
+of their own frozen bytes; a cache file of the type with code 99 was written without
+complaint and refused by every build, the one that wrote it included; and a user's `i32`
+with `f32`'s code 1 was read as `f32`, 1 065 353 216 as 1.0. Sealing `Value` whole would
+forbid types used in memory only. The human decided:
+
+- `Value` stays open: a field, its parallel update, gathers, accessors and analyses take
+  any type that implements it. It no longer carries a type code.
+- `Stored: Value` is sealed and carries `TYPE_CODE`; brodo implements it for its six
+  types alone. `freeze`, `GridView`, `CacheEntry::new` and `CacheFile::view` take a
+  `Stored` type, so that a file holds only codes brodo assigns and reads.
+- A user implementing `Value` drops `TYPE_CODE` from its implementation; CHANGELOG.md lists
+  the change as breaking.

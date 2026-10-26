@@ -234,10 +234,12 @@ fastest. A neighbour beyond the `i32` coordinate range is the background.
 
 ### 4.8 Value types
 
-`f32`, `f64`, `u8`, `u32`, `[f32; 3]` and `[f64; 3]` (ADR-0029), the types implementing
-brodo's `Value` trait: `Copy`, `Send` and `Sync`, with a comparison by bits for merge
-rules, and `zerocopy`'s traits from `freeze` on (§4.6). Each is named in frozen grids and
-cache files by a type code brodo assigns, 1 to 6 in that order.
+A field holds any type implementing brodo's `Value` trait: `Copy`, `Send` and `Sync`, with
+a comparison by bits for merge rules, and `zerocopy`'s traits, so that its values are plain
+bytes. `Value` is open: a field, its parallel update, gathers, accessors and analyses take
+a type of a user's own. Frozen grids and cache files hold only `Stored` types, a sealed
+trait over `Value` that brodo implements for `f32`, `f64`, `u8`, `u32`, `[f32; 3]` and
+`[f64; 3]`, each named by a type code brodo assigns, 1 to 6 in that order (ADR-0029).
 
 ### 4.9 Hermite data (ADR-0032)
 

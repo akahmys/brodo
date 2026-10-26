@@ -6,7 +6,7 @@ use zerocopy::little_endian::U32;
 use zerocopy::{FromBytes, IntoBytes};
 
 use crate::error::FormatError;
-use crate::field::{LEAF_VOXELS, Value};
+use crate::field::{LEAF_VOXELS, Stored};
 use crate::frozen::{
     BLOCK, Header, LOWER_PLACES, LowerNode, MAGIC, ROOT_NODE, ROOT_TILE, RootEntry, UPPER_PLACES,
     UpperNode, VERSION, local, place,
@@ -76,7 +76,7 @@ fn links_fit(children: &[U32], tiles: &[U32], first: [U32; 2], len: [usize; 2]) 
         && children.iter().zip(tiles).all(|(c, t)| c.get() & t.get() == 0)
 }
 
-fn check_header<T: Value>(h: &Header, len: usize) -> Result<(), FormatError> {
+fn check_header<T: Stored>(h: &Header, len: usize) -> Result<(), FormatError> {
     if h.magic.get() != MAGIC {
         return Err(FormatError::BadMagic(h.magic.get()));
     }
@@ -129,7 +129,7 @@ fn sections<'a, T>(h: &Header, bytes: &'a [u8]) -> Result<[&'a [u8]; 5], FormatE
     Ok(out)
 }
 
-impl<'a, T: Value> GridView<'a, T> {
+impl<'a, T: Stored> GridView<'a, T> {
     /// Checks `bytes` whole as a frozen grid of `T` values and reads it in place.
     pub fn new(bytes: &'a [u8]) -> Result<Self, FormatError> {
         if bytes.as_ptr().align_offset(BLOCK) != 0 || !bytes.len().is_multiple_of(BLOCK) {
@@ -258,7 +258,7 @@ impl<'a, T: Value> GridView<'a, T> {
 
     /// Whether `other` holds the same tree: its root table and nodes are the same bytes,
     /// which do not depend on the value type (ADR-0032).
-    pub(crate) fn same_topology<U: Value>(&self, other: &GridView<'_, U>) -> bool {
+    pub(crate) fn same_topology<U: Stored>(&self, other: &GridView<'_, U>) -> bool {
         self.roots.as_bytes() == other.roots.as_bytes()
             && self.uppers.as_bytes() == other.uppers.as_bytes()
             && self.lowers.as_bytes() == other.lowers.as_bytes()

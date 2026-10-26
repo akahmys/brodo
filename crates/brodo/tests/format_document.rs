@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use brodo::cache::CacheFile;
-use brodo::field::Value;
+use brodo::field::Stored;
 use brodo::hermite::HermiteView;
 use brodo::meta::Bounds;
 use brodo::tree::TileLevel;
@@ -82,7 +82,7 @@ fn coord(words: &[&str]) -> [i32; 3] {
 
 /// Checks one grid's background, leaves and tiles, as the reader printed them, against a
 /// view of it.
-fn same_values<T: Value>(view: &GridView<'_, T>, lines: &[String]) {
+fn same_values<T: Stored>(view: &GridView<'_, T>, lines: &[String]) {
     let (mut leaves, mut tiles) = (0_u32, 0_usize);
     for line in lines {
         let w: Vec<&str> = line.split(' ').collect();

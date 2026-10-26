@@ -23,6 +23,16 @@ are recorded here when they change (V6).
   manifest and `freeze`; Hermite data holds no work field over every leaf (ROADMAP.md §2,
   P5's costs).
 
+### Breaking
+
+- `Value` no longer carries `TYPE_CODE`: a type of a user's own implements `Value` with
+  `same_bits` alone, and serves in a field, its parallel update, gathers and analyses. The
+  code moves to the new `brodo::field::Stored: Value`, sealed, implemented for brodo's six
+  value types alone; `freeze`, `FrozenGrid::view`, `GridView`, `CacheEntry::new` and
+  `CacheFile::view` take a `Stored` type, so that a cache file of a user's type, which no
+  build read, and a user's type under brodo's code, read as brodo's, can no longer be
+  written (ADR-0029). `VtkValue` is `Stored` with its VTK names.
+
 ## 0.5.0 (2026-10-25)
 
 Closes P4: the public API shaped to grow without breaking users, what a user does not need

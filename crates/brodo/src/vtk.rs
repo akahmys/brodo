@@ -18,7 +18,7 @@ use std::collections::BTreeMap;
 use std::io::{BufWriter, Write};
 
 use crate::error::VtkError;
-use crate::field::{Field, Value};
+use crate::field::{Field, Stored};
 use crate::topology::Topology;
 use crate::tree::Coord;
 
@@ -28,19 +28,8 @@ const VOXEL: u8 = 11;
 /// A point, in index space; `i64` so that a tile's far corner never overflows.
 type Point = [i64; 3];
 
-mod sealed {
-    /// Keeps [`super::VtkValue`] to the types this module writes.
-    pub trait Sealed {}
-    impl Sealed for f32 {}
-    impl Sealed for f64 {}
-    impl Sealed for u8 {}
-    impl Sealed for u32 {}
-    impl Sealed for [f32; 3] {}
-    impl Sealed for [f64; 3] {}
-}
-
 /// A value type with a VTK data-array type and a number of components (ADR-0018).
-pub trait VtkValue: Value + sealed::Sealed {
+pub trait VtkValue: Stored {
     /// The `type` attribute of its `DataArray`.
     const TYPE_NAME: &'static str;
 
