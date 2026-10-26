@@ -6,11 +6,12 @@ use zerocopy::little_endian::U32;
 use zerocopy::{FromBytes, IntoBytes};
 
 use crate::error::FormatError;
-use crate::field::{LEAF_VOXELS, Stored};
+use crate::field::{Field, LEAF_VOXELS, Stored};
 use crate::frozen::{
     BLOCK, Header, LOWER_PLACES, LowerNode, MAGIC, ROOT_NODE, ROOT_TILE, RootEntry, UPPER_PLACES,
     UpperNode, VERSION, local, place,
 };
+use crate::topology::{Location, Topology};
 use crate::tree::{Coord, TileLevel};
 
 /// What holds a voxel in a view.
@@ -276,10 +277,61 @@ impl<'a, T: Stored> GridView<'a, T> {
         self.tiles.get(i as usize).copied().ok_or(lost("tile value"))
     }
 
+    /// The view's tree and values as an owned topology and field, the topology numbering
+    /// its leaves and tiles in its own order (ADR-0042). The nodes are walked once: a view
+    /// in which a node, a leaf or a tile value is reached twice is refused as `Shared`.
+    pub fn thaw(&self) -> Result<(Topology, Field<T>), FormatError> {
+        let r = self.regions()?;
+        let empty = Topology::new();
+        let mut e = empty.edit();
+        for o in &r.leaves {
+            e.activate(*o).map_err(|_| lost("leaf value"))?;
+        }
+        for (level, o, _) in &r.tiles {
+            e.add_tile(*level, *o).map_err(|_| lost("tile value"))?;
+        }
+        let t = e.commit().map_err(|_| lost("root"))?.0;
+        let f = self.fill(&t, &r)?;
+        Ok((t, f))
+    }
+
+    /// The view's values as a field on `t`, which must hold the view's leaves and tiles,
+    /// as a topology thawed from a view of the same tree does; another is refused as
+    /// `OtherTopology` (ADR-0042).
+    pub fn thaw_on(&self, t: &Topology) -> Result<Field<T>, FormatError> {
+        let r = self.regions()?;
+        if t.leaf_count() != r.leaves.len() || t.tile_count() != r.tiles.len() {
+            return Err(FormatError::OtherTopology);
+        }
+        self.fill(t, &r)
+    }
+
+    /// A field on `t` holding the view's values, each leaf and tile found in `t` at its
+    /// origin; one not there is refused as `OtherTopology`. With as many leaves and tiles
+    /// in `t` as in the view, each found at another origin, `t` holds them all.
+    fn fill(&self, t: &Topology, r: &Regions) -> Result<Field<T>, FormatError> {
+        let mut f = Field::new(t, self.background);
+        for (n, o) in (0_u32..).zip(&r.leaves) {
+            let Location::Leaf(m) = t.locate(*o) else { return Err(FormatError::OtherTopology) };
+            *f.leaf_mut(t, m).map_err(|_| lost("leaf value"))? = *self.leaf(n)?;
+        }
+        for (level, o, i) in &r.tiles {
+            let Location::Tile(m, _) = t.locate(*o) else {
+                return Err(FormatError::OtherTopology);
+            };
+            if t.tile(m).map_err(|_| lost("tile value"))? != (*level, *o) {
+                return Err(FormatError::OtherTopology);
+            }
+            f.set_tile(t, m, self.tile_value(*i)?).map_err(|_| lost("tile value"))?;
+        }
+        Ok(f)
+    }
+
     /// Whether `other` holds the same tree: its root table and nodes are the same bytes,
     /// which do not depend on the value type (ADR-0032), and it holds as many leaves and
-    /// tiles, so that neither holds values its nodes do not reach (ADR-0038).
-    pub(crate) fn same_topology<U: Stored>(&self, other: &GridView<'_, U>) -> bool {
+    /// tiles, so that neither holds values its nodes do not reach (ADR-0038). Two views of
+    /// one tree thaw into one topology.
+    pub fn same_topology<U: Stored>(&self, other: &GridView<'_, U>) -> bool {
         self.leaves.len() == other.leaves.len()
             && self.tiles.len() == other.tiles.len()
             && self.roots.as_bytes() == other.roots.as_bytes()
@@ -472,6 +524,9 @@ mod tests {
             let b = shared(kind);
             let view = GridView::<u8>::new(b.as_bytes()).unwrap();
             assert_eq!(view.regions(), Err(FormatError::Shared), "kind {kind}");
+            assert_eq!(view.thaw().err(), Some(FormatError::Shared), "kind {kind}");
+            let t = mixed();
+            assert_eq!(view.thaw_on(&t).err(), Some(FormatError::Shared), "kind {kind}");
         }
         let t = mixed();
         let frozen = freeze(&t, &Field::new(&t, 0_u8)).unwrap();

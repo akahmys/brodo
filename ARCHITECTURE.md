@@ -201,6 +201,11 @@ fastest. A neighbour beyond the `i32` coordinate range is the background.
   version, value type, every section within the buffer, and every node's children and
   tiles within their sections. It accepts its own layout version only; any other is a
   typed error naming it.
+- A view thaws into an owned `Topology` and `Field<T>` (`GridView::thaw`), or into a field
+  on a topology holding its leaves and tiles (`thaw_on`), by walking its nodes once and
+  refusing a node, a leaf or a tile value reached twice; the topology numbers them in its
+  own order, so that one buffer gives one topology. Views whose root tables, nodes and
+  counts agree hold one tree (`same_topology`) (ADR-0042).
 
 ### 4.7 Files (ADR-0016)
 

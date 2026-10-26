@@ -19,6 +19,11 @@ are recorded here when they change (V6).
   (ADR-0027).
 - Labelling holds 4 bytes a voxel for its labels rather than 8 beside the union-find's
   parents; a component number reaching `u32::MAX` is refused as too large.
+- A frozen view thaws into an owned topology and field, `GridView::thaw`, or into a field
+  on a topology holding its leaves and tiles, `GridView::thaw_on`, refusing another with
+  the new `FormatError::OtherTopology`; `GridView::same_topology` is public. Thawing walks
+  the view's nodes once, so its cost follows the buffer, and refuses a view whose nodes,
+  leaves or tile values are reached twice, `FormatError::Shared` (ADR-0042, R12).
 - Faster, with the same output: Hermite data's unhit edges, labelling, `commit`'s leaf
   manifest and `freeze`; Hermite data holds no work field over every leaf (ROADMAP.md §2,
   P5's costs).

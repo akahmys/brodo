@@ -76,6 +76,7 @@ fn format_error(e: &FormatError) -> &'static str {
         FormatError::WrongValueType { .. } => "WrongValueType",
         FormatError::Inconsistent(..) => "Inconsistent",
         FormatError::Shared => "Shared",
+        FormatError::OtherTopology => "OtherTopology",
         _ => "later",
     }
 }

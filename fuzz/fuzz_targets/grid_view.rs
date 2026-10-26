@@ -1,5 +1,5 @@
 //! Fuzzes `GridView::new`, the reader of frozen grids (`crates/brodo/src/view.rs`), and the
-//! reads of any view it accepts: no input may panic (TESTING.md T6).
+//! reads and thawing of any view it accepts: no input may panic (TESTING.md T6).
 
 #![no_main]
 
@@ -33,10 +33,12 @@ fuzz_target!(|data: &[u8]| {
         for v in PROBES {
             let _read = view.get(v);
         }
+        let _thawed = view.thaw();
     }
     if let Ok(view) = GridView::<[f32; 3]>::new(bytes) {
         for v in PROBES {
             let _read = view.get(v);
         }
+        let _thawed = view.thaw();
     }
 });

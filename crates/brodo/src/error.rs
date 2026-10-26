@@ -151,6 +151,9 @@ pub enum FormatError {
     /// which a reader walking the whole tree refuses (docs/formats.md §4.2, rule 11).
     #[error("a node, leaf or tile value is reached twice from the root table")]
     Shared,
+    /// A topology asked to hold a view's values does not hold the view's leaves and tiles.
+    #[error("the topology does not hold the view's leaves and tiles")]
+    OtherTopology,
 }
 
 /// Why a grid's metadata was refused.

@@ -151,6 +151,78 @@ proptest! {
     }
 }
 
+/// A topology's leaves' origins and its tiles' levels and origins, in its own order.
+fn tree(t: &Topology) -> (Vec<Coord>, Vec<(TileLevel, Coord)>) {
+    (
+        t.leaf_numbers().map(|n| t.leaf_origin(n).unwrap()).collect(),
+        t.tile_numbers().map(|n| t.tile(n).unwrap()).collect(),
+    )
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(128))]
+
+    /// A view thaws into the tree and values frozen, which freeze into the same bytes, and
+    /// thaws on that topology, or one of the same tree; another is refused.
+    #[test]
+    fn a_view_thaws_into_what_was_frozen(ops in ops(), others in ops()) {
+        let t = build(&ops);
+        let f = field(&t);
+        let frozen = freeze(&t, &f).unwrap();
+        let view = frozen.view::<f32>().unwrap();
+        let (thawed, values) = view.thaw().unwrap();
+        prop_assert_eq!(tree(&thawed), tree(&t));
+        let again = freeze(&thawed, &values).unwrap();
+        prop_assert_eq!(again.as_bytes(), frozen.as_bytes());
+        let on = view.thaw_on(&t).unwrap();
+        let again = freeze(&t, &on).unwrap();
+        prop_assert_eq!(again.as_bytes(), frozen.as_bytes());
+        let other = build(&others);
+        let on_other = view.thaw_on(&other);
+        if tree(&other) == tree(&t) {
+            prop_assert!(on_other.is_ok());
+        } else {
+            prop_assert_eq!(on_other.err(), Some(FormatError::OtherTopology));
+        }
+        let signs = freeze(&t, &Field::new(&t, 0_u8)).unwrap();
+        let signs = signs.view::<u8>().unwrap();
+        prop_assert!(view.same_topology(&signs) && signs.same_topology(&view));
+        let apart = freeze(&other, &Field::new(&other, 0_u8)).unwrap();
+        prop_assert_eq!(view.same_topology(&apart.view::<u8>().unwrap()), tree(&other) == tree(&t));
+    }
+}
+
+#[test]
+fn a_topology_holding_other_leaves_or_tiles_is_refused_to_thaw_on() {
+    // As many leaves and tiles, one of them elsewhere or at another level; or the view's
+    // leaves and tiles and one more.
+    let t = |leaves: &[Coord], tiles: &[(TileLevel, Coord)]| {
+        let empty = Topology::new();
+        let mut e = empty.edit();
+        for v in leaves {
+            e.activate(*v).unwrap();
+        }
+        for (level, v) in tiles {
+            e.add_tile(*level, *v).unwrap();
+        }
+        e.commit().unwrap().0
+    };
+    let (upper, lower) = (TileLevel::Upper, TileLevel::Lower);
+    let mine = t(&[[0; 3], [8, 0, 0]], &[(upper, [128, 0, 0])]);
+    let frozen = freeze(&mine, &field(&mine)).unwrap();
+    let view = frozen.view::<f32>().unwrap();
+    assert!(view.thaw_on(&mine).is_ok());
+    for other in [
+        t(&[[0; 3], [16, 0, 0]], &[(upper, [128, 0, 0])]),
+        t(&[[0; 3], [8, 0, 0]], &[(upper, [256, 0, 0])]),
+        t(&[[0; 3], [8, 0, 0]], &[(lower, [128, 0, 0])]),
+        t(&[[0; 3], [8, 0, 0], [16, 0, 0]], &[(upper, [128, 0, 0])]),
+        t(&[[0; 3], [8, 0, 0]], &[(upper, [128, 0, 0]), (lower, [16, 0, 0])]),
+    ] {
+        assert_eq!(view.thaw_on(&other).err(), Some(FormatError::OtherTopology));
+    }
+}
+
 #[test]
 fn every_value_type_round_trips_and_a_wrong_one_is_refused() {
     let t = build(&[Op::Activate([0, 0, 0]), Op::AddTile(TileLevel::Lower, [8, 0, 0])]);
@@ -296,6 +368,7 @@ proptest! {
             for v in [[0, 0, 0], [-1, 0, 0], [4096, 7, 9], [130, 5, 5], [9, 9, 9], [0, 8200, 3]] {
                 let _either = view.get(v);
             }
+            let _thawed = view.thaw();
         }
     }
 }

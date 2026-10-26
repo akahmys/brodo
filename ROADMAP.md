@@ -278,8 +278,9 @@ built.
         files (3MF, cache, Hermite, OBJ), parts sharing a face split in two, a Hermite set
         written beside its SDF claiming the SDF's convention, and costs beyond the band
   - [ ] A review again of what the fixes changed, chosen by the human (2026-10-26)
-  - [ ] R12, a frozen view thawed into a topology and a field (ADR-0042), scheduled by
-        the human (2026-10-26), after the review's fixes to the Hermite reader
+  - [x] R12, a frozen view thawed into a topology and a field (ADR-0042), scheduled by
+        the human (2026-10-26), after the review's fixes to the Hermite reader: landed
+        (2026-10-27), `GridView::thaw`, `thaw_on` and `same_topology`
   - [ ] Refactoring across the crates, its candidates listed for the human to choose
   - [ ] The public API tidied in 0.6.0, already breaking for `Stored`:
         `FreezeError::Inconsistent` removed among it
