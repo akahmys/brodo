@@ -259,7 +259,8 @@ built.
   - [x] Finding them, by rays along each sampled point's normal (ADR-0028): the report of
         the sphere of radius 50 took 130 ms with it, 84 without; of radius 200, 2.33 s and
         1.69 s; of radius 400, 10.5 s, at loads of 4 to 6 (2026-10-26)
-  - [ ] Checking them by a local reconversion at h/2, by a spike and its ADR
+  - [ ] Checking them by a local reconversion at h/2: answered by `spikes/recheck/`
+        (ADR-0028), the three invariants of each place's box at h and at h/2
 - [ ] Retrospective and refactoring; benchmarks; mutation run (ADR-0023). Chosen by the
       human for this content (ADR-0033): no fuzz round or Miri run, unless a step adds a
       reader of untrusted bytes or unsafe code
@@ -298,14 +299,13 @@ implementation (PLANNING.md §2).
 | B-021 | Does brodo build `piatto`? | Not now (owner, 2026-10-24; ADR-0018): no user has asked for a viewer, the slice as PNG and VTK for ParaView serve checking, `.vdb` from P6 would open in common tools, and a GPU, window and GUI stack is costly. Revisited when a user asks for a viewer or for drawing to embed, grids too large for VTK and `.vdb` must be looked at, or P6 finds `.vdb` cannot be written |
 | B-018 | Does model checking with Kani join the closing checks? | Not now (owner, 2026-10-23): it fits only integer bit work and `view.rs`'s small helpers, already fuzzed and mutation-tested, and cannot reach rayon or the memory mapping; this milestone's defects were numeric and in design claims. Revisited by a spike if Miri-unreachable unsafe code grows, an integer coordinate bug escapes the tests, or before 1.0 |
 | B-017 | Is `Value` sealed, so that only brodo assigns type codes? | Not yet: a type outside brodo is refused by every other build's reader, and sealing would forbid types used in memory only (ADR-0029) |
-| B-020 | How does colino's layer 3 check the places thinner, or gaps narrower, than two voxels by a local reconversion at h/2 (ARCHITECTURE.md §5.2)? | Finding them answered by `spikes/thin/` and the human (2026-10-26, ADR-0028): rays along each sampled point's normal, both ways. Checking them by reconversion: none yet, to be measured |
 | B-003 | Do level-set operations (CSG, redistancing) belong in brodo? | No, until shown to be general |
 | B-004 | Does a shared IR schema crate live in this repository? | Undecided; for brodo's users to agree, not for brodo to anticipate |
 | B-005 | What is the archive profile's default compressor, and is it pure Rust (CODING.md Rule 12)? | Zstd, LZ4 when decompression speed is asked for; whether a pure-Rust implementation suffices is to be measured |
 | B-006 | Does `vdb-rs` pass Rules 12 and 13 (no C, permissive licence) on every target, and is it written apart from OpenVDB's source rather than translated from it, which would carry MPL-2.0 (ADR-0007)? | To be checked before it is added |
 | B-013 | Which crates handle `piatto`'s window, input and GUI parts? | `winit` and `egui`, to be measured against Rules 12 and 13 (ADR-0018) |
 
-`spikes/sign/` answered B-016 (ADR-0027); `spikes/thin/` the first half of B-020 (ADR-0028). No spike is running. `spikes/remap/` answered B-001 and B-008, and `spikes/merge/` B-010
+`spikes/sign/` answered B-016 (ADR-0027); `spikes/thin/` and `spikes/recheck/` B-020 (ADR-0028). No spike is running. `spikes/remap/` answered B-001 and B-008, and `spikes/merge/` B-010
 (ADR-0014); `spikes/vtk/` answered B-012 (ADR-0018); `spikes/bench/` B-007 (ADR-0019); `spikes/threads/` B-014, rayon kept (ADR-0015); `spikes/dilate/` B-011, no mask (ADR-0025); `spikes/ghost/` B-002, one to three layers (ADR-0015); `spikes/mutants/` the audit review's proposal C (ADR-0023).
 
 ## 4. Administrative items still open

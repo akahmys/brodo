@@ -98,3 +98,18 @@ tetrahedrization. The human decided:
   lie (2026-10-26).
 - Checking a place by reconverting it at h/2 is measured apart, before it is built, and
   recorded here.
+
+`spikes/recheck/` then compared, in each place's box grown by 2h and aligned to the h
+grid's cells, the solid at h, the conversion's voxels, with the solid at h/2, the voxel
+centres the conversion's sign puts inside, by χ of the union of closed voxels, the solid's
+components under 26-connectivity and the rest's under 6; a reference at h/8 judged which
+had changed (its REPORT.md). On plates, gaps, a shell and necks, 60 places at two origins,
+all 23 that changed differed and none of the 37 that did not; where h/2 was wrong too, it
+was wrong otherwise than h. The cost follows the box's volume. The human decided:
+
+- Each place is checked by those three invariants at h and at h/2 in its box grown by 2h
+  and aligned to h's cells, h/2 sampled at voxel centres by the conversion's sign, without
+  converting the mesh again; differing, the place has changed.
+- A place whose box holds more than 2²⁶ voxels at h/2 is not checked, and says so.
+- Each place reports its check: the same invariants, both sets where they differ, or
+  unchecked.
