@@ -271,6 +271,55 @@ fn a_change_on_a_far_patch_of_a_tiles_face_is_found_there() {
     assert_eq!(rule(shell_with_hole().make()), Ok((Some([127, 64, 32]), Some(0), Rule::Owner)));
 }
 
+/// Tiles of the given levels, origins and signs, on no leaf, with no crossing.
+fn tiles(tiles: &[(TileLevel, Coord, u8)]) -> Parts {
+    let empty = Topology::new();
+    let mut e = empty.edit();
+    for (level, o, _) in tiles {
+        e.add_tile(*level, *o).unwrap();
+    }
+    let topology = e.commit().unwrap().0;
+    let none = |t: &Topology| Crossings {
+        fraction: Field::new(t, NO_CROSSING.0),
+        normal: Field::new(t, NO_CROSSING.1),
+        group: Field::new(t, NO_CROSSING.2),
+    };
+    let mut signs = Field::new(&topology, 0_u8);
+    for t in topology.tile_numbers() {
+        let (level, o) = topology.tile(t).unwrap();
+        let sign = tiles.iter().find(|(l, p, _)| (*l, *p) == (level, o)).unwrap().2;
+        signs.set_tile(&topology, t, sign).unwrap();
+    }
+    let axes = [none(&topology), none(&topology), none(&topology)];
+    Parts { topology, signs, axes, names: Vec::new() }
+}
+
+#[test]
+fn a_root_tiles_face_reaches_the_tiles_of_the_node_beside_it() {
+    // An outside root tile, and beside its +x face, in an upper node, an inside lower tile:
+    // the root tile is checked first, and its face is found to meet the lower tile there,
+    // not left to the lower tile, whose own first change is on its +x face, at x = 4103.
+    let p = tiles(&[(TileLevel::Root, [0; 3], 0), (TileLevel::Lower, [4096, 136, 8], 1)]);
+    assert_eq!(rule(p.make()), Ok((Some([4095, 136, 8]), Some(0), Rule::Owner)));
+}
+
+#[test]
+fn a_tiles_faces_cost_what_the_nodes_beside_them_hold() {
+    // 4096 root tiles, each face 4096² voxels beside another tile or the background: each
+    // face is checked once, not patch by patch.
+    let mut all = Vec::new();
+    for x in 0..16 {
+        for y in 0..16 {
+            for z in 0..16 {
+                all.push((TileLevel::Root, [4096 * x, 4096 * y, 4096 * z], 0));
+            }
+        }
+    }
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || tx.send(tiles(&all).make().is_ok()).unwrap_or(()));
+    assert_eq!(rx.recv_timeout(std::time::Duration::from_secs(60)), Ok(true));
+}
+
 #[test]
 fn each_broken_value_is_refused_for_its_rule() {
     // A crossed edge: point 19 inside, 20 outside, on x; and a point deep inside, whose
@@ -603,6 +652,16 @@ fn a_file_decides_as_memory_does() {
         ("a tile's sign of 2", bad_tile, false),
         ("inside reaching the leaves' lower face", parts(3, Some([8, 8, 8]), 0, 20), false),
         ("a hole by a tile's face", shell_with_hole(), false),
+        (
+            "a root tile by a node's tile of its sign",
+            tiles(&[(TileLevel::Root, [0; 3], 0), (TileLevel::Upper, [4096, 128, 0], 0)]),
+            true,
+        ),
+        (
+            "a root tile by a node's tile of the other sign",
+            tiles(&[(TileLevel::Root, [0; 3], 0), (TileLevel::Lower, [4096, 136, 8], 1)]),
+            false,
+        ),
     ];
     for (name, p, taken) in cases {
         let bytes = to_bytes(&unchecked(&p)).unwrap();

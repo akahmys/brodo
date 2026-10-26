@@ -39,6 +39,9 @@ are recorded here when they change (V6).
 - The Hermite check takes a point beyond the `i32` range as the background, as the rest of
   brodo and docs/formats.md §4.2 do, rather than the range's other end: a set at both ends
   of a range was judged by voxels 2³² apart.
+- The Hermite check of a tile's faces costs what the nodes beside them hold, not the faces'
+  area: a root tile's faces had been checked 8 × 8 patch by patch, 1.5 million points, so
+  that a small file of root tiles asked for much work.
 
 ### Breaking
 

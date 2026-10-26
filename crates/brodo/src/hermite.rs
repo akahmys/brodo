@@ -145,6 +145,8 @@ trait Source {
     /// Each tile's level, origin and the number its values are read by.
     fn tiles(&self) -> Result<Vec<(TileLevel, Coord, u32)>, HermiteError>;
     fn is_leaf(&self, v: Coord) -> Result<bool, HermiteError>;
+    /// Whether a node holds the voxel's region of `level`.
+    fn holds_node(&self, level: TileLevel, v: Coord) -> Result<bool, HermiteError>;
     fn sign_at(&self, v: Coord) -> Result<u8, HermiteError>;
     fn sign_leaf(&self, n: u32) -> Result<&[u8; LEAF_VOXELS], HermiteError>;
     fn crossing_leaf(&self, axis: usize, n: u32) -> Result<LeafCrossings<'_>, HermiteError>;
@@ -286,44 +288,81 @@ fn check_leaf(s: &impl Source, n: u32, origin: Coord, groups: usize) -> Result<(
 }
 
 /// Checks that no edge a tile's point owns, or that reaches the tile from outside every
-/// leaf, crosses anything. Edges between a tile and a leaf are the leaf's to check. Tiles,
-/// leaves and the background each cover whole 8³ blocks, so one point of each 8 × 8 patch
-/// of a face stands for the patch.
+/// leaf, crosses anything. Edges between a tile and a leaf are the leaf's to check. Across
+/// each face, the region of the tile's level beyond it is one value unless a node holds it,
+/// and then each of the node's regions along the face is checked in turn, so the work
+/// follows the nodes the face touches, not its area.
 fn check_tile_faces(
     s: &impl Source,
     level: TileLevel,
     origin: Coord,
     sign: u8,
 ) -> Result<(), HermiteError> {
-    let edge = level.edge();
+    let far = level.edge() - 1;
     for axis in 0..3 {
         let e = step(axis);
-        let [a, b] = [step((axis + 1) % 3), step((axis + 2) % 3)];
-        let far = e.map(|c| c * (edge - 1));
-        for i in (0..edge).step_by(8) {
-            for j in (0..edge).step_by(8) {
-                let lower = plus(origin, plus(a.map(|c| c * i), b.map(|c| c * j)));
-                let upper = plus(lower, far);
-                // The tile's upper face owns the edges out of it; the point below its lower
-                // face owns the edges into it.
-                // Beyond the range lies the background, sign 0, in no leaf; the error then
-                // names the tile's point.
-                let below = neighbour(lower, e, false);
-                for (outside, owner) in
-                    [(neighbour(upper, e, true), upper), (below, below.unwrap_or(lower))]
-                {
-                    let differs = match outside {
-                        Some(o) => !s.is_leaf(o)? && s.sign_at(o)? != sign,
-                        None => sign != 0,
-                    };
-                    if differs {
-                        return Err(violation(Some(owner), Some(axis), Rule::Owner));
-                    }
-                }
-            }
+        // The tile's upper face owns the edges out of it; the point below its lower face
+        // owns the edges into it. Beyond the range lies the background, sign 0, in no leaf;
+        // the error then names the tile's point.
+        let upper = plus(origin, e.map(|c| c * far));
+        let face = Face { axis, sign, forward: true };
+        match neighbour(upper, e, true) {
+            Some(o) => face.check_region(s, level, o)?,
+            None if sign != 0 => return Err(violation(Some(upper), Some(axis), Rule::Owner)),
+            None => {}
+        }
+        let face = Face { forward: false, ..face };
+        match neighbour(origin, e, false) {
+            Some(o) => face.check_region(s, level, o)?,
+            None if sign != 0 => return Err(violation(Some(origin), Some(axis), Rule::Owner)),
+            None => {}
         }
     }
     Ok(())
+}
+
+/// The outside of one face of a tile: the voxels beyond it along `axis`, after it if
+/// `forward`, which must have the tile's `sign` wherever no leaf holds them.
+#[derive(Clone, Copy)]
+struct Face {
+    axis: usize,
+    sign: u8,
+    forward: bool,
+}
+
+impl Face {
+    /// Checks the voxels beyond the face in the region of `level` whose corner is `at`.
+    // Bounded recursion: each call goes one tile level finer, root to upper to lower, so
+    // three deep at most.
+    fn check_region(
+        self,
+        s: &impl Source,
+        level: TileLevel,
+        at: Coord,
+    ) -> Result<(), HermiteError> {
+        if !s.holds_node(level, at)? {
+            if s.sign_at(at)? == self.sign {
+                return Ok(());
+            }
+            let e = step(self.axis);
+            let owner = if self.forward { minus(at, e) } else { at };
+            return Err(violation(Some(owner), Some(self.axis), Rule::Owner));
+        }
+        let finer = match level {
+            TileLevel::Root => TileLevel::Upper,
+            TileLevel::Upper => TileLevel::Lower,
+            // A leaf's edges to a tile are the leaf's to check.
+            TileLevel::Lower => return Ok(()),
+        };
+        let [a, b] = [step((self.axis + 1) % 3), step((self.axis + 2) % 3)];
+        let edge = usize::try_from(finer.edge()).unwrap_or(usize::MAX);
+        for i in (0..level.edge()).step_by(edge) {
+            for j in (0..level.edge()).step_by(edge) {
+                self.check_region(s, finer, plus(at, plus(a.map(|c| c * i), b.map(|c| c * j))))?;
+            }
+        }
+        Ok(())
+    }
 }
 
 /// A set in memory.
@@ -347,6 +386,15 @@ impl Source for Owned<'_> {
 
     fn is_leaf(&self, v: Coord) -> Result<bool, HermiteError> {
         Ok(matches!(self.0.topology.locate(v), Location::Leaf(_)))
+    }
+
+    fn holds_node(&self, level: TileLevel, v: Coord) -> Result<bool, HermiteError> {
+        let t = &self.0.topology;
+        Ok(match level {
+            TileLevel::Root => t.has_upper_node(v),
+            TileLevel::Upper => t.has_lower_node(v),
+            TileLevel::Lower => matches!(t.locate(v), Location::Leaf(_)),
+        })
     }
 
     fn sign_at(&self, v: Coord) -> Result<u8, HermiteError> {
@@ -467,6 +515,10 @@ impl Source for Viewed<'_, '_> {
 
     fn is_leaf(&self, v: Coord) -> Result<bool, HermiteError> {
         Ok(matches!(self.set.signs.locate(v)?, ViewLocation::Leaf(_)))
+    }
+
+    fn holds_node(&self, level: TileLevel, v: Coord) -> Result<bool, HermiteError> {
+        Ok(self.set.signs.holds_node(level, v)?)
     }
 
     fn sign_at(&self, v: Coord) -> Result<u8, HermiteError> {
