@@ -69,3 +69,29 @@ The human decided:
   the build scripts of `serde` and `serde_core` running only `rustc --version`;
   `cargo deny check` passing. Besides them, `serde_core`, `serde_derive`, `itoa` and `zmij`
   are new; `proc-macro2`, `quote`, `syn` and `unicode-ident` are already present.
+
+## Amendment
+
+- **Date**: 2026-10-26
+
+B-020 asked how the third layer finds places thinner, or gaps narrower, than two voxels
+before conversion. `spikes/thin/` sampled points h/2 apart on every triangle and measured,
+on both sides of each, a single ray along the normal (the shape diameter function of
+Shapira et al. without its cone, as Cabiddu and Attene, *Epsilon-shapes*, Computers &
+Graphics 66, 2017, §2.2, describe it) and the largest tangent ball holding no point of the
+mesh (after the abstract of Ma, Bae and Choi, The Visual Computer 28(1), 2012). The rays
+found every thin wall and narrow gap the cases judged, on plates, gaps, a neck, a cone's
+tip, a slanting plate, a ball over a plate and a thin torus, turned triangles included,
+calling thick nothing but points within 0.14 voxels of an edge sharper than a right angle;
+the balls were stopped by the mesh's facets and called curved surfaces thin (its
+REPORT.md). Cabiddu and Attene's exact ε-shapes need a closed 2-manifold and a
+tetrahedrization. The human decided:
+
+- Each point sampled h/2 apart on each triangle measures the distance to the nearest
+  other triangle along its normal, both ways. A side whose midpoint is inside, by the
+  conversion's sign as Hermite data's points are, is a wall that thick; otherwise a gap
+  that wide. Below 2h, the point is thin.
+- Thin points within h of each other are one place, reported with its kind, its box in
+  world coordinates, its least thickness or width, and its count of points.
+- Checking a place by reconverting it at h/2 is measured apart, before it is built, and
+  recorded here.
