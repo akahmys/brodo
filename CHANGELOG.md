@@ -42,6 +42,10 @@ are recorded here when they change (V6).
 - The Hermite check of a tile's faces costs what the nodes beside them hold, not the faces'
   area: a root tile's faces had been checked 8 × 8 patch by patch, 1.5 million points, so
   that a small file of root tiles asked for much work.
+- colino's OBJ and 3MF readers look up a group's name once, not once a face or a placement:
+  a long name over many faces took time following their product.
+- colino's OBJ reader takes its statements one at a time: it held them all, about 49 bytes
+  for each byte read, 3.3 GB for 64 MB of empty lines.
 
 ### Breaking
 

@@ -83,23 +83,35 @@ pub(crate) struct Grouping {
 #[cfg(any(feature = "stl", feature = "obj", feature = "threemf"))]
 impl Grouping {
     /// Puts the next `n` triangles in the group named `name`.
+    #[cfg(feature = "stl")]
     pub(crate) fn take(&mut self, name: &str, n: usize) {
-        if n == 0 {
-            return;
+        if n > 0 {
+            let id = self.id(name);
+            self.take_id(id, n);
         }
-        let id = if name.is_empty() {
-            0
-        } else if let Some(id) = self.ids.get(name) {
-            *id
-        } else {
-            if self.names.is_empty() {
-                self.names.push(String::new());
-            }
-            let id = u32::try_from(self.names.len()).unwrap_or(u32::MAX);
-            self.ids.insert(name.to_owned(), id);
-            self.names.push(name.to_owned());
-            id
-        };
+    }
+
+    /// The id of the group named `name`, given it if the name is new. A reader that puts
+    /// many runs of triangles in one group keeps the id, so that a long name is looked up
+    /// once, not once a run.
+    pub(crate) fn id(&mut self, name: &str) -> u32 {
+        if name.is_empty() {
+            return 0;
+        }
+        if let Some(id) = self.ids.get(name) {
+            return *id;
+        }
+        if self.names.is_empty() {
+            self.names.push(String::new());
+        }
+        let id = u32::try_from(self.names.len()).unwrap_or(u32::MAX);
+        self.ids.insert(name.to_owned(), id);
+        self.names.push(name.to_owned());
+        id
+    }
+
+    /// Puts the next `n` triangles in the group `id`, as `Grouping::id` gave it.
+    pub(crate) fn take_id(&mut self, id: u32, n: usize) {
         self.groups.extend(std::iter::repeat_n(id, n));
     }
 

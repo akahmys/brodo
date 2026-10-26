@@ -615,6 +615,9 @@ impl Reading {
         }
         let mut mesh = Mesh { unit: Some(self.unit.clone()), ..Mesh::default() };
         let mut grouping = Grouping::default();
+        // Each object's group id, once looked up: an object placed many times looks up its
+        // name once.
+        let mut ids: Vec<Option<u32>> = vec![None; self.objects.len()];
         let mut stack: Vec<(usize, Transform)> = self.items.iter().rev().copied().collect();
         while let Some((i, m)) = stack.pop() {
             let Some(object) = self.objects.get(i) else { continue };
@@ -628,7 +631,12 @@ impl Reading {
                 }
                 (Kind::Model, Body::Mesh(v, t)) => {
                     place(&mut mesh, v, t, &m)?;
-                    grouping.take(&object.group, t.len());
+                    if let Some(known) = ids.get_mut(i)
+                        && !t.is_empty()
+                    {
+                        let id = *known.get_or_insert_with(|| grouping.id(&object.group));
+                        grouping.take_id(id, t.len());
+                    }
                 }
                 (Kind::Model, Body::Components(c)) => {
                     stack.extend(c.iter().rev().map(|(child, cm)| (*child, then(cm, &m))));

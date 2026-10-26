@@ -64,6 +64,23 @@ fn faces_take_the_last_groups_names_else_the_objects() {
 }
 
 #[test]
+fn a_long_group_name_is_looked_up_once_in_time() {
+    // 2¹⁹ faces under a group named by 16 MiB: looked up once a face, the name would be
+    // compared for 8 TiB. A later `g` of the same name takes the same id again.
+    let name = "n".repeat(1 << 24);
+    let mut text = format!("v 0 0 0\nv 1 0 0\nv 0 1 0\ng {name}\n");
+    text.push_str(&"f 1 2 3\n".repeat(1 << 19));
+    text.push_str(&format!("g other\nf 1 2 3\ng {name}\nf 1 2 3\n"));
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || tx.send(read_str(&text)).unwrap_or(()));
+    let m = rx.recv_timeout(std::time::Duration::from_secs(60)).unwrap().unwrap();
+    assert_eq!(m.groups.len(), (1 << 19) + 2);
+    assert_eq!(m.groups.last(), Some(&1));
+    assert_eq!(m.groups.get(1 << 19), Some(&2));
+    assert_eq!(m.group_names.len(), 3);
+}
+
+#[test]
 fn a_file_without_groups_has_none() {
     let m = read_str("v 0 0 0\nv 1 0 0\nv 0 1 0\ng\nf 1 2 3\n").unwrap();
     assert!(m.groups.is_empty() && m.group_names.is_empty());

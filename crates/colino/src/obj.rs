@@ -50,27 +50,27 @@ const REFUSED: &[&str] = &[
 ];
 
 /// Each statement with the line it begins on, from 1: comments dropped, continued lines
-/// joined.
-fn statements(text: &str) -> Vec<(usize, String)> {
-    let mut out = Vec::new();
-    let mut pending: Option<(usize, String)> = None;
-    for (n, raw) in (1..).zip(text.lines()) {
-        let line = raw.split('#').next().unwrap_or("");
-        let (body, goes_on) = match line.trim_end().strip_suffix('\\') {
-            Some(b) => (b, true),
-            None => (line, false),
-        };
-        let (start, mut joined) = pending.take().unwrap_or((n, String::new()));
-        joined.push(' ');
-        joined.push_str(body);
-        if goes_on {
+/// joined. One at a time, so that what is held follows the longest statement, not the file.
+fn statements(text: &str) -> impl Iterator<Item = (usize, String)> + '_ {
+    let mut lines = (1..).zip(text.lines());
+    std::iter::from_fn(move || {
+        let mut pending: Option<(usize, String)> = None;
+        for (n, raw) in lines.by_ref() {
+            let line = raw.split('#').next().unwrap_or("");
+            let (body, goes_on) = match line.trim_end().strip_suffix('\\') {
+                Some(b) => (b, true),
+                None => (line, false),
+            };
+            let (start, mut joined) = pending.take().unwrap_or((n, String::new()));
+            joined.push(' ');
+            joined.push_str(body);
+            if !goes_on {
+                return Some((start, joined));
+            }
             pending = Some((start, joined));
-        } else {
-            out.push((start, joined));
         }
-    }
-    out.extend(pending);
-    out
+        pending
+    })
 }
 
 fn number(word: &str, line: usize) -> Result<f64, ReadError> {
@@ -153,6 +153,9 @@ pub fn read(bytes: &[u8], limits: Limits) -> Result<Mesh, ReadError> {
     let mut furthest: Option<(usize, i64)> = None;
     let (mut g, mut o): (Option<String>, Option<String>) = (None, None);
     let mut grouping = Grouping::default();
+    // The id of the group the next face's triangles take, once a face has looked it up;
+    // `g` and `o` forget it.
+    let mut current: Option<u32> = None;
     for (line, statement) in statements(text) {
         let mut words = statement.split_ascii_whitespace();
         match words.next() {
@@ -161,11 +164,15 @@ pub fn read(bytes: &[u8], limits: Limits) -> Result<Mesh, ReadError> {
             Some("f") => {
                 let before = mesh.triangles.len();
                 face(&mut mesh, words, line, limits, &mut furthest)?;
-                let name = g.as_deref().or(o.as_deref()).unwrap_or("");
-                grouping.take(name, mesh.triangles.len() - before);
+                let id = match current {
+                    Some(id) => id,
+                    None => grouping.id(g.as_deref().or(o.as_deref()).unwrap_or("")),
+                };
+                current = Some(id);
+                grouping.take_id(id, mesh.triangles.len() - before);
             }
-            Some("g") => g = Some(words.collect::<Vec<_>>().join(" ")),
-            Some("o") => o = Some(words.collect::<Vec<_>>().join(" ")),
+            Some("g") => (g, current) = (Some(words.collect::<Vec<_>>().join(" ")), None),
+            Some("o") => (o, current) = (Some(words.collect::<Vec<_>>().join(" ")), None),
             Some(k) if SKIPPED.contains(&k) => {}
             Some(k) if REFUSED.contains(&k) => {
                 return Err(ReadError::Unsupported { line, word: k.to_owned() });

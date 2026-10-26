@@ -328,6 +328,32 @@ fn each_break_of_the_model_is_its_own_error() {
 }
 
 #[test]
+fn a_long_name_placed_many_times_is_looked_up_once_in_time() {
+    // A triangle named by 16 MiB, placed 2¹⁸ times through objects of two components each:
+    // looked up once a placement, the name would be compared for 4 TiB.
+    let (v, _) = tetra();
+    let name = "n".repeat(1 << 24);
+    let mut resources = mesh_object(1, "model", &v[..3], &[[0, 1, 2]]).replacen(
+        "id=\"1\"",
+        &format!("id=\"1\" name=\"{name}\""),
+        1,
+    );
+    for id in 2..=19 {
+        let below = id - 1;
+        resources.push_str(&format!(
+            "<object id=\"{id}\"><components><component objectid=\"{below}\"/><component objectid=\"{below}\"/></components></object>"
+        ));
+    }
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        tx.send(one("<item objectid=\"19\"/>", &resources)).unwrap_or(());
+    });
+    let m = rx.recv_timeout(std::time::Duration::from_secs(60)).unwrap().unwrap();
+    assert_eq!((m.triangles.len(), m.groups.len()), (1 << 18, 1 << 18));
+    assert_eq!(m.group_names.len(), 2);
+}
+
+#[test]
 fn an_object_naming_itself_as_a_component_is_refused_in_time() {
     // Its id is known from its own element's start, so its component would resolve to the
     // object still being read: expanded, it never ends (once named) or doubles on every
