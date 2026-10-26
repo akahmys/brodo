@@ -11,6 +11,7 @@ pub mod intersect;
 pub mod mesh;
 #[cfg(feature = "obj")]
 pub mod obj;
+mod parity;
 pub mod report;
 #[cfg(feature = "stl")]
 pub mod stl;

@@ -2,8 +2,9 @@
 //! signs on the corners of a conversion's voxels, and on each edge whose ends differ, where
 //! the mesh crosses it, its normal and its group.
 //!
-//! A leaf point's sign is the winding number's, at the conversion's accuracy; a point at
-//! distance zero from the mesh is inside. Tiles, inside regions, are inside, and the
+//! A leaf point's sign is found as the conversion found its voxels' (`Converted::sign`):
+//! the winding number's, at the accuracy given, or the parity count's; a point at distance
+//! zero from the mesh is inside. Tiles, inside regions, are inside, and the
 //! background outside. Signs are found first, then each edge whose stored signs differ is
 //! tested against every triangle with area near it (`intersect::crossing`): the hit nearest
 //! the edge's inside end is kept, the lowest triangle number of equals, and at an inside end
@@ -27,7 +28,7 @@ use brodo::topology::{LeafNumber, Topology};
 use brodo::tree::Coord;
 
 use crate::bvh::Bvh;
-use crate::convert::Converted;
+use crate::convert::{Converted, Inside};
 use crate::distance::{Point, cross, dot, sub};
 use crate::error::HermiteError;
 use crate::intersect::crossing;
@@ -118,7 +119,8 @@ fn find(bvh: &Bvh, a: Point, b: Point, lower_inside: bool) -> Option<Found> {
     near.map(|(fraction, _, triangle)| Found { fraction, triangle, hit: false })
 }
 
-/// Hermite data for `mesh` on its conversion `c`, signs at `accuracy`, as `c` was made.
+/// Hermite data for `mesh` on its conversion `c`, signs by `c`'s sign, winding numbers at
+/// `accuracy`, as `c` was made.
 pub fn hermite(mesh: &Mesh, c: &Converted, accuracy: Accuracy) -> Result<Produced, HermiteError> {
     mesh.check_groups()?;
     let lattice = Lattice::of(c)?;
@@ -126,7 +128,7 @@ pub fn hermite(mesh: &Mesh, c: &Converted, accuracy: Accuracy) -> Result<Produce
     let winding = Winding::new(mesh)?;
     let bvh = winding.bvh();
     let t = &c.topology;
-    let signs = signs(t, &lattice, &winding, accuracy)?;
+    let signs = signs(t, &lattice, bvh, &Inside::new(&winding, c.sign, accuracy))?;
     let mut unhit = 0_u64;
     let mut axes = Vec::with_capacity(3);
     for axis in 0..3 {
@@ -153,15 +155,14 @@ fn on_mesh(bvh: &Bvh, p: Point) -> bool {
 fn signs(
     t: &Topology,
     lattice: &Lattice,
-    winding: &Winding,
-    accuracy: Accuracy,
+    bvh: &Bvh,
+    inside: &Inside<'_>,
 ) -> Result<Field<u8>, HermiteError> {
-    let bvh = winding.bvh();
     let mut signs = Field::new(t, 0_u8);
     par_update(t, &mut signs, |n, values| {
         for (v, x) in voxels(t, n)?.zip(values) {
             let p = lattice.world(v);
-            *x = u8::from(on_mesh(bvh, p) || winding.number(p, accuracy) >= 0.5);
+            *x = u8::from(on_mesh(bvh, p) || inside.at(p));
         }
         Ok::<(), FieldError>(())
     })?;

@@ -8,7 +8,9 @@ and reports how the conversion may have changed the shape's topology. It reports
   meshes are read as they are. Each reader is a feature, `stl`, `obj` and `threemf`, all
   on by default; a user who reads no 3MF can leave out its ZIP and XML parsing.
 - **Converting**: exact distances to the nearest triangle, signed by the generalised winding
-  number (exact, or Barill et al.'s fast approximation), clamped to a band of ±N voxels.
+  number (exact, or Barill et al.'s fast approximation), or, for a mesh whose triangles
+  are turned at random, by a parity count along the axes that does not depend on their
+  orientation (`Sign::Parity`), clamped to a band of ±N voxels.
   Leaves lie only in the band; inside regions become tiles; memory follows the band's
   volume, not the grid's.
 - **Reporting**: the solid's and its complement's Betti numbers, the Euler characteristic

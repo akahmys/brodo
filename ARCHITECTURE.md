@@ -284,8 +284,13 @@ are in ADR-0030.
   voxel sampled at its centre (ADR-0027).
 - Distance: exact, to the nearest triangle through a BVH of axis-aligned boxes.
 - Sign: inside where the generalised winding number is 1/2 or more, by Barill et al.'s
-  far-field approximation (β = 2, second order) or the exact sum; an orientation-independent
-  method as an option, open (B-016).
+  far-field approximation (β = 2, second order) or the exact sum, by default; or, as an
+  option that does not depend on orientation, where most of the three lines through the
+  point along the axes cross the mesh an odd number of times, a line with an odd count not
+  voting and a tie outside, a line exactly on an edge or a corner counted as if moved by
+  (ε, ε²). The winding number holds where parts pass into each other or walls are doubled;
+  parity holds where faces are turned, across small holes, and in cavities; within a
+  missing cap's sag a line across finds nothing (ADR-0027).
 - Output: leaves only in a band of ±N voxels around the surface (N = 3 by default), values
   signed distances clamped to ±N·h; negative tiles inside, each region classified once,
   from the root region down; the positive background outside. No dense grid: memory follows
@@ -293,7 +298,7 @@ are in ADR-0030.
   1, which the grid's `extra` names under the key `sdf.version` (`brodo::meta::SDF_KEY`,
   ADR-0039) so that any producer can claim it.
 - Hermite data: a set in brodo's format (§4.9) on the conversion's topology, its signs
-  the winding number's and its crossings found by a watertight edge test, with the count
+  found by the conversion's sign and its crossings found by a watertight edge test, with the count
   of crossed edges no triangle was hit on beside it (ADR-0030).
 - It reports changes; it does not repair a shape or refine a grid.
 

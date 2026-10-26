@@ -6,7 +6,7 @@
 //! constructor and set by assignment, and each one a user reads is read by its fields,
 //! which a field added later leaves working.
 
-use colino::convert::{Options, convert};
+use colino::convert::{Options, Sign, convert};
 use colino::error::{ConvertError, HermiteError, MeshError, ReadError, ReportError};
 use colino::hermite::hermite;
 use colino::mesh::{Limits, Mesh};
@@ -108,6 +108,14 @@ fn accuracy(e: &Accuracy) -> &'static str {
     }
 }
 
+fn sign(e: &Sign) -> &'static str {
+    match e {
+        Sign::Winding => "Winding",
+        Sign::Parity => "Parity",
+        _ => "later",
+    }
+}
+
 /// A tetrahedron, its triangles facing out.
 fn tetrahedron() -> Mesh {
     let vertices = vec![[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
@@ -124,6 +132,7 @@ fn every_enum_that_may_grow_is_matched_with_a_wildcard() {
     assert_eq!(hermite_error(&HermiteError::Transform), "Transform");
     assert_eq!(report_error(&ReportError::Transform), "Transform");
     assert_eq!(accuracy(&Accuracy::Exact), "Exact");
+    assert_eq!(sign(&Sign::Parity), "Parity");
     let mesh = tetrahedron().with_unit(Some("mm".to_owned()));
     let c = convert(&mesh, &Options::new(0.25)).unwrap();
     let r = report(&mesh, &c, &[("inside".to_owned(), [0.2, 0.2, 0.2])]).unwrap();
@@ -138,11 +147,13 @@ fn every_struct_is_built_by_its_constructor_set_by_assignment_and_read_by_its_fi
     let mut options = Options::new(0.25);
     options.band = 2;
     options.accuracy = Accuracy::Exact;
+    options.sign = Sign::Parity;
     let mut limits = Limits::new(10, 10, 1000);
     limits.bytes = 2000;
     assert_eq!((limits.triangles, limits.bytes), (10, 2000));
     let c = convert(&mesh, &options).unwrap();
     assert_eq!((c.meta.unit.as_str(), c.topology.leaf_count() > 0), ("mm", true));
+    assert_eq!(c.sign, Sign::Parity);
     assert!(c.field.value_at(&c.topology, [0, 0, 0]).unwrap() < 0.0);
     let produced = hermite(&mesh, &c, Accuracy::Exact).unwrap();
     assert_eq!((produced.unhit, produced.set.group_names().len()), (0, 0));

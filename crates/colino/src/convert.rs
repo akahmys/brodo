@@ -26,10 +26,46 @@ use brodo::tree::{Coord, TileLevel};
 use crate::distance::{Point, on_triangle, squared};
 use crate::error::ConvertError;
 use crate::mesh::Mesh;
+use crate::parity;
 use crate::winding::{Accuracy, Winding};
 
 /// Voxels along a leaf-sized cell's edge.
 const CELL: i64 = 8;
+
+/// How a point's sign is found: whether it is inside the mesh.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum Sign {
+    /// Inside where the generalised winding number is 1/2 or more, at the options'
+    /// accuracy. Holds where parts pass into each other or walls are doubled; a face turned
+    /// in moves the inside.
+    Winding,
+    /// Inside where most of the lines through the point along the three axes cross the
+    /// mesh an odd number of times, a line crossing an odd number of times not voting and a
+    /// tie outside. Does not depend on the triangles' orientation and holds across small
+    /// holes; fails where parts pass into each other or walls are doubled (ADR-0027).
+    Parity,
+}
+
+/// Whether points are inside, by a sign.
+pub(crate) struct Inside<'a> {
+    winding: &'a Winding,
+    sign: Sign,
+    accuracy: Accuracy,
+}
+
+impl<'a> Inside<'a> {
+    pub(crate) fn new(winding: &'a Winding, sign: Sign, accuracy: Accuracy) -> Inside<'a> {
+        Inside { winding, sign, accuracy }
+    }
+
+    pub(crate) fn at(&self, p: Point) -> bool {
+        match self.sign {
+            Sign::Winding => self.winding.number(p, self.accuracy) >= 0.5,
+            Sign::Parity => parity::inside(self.winding.bvh(), p),
+        }
+    }
+}
 
 /// How a mesh is converted.
 #[derive(Debug, Clone, PartialEq)]
@@ -43,19 +79,22 @@ pub struct Options {
     pub band: u32,
     /// How each winding number is found.
     pub accuracy: Accuracy,
+    /// How each point's sign is found.
+    pub sign: Sign,
     /// The grid's unit when the mesh states none.
     pub unit: Option<String>,
 }
 
 impl Options {
-    /// Voxels of edge `voxel_size` on the world's lattice, a band of 3, and Barill et al.'s
-    /// approximation with β = 2.
+    /// Voxels of edge `voxel_size` on the world's lattice, a band of 3, and the winding
+    /// number's sign by Barill et al.'s approximation with β = 2.
     pub fn new(voxel_size: f64) -> Options {
         Options {
             voxel_size,
             origin: [0.0; 3],
             band: 3,
             accuracy: Accuracy::Approximate { beta: 2.0 },
+            sign: Sign::Winding,
             unit: None,
         }
     }
@@ -76,6 +115,12 @@ impl Options {
     #[must_use]
     pub fn with_accuracy(self, accuracy: Accuracy) -> Options {
         Options { accuracy, ..self }
+    }
+
+    /// The same options, each point's sign found by `sign`.
+    #[must_use]
+    pub fn with_sign(self, sign: Sign) -> Options {
+        Options { sign, ..self }
     }
 
     /// The same options, `unit` the grid's unit when the mesh states none.
@@ -123,6 +168,8 @@ pub struct Converted {
     pub field: Field<f32>,
     /// The voxel size, unit and transform from voxel to world coordinates.
     pub meta: GridMeta,
+    /// The sign the conversion used, which Hermite data from it uses too.
+    pub sign: Sign,
 }
 
 /// Index space's corners `lo` and `hi`, as `i64` cells' range; refused beyond `i32`.
@@ -171,10 +218,10 @@ fn candidates(winding: &Winding, o: &Options) -> Result<BTreeSet<Coord>, Convert
 }
 
 /// A voxel's signed distance, clamped to ±`width`.
-fn value(winding: &Winding, o: &Options, v: Coord, width: f64) -> f32 {
+fn value(winding: &Winding, inside: &Inside<'_>, o: &Options, v: Coord, width: f64) -> f32 {
     let p = o.world(v.map(|c| f64::from(c) + 0.5));
     let d = winding.nearest(p).unwrap_or(f64::INFINITY);
-    let signed = if winding.number(p, o.accuracy) >= 0.5 { -d } else { d };
+    let signed = if inside.at(p) { -d } else { d };
     #[expect(clippy::cast_possible_truncation, reason = "values are stored as f32 (ADR-0027)")]
     let stored = signed.clamp(-width, width) as f32;
     stored
@@ -185,6 +232,7 @@ pub fn convert(mesh: &Mesh, o: &Options) -> Result<Converted, ConvertError> {
     o.check()?;
     let unit = mesh.unit.clone().or_else(|| o.unit.clone()).ok_or(ConvertError::NoUnit)?;
     let winding = Winding::new(mesh)?;
+    let signs = Inside::new(&winding, o.sign, o.accuracy);
     let width = f64::from(o.band) * o.voxel_size;
     #[expect(clippy::cast_possible_truncation, reason = "values are stored as f32 (ADR-0027)")]
     let edge = width as f32;
@@ -198,7 +246,7 @@ pub fn convert(mesh: &Mesh, o: &Options) -> Result<Converted, ConvertError> {
     let mut f = Field::new(&t, edge);
     par_update(&t, &mut f, |n, values| {
         for (v, x) in t.leaf_voxels(n).map_err(|_| FieldError::UnknownLeaf(n.get()))?.zip(values) {
-            *x = value(&winding, o, v, width);
+            *x = value(&winding, &signs, o, v, width);
         }
         Ok::<(), FieldError>(())
     })?;
@@ -214,7 +262,7 @@ pub fn convert(mesh: &Mesh, o: &Options) -> Result<Converted, ConvertError> {
     let f = f.remap(&remap, &uniform::<f32>)?;
 
     let mut e = t.edit();
-    for (level, at) in inside(&t, &winding, o)? {
+    for (level, at) in inside(&t, &winding, &signs, o)? {
         e.add_tile(level, at)?;
     }
     let (t, remap) = e.commit()?;
@@ -230,7 +278,7 @@ pub fn convert(mesh: &Mesh, o: &Options) -> Result<Converted, ConvertError> {
     }
     meta.extra.insert(SDF_KEY.to_owned(), SDF_VERSION.to_owned());
     meta.check()?;
-    Ok(Converted { topology: t, field: f, meta })
+    Ok(Converted { topology: t, field: f, meta, sign: o.sign })
 }
 
 /// The root regions, 4096³ voxels, overlapping cells `first` to `last`.
@@ -252,6 +300,7 @@ fn root_regions(first: [i64; 3], last: [i64; 3]) -> Result<Vec<Coord>, ConvertEr
 fn inside(
     t: &Topology,
     winding: &Winding,
+    signs: &Inside<'_>,
     o: &Options,
 ) -> Result<Vec<(TileLevel, Coord)>, ConvertError> {
     let leaves: BTreeSet<Coord> =
@@ -281,7 +330,7 @@ fn inside(
         if !holds {
             let half = f64::from(level.edge()) / 2.0;
             let centre = o.world(at.map(|c| f64::from(c) + half));
-            if winding.number(centre, o.accuracy) >= 0.5 {
+            if signs.at(centre) {
                 out.push((level, at));
             }
             continue;

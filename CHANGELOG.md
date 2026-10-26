@@ -6,6 +6,17 @@ are recorded here when they change (V6).
 
 ## Unreleased
 
+- colino converts, and gives Hermite data, by a sign that does not depend on the
+  triangles' orientation as an option: `Options::with_sign(Sign::Parity)`, a parity count
+  along the three axes; the winding number stays the default (`Sign::Winding`). `Options`
+  and `Converted` gain a field `sign`, and Hermite data follows its conversion's
+  (ADR-0027).
+- Labelling holds 4 bytes a voxel for its labels rather than 8 beside the union-find's
+  parents; a component number reaching `u32::MAX` is refused as too large.
+- Faster, with the same output: Hermite data's unhit edges, labelling, `commit`'s leaf
+  manifest and `freeze`; Hermite data holds no work field over every leaf (ROADMAP.md §2,
+  P5's costs).
+
 ## 0.5.0 (2026-10-25)
 
 Closes P4: the public API shaped to grow without breaking users, what a user does not need

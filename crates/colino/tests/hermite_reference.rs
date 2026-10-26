@@ -6,7 +6,8 @@
 //! point, at bands of 1 to 3; an open mesh counts its edges with no triangle hit; of the
 //! hits on an edge, the one nearest its inside end is kept, whichever end that is; a
 //! triangle with no area never gives an unhit edge its data; a normal perpendicular to its
-//! edge keeps its triangle's side.
+//! edge keeps its triangle's side; a face turned in, refused by the winding number beyond
+//! the band, gives by parity the cube's set as meant.
 
 mod common;
 
@@ -410,6 +411,27 @@ fn a_face_turned_in_is_refused_beyond_the_band_and_counted_within_it() {
     assert!(matches!(run(3), Err(colino::error::HermiteError::SignOutsideBand(_))));
     let wide = run(6);
     assert!(wide.as_ref().is_ok_and(|p| p.unhit > 0), "{:?}", wide.map(|p| p.unhit));
+}
+
+#[test]
+fn a_face_turned_in_gives_the_cubes_hermite_data_by_parity() {
+    // The case above, refused by the winding number at a band of 3 (ADR-0030), gives by
+    // parity the set of the cube as meant, to the byte, every crossed edge hit (ADR-0027).
+    let cube = Cube::new(6.3, [0.37, -0.21, 0.13], 0.4, 0.7);
+    let as_meant = turned_cube(cube.r, cube.centre, cube.a, cube.b);
+    let mut m = as_meant.clone();
+    for t in m.triangles.iter_mut().skip(2).take(2) {
+        t.swap(1, 2);
+    }
+    let o = Options::new(0.5).with_sign(colino::convert::Sign::Parity);
+    let meta = GridMeta::new("cube", [0.5; 3], "millimeter").unwrap();
+    let set = |m: &Mesh| {
+        let p = hermite(m, &convert(m, &o).unwrap(), o.accuracy).unwrap();
+        (to_bytes(&p.set.entries("cube", &meta).unwrap()).unwrap(), p.unhit)
+    };
+    let (broken, unhit) = set(&m);
+    assert_eq!(unhit, 0);
+    assert!(broken == set(&as_meant).0);
 }
 
 /// The value index of point `v` in its leaf, which must exist.

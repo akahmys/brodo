@@ -80,3 +80,8 @@ the lines signed the moved point rather than the voxel's centre and missed 20 vo
 nearest each sphere. The human chose the perturbation (2026-10-26): parity counts with an
 edge test of its own beside `crossing`, which keeps hitting both triangles of an edge for
 Hermite data's crossings.
+
+Building it found one limit the spike's holes were too shallow to show: within the sag of
+a missing cap, a point whose lines across pass through the hole finds no crossing on them
+and is outside. A sphere with a hole and a tenth of its faces turned keeps every sign below
+the hole's rim (`sign_reference`).
