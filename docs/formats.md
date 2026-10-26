@@ -255,6 +255,9 @@ unless:
 11. walking the sign grid's nodes from its root table, as §2.4 does, reaches every leaf, and
     no upper node, lower node, leaf or tile value twice.
 
+A point beyond the `i32` range of coordinates, which rules 8 to 10 reach from the range's
+ends, is the background: sign 0, in no leaf.
+
 Rules 8 and 10 hold that only a leaf point owns an edge whose ends differ. Rule 11 refuses
 what §2.5 leaves unchecked, nodes shared between entries, so that checking a set costs what
 its bytes hold (ADR-0038).

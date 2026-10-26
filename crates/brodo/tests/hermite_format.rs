@@ -208,6 +208,64 @@ fn shell_with_hole() -> Parts {
     Parts { topology, signs, axes, names: Vec::new() }
 }
 
+/// A set on leaves at `origins`, inside where `inside` says, its crossings as `parts`
+/// makes them; a point beyond the `i32` range is outside, as the format takes it.
+fn parts_at(origins: &[Coord], inside: impl Fn(Coord) -> bool) -> Parts {
+    let empty = Topology::new();
+    let mut e = empty.edit();
+    for o in origins {
+        e.activate(*o).unwrap();
+    }
+    let topology = e.commit().unwrap().0;
+    let next = |v: Coord, axis: usize| {
+        let mut w = v;
+        w[axis] = v[axis].checked_add(1)?;
+        Some(w)
+    };
+    let inside_at = |v: Option<Coord>| v.is_some_and(&inside);
+    let none = |t: &Topology| Crossings {
+        fraction: Field::new(t, NO_CROSSING.0),
+        normal: Field::new(t, NO_CROSSING.1),
+        group: Field::new(t, NO_CROSSING.2),
+    };
+    let mut signs = Field::new(&topology, 0_u8);
+    let mut axes = [none(&topology), none(&topology), none(&topology)];
+    for n in topology.leaf_numbers() {
+        let voxels: Vec<Coord> = topology.leaf_voxels(n).unwrap().collect();
+        for (s, v) in signs.leaf_mut(&topology, n).unwrap().iter_mut().zip(&voxels) {
+            *s = u8::from(inside(*v));
+        }
+        for (axis, c) in axes.iter_mut().enumerate() {
+            for (i, v) in voxels.iter().enumerate() {
+                if inside(*v) == inside_at(next(*v, axis)) {
+                    continue;
+                }
+                let mut normal = [0.0_f32; 3];
+                normal[axis] = if inside(*v) { 1.0 } else { -1.0 };
+                c.fraction.leaf_mut(&topology, n).unwrap()[i] = 0.5;
+                c.normal.leaf_mut(&topology, n).unwrap()[i] = normal;
+            }
+        }
+    }
+    Parts { topology, signs, axes, names: Vec::new() }
+}
+
+#[test]
+fn beyond_the_i32_range_lies_the_background() {
+    // Leaves at both ends of the x range, one point inside at x = i32::MIN. The point
+    // before it along x lies beyond the range, the background, sign 0, in no leaf: the
+    // edge from it crosses a surface no leaf point owns, and the set is refused there. Had
+    // the range wrapped, that point would be i32::MAX, in the other leaf.
+    let (low, high) = ([i32::MIN, 0, 0], [i32::MAX - 7, 0, 0]);
+    let point = [i32::MIN, 3, 3];
+    let p = parts_at(&[low, high], |v| v == point);
+    assert_eq!(rule(p.make()), Ok((Some(point), Some(0), Rule::Owner)));
+    // Inside at x = i32::MAX instead: the edge beyond it is its own, and holds its crossing.
+    let point = [i32::MAX, 3, 3];
+    let p = parts_at(&[low, high], |v| v == point);
+    assert!(p.make().is_ok());
+}
+
 #[test]
 fn a_change_on_a_far_patch_of_a_tiles_face_is_found_there() {
     assert_eq!(rule(shell_with_hole().make()), Ok((Some([127, 64, 32]), Some(0), Rule::Owner)));

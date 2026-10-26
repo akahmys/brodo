@@ -111,6 +111,13 @@ fn minus(v: Coord, d: Coord) -> Coord {
     [a.wrapping_sub(x), b.wrapping_sub(y), c.wrapping_sub(z)]
 }
 
+/// The point a step `d` from `v`, forward or back, or nothing beyond the `i32` range, which
+/// is the background: sign 0, in no leaf (docs/formats.md §4.2).
+fn neighbour(v: Coord, d: Coord, forward: bool) -> Option<Coord> {
+    let step = |c: i32, k: i32| if forward { c.checked_add(k) } else { c.checked_sub(k) };
+    Some([step(v[0], d[0])?, step(v[1], d[1])?, step(v[2], d[2])?])
+}
+
 fn violation(at: Option<Coord>, axis: Option<usize>, rule: Rule) -> HermiteError {
     HermiteError::Violation { at, axis, rule }
 }
@@ -249,7 +256,11 @@ fn check_leaf(s: &impl Source, n: u32, origin: Coord, groups: usize) -> Result<(
         {
             let v = voxel(origin, i);
             let crossing = (*fraction, *normal, *group);
-            if sign_of(plus(v, e))? == *sign {
+            let beyond = match neighbour(v, e, true) {
+                Some(w) => sign_of(w)?,
+                None => 0,
+            };
+            if beyond == *sign {
                 if !same(crossing, NO_CROSSING) {
                     return Err(violation(Some(v), Some(axis), Rule::NoCrossing));
                 }
@@ -257,10 +268,17 @@ fn check_leaf(s: &impl Source, n: u32, origin: Coord, groups: usize) -> Result<(
                 check_crossing(crossing, axis, *sign == 1, groups)
                     .map_err(|rule| violation(Some(v), Some(axis), rule))?;
             }
-            let u = minus(v, e);
-            let in_leaf = minus(u, origin).iter().all(|c| (0..8).contains(c));
-            if !in_leaf && !s.is_leaf(u)? && sign_of(u)? != *sign {
-                return Err(violation(Some(u), Some(axis), Rule::Owner));
+            // The point before v owns the edge into it; beyond the range it is the
+            // background, which owns nothing, and the error names v.
+            match neighbour(v, e, false) {
+                Some(u) => {
+                    let in_leaf = minus(u, origin).iter().all(|c| (0..8).contains(c));
+                    if !in_leaf && !s.is_leaf(u)? && sign_of(u)? != *sign {
+                        return Err(violation(Some(u), Some(axis), Rule::Owner));
+                    }
+                }
+                None if *sign != 0 => return Err(violation(Some(v), Some(axis), Rule::Owner)),
+                None => {}
             }
         }
     }
@@ -288,10 +306,17 @@ fn check_tile_faces(
                 let upper = plus(lower, far);
                 // The tile's upper face owns the edges out of it; the point below its lower
                 // face owns the edges into it.
+                // Beyond the range lies the background, sign 0, in no leaf; the error then
+                // names the tile's point.
+                let below = neighbour(lower, e, false);
                 for (outside, owner) in
-                    [(plus(upper, e), upper), (minus(lower, e), minus(lower, e))]
+                    [(neighbour(upper, e, true), upper), (below, below.unwrap_or(lower))]
                 {
-                    if !s.is_leaf(outside)? && s.sign_at(outside)? != sign {
+                    let differs = match outside {
+                        Some(o) => !s.is_leaf(o)? && s.sign_at(o)? != sign,
+                        None => sign != 0,
+                    };
+                    if differs {
                         return Err(violation(Some(owner), Some(axis), Rule::Owner));
                     }
                 }

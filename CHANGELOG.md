@@ -36,6 +36,9 @@ are recorded here when they change (V6).
   walked the shared nodes once per entry, a small file asking for much work, and checked
   a shared leaf at one origin only. This refuses files version 1 accepted; brodo writes
   none (ADR-0038).
+- The Hermite check takes a point beyond the `i32` range as the background, as the rest of
+  brodo and docs/formats.md §4.2 do, rather than the range's other end: a set at both ends
+  of a range was judged by voxels 2³² apart.
 
 ### Breaking
 
