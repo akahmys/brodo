@@ -273,7 +273,11 @@ built.
         (2026-10-26)
   - [ ] A review of the logic and algorithms of both crates, chosen by the human
         (2026-10-26), what P5 wrote or rewrote first; each defect fixed on its own, with
-        its test
+        its test. Three passes, by module, by concern and by workflow, found 53 items
+        (2026-10-26): readers of untrusted bytes that hang or exhaust memory on small
+        files (3MF, cache, Hermite, OBJ), parts sharing a face split in two, a Hermite set
+        written beside its SDF claiming the SDF's convention, and costs beyond the band
+  - [ ] A review again of what the fixes changed, chosen by the human (2026-10-26)
   - [ ] R12, a frozen view thawed into a topology and a field (ADR-0042), scheduled by
         the human (2026-10-26), after the review's fixes to the Hermite reader
   - [ ] Refactoring across the crates, its candidates listed for the human to choose
