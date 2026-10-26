@@ -69,3 +69,4 @@ A record is `Proposed` until the human accepts it.
 | [0039](0039-whether-the-narrow-band-sdf-conventions-are-a-public-convention.md) | Whether the narrow-band SDF's conventions are a public convention |
 | [0040](0040-users-pin-a-release-tag-and-small-releases-are-cut-on-request.md) | Users pin a release tag, and small releases are cut on request |
 | [0041](0041-whether-brodos-files-get-media-type-names.md) | Whether brodo's files get media type names |
+| [0042](0042-a-frozen-view-thaws-into-a-topology-and-a-field.md) | A frozen view thaws into a topology and a field |

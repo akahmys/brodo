@@ -274,6 +274,8 @@ built.
   - [ ] A review of the logic and algorithms of both crates, chosen by the human
         (2026-10-26), what P5 wrote or rewrote first; each defect fixed on its own, with
         its test
+  - [ ] R12, a frozen view thawed into a topology and a field (ADR-0042), scheduled by
+        the human (2026-10-26), after the review's fixes to the Hermite reader
   - [ ] Refactoring across the crates, its candidates listed for the human to choose
   - [ ] The public API tidied in 0.6.0, already breaking for `Stored`:
         `FreezeError::Inconsistent` removed among it
@@ -386,3 +388,8 @@ implementation (PLANNING.md §2).
   - Held until asked: a per-triangle table in the cache file, for exact `f64` crossings;
     every crossing along an edge, which the user measured at 0.3 to 1.2 % of crossed
     edges on a turned box (2026-10-20).
+  From a user's solver reading callers' cache files as untrusted, received 2026-10-26
+  against v0.5.0:
+  - R12, a grid read from a cache file turned back into an owned topology and field, at a
+    cost that follows the file, not the grid's bounds: accepted, ADR-0042, `GridView::thaw`,
+    `thaw_on` and a public `same_topology`, in 0.6.0.
