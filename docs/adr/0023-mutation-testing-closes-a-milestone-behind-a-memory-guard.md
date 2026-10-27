@@ -186,3 +186,15 @@ that a part of the timeouts run again with none of them to run might write no re
 fail reading it. The human decided that `--report` holds the reports to every mutant only
 when given `--`, the whole run's arguments after it, as the workflow gives them, and that
 a part with none of the timeouts passes with the missed mutants alone.
+
+## Amendment: a shard given no mutant
+
+- **Date**: 2026-10-28
+
+The run on `fa72208` (2026-10-27) split 3573 mutants into 160 shards, and the last four
+were given none: cargo-mutants wrote them no `outcomes.json`, only an empty
+`mutants.json`, and every part of the timeouts run again failed reading one, so the run
+gave no verdict. The human decided that a report with no `outcomes.json` and an empty
+`mutants.json` reports no mutant, and that one with no `outcomes.json` and mutants listed
+still fails, as a lost report. Shown to fire on that run's reports: shard 156 failed
+before and passes after, and shard 155 with its `outcomes.json` removed still fails.

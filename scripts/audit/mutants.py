@@ -15,7 +15,8 @@ that the timeout was the mutant's doing. ARGS go to cargo-mutants (`-f <file>`,
 `--iterate`, `--shard k/n`). With `--report DIR [DIR…] [-- [ARGS]]`, the same verdict on
 reports already written, one or a shard each, taken together; given `--`, the whole run's
 ARGS after it, it also fails unless they report every mutant `cargo mutants --list` gives
-with ARGS but `--shard`, so that a shard cut off or lost shows (ADR-0023).
+with ARGS but `--shard`, so that a shard cut off or lost shows (ADR-0023). A shard given
+no mutant, with an empty `mutants.json` and no `outcomes.json`, reports none.
 
 With `--run --patient`, the mutants the last report shows timing out before any test
 failed run again, alone, under `PATIENT_TIMEOUT` seconds each, into `out/mutants/patient`:
@@ -173,8 +174,8 @@ def patient(args: list[str]) -> int:
         # A part of the timeouts with none of them to run writes no report.
         print("  this part holds none of the timeouts")
         return report(missed)
-    outcomes = json.loads(written.read_text())
-    for o in outcomes["outcomes"]:
+    rerun = json.loads(written.read_text())
+    for o in rerun["outcomes"]:
         if o["scenario"] == "Baseline":
             continue
         name = o["scenario"]["Mutant"]["name"]
@@ -220,9 +221,7 @@ def unreported(outs: list[Path], args: list[str]) -> list[str]:
     ).stdout.splitlines()
     reported = set()
     for out in outs:
-        for o in json.loads((out / "outcomes.json").read_text())["outcomes"]:
-            if o["scenario"] != "Baseline":
-                reported.add(o["scenario"]["Mutant"]["name"])
+        reported.update(o["scenario"]["Mutant"]["name"] for o in outcomes(out))
     missing = [n for n in listed if n not in reported]
     print(f"  {len(listed) - len(missing)} of {len(listed)} mutants listed are reported")
     if not missing:
@@ -230,13 +229,20 @@ def unreported(outs: list[Path], args: list[str]) -> list[str]:
     return [f"  in no report, {len(missing)} mutants, such as: {missing[0]}"]
 
 
+def outcomes(out: Path) -> list[dict]:
+    """A report's mutants' outcomes, the baseline left out. A shard given no mutant writes
+    no `outcomes.json`, only an empty `mutants.json`, and reports none (ADR-0023)."""
+    written = out / "outcomes.json"
+    if not written.exists() and json.loads((out / "mutants.json").read_text()) == []:
+        return []
+    return [o for o in json.loads(written.read_text())["outcomes"] if o["scenario"] != "Baseline"]
+
+
 def verdict(out: Path) -> list[str]:
     """What a cargo-mutants report shows was not caught."""
     failures = []
-    outcomes = json.loads((out / "outcomes.json").read_text())["outcomes"]
-    for o in outcomes:
-        if o["scenario"] == "Baseline":
-            continue
+    reported = outcomes(out)
+    for o in reported:
         name = o["scenario"]["Mutant"]["name"]
         if o["summary"] == "MissedMutant":
             failures.append(f"  missed: {name}")
@@ -244,7 +250,7 @@ def verdict(out: Path) -> list[str]:
             text = (out / o["log_path"]).read_text(errors="replace")
             if not any(l.startswith("test ") and l.endswith(" ... FAILED") for l in text.splitlines()):
                 failures.append(f"  timed out before any test failed: {name}")
-    print(f"  {len(outcomes) - 1} mutants reported")
+    print(f"  {len(reported)} mutants reported")
     return failures
 
 
