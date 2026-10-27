@@ -43,3 +43,14 @@ The human decided, on 2026-10-26, the request being taken:
 The user computes on a file's grids by thawing one and the others on its topology, at a
 cost that follows the file. Option 2 of the request, iterating a view's leaves and tiles
 in public, is not taken: thawing serves the use with a smaller API.
+
+## Amendment: the Hermite reader refuses shared nodes too
+
+- **Date**: 2026-10-27
+
+The decision above left `GridView::new` and the Hermite reader to version 1's checks,
+refusing shared nodes waiting for a version raised for another reason. P5's review then
+found that the Hermite reader, walking the whole tree, asked much work of a small file
+whose nodes were shared, and ADR-0038's amendment of 2026-10-27 has it refuse them now,
+by the walk thawing uses (docs/formats.md §4.2, rule 11). `GridView::new` and the cache
+reader keep version 1's checks.

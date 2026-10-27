@@ -143,9 +143,10 @@ A reader refuses a buffer, before reading any value, unless:
    the same, against the leaf count and the tile count.
 
 Padding, the background's bytes beyond its size, the order of nodes, whether every node and
-leaf is reached, and three more of the writer's rules, that a node with no child or tile
-holds 0 for each first, that root tiles take tile places in table order, and that each
-section starts at the block right after the one before, are not checked.
+leaf is reached, and four more of the writer's rules, that a node with no child or tile
+holds 0 for each first, that root tiles take tile places in table order, that the other
+tile places go to the nodes in node order, and that each section starts at the block right
+after the one before, are not checked.
 
 ## 3. The cache profile, format version 1
 

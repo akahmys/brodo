@@ -23,7 +23,8 @@ are recorded here when they change (V6).
   on a topology holding its leaves and tiles, `GridView::thaw_on`, refusing another with
   the new `FormatError::OtherTopology`; `GridView::same_topology` is public. Thawing walks
   the view's nodes once, so its cost follows the buffer, and refuses a view whose nodes,
-  leaves or tile values are reached twice, `FormatError::Shared` (ADR-0042, R12).
+  leaves or tile values are reached twice, `FormatError::Shared`, or a leaf never reached,
+  `FormatError::Inconsistent` (ADR-0042, R12).
 - `euler` sums the tiles' edge vertices in parallel, keeping no set of them: on a sphere
   of radius 400 voxels converted by colino, 1.8 to 2.7 s against 4.5 to 5.5 s, and 532 MB
   at most against 857 MB, the old and new code run in turn on a loaded machine
@@ -45,11 +46,6 @@ are recorded here when they change (V6).
 - `CacheFile::read` reads no more than its limit and one byte: a device, a pipe or a file
   growing after its length was read had passed the length's check and been read whole,
   `/dev/zero` until memory ran out.
-- A Hermite set whose sign grid shares a node, a leaf or a tile value between entries is
-  refused, `FormatError::Shared` (docs/formats.md §4.2, rule 11): checking such a set
-  walked the shared nodes once per entry, a small file asking for much work, and checked
-  a shared leaf at one origin only. This refuses files version 1 accepted; brodo writes
-  none (ADR-0038).
 - The Hermite check takes a point beyond the `i32` range as the background, as the rest of
   brodo and docs/formats.md §4.2 do, rather than the range's other end: a set at both ends
   of a range was judged by voxels 2³² apart.
@@ -59,11 +55,8 @@ are recorded here when they change (V6).
 - colino's OBJ and 3MF readers look up a group's name once, not once a face or a placement:
   a long name over many faces took time following their product.
 - colino's OBJ reader takes its statements one at a time: it held them all, about 49 bytes
-  for each byte read, 3.3 GB for 64 MB of empty lines.
-- A Hermite set whose fields hold more leaves or tiles than its signs is refused,
-  `HermiteError::OtherTopology` (docs/formats.md §4.2, rule 3): the values beyond the
-  signs' were reached by no node and checked by nothing. This refuses files version 1
-  accepted; brodo writes none (ADR-0038).
+  for each byte read, 3.3 GB at most for 64 MB of empty lines against 69 MB now
+  (2026-10-27, `/usr/bin/time -l`, release).
 - colino's third layer leaves a place unchecked when its box at h/2 holds more voxels than
   an `i64` counts, rather than overflowing the count.
 - colino's report refuses a transform not aligned with the axes, `ReportError::Transform`,
@@ -81,10 +74,6 @@ are recorded here when they change (V6).
 - `label` refuses a topology whose voxels and tiles a `u32` does not number before making
   any unit, `AnalysisError::TooLarge`, rather than overflowing the walk's unit numbers.
 - colino's 3MF reader refuses a vertex number beyond a `u32`, rather than clamping it.
-- A voxel centre on the mesh, at distance exactly 0, takes the parity count's sign whichever
-  sign is asked for, where the winding number turned on a rounded zero's sign; an inside
-  voxel whose distance rounds to zero holds −`f32::MIN_POSITIVE`, not −0, so that `v < 0`
-  finds it and parts sharing a face are one solid (ADR-0027).
 - colino's third layer starts each ray off its own triangle by 2⁻⁴⁰ of the coordinates
   it works with, rather than 10⁻⁹ of the mesh's size: far from the origin the start was
   lost to rounding and the ray crossed its own face, and on a large mesh it could pass
@@ -92,28 +81,44 @@ are recorded here when they change (V6).
 - colino refuses a mesh whose triangles reach a vertex that is not finite, the new
   `MeshError::NotFinite`: a mesh made by hand with a NaN converted without an error, and
   the BVH's sort lost its total order.
-- `Mesh::check_groups` refuses a group after 0 named `""` or by an earlier group's name,
-  the new `MeshError::BadGroupName`, as Hermite data does: such a mesh converted and was
-  refused only once its Hermite data was made.
-- A Hermite set made with the group table `[""]` keeps it empty, as a file reads it back.
 - `write_vtu` refuses a field of another topology when the topology is empty, as it does
   otherwise, `FieldError::StaleField`.
 - colino's Hermite data from a conversion with a leaf at the end of the `i32` range takes
   the background beyond it, sign 0, rather than overflowing.
 - Morphology ends for the largest k: value dilation and erosion stop once a pass changes
-  nothing; eroding by more than the box's widest side removes no more; and a dilation
-  whose new leaves a `u32` could not number is refused before any is made,
-  `TreeError::ArenaFull`.
+  nothing; erosion looks at a cell's surroundings nearest first, stopping at the first
+  background cell, rather than listing every cell within reach, and removes no more for k
+  beyond the box's widest side; and a dilation whose new leaves a `u32` could not number
+  is refused before any is made, `TreeError::ArenaFull`, though one that needs more memory
+  than there is is not.
 - `CacheFile::map`'s safety contract holds from the call on, the check's reads among
   those the file must not change under.
-- `cache::write` writes a hidden file beside the path, `.<name>.<process id>.tmp`, and
-  renames it over the path once flushed: written in place, a file another process mapped
-  changed under it, and a failed write lost the old file.
 - `euler` returns the lowest-numbered leaf's error whatever the thread count, as
   `par_update` does; `par_update` states that a failure undoes nothing.
 
 ### Breaking
 
+- A Hermite set whose sign grid shares a node, a leaf or a tile value between entries is
+  refused, `FormatError::Shared` (docs/formats.md §4.2, rule 11): checking such a set
+  walked the shared nodes once per entry, a small file asking for much work, and checked
+  a shared leaf at one origin only. This refuses files version 1 accepted; brodo writes
+  none (ADR-0038).
+- A Hermite set whose fields hold more leaves or tiles than its signs is refused,
+  `HermiteError::OtherTopology` (docs/formats.md §4.2, rule 3): the values beyond the
+  signs' were reached by no node and checked by nothing. This refuses files version 1
+  accepted; brodo writes none (ADR-0038).
+- A voxel centre on the mesh, at distance exactly 0, is inside whichever sign is asked
+  for, as in Hermite data, where the winding number turned on a rounded zero's sign; an
+  inside voxel whose distance rounds to zero holds −`f32::MIN_POSITIVE`, not −0, so that
+  `v < 0` finds it and parts sharing a face are one solid (ADR-0027).
+- `Mesh::check_groups` refuses a group after 0 named `""` or by an earlier group's name,
+  the new `MeshError::BadGroupName`, as Hermite data does: such a mesh converted and was
+  refused only once its Hermite data was made.
+- A Hermite set made with the group table `[""]` keeps it empty, as a file reads it back.
+- `cache::write` writes a hidden file beside the path, `.<name>.<process id>.<n>.tmp`, n
+  counting the process's writes, and renames it over the path once flushed: written in
+  place, a file another process mapped changed under it, and a failed write lost the old
+  file.
 - `FreezeError::Inconsistent` is removed: nothing made it.
 - `Converted` records the accuracy its winding numbers were found at, the new field
   `accuracy`, which `hermite` and the report's third layer follow: `hermite(mesh, c)` takes

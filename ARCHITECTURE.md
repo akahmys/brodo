@@ -209,7 +209,8 @@ fastest. A neighbour beyond the `i32` coordinate range is the background.
   alone so far; any other is a typed error naming it.
 - A view thaws into an owned `Topology` and `Field<T>` (`GridView::thaw`), or into a field
   on a topology holding its leaves and tiles (`thaw_on`), by walking its nodes once and
-  refusing a node, a leaf or a tile value reached twice; the topology numbers them in its
+  refusing a node, a leaf or a tile value reached twice, and a leaf never reached; the
+  topology numbers them in its
   own order, so that one buffer gives one topology. Views whose root tables, nodes and
   counts agree hold one tree (`same_topology`) (ADR-0042).
 
@@ -220,9 +221,10 @@ fastest. A neighbour beyond the `i32` coordinate range is the background.
 | **cache** | passing between processes, replaying frame caches | the `GridView` buffer, uncompressed | memory mapping, no copy |
 | **archive** | storing, shipping | metadata, topology and value blocks in compressed chunks of hundreds to thousands of leaves | decompressing chunks, in parallel, into a `GridView` (one copy) |
 
-- Common content: a header (magic number, format version, grid count); per grid, its
+- A cache file holds a header (magic number, format version, grid count) and, per grid, its
   name, value type, voxel size and unit, affine transform, bounding box and free
-  key-value metadata; the topology; the values.
+  key-value metadata, the topology and the values; a bare frozen buffer, a file of its own,
+  holds one grid's header, topology and values (docs/formats.md §2).
 - A grid's metadata is a `GridMeta`, apart from `Grid<T>`, so that any topology and field
   can be written: a name, a voxel size per axis, a unit, a 3×4 affine transform from voxel
   to world coordinates, and free string pairs. The unit is a non-empty UTF-8 string brodo
@@ -282,7 +284,9 @@ are in ADR-0030.
 - In a cache file, a set is ten grids told apart by keys in `GridMeta::extra`, the sign
   grid holding the group table ([docs/formats.md](docs/formats.md) §4). A reader reads a
   set as ten `GridView`s, without a copy, the shared topology checked by comparing their
-  node sections.
+  root tables and node sections and their counts of leaves and tiles, and the sign grid's
+  nodes walked from its root table, each reached once and every leaf reached
+  (docs/formats.md §4.2, rules 3 and 11).
 - A producer's own information, such as edges it found no surface for, is not in the
   format; it reports it beside the set.
 
@@ -307,8 +311,8 @@ are in ADR-0030.
   option that does not depend on orientation, where most of the three lines through the
   point along the axes cross the mesh an odd number of times, a line with an odd count not
   voting and a tie outside, a line exactly on an edge or a corner counted as if moved by
-  (ε, ε²). A point on the mesh, at distance exactly 0, takes the parity count's sign
-  whichever is asked for, and an inside voxel whose distance rounds to zero holds
+  (ε, ε²). A point on the mesh, at distance exactly 0, is inside whichever is asked for, as
+  in Hermite data, and an inside voxel whose distance rounds to zero holds
   −`f32::MIN_POSITIVE`, so that `v < 0` finds it. The winding number holds where parts
   pass into each other or walls are doubled; parity holds where faces are turned, across
   small holes, and in cavities; within a missing cap's sag a line across finds nothing
@@ -340,8 +344,8 @@ are in ADR-0030.
 - Connectivity: the solid 26, its complement 6. The complement's β₀ is counted and held
   by tests to duality with the solid's β₂; its β₁ and β₂ are the solid's by duality, since
   under this pairing each lattice vertex adds as much to the complement's χ as to the
-  solid's: β₁ the solid's, β₂ the solid's components less one, or, by convention, 1 when
-  there is no solid, where duality would give 0 (ADR-0028).
+  solid's: β₁ the solid's, and β₂ the solid's components less one where there is a solid,
+  and, by convention, 1 where there is none (ADR-0028).
 - Reference for layer 1: the input's V − E + F when, welded, it is a closed 2-manifold,
   the solid's χ being half the surface's; otherwise none, the report saying why. Layer 3's
   check stands in for it where it is thin, for any input.

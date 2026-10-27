@@ -113,7 +113,7 @@ run shows.
 
 - **Date**: 2026-10-27
 
-At 80 shards, about 46 mutants each, the run on `9940bd5` (2026-10-27) lost two shards of
+At 80 shards, about 46 mutants each, the run on `9940bd5` (2026-10-26 to 27) lost two shards of
 colino's heaviest to the six hours a job may run, and the one last job running the
 timeouts again under 1800 s each was cut off too. GitHub Free runs 20 jobs at once, six
 hours each, a matrix of 256 jobs at most (docs.github.com, Actions limits, read
