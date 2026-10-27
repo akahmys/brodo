@@ -270,25 +270,9 @@ pub fn convert(mesh: &Mesh, o: &Options) -> Result<Converted, ConvertError> {
         Ok::<(), FieldError>(())
     })?;
 
-    // Candidates with no value inside the band go.
-    let mut e = t.edit();
-    for n in t.leaf_numbers() {
-        if f.leaf(&t, n)?.iter().all(|x| x.abs() >= edge) {
-            e.deactivate(t.leaf_origin(n)?)?;
-        }
-    }
-    let (t, remap) = e.commit()?;
-    let f = f.remap(&remap, &uniform::<f32>)?;
-
-    let mut e = t.edit();
-    for (level, at) in inside(&t, &winding, &signs, o)? {
-        e.add_tile(level, at)?;
-    }
-    let (t, remap) = e.commit()?;
-    let mut f = f.remap(&remap, &uniform::<f32>)?;
-    for n in t.tile_numbers().collect::<Vec<_>>() {
-        f.set_tile(&t, n, -edge)?;
-    }
+    // Each step takes the last one's topology and field, so that they are freed as it ends.
+    let (t, f) = trimmed(t, f, edge)?;
+    let (t, f) = with_inside(t, f, &winding, &signs, o, edge)?;
 
     let h = o.voxel_size;
     let mut meta = GridMeta::new("sdf", [h; 3], &unit)?;
@@ -298,6 +282,40 @@ pub fn convert(mesh: &Mesh, o: &Options) -> Result<Converted, ConvertError> {
     meta.extra.insert(SDF_KEY.to_owned(), SDF_VERSION.to_owned());
     meta.check()?;
     Ok(Converted { topology: t, field: f, meta, sign: o.sign })
+}
+
+/// The topology and field without the candidates holding no value inside the band.
+fn trimmed(t: Topology, f: Field<f32>, edge: f32) -> Result<(Topology, Field<f32>), ConvertError> {
+    let mut e = t.edit();
+    for n in t.leaf_numbers() {
+        if f.leaf(&t, n)?.iter().all(|x| x.abs() >= edge) {
+            e.deactivate(t.leaf_origin(n)?)?;
+        }
+    }
+    let (t, remap) = e.commit()?;
+    let f = f.remap(&remap, &uniform::<f32>)?;
+    Ok((t, f))
+}
+
+/// The topology and field with the inside regions holding no leaf as tiles of −`edge`.
+fn with_inside(
+    t: Topology,
+    f: Field<f32>,
+    winding: &Winding,
+    signs: &Inside<'_>,
+    o: &Options,
+    edge: f32,
+) -> Result<(Topology, Field<f32>), ConvertError> {
+    let mut e = t.edit();
+    for (level, at) in inside(&t, winding, signs, o)? {
+        e.add_tile(level, at)?;
+    }
+    let (t, remap) = e.commit()?;
+    let mut f = f.remap(&remap, &uniform::<f32>)?;
+    for n in t.tile_numbers().collect::<Vec<_>>() {
+        f.set_tile(&t, n, -edge)?;
+    }
+    Ok((t, f))
 }
 
 /// The root regions, 4096³ voxels, overlapping cells `first` to `last`.

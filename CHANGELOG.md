@@ -28,6 +28,11 @@ are recorded here when they change (V6).
   of radius 400 voxels converted by colino, 1.8 to 2.7 s against 4.5 to 5.5 s, and 532 MB
   at most against 857 MB, the old and new code run in turn on a loaded machine
   (2026-10-27).
+- Less memory, with the same output (2026-10-27, old and new run in turn): colino's
+  conversion frees each step's topology and field as the next is made, 103 to 105 MB at
+  most against 142 MB on a sphere of radius 200 voxels; `cache::write` writes the file part
+  by part and `CacheFile::read` reads it straight into aligned blocks, 888 MB against
+  1.30 GB to write and 412 MB against 822 MB to read a file of 410 MB.
 - Faster, with the same output: Hermite data's unhit edges, labelling, `commit`'s leaf
   manifest and `freeze`; Hermite data holds no work field over every leaf (ROADMAP.md §2,
   P5's costs).

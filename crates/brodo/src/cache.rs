@@ -8,7 +8,7 @@
 use std::io::Read;
 use std::path::Path;
 
-use zerocopy::IntoBytes;
+use zerocopy::{FromZeros, IntoBytes};
 
 use crate::error::{CacheError, FormatError};
 use crate::field::{Field, Stored};
@@ -100,9 +100,27 @@ fn encode_meta(m: &GridMeta, b: Bounds) -> Result<Vec<u8>, CacheError> {
 
 /// The bytes of a cache file holding `entries`, in order.
 pub fn to_bytes(entries: &[CacheEntry]) -> Result<Vec<u8>, CacheError> {
+    let mut out = Vec::new();
+    emit(entries, &mut out)?;
+    Ok(out)
+}
+
+/// Writes zeros to `out` from `*written` bytes to `to`.
+fn pad_to(out: &mut impl std::io::Write, to: usize, written: &mut usize) -> std::io::Result<()> {
+    let zeros = to.saturating_sub(*written);
+    *written = to.max(*written);
+    out.write_all(&vec![0; zeros])
+}
+
+/// Writes the file holding `entries` to `out`, part by part, so that no copy of the whole
+/// is made.
+fn emit(entries: &[CacheEntry], out: &mut impl std::io::Write) -> Result<(), CacheError> {
     let metas =
         entries.iter().map(|e| encode_meta(&e.meta, e.bounds)).collect::<Result<Vec<_>, _>>()?;
-    let mut directory = Vec::new();
+    let mut head = Vec::new();
+    for x in [MAGIC, VERSION, u32_of(entries.len())?, 0, 0, 0, 0, 0] {
+        put_u32(&mut head, x);
+    }
     let mut at = 1 + entries.len();
     let mut places = Vec::new();
     for (e, m) in entries.iter().zip(&metas) {
@@ -119,22 +137,21 @@ pub fn to_bytes(entries: &[CacheEntry]) -> Result<Vec<u8>, CacheError> {
             0,
             0,
         ] {
-            put_u32(&mut directory, x);
+            put_u32(&mut head, x);
         }
         places.push((meta_at, grid_at));
     }
-    let mut out = Vec::new();
-    for x in [MAGIC, VERSION, u32_of(entries.len())?, 0, 0, 0, 0, 0] {
-        put_u32(&mut out, x);
-    }
-    out.extend_from_slice(&directory);
+    out.write_all(&head)?;
+    let mut written = head.len();
     for ((e, m), (meta_at, grid_at)) in entries.iter().zip(&metas).zip(places) {
-        out.resize(meta_at * BLOCK, 0);
-        out.extend_from_slice(m);
-        out.resize(grid_at * BLOCK, 0);
-        out.extend_from_slice(e.frozen.as_bytes());
+        pad_to(out, meta_at * BLOCK, &mut written)?;
+        out.write_all(m)?;
+        written += m.len();
+        pad_to(out, grid_at * BLOCK, &mut written)?;
+        out.write_all(e.frozen.as_bytes())?;
+        written += e.frozen.as_bytes().len();
     }
-    Ok(out)
+    Ok(())
 }
 
 /// Writes a cache file holding `entries`. The bytes go to a hidden file beside `path`,
@@ -144,7 +161,6 @@ pub fn to_bytes(entries: &[CacheEntry]) -> Result<Vec<u8>, CacheError> {
 /// while writing may leave the hidden file behind.
 pub fn write(path: &Path, entries: &[CacheEntry]) -> Result<(), CacheError> {
     use std::io::Write;
-    let bytes = to_bytes(entries)?;
     let name = path.file_name().ok_or_else(|| {
         std::io::Error::new(std::io::ErrorKind::InvalidInput, "the path names no file")
     })?;
@@ -152,17 +168,20 @@ pub fn write(path: &Path, entries: &[CacheEntry]) -> Result<(), CacheError> {
     hidden.push(name);
     hidden.push(format!(".{}.tmp", std::process::id()));
     let temp = path.with_file_name(hidden);
-    let written = std::fs::File::create(&temp).and_then(|mut f| {
-        f.write_all(&bytes)?;
-        f.sync_all()
-    });
-    let renamed = written.and_then(|()| std::fs::rename(&temp, path));
-    if let Err(e) = renamed {
+    let written = (|| -> Result<(), CacheError> {
+        let mut file = std::io::BufWriter::new(std::fs::File::create(&temp)?);
+        emit(entries, &mut file)?;
+        file.flush()?;
+        file.get_ref().sync_all()?;
+        drop(file);
+        std::fs::rename(&temp, path)?;
+        Ok(())
+    })();
+    if written.is_err() {
         // The hidden file may hold part of the bytes; the old file is untouched.
         let _ignored = std::fs::remove_file(&temp);
-        return Err(e.into());
     }
-    Ok(())
+    written
 }
 
 /// Reads bytes in order, refusing to read past their end.
@@ -404,13 +423,35 @@ impl CacheFile {
         if length > limit {
             return Err(CacheError::FileTooLarge { length, limit });
         }
-        let mut bytes = Vec::with_capacity(usize::try_from(length).unwrap_or(0));
-        file.take(limit.saturating_add(1)).read_to_end(&mut bytes)?;
-        let read = u64::try_from(bytes.len()).unwrap_or(u64::MAX);
+        // Read into aligned blocks, so that the file is held once, not copied to align it:
+        // room for the length it reports and a block more, grown should it hold more, as a
+        // device, a pipe or a growing file may, up to the limit and one byte.
+        let room = usize::try_from(length).unwrap_or(0).div_ceil(BLOCK) + 1;
+        let mut blocks = vec![Block::new_zeroed(); room];
+        let mut source = file.take(limit.saturating_add(1));
+        let mut filled = 0_usize;
+        loop {
+            if filled == blocks.len() * BLOCK {
+                blocks.resize(blocks.len() * 2, Block::new_zeroed());
+            }
+            let Some(free) = blocks.as_mut_bytes().get_mut(filled..) else { break };
+            match source.read(free) {
+                Ok(0) => break,
+                Ok(n) => filled += n,
+                Err(e) if e.kind() == std::io::ErrorKind::Interrupted => {}
+                Err(e) => return Err(e.into()),
+            }
+        }
+        let read = u64::try_from(filled).unwrap_or(u64::MAX);
         if read > limit {
             return Err(CacheError::FileTooLarge { length: read, limit });
         }
-        Self::from_bytes(&bytes)
+        if !filled.is_multiple_of(BLOCK) {
+            return Err(CacheError::Inconsistent("length"));
+        }
+        blocks.truncate(filled / BLOCK);
+        let grids = index(blocks.as_bytes())?;
+        Ok(Self { storage: Storage::Copied(blocks), grids })
     }
 
     /// Checks bytes whole as a cache file, copying them to an aligned buffer.
