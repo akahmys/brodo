@@ -162,7 +162,8 @@ fn signs(
     par_update(t, &mut signs, |n, values| {
         for (v, x) in voxels(t, n)?.zip(values) {
             let p = lattice.world(v);
-            *x = u8::from(on_mesh(bvh, p) || inside.at(p));
+            let d = bvh.nearest(p).map(|(d, _)| d);
+            *x = u8::from(d == Some(0.0) || inside.at_distance(p, d));
         }
         Ok::<(), FieldError>(())
     })?;

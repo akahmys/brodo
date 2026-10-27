@@ -72,6 +72,10 @@ are recorded here when they change (V6).
 - `label` refuses a topology whose voxels and tiles a `u32` does not number before making
   any unit, `AnalysisError::TooLarge`, rather than overflowing the walk's unit numbers.
 - colino's 3MF reader refuses a vertex number beyond a `u32`, rather than clamping it.
+- A voxel centre on the mesh, at distance exactly 0, takes the parity count's sign whichever
+  sign is asked for, where the winding number turned on a rounded zero's sign; an inside
+  voxel whose distance rounds to zero holds −`f32::MIN_POSITIVE`, not −0, so that `v < 0`
+  finds it and parts sharing a face are one solid (ADR-0027).
 
 ### Breaking
 

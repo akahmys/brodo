@@ -60,9 +60,17 @@ impl<'a> Inside<'a> {
     }
 
     pub(crate) fn at(&self, p: Point) -> bool {
+        self.at_distance(p, self.winding.nearest(p))
+    }
+
+    /// Whether `p`, at distance `d` from the mesh, is inside. A point on the mesh, at
+    /// distance exactly 0, takes the parity count's sign whatever the sign asked for: its
+    /// lines moved by (ε, ε²) decide it, where the winding number's solid angles would turn
+    /// on the sign of a rounded zero.
+    pub(crate) fn at_distance(&self, p: Point, d: Option<f64>) -> bool {
         match self.sign {
-            Sign::Winding => self.winding.number(p, self.accuracy) >= 0.5,
-            Sign::Parity => parity::inside(self.winding.bvh(), p),
+            Sign::Winding if d != Some(0.0) => self.winding.number(p, self.accuracy) >= 0.5,
+            Sign::Winding | Sign::Parity => parity::inside(self.winding.bvh(), p),
         }
     }
 }
@@ -225,14 +233,17 @@ fn candidates(winding: &Winding, o: &Options) -> Result<BTreeSet<Coord>, Convert
     Ok(cells)
 }
 
-/// A voxel's signed distance, clamped to ±`width`.
+/// A voxel's signed distance, clamped to ±`width`. An inside voxel whose distance rounds
+/// to zero holds −`f32::MIN_POSITIVE`, so that `v < 0` finds it inside.
 fn value(winding: &Winding, inside: &Inside<'_>, o: &Options, v: Coord, width: f64) -> f32 {
     let p = o.world(v.map(|c| f64::from(c) + 0.5));
-    let d = winding.nearest(p).unwrap_or(f64::INFINITY);
-    let signed = if inside.at(p) { -d } else { d };
+    let nearest = winding.nearest(p);
+    let d = nearest.unwrap_or(f64::INFINITY);
+    let is_inside = inside.at_distance(p, nearest);
+    let signed = if is_inside { -d } else { d };
     #[expect(clippy::cast_possible_truncation, reason = "values are stored as f32 (ADR-0027)")]
     let stored = signed.clamp(-width, width) as f32;
-    stored
+    if is_inside && stored == 0.0 { -f32::MIN_POSITIVE } else { stored }
 }
 
 /// Converts `mesh` into a narrow-band signed distance field.

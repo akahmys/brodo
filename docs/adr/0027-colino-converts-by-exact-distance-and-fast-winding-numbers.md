@@ -85,3 +85,17 @@ Building it found one limit the spike's holes were too shallow to show: within t
 a missing cap, a point whose lines across pass through the hole finds no crossing on them
 and is outside. A sphere with a hole and a tenth of its faces turned keeps every sign below
 the hole's rim (`sign_reference`).
+
+## Amendment: a point on the mesh
+
+- **Date**: 2026-10-27
+
+P5's review found two faults at a voxel centre exactly on the mesh. Its winding number
+turned on the sign of a rounded zero, the solid angle of the triangle holding it being
+2·atan2(±0, d) with d < 0, so the winding number and parity converted a cube with its
+faces on planes of centres differently in 206 values (2026-10-26); and an inside one held
+−0, which `v < 0` does not find, so two boxes sharing a face labelled as two parts. The
+human decided that a point at distance exactly 0 takes the parity count's sign, decided by
+its lines moved by (ε, ε²), whichever sign is asked for, and that an inside voxel whose
+distance rounds to zero holds −`f32::MIN_POSITIVE`. Hermite data keeps its own rule: a
+point on the mesh is inside, so that the crossing lies there.

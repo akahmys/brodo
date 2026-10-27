@@ -297,9 +297,12 @@ are in ADR-0030.
   option that does not depend on orientation, where most of the three lines through the
   point along the axes cross the mesh an odd number of times, a line with an odd count not
   voting and a tie outside, a line exactly on an edge or a corner counted as if moved by
-  (ε, ε²). The winding number holds where parts pass into each other or walls are doubled;
-  parity holds where faces are turned, across small holes, and in cavities; within a
-  missing cap's sag a line across finds nothing (ADR-0027).
+  (ε, ε²). A point on the mesh, at distance exactly 0, takes the parity count's sign
+  whichever is asked for, and an inside voxel whose distance rounds to zero holds
+  −`f32::MIN_POSITIVE`, so that `v < 0` finds it. The winding number holds where parts
+  pass into each other or walls are doubled; parity holds where faces are turned, across
+  small holes, and in cavities; within a missing cap's sag a line across finds nothing
+  (ADR-0027).
 - Output: leaves only in a band of ±N voxels around the surface (N = 3 by default), values
   signed distances clamped to ±N·h; negative tiles inside, each region classified once,
   from the root region down; the positive background outside. No dense grid: memory follows

@@ -6,6 +6,7 @@
 
 mod common;
 
+use brodo::analysis::{Connectivity, label};
 use brodo::topology::Topology;
 use brodo::tree::Coord;
 use colino::convert::{Converted, Options, Sign, convert};
@@ -159,4 +160,38 @@ fn the_bytes_by_parity_do_not_depend_on_the_thread_count() {
         pool.install(|| convert(&m, &parity(1.0)).unwrap())
     };
     assert_eq!(bytes(&run(1)), bytes(&run(8)));
+}
+
+/// Boxes from `lo` to `hi`, each of 12 triangles facing out, in one mesh.
+fn boxes(parts: &[([f64; 3], [f64; 3])]) -> Mesh {
+    let mut vertices = Vec::new();
+    let mut triangles = Vec::new();
+    let quads: [[u32; 4]; 6] =
+        [[0, 4, 6, 2], [1, 3, 7, 5], [0, 1, 5, 4], [2, 6, 7, 3], [0, 2, 3, 1], [4, 5, 7, 6]];
+    for (lo, hi) in parts {
+        let base = u32::try_from(vertices.len()).unwrap();
+        vertices
+            .extend((0..8).map(|i| [0, 1, 2].map(|k| if i >> k & 1 == 1 { hi[k] } else { lo[k] })));
+        for [p, q, r, t] in quads.map(|q| q.map(|i| i + base)) {
+            triangles.extend([[p, q, r], [p, r, t]]);
+        }
+    }
+    Mesh::new(vertices, triangles).with_unit(Some("millimeter".into()))
+}
+
+/// Voxel centres on the mesh, at distance exactly 0 (N1, N2 of P5's review): two boxes
+/// sharing a face, every face on a plane of centres. Such a point takes the parity count's
+/// sign under either sign, so the two convert alike, and an inside one holds a negative
+/// value, so that the solid `v < 0` is one part, not two.
+#[test]
+fn a_point_on_the_mesh_takes_one_sign_and_an_inside_one_is_below_zero() {
+    let m = boxes(&[([0.5; 3], [4.5; 3]), ([4.5, 0.5, 0.5], [8.5, 4.5, 4.5])]);
+    let by_winding = convert(&m, &Options::new(1.0)).unwrap();
+    let by_parity = convert(&m, &parity(1.0)).unwrap();
+    assert_eq!(bytes(&by_winding), bytes(&by_parity));
+    let c = &by_winding;
+    let on_shared_face = c.field.value_at(&c.topology, [4, 2, 2]).unwrap();
+    assert!(on_shared_face < 0.0, "{on_shared_face}");
+    let solid = label(&c.topology, &c.field, |v| v < 0.0, Connectivity::TwentySix).unwrap();
+    assert_eq!(solid.count(), 1);
 }
