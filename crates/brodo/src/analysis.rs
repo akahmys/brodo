@@ -222,6 +222,12 @@ fn place(o: Coord, level: usize) -> u32 {
     child_place(o, LOG[level], LOG[level - 1] - LOG[level])
 }
 
+/// The place, in the other of two regions `n` children a side apart along `e`, of the
+/// neighbour by step `f` of the child at `c`.
+fn across(c: [i32; 3], f: [i32; 3], e: [i32; 3], n: i32) -> [i32; 3] {
+    [0, 1, 2].map(|k| c[k] + f[k] - e[k] * n)
+}
+
 /// The children per axis of a region at `level`.
 fn per_axis(level: usize) -> i32 {
     1 << (LOG[level] - LOG[level + 1])
@@ -297,10 +303,9 @@ impl Walk<'_> {
     }
 
     fn classify(&mut self, r: Coord, level: usize) -> Kind {
+        // A leaf's voxels are found by the leaf's own paths (`run`, `pair`, `kinds`), so no
+        // region below level 2 is classified.
         match (level, self.t.locate(r)) {
-            (3, Location::Leaf(n)) => {
-                Kind::Uniform(self.voxel_base + n.get() * 512 + leaf_place(r))
-            }
             (2, Location::Leaf(_)) => Kind::Split,
             (_, Location::Tile(n, l)) if l.edge_log2() >= LOG[level] => {
                 Kind::Uniform(self.tile_base + n.get())
@@ -360,7 +365,7 @@ impl Walk<'_> {
     /// pairs are two uniform units, joined at once, and only pairs with a split child go on
     /// the stack.
     fn inside(&mut self, r: Coord, l: usize) {
-        if l == 3 || matches!(self.classify(r, l), Kind::Uniform(_)) {
+        if matches!(self.classify(r, l), Kind::Uniform(_)) {
             return;
         }
         let n = per_axis(l);
@@ -405,7 +410,7 @@ impl Walk<'_> {
                 let (ba, bb, n) = (self.leaf_base(a), self.leaf_base(b), per_axis(l));
                 for c in children(l).filter(|c| on_side(*c, e, n)) {
                     for f in &self.offsets {
-                        let t = [0, 1, 2].map(|k| c[k] + f[k] - e[k] * n);
+                        let t = across(c, *f, e, n);
                         if t.iter().all(|x| (0..n).contains(x)) {
                             self.units.join(Self::voxel(ba, a, c), Self::voxel(bb, b, t));
                         }
@@ -416,7 +421,7 @@ impl Walk<'_> {
                 let n = per_axis(l);
                 for c in children(l).filter(|c| on_side(*c, e, n)) {
                     for f in &self.offsets {
-                        let t = [0, 1, 2].map(|k| c[k] + f[k] - e[k] * n);
+                        let t = across(c, *f, e, n);
                         if t.iter().all(|x| (0..n).contains(x)) {
                             self.stack.push(Work::Pair(child(a, l, c), child(b, l, t), l + 1, *f));
                         }
@@ -829,6 +834,13 @@ mod tests {
         assert!(!fill.contains(&t, [129, 3, 5]).unwrap());
         assert!(!fill.contains(&t, [200, 0, 0]).unwrap(), "the far tile is apart");
         assert!(!fill.reaches_outside());
+        // A seed that does not meet the condition holds nothing, not even itself or the other
+        // voxels that do not meet it (W5 of P5's review).
+        let none = flood_fill(&t, &f, positive, Connectivity::Six, [129, 3, 5]).unwrap();
+        assert_eq!(none.label(), Label::Excluded);
+        for v in [[129, 3, 5], [130, 0, 0], [5000, 0, 0]] {
+            assert!(!none.contains(&t, v).unwrap(), "{v:?}");
+        }
         let (t2, _) = t.edit().commit().unwrap();
         assert_eq!(
             fill.contains(&t2, [0, 0, 0]),

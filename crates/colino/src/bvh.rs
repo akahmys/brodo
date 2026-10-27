@@ -63,6 +63,22 @@ pub struct Bvh {
     pub(crate) corners: Vec<[Point; 3]>,
 }
 
+#[cfg(test)]
+thread_local! {
+    /// The triangles the walks have tested on this thread, that tests may see the
+    /// pruning work.
+    static TESTED: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
+}
+
+/// Counts a triangle a walk tests, in tests alone.
+#[cfg(test)]
+fn tested() {
+    TESTED.with(|c| c.set(c.get() + 1));
+}
+
+#[cfg(not(test))]
+fn tested() {}
+
 fn centre(t: &[Point; 3]) -> Point {
     let [a, b, c] = *t;
     [0, 1, 2].map(|k| {
@@ -292,6 +308,7 @@ impl Bvh {
             if node.children == 0 {
                 for i in self.order.get(node.first..node.first + node.count).unwrap_or(&[]) {
                     let Some(t) = self.corners(*i).filter(|t| keep(*t)) else { continue };
+                    tested();
                     let (s, d) = nearest(a, b, t);
                     if best.is_none_or(|(_, e, j)| d.total_cmp(&e).then(i.cmp(&j)).is_lt()) {
                         best = Some((s, d, *i));
@@ -329,6 +346,7 @@ impl Bvh {
             if node.children == 0 {
                 for i in self.order.get(node.first..node.first + node.count).unwrap_or(&[]) {
                     let Some(t) = self.corners(*i) else { continue };
+                    tested();
                     if let Some(s) = crossing(a, b, t) {
                         best = Some(best.map_or(s, |x| x.min(s)));
                     }
@@ -464,6 +482,64 @@ mod tests {
             crossed += usize::from(found.is_some());
         }
         assert!(crossed > 900 && crossed < 1900, "{crossed} of 2000 crossed");
+    }
+
+    /// The walks prune, among 300 scattered triangles, testing a few of them where a walk
+    /// that passed no box would test them all: over short segments, and short ones along
+    /// an axis, by the segment's box.
+    #[test]
+    fn the_walks_test_few_of_the_triangles() {
+        let mut next = sequence();
+        let bvh = Bvh::new(&scattered(&mut next)).unwrap();
+        let (mut near, mut cross, mut along) = (0, 0, 0);
+        for q in 0..200_usize {
+            let a = [next(), next(), next()];
+            let b = [0, 1, 2].map(|k| a[k] + next() / 10.0);
+            near += tested_by(|| bvh.nearest_segment(a, b, has_area).is_some()).0;
+            cross += tested_by(|| bvh.first_crossing(a, b).is_some()).0;
+            let mut c = a;
+            c[q % 3] += next() / 10.0;
+            along += tested_by(|| bvh.first_crossing(a, c).is_some()).0;
+        }
+        // Of 200 × 343 tests a walk passing no box would make.
+        let all = 200 * u64::from(bvh.len());
+        assert!(
+            near * 20 < all && cross * 100 < all && along * 100 < all,
+            "{near} {cross} {along}"
+        );
+    }
+
+    /// The triangles the walk run by `walk` tests, and what it found.
+    fn tested_by(walk: impl FnOnce() -> bool) -> (u64, bool) {
+        let count = || TESTED.with(std::cell::Cell::get);
+        let before = count();
+        let found = walk();
+        (count() - before, found)
+    }
+
+    /// A segment through 100 parallel triangles, nearest first: once it finds the first
+    /// crossing, the walk passes every box it would enter later, testing a few.
+    #[test]
+    fn the_first_crossing_passes_the_boxes_beyond_it() {
+        let (mut vertices, mut triangles) = (Vec::new(), Vec::new());
+        for i in 0..100_u32 {
+            let x = f64::from(i);
+            vertices.extend([[x, -10.0, -10.0], [x, 10.0, -10.0], [x, 0.0, 10.0]]);
+            triangles.push([3 * i, 3 * i + 1, 3 * i + 2]);
+        }
+        let bvh = Bvh::new(&Mesh { vertices, triangles, ..Mesh::default() }).unwrap();
+        for (a, b, first) in [
+            ([-1.0, 0.0, 0.0], [101.0, 0.0, 0.0], 1.0 / 102.0),
+            ([101.0, 0.0, 0.0], [-1.0, 0.0, 0.0], 2.0 / 102.0),
+        ] {
+            let mut found = None;
+            let (n, _) = tested_by(|| {
+                found = bvh.first_crossing(a, b);
+                found.is_some()
+            });
+            assert!(found.is_some_and(|s| (s - first).abs() < 1e-12), "{found:?}");
+            assert!(n <= 2 * LEAF as u64, "{n} tested");
+        }
     }
 
     /// A box entered first may hold only a later crossing: a large slanted triangle whose box

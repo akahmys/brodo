@@ -140,3 +140,16 @@ the ground that another tile touching such an edge visits it on its near side. T
 longer holds: the vertex is the first tile's to sum, and a small tile touching a large
 one's far edge mid-way is lost. A test of that case kills both, and the human decided
 that the two exclusions are withdrawn.
+
+## Amendment: P5's missed mutants
+
+- **Date**: 2026-10-27
+
+The run on `9940bd5` (2026-10-27) missed 72 mutants, all in code P5 wrote or rewrote.
+Most are now killed by tests written for them, each shown to fail with its mutant applied
+by hand; the hand-applied runs went behind `rss_guard.py` once one, a voxel of no size let
+through, grew until the machine went down. Dead code that held others is gone: the level-3
+arm of the labelling's `classify` and the early return of its `inside`, a guard on a
+section's height never met, the parity lines' growth of the box. The human decided that
+twelve that no test can tell from the original are excluded, each with its reason, and
+that the exclusion for `inside`'s early return, gone, is withdrawn.

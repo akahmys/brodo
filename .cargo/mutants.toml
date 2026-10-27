@@ -5,6 +5,38 @@
 # why, and matches at least one mutant (`scripts/audit/mutants.py`). Leave line numbers
 # out of a pattern, so that it survives an edit above it.
 exclude_re = [
+    # Only the sign of a crossing's height is read, and dividing by a determinant that is
+    # not 0 gives it as multiplying does.
+    'parity\.rs:.*: replace / with \* in height$',
+    # A line votes only when it crosses an even number of times, and then the count above
+    # it and the count below have one parity, wherever a height of exactly 0 is counted.
+    'parity\.rs:.*: replace >= with < in inside$',
+    # A section's width or the longest edge is 0 only for a triangle of no area, whose
+    # sections hold no point, so the centroid is taken either way.
+    'thin\.rs:\d+:11: replace > with >= in samples$',
+    # As above.
+    'thin\.rs:\d+:25: replace > with >= in samples$',
+    # A value of exactly +0 is a voxel centre outside and on the mesh; counting it solid
+    # changes no invariant of a place's box.
+    'thin\.rs:.*: replace < with <= in check$',
+    # Narrowing a box by the margin, or the closed bounds of a segment parallel to an axis,
+    # changes what is entered only within rounding of a box's face; a crossing there is
+    # found through the box of its own triangle.
+    'bvh\.rs:.*: replace \+ with - in entry$',
+    # As above.
+    'bvh\.rs:.*: replace < with <= in entry$',
+    # As above.
+    'bvh\.rs:.*: replace > with >= in entry$',
+    # A smaller margin, or a node passed at an equal bound, prunes more only where distances
+    # tie within rounding; 160 000 queries agreed with a scan (P5's review, C6).
+    'bvh\.rs:\d+:42: replace \* with / in Bvh::nearest_segment$',
+    # As above.
+    'bvh\.rs:.*: replace > with >= in Bvh::nearest_segment$',
+    # As above.
+    'bvh\.rs:\d+:74: replace \+ with - in Bvh::nearest_segment$',
+    # A box entered exactly at the best crossing so far holds none nearer, so passing it
+    # leaves the least the same.
+    'bvh\.rs:.*: replace > with >= in Bvh::first_crossing$',
     # `cell()` skips 13, so `26 - cell()` is never 13 and `<` and `<=` agree.
     'manifest\.rs:.*: replace < with <= in Offset::opposite$',
     # x, y and z are each masked to `dim_log2` bits and shifted apart, so they share no
@@ -25,9 +57,6 @@ exclude_re = [
     'analysis\.rs:.*: replace \+ with \* in Walk<._>::kinds$',
     # As above.
     'analysis\.rs:\d+:72: replace \+ with \- in Walk<._>::kinds$',
-    # `inside` is pushed only for split regions above the voxels, so its early return never
-    # decides.
-    'analysis\.rs:.*: replace \|\| with \&\& in Walk<._>::inside$',
     # A touching pair is joined once whichever way it is walked; and a first non-zero step is
     # never zero, so `>` and `>=` agree on it.
     'analysis\.rs:.*: replace > with < in Walk<._>::inside$',

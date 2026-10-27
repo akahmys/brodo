@@ -14,6 +14,7 @@ mod common;
 use brodo::cache::to_bytes;
 use brodo::error::HermiteError;
 use brodo::meta::{GridMeta, SDF_KEY};
+use brodo::topology::Location;
 use colino::convert::{Options, convert};
 use colino::distance::Point;
 use colino::hermite::{Produced, hermite};
@@ -199,7 +200,7 @@ fn every_crossed_edge_of_a_torus_is_hit() {
     // exactly there.
     let bvh = colino::bvh::Bvh::new(&m).unwrap();
     let on_mesh = |v: [i32; 3]| bvh.nearest(v.map(f64::from)).is_some_and(|(d, _)| d == 0.0);
-    let mut on = 0;
+    let (mut on, mut upper) = (0, 0);
     for n in t.leaf_numbers() {
         let voxels: Vec<_> = t.leaf_voxels(n).unwrap().collect();
         for (i, v) in voxels.iter().enumerate() {
@@ -212,9 +213,24 @@ fn every_crossed_edge_of_a_torus_is_hit() {
                 let f = c.fraction.leaf(t, n).unwrap()[i];
                 assert!(f <= 0.0, "{v:?}: {f}");
             }
+            // The edge into it from an outside point below crosses exactly at its upper end
+            // (W7 of P5's review).
+            for (k, c) in p.set.axes().iter().enumerate() {
+                let mut u = *v;
+                u[k] -= 1;
+                let Location::Leaf(m) = t.locate(u) else { continue };
+                if p.set.signs().value_at(t, u).unwrap() != 0 {
+                    continue;
+                }
+                let at = t.leaf_voxels(m).unwrap().position(|w| w == u).unwrap();
+                let f = c.fraction.leaf(t, m).unwrap()[at];
+                assert_eq!(f.to_bits(), 1.0_f32.to_bits(), "{u:?} along {k}: {f}");
+                upper += 1;
+            }
         }
     }
     assert!(on > 0, "no lattice point on the mesh");
+    assert!(upper > 0, "no edge up to a lattice point on the mesh");
 }
 
 #[test]
