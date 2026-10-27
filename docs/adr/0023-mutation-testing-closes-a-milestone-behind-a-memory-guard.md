@@ -164,3 +164,14 @@ them missing. The human decided that a verdict on a sharded run's reports, `muta
 --report` and `--patient --from`, fails unless they report every mutant `cargo mutants
 --list` gives with the run's arguments, `--shard` aside, naming how many are in no report.
 Shown to fire by two reports made by hand of `grid.rs`'s twelve mutants, one dropped.
+
+## Amendment: a mutant applied by hand
+
+- **Date**: 2026-10-27
+
+Showing that a new test fails on a mutant (TESTING.md T3), P5's fixes applied mutants by
+hand and ran the tests unguarded: one, a voxel of no size let through, sampled a triangle
+without end and took the machine down (2026-10-27). The human decided that a mutant
+applied by hand runs behind `rss_guard.py` too, set as cargo's runner as `mutants.py`
+sets it, the command stated in TESTING.md §3; held by nothing. Run so, the same mutant
+was stopped at 1086 MiB.

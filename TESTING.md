@@ -115,6 +115,15 @@ python3 scripts/audit/mutants.py --run --patient --from shards/*        # their 
 python3 scripts/audit/mutants.py --run --patient --from shards/* -- --shard 3/20  # a twentieth of them
 ```
 
+A mutant applied by hand, to show that a test fails on it (T3), runs behind the same
+guard, as cargo's runner, since such a mutant can grow without bound as a run's can; held
+by nothing (ADR-0023):
+
+```bash
+CARGO_TARGET_AARCH64_APPLE_DARWIN_RUNNER=$PWD/scripts/audit/rss_guard.py RSS_GUARD_MIB=1024 \
+  RSS_GUARD_LOG=$PWD/target/hand-mutants-guard.log cargo test -p colino --lib thin
+```
+
 On GitHub Actions, `.github/workflows/mutants.yml`, started by hand, runs 160 shards and
 the timeouts again in 20 parts, each part holding the shards' reports to every mutant
 listed (ADR-0034).
