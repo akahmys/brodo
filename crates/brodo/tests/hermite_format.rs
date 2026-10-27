@@ -437,6 +437,17 @@ fn file(entries: &[CacheEntry]) -> CacheFile {
 }
 
 #[test]
+fn a_table_naming_group_0_alone_is_kept_empty_as_a_file_reads_it() {
+    // Every crossing in group 0.
+    let mut p = parts_at(&[[0; 3]], |v| v == [3, 3, 3]);
+    p.names = vec![String::new()];
+    let set = p.make().unwrap();
+    assert!(set.group_names().is_empty());
+    let f = file(&set.entries("s", &meta("s")).unwrap());
+    assert!(HermiteView::find(&f, "s").unwrap().group_names().is_empty());
+}
+
+#[test]
 fn a_set_round_trips_through_a_file_among_others() {
     let set = valid().make().unwrap();
     let small = parts(1, None, 2, 6).make().unwrap();

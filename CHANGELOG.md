@@ -83,6 +83,10 @@ are recorded here when they change (V6).
 - colino refuses a mesh whose triangles reach a vertex that is not finite, the new
   `MeshError::NotFinite`: a mesh made by hand with a NaN converted without an error, and
   the BVH's sort lost its total order.
+- `Mesh::check_groups` refuses a group after 0 named `""` or by an earlier group's name,
+  the new `MeshError::BadGroupName`, as Hermite data does: such a mesh converted and was
+  refused only once its Hermite data was made.
+- A Hermite set made with the group table `[""]` keeps it empty, as a file reads it back.
 
 ### Breaking
 

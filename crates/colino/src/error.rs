@@ -172,6 +172,9 @@ pub enum MeshError {
     /// Group 0 is named other than `""`.
     #[error("group 0 is named, but it is no group")]
     GroupZeroNamed,
+    /// A group after 0 is named `""`, or by a name an earlier group has.
+    #[error("group {0}'s name is empty or an earlier group's")]
+    BadGroupName(u32),
     /// A triangle's vertex has a coordinate that is not finite: NaN or an infinity.
     #[error("vertex {vertex} has a coordinate that is not finite")]
     NotFinite {

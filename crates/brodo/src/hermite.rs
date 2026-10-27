@@ -445,6 +445,9 @@ impl Hermite {
         if let Some((name, _)) = FIELDS.iter().zip(&belongs).find(|(_, r)| r.is_err()) {
             return Err(HermiteError::OtherTopology(name));
         }
+        // `[""]` names group 0 alone, as an empty table does; it is kept empty, as a file
+        // reads it back.
+        let group_names = if group_names == [""] { Vec::new() } else { group_names };
         let set = Hermite { topology, signs, axes, group_names };
         check(&Owned(&set), &set.group_names)?;
         Ok(set)

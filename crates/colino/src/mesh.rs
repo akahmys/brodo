@@ -2,7 +2,7 @@
 //! that index them, as given. Nothing is repaired; badly oriented, holed and degenerate
 //! meshes are kept as they are (ADR-0017).
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::error::MeshError;
 
@@ -151,7 +151,8 @@ impl Mesh {
     }
 
     /// Refuses groups that do not fit the triangles: `groups` neither empty nor one per
-    /// triangle, an id with no name, or a first name other than `""`.
+    /// triangle, an id with no name, a first name other than `""`, or a later name empty
+    /// or given twice, which Hermite data would refuse (ADR-0030).
     pub fn check_groups(&self) -> Result<(), MeshError> {
         if !self.groups.is_empty() && self.groups.len() != self.triangles.len() {
             return Err(MeshError::GroupCount {
@@ -161,6 +162,12 @@ impl Mesh {
         }
         if self.group_names.first().is_some_and(|n| !n.is_empty()) {
             return Err(MeshError::GroupZeroNamed);
+        }
+        let mut seen = BTreeSet::new();
+        for (id, name) in (0_u32..).zip(&self.group_names).skip(1) {
+            if name.is_empty() || !seen.insert(name) {
+                return Err(MeshError::BadGroupName(id));
+            }
         }
         let named = self.group_names.len().max(1);
         let unnamed =
@@ -254,6 +261,15 @@ mod tests {
             Err(MeshError::UnnamedGroup { triangle: 0, group: 2 })
         );
         assert_eq!(pair(vec![], &["a"]).check_groups(), Err(MeshError::GroupZeroNamed));
+        // A later name empty, or an earlier group's: Hermite data would refuse the table.
+        assert_eq!(
+            pair(vec![1, 2], &["", "a", ""]).check_groups(),
+            Err(MeshError::BadGroupName(2))
+        );
+        assert_eq!(
+            pair(vec![1, 2], &["", "a", "a"]).check_groups(),
+            Err(MeshError::BadGroupName(2))
+        );
         assert_eq!(
             pair(vec![0], &[]).welded(),
             Err(MeshError::GroupCount { groups: 1, triangles: 2 })
