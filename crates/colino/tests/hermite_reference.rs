@@ -553,3 +553,20 @@ fn the_set_is_written_with_its_own_metadata() {
     assert!(p.set.entries("torus", &p.meta).is_ok());
     assert!(matches!(p.set.entries("torus", &c.meta), Err(HermiteError::ClaimsSdf)));
 }
+
+/// A conversion a user changed, with a leaf at the end of the `i32` range (C3 of P5's
+/// review): the edge beyond its last points reaches the background, sign 0, as brodo takes
+/// it, rather than overflowing.
+#[test]
+fn a_leaf_at_the_end_of_the_range_has_the_background_beyond() {
+    let m = common::torus(20.0, 7.0, 32);
+    let o = Options::new(1.0);
+    let mut c = convert(&m, &o).unwrap();
+    let mut e = c.topology.edit();
+    e.activate([i32::MAX, 0, 0]).unwrap();
+    let (t, r) = e.commit().unwrap();
+    c.field = c.field.remap(&r, &brodo::field::uniform).unwrap();
+    c.topology = t;
+    let p = hermite(&m, &c, o.accuracy).unwrap();
+    assert_eq!(p.set.signs().value_at(p.set.topology(), [i32::MAX, 0, 0]), Ok(0));
+}

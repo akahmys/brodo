@@ -21,10 +21,11 @@ impl CacheFile {
     ///
     /// # Safety
     ///
-    /// While the returned value lives, the file is not changed or truncated, by this
-    /// process or any other: the mapped bytes would change under references that Rust
-    /// assumes cannot change, which is undefined behaviour (ADR-0008, ADR-0036). A file
-    /// that is merely wrong is refused by the check, not trusted.
+    /// From the call on, while it checks the file and while the returned value lives, the
+    /// file is not changed or truncated, by this process or any other: the mapped bytes
+    /// would change under references that Rust assumes cannot change, the check's own
+    /// among them, which is undefined behaviour (ADR-0008, ADR-0036). A file that is merely
+    /// wrong is refused by the check, not trusted.
     pub unsafe fn map(path: &Path) -> Result<CacheFile, CacheError> {
         let file = std::fs::File::open(path)?;
         let len = file.metadata()?.len();

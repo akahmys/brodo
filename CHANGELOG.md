@@ -87,6 +87,16 @@ are recorded here when they change (V6).
   the new `MeshError::BadGroupName`, as Hermite data does: such a mesh converted and was
   refused only once its Hermite data was made.
 - A Hermite set made with the group table `[""]` keeps it empty, as a file reads it back.
+- `write_vtu` refuses a field of another topology when the topology is empty, as it does
+  otherwise, `FieldError::StaleField`.
+- colino's Hermite data from a conversion with a leaf at the end of the `i32` range takes
+  the background beyond it, sign 0, rather than overflowing.
+- Morphology ends for the largest k: value dilation and erosion stop once a pass changes
+  nothing; eroding by more than the box's widest side removes no more; and a dilation
+  whose new leaves a `u32` could not number is refused before any is made,
+  `TreeError::ArenaFull`.
+- `CacheFile::map`'s safety contract holds from the call on, the check's reads among
+  those the file must not change under.
 
 ### Breaking
 

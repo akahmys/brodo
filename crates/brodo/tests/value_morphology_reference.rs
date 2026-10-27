@@ -134,3 +134,26 @@ fn an_integer_peak_spreads_and_shrinks() {
     let grown = dilate_values(&t, &f, Connectivity::TwentySix, 1).unwrap();
     assert_eq!(count(&erode_values(&t, &grown, Connectivity::TwentySix, 1).unwrap()), 1);
 }
+
+/// The largest k ends once the values settle (C4 of P5's review), as many passes as it
+/// takes giving what more would.
+#[test]
+fn the_largest_k_ends_once_the_values_settle() {
+    let empty = Topology::new();
+    let mut e = empty.edit();
+    e.activate([0, 0, 0]).unwrap();
+    let t = e.commit().unwrap().0;
+    let mut f = Field::new(&t, 0.0_f32);
+    let n = t.leaf_numbers().next().unwrap();
+    f.leaf_mut(&t, n).unwrap()[0] = 5.0;
+    let (tx, rx) = std::sync::mpsc::channel();
+    let (t2, f2) = (t.clone(), f.clone());
+    std::thread::spawn(move || {
+        tx.send(dilate_values(&t2, &f2, Connectivity::TwentySix, u32::MAX)).unwrap_or(())
+    });
+    let all = rx.recv_timeout(std::time::Duration::from_secs(60)).unwrap().unwrap();
+    let some = dilate_values(&t, &f, Connectivity::TwentySix, 20).unwrap();
+    let bits = |f: &Field<f32>| f.leaf(&t, n).unwrap().map(f32::to_bits);
+    assert_eq!(bits(&all), bits(&some));
+    assert_eq!(bits(&all), [5.0_f32.to_bits(); 512]);
+}

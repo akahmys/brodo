@@ -70,14 +70,32 @@ impl Lattice {
     }
 
     fn world(&self, v: Coord) -> Point {
-        [0, 1, 2].map(|k| self.origin[k] + self.h[k] * f64::from(v[k]))
+        self.at(v.map(f64::from))
+    }
+
+    /// Point `v`, given in `f64` so that it may lie beyond the `i32` range.
+    fn at(&self, v: Point) -> Point {
+        [0, 1, 2].map(|k| self.origin[k] + self.h[k] * v[k])
     }
 }
 
-fn step(axis: usize, v: Coord) -> Coord {
+/// The sign and place of the point after `v` along `axis`. Beyond the `i32` range lies
+/// the background, sign 0, as brodo takes it.
+fn after(
+    t: &Topology,
+    signs: &Field<u8>,
+    lattice: &Lattice,
+    axis: usize,
+    v: Coord,
+) -> Result<(u8, Point), FieldError> {
     let mut w = v;
-    w[axis] += 1;
-    w
+    if let Some(c) = v[axis].checked_add(1) {
+        w[axis] = c;
+        return Ok((signs.value_at(t, w)?, lattice.world(w)));
+    }
+    let mut p = v.map(f64::from);
+    p[axis] += 1.0;
+    Ok((0, lattice.at(p)))
 }
 
 /// The triangle's unit normal, by its corners' order; zero for one with no area.
@@ -194,11 +212,11 @@ fn crossings(
     let leaf = |n: LeafNumber, lower: &[u8; LEAF_VOXELS]| -> Result<Vec<_>, FieldError> {
         let mut out = Vec::new();
         for (i, (v, inside)) in voxels(t, n)?.zip(lower).enumerate() {
-            let w = step(axis, v);
-            if signs.value_at(t, w)? == *inside {
+            let (far, b) = after(t, signs, lattice, axis, v)?;
+            if far == *inside {
                 continue;
             }
-            let (a, b) = (lattice.world(v), lattice.world(w));
+            let a = lattice.world(v);
             let lower_inside = *inside == 1;
             let Some(mut f) = find(bvh, a, b, lower_inside) else { continue };
             // An inside end on the mesh holds the crossing exactly, though the edge may only

@@ -203,6 +203,8 @@ fn check_name(name: &str) -> Result<(), VtkError> {
 
 /// The cells, leaves then tiles; an infinite value is refused before anything is written.
 fn cells<T: VtkValue>(t: &Topology, f: &Field<T>) -> Result<Vec<Cell<T>>, VtkError> {
+    // Checked first, so that an empty topology does not let another's field through.
+    f.belongs_to(t)?;
     let mut out = Vec::new();
     for n in t.leaf_numbers() {
         for (origin, value) in t.leaf_voxels(n)?.zip(f.leaf(t, n)?) {
@@ -264,6 +266,20 @@ fn write_cells<T>(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_field_of_another_topology_is_refused_on_an_empty_one() {
+        let empty = Topology::new();
+        let mut e = empty.edit();
+        e.activate([0, 0, 0]).unwrap();
+        let other = e.commit().unwrap().0;
+        let f = Field::new(&other, 0.0_f32);
+        let got = write_vtu(&empty, &f, "f", Vec::new());
+        assert!(
+            matches!(got, Err(VtkError::Field(crate::error::FieldError::StaleField))),
+            "{got:?}"
+        );
+    }
     use crate::tree::TileLevel;
 
     /// One tile of edge 8 at the given origin, holding `value`, on a background of zero.

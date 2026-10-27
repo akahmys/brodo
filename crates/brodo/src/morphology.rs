@@ -18,7 +18,7 @@ use std::collections::BTreeSet;
 use std::cmp::Ordering;
 
 use crate::analysis::Connectivity;
-use crate::error::{FieldError, TreeError};
+use crate::error::{FieldError, NodeKind, TreeError};
 use crate::field::{Field, Value};
 use crate::gather::{GATHER_EDGE, GATHER_VOXELS, gather};
 use crate::parallel::par_update;
@@ -119,11 +119,48 @@ fn around(lo: [i64; 3], side: i64, k: u32, conn: Connectivity, mut visit: impl F
 
 /// The topology with a leaf at every background cell within k steps of a leaf or tile.
 pub fn dilate(t: &Topology, conn: Connectivity, k: u32) -> Result<(Topology, Remap), TreeError> {
+    within_count(&regions(t)?, k)?;
     let mut e = t.edit();
     for o in grown(t, conn, k)? {
         e.activate(o)?;
     }
     e.commit()
+}
+
+/// The cells of the box holding `regions`, its least and its greatest bound, excluded;
+/// nothing for none.
+fn bounds(regions: &[([i64; 3], i64)]) -> Option<([i64; 3], [i64; 3])> {
+    let mut it = regions.iter();
+    let (lo, side) = it.next()?;
+    let mut b = (*lo, lo.map(|c| c + side));
+    for (lo, side) in it {
+        b.0 = [0, 1, 2].map(|k| b.0[k].min(lo[k]));
+        b.1 = [0, 1, 2].map(|k| b.1[k].max(lo[k] + side));
+    }
+    Some(b)
+}
+
+/// Refuses, before any is made, a dilation by k whose new leaves could be more than a
+/// `u32` numbers: at most the cells of every region's shell, and at most those of the box
+/// holding them grown by k's reach and kept to the `i32` range.
+fn within_count(regions: &[([i64; 3], i64)], k: u32) -> Result<(), TreeError> {
+    let r = reach(k);
+    let wide = |n: i64| u128::try_from(n).unwrap_or(0);
+    let cube = |n: i64| wide(n).saturating_mul(wide(n)).saturating_mul(wide(n));
+    let shells = regions.iter().fold(0_u128, |sum, (_, side)| {
+        sum.saturating_add(cube(side + 2 * r).saturating_sub(cube(*side)))
+    });
+    let (first, last) = (i64::from(i32::MIN) / CELL, i64::from(i32::MAX) / CELL + 1);
+    let grown = bounds(regions).map_or(0, |(lo, hi)| {
+        (0..3).fold(1_u128, |v, k| {
+            let side = (hi[k] + r).min(last) - (lo[k] - r).max(first);
+            v.saturating_mul(wide(side))
+        })
+    });
+    if shells.min(grown) > u128::from(u32::MAX) {
+        return Err(TreeError::ArenaFull(NodeKind::Leaf));
+    }
+    Ok(())
 }
 
 /// The origins of the background cells dilating by k makes leaves.
@@ -147,6 +184,11 @@ fn near_background(t: &Topology, cell: [i64; 3], near: &[[i64; 3]]) -> bool {
 /// The topology without every leaf within k steps of a background cell; a larger tile is
 /// split where its cells within reach must go.
 pub fn erode(t: &Topology, conn: Connectivity, k: u32) -> Result<(Topology, Remap), TreeError> {
+    // Every cell of the box holding the regions lies within its widest side's steps of the
+    // background beyond it: a larger k removes no more.
+    let widest =
+        bounds(&regions(t)?).map_or(0, |(lo, hi)| (0..3).map(|a| hi[a] - lo[a]).max().unwrap_or(0));
+    let k = u32::try_from(widest.saturating_mul(CELL)).map_or(k, |w| k.min(w));
     let (leaves, split) = removed(t, conn, k)?;
     let mut e = t.edit();
     for o in &split {
@@ -262,9 +304,25 @@ fn filter<T: Ordered>(
             }
             Ok::<(), FieldError>(())
         })?;
+        // A pass that changes nothing leaves every later one nothing to change: a large k
+        // ends once the values settle.
+        let settled = same_leaves(t, &current, &next)?;
         current = next;
+        if settled {
+            break;
+        }
     }
     Ok(current)
+}
+
+/// Whether two fields on `t` hold the same leaf values, by bits.
+fn same_leaves<T: Value>(t: &Topology, a: &Field<T>, b: &Field<T>) -> Result<bool, FieldError> {
+    for n in t.leaf_numbers() {
+        if !a.leaf(t, n)?.iter().zip(b.leaf(t, n)?).all(|(x, y)| x.same_bits(y)) {
+            return Ok(false);
+        }
+    }
+    Ok(true)
 }
 
 /// The field with each leaf voxel the largest of itself and its neighbours, k times over.
