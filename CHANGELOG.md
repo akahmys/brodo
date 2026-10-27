@@ -114,6 +114,8 @@ are recorded here when they change (V6).
 
 ### Breaking
 
+- colino's OBJ reader takes a `g` naming no group as none: the triangles after it take the
+  last `o`'s name, where they took group 0 (ADR-0030).
 - `Grid::parts_mut` is removed: a grid's field is written through `Grid::par_update_leaves`,
   whose closure takes the topology, a leaf's number and its values, `Grid::leaf_mut` and
   `Grid::set_tile`, so that it cannot be replaced by another topology's (ADR-0014).

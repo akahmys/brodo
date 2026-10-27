@@ -46,7 +46,8 @@ fn reference_forms_comments_continuations_and_skipped_statements_read() {
 }
 
 /// Groups (ADR-0030): the last `g`'s names joined by a space, else the last `o`'s name,
-/// else group 0; ids in the order a triangle first takes each name.
+/// else group 0; a `g` naming no group is as none (Q3 of P5's review); ids in the order a
+/// triangle first takes each name.
 #[test]
 fn faces_take_the_last_groups_names_else_the_objects() {
     let text = "v 0 0 0\nv 1 0 0\nv 0 1 0\nv 1 1 0\n\
@@ -58,8 +59,8 @@ fn faces_take_the_last_groups_names_else_the_objects() {
                 g body\nf 1 2 3\n\
                 g left right\nf 1 2 3\n";
     let m = read_str(text).unwrap();
-    assert_eq!(m.groups, vec![0, 1, 1, 2, 2, 0, 1, 2]);
-    assert_eq!(m.group_names, ["", "body", "left right"]);
+    assert_eq!(m.groups, vec![0, 1, 1, 2, 2, 3, 1, 2]);
+    assert_eq!(m.group_names, ["", "body", "left right", "other"]);
     assert_eq!(m.check_groups(), Ok(()));
 }
 

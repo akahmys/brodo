@@ -99,3 +99,14 @@ human decided that a point at distance exactly 0 takes the parity count's sign, 
 its lines moved by (ε, ε²), whichever sign is asked for, and that an inside voxel whose
 distance rounds to zero holds −`f32::MIN_POSITIVE`. Hermite data keeps its own rule: a
 point on the mesh is inside, so that the crossing lies there.
+
+## Amendment: the inside beyond an open mesh's band
+
+- **Date**: 2026-10-27
+
+P5's review found that across an open mesh's hole, beyond the band, the boundary between
+inside and outside followed the tiles, a region of up to 4096³ voxels taking its centre's
+sign. A closed mesh is not affected, its inside being the same at every point of such a
+region. The human decided that this is stated, not changed: an open mesh's inside is not
+defined, the report counts its open edges, and refining the regions whose corners
+disagree would add leaves and time to every conversion.

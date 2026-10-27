@@ -11,7 +11,8 @@
 //! in the next.
 //!
 //! Groups (ADR-0030): a triangle takes the names of the last `g`, joined by one space;
-//! where no `g` precedes it, the name of the last `o`; failing that, group 0.
+//! where no `g` naming a group precedes it, a bare `g` being as none, the name of the last
+//! `o`; failing that, group 0.
 //!
 //! Skipped by name, having no part in a mesh's triangles: texture and normal vertices,
 //! smoothing and merging groups, display and rendering attributes, points and lines. Refused: free-form
@@ -171,7 +172,11 @@ pub fn read(bytes: &[u8], limits: Limits) -> Result<Mesh, ReadError> {
                 current = Some(id);
                 grouping.take_id(id, mesh.triangles.len() - before);
             }
-            Some("g") => (g, current) = (Some(words.collect::<Vec<_>>().join(" ")), None),
+            // A `g` naming no group is as none: the last `o` names the faces after it.
+            Some("g") => {
+                let names = words.collect::<Vec<_>>().join(" ");
+                (g, current) = ((!names.is_empty()).then_some(names), None);
+            }
             Some("o") => (o, current) = (Some(words.collect::<Vec<_>>().join(" ")), None),
             Some(k) if SKIPPED.contains(&k) => {}
             Some(k) if REFUSED.contains(&k) => {

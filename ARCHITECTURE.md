@@ -311,7 +311,9 @@ are in ADR-0030.
   (ADR-0027).
 - Output: leaves only in a band of ±N voxels around the surface (N = 3 by default), values
   signed distances clamped to ±N·h; negative tiles inside, each region classified once,
-  from the root region down; the positive background outside. No dense grid: memory follows
+  from the root region down, by its centre's sign; the positive background outside. Beyond
+  the band of an open mesh, where the inside is not defined, the boundary the signs give
+  across a hole follows the regions, as coarse as the tiles there. No dense grid: memory follows
   the band's volume, at 3000³ resolution as well. These are brodo's SDF convention, version
   1, which the grid's `extra` names under the key `sdf.version` (`brodo::meta::SDF_KEY`,
   ADR-0039) so that any producer can claim it.

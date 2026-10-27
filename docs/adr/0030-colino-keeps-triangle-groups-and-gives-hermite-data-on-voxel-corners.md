@@ -234,3 +234,12 @@ refuse the `hermite.` keys, so any grid could pass for a set's. The human decide
 - `CacheEntry::new` refuses a key beginning `hermite.`, `CacheError::ReservedKey`;
   `CacheEntry::with_reserved_keys` takes one, for a set's own entries and for files made
   on purpose to break the format.
+
+## Amendment: a bare `g`
+
+- **Date**: 2026-10-27
+
+P5's review found that the triangles after an OBJ `g` naming no group took group 0, not
+the last `o`'s name. The specification says only that group information is optional and
+that the default group is named `default`. The human decided that a `g` naming no group
+is as none: the triangles after it take the last `o`'s name, failing that group 0.
