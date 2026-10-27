@@ -9,6 +9,11 @@
 //! Taylor expansion to second order of the dipole field of its triangles about their
 //! area-weighted centre (equations 18 to 20, coefficients by appendix B, derivatives by
 //! appendix A); a nearer one is opened, and a leaf's triangles summed exactly.
+//!
+//! Both are worked in `f64`: they hold for a mesh whose size lies between 10⁻⁴⁵ and 10⁶⁰,
+//! and the exact sum alone between 10⁻¹⁰⁰ and 10¹⁰⁰, measured on a sphere at the powers of ten in steps of five (2026-10-27). Beyond,
+//! the approximation gives NaN or a wrong value, and the exact sum 0 or NaN; a conversion
+//! takes its signs from them, whatever its voxel size.
 
 use std::f64::consts::PI;
 

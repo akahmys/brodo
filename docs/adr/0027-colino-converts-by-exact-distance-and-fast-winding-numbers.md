@@ -120,3 +120,14 @@ accuracy its winding numbers were found at: Hermite data took the accuracy as an
 of its own, unchecked against the conversion's, and the report's third layer always used
 β = 2. The human decided that `Converted::accuracy` records it, and that Hermite data and
 the report follow it, as they follow `Converted::sign`; `hermite` takes no accuracy.
+
+## Amendment: the sizes the winding number holds for
+
+- **Date**: 2026-10-27
+
+P5's review found that at very small or very large coordinates the solid angles or the
+far field fell to 0, NaN or infinity. Measured on a sphere at the powers of ten in steps
+of five, the approximation holds for a mesh whose size lies between 10⁻⁴⁵ and 10⁶⁰, and
+the exact sum between 10⁻¹⁰⁰ and 10¹⁰⁰ (2026-10-27). The human decided that the range is
+stated, not enforced or widened by scaling the coordinates, which would change the bits
+of every result.
