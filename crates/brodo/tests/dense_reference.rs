@@ -148,15 +148,14 @@ proptest! {
             check(&g, &d)?;
             for (v, x) in writes {
                 let value = f32::from(x) / 8.0;
-                let (t, f) = g.parts_mut();
-                match t.locate(v) {
+                match g.topology().locate(v) {
                     Location::Leaf(n) => {
                         let [a, b, c] = v.map(|k| usize::try_from(k.rem_euclid(8)).unwrap());
-                        f.leaf_mut(t, n).unwrap()[a + 8 * b + 64 * c] = value;
+                        g.leaf_mut(n).unwrap()[a + 8 * b + 64 * c] = value;
                         d.0[Dense::index(v)] = value;
                     }
                     Location::Tile(n, level) => {
-                        f.set_tile(t, n, value).unwrap();
+                        g.set_tile(n, value).unwrap();
                         d.fill(level, v, value);
                     }
                     Location::Background => {}

@@ -137,9 +137,31 @@ pub fn to_bytes(entries: &[CacheEntry]) -> Result<Vec<u8>, CacheError> {
     Ok(out)
 }
 
-/// Writes a cache file holding `entries`.
+/// Writes a cache file holding `entries`. The bytes go to a hidden file beside `path`,
+/// `.<name>.<process id>.tmp`, flushed to the disk and then renamed over `path`: a reader,
+/// a process mapping the old file among them, sees the old file or the new one whole, and a
+/// write that fails leaves the old one. The directory must be writable; a process killed
+/// while writing may leave the hidden file behind.
 pub fn write(path: &Path, entries: &[CacheEntry]) -> Result<(), CacheError> {
-    std::fs::write(path, to_bytes(entries)?)?;
+    use std::io::Write;
+    let bytes = to_bytes(entries)?;
+    let name = path.file_name().ok_or_else(|| {
+        std::io::Error::new(std::io::ErrorKind::InvalidInput, "the path names no file")
+    })?;
+    let mut hidden = std::ffi::OsString::from(".");
+    hidden.push(name);
+    hidden.push(format!(".{}.tmp", std::process::id()));
+    let temp = path.with_file_name(hidden);
+    let written = std::fs::File::create(&temp).and_then(|mut f| {
+        f.write_all(&bytes)?;
+        f.sync_all()
+    });
+    let renamed = written.and_then(|()| std::fs::rename(&temp, path));
+    if let Err(e) = renamed {
+        // The hidden file may hold part of the bytes; the old file is untouched.
+        let _ignored = std::fs::remove_file(&temp);
+        return Err(e.into());
+    }
     Ok(())
 }
 

@@ -151,6 +151,40 @@ fn golden() -> Vec<u8> {
 
 const GOLDEN: &[u8] = include_bytes!("data/cache_v1.bin");
 
+/// A file is replaced whole, not written in place (G1 of P5's review): a handle opened on
+/// the old file reads the old bytes after a new file is written over it, and nothing is
+/// left beside it; a write that cannot finish leaves the old file.
+#[test]
+fn a_file_is_replaced_whole() {
+    use std::io::Read;
+    let dir = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("replaced_whole");
+    let _fresh = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("grids.brdc");
+    let t = build(&[[3, 3, 3]], &[]);
+    let entry = |x: f32| CacheEntry::new(&meta("g", &[]), &t, &Field::new(&t, x)).unwrap();
+    write(&path, &[entry(1.0)]).unwrap();
+    let old = std::fs::read(&path).unwrap();
+    let mut held = std::fs::File::open(&path).unwrap();
+    write(&path, &[entry(2.0)]).unwrap();
+    let mut seen = Vec::new();
+    held.read_to_end(&mut seen).unwrap();
+    assert_eq!(seen, old);
+    assert_ne!(std::fs::read(&path).unwrap(), old);
+    let names: Vec<_> = std::fs::read_dir(&dir).unwrap().map(|e| e.unwrap().file_name()).collect();
+    assert_eq!(names, ["grids.brdc"]);
+    // A directory where the file would go: the rename fails, the directory stays as it
+    // was, and the hidden file is removed.
+    let blocked = dir.join("blocked");
+    std::fs::create_dir(&blocked).unwrap();
+    assert!(write(&blocked, &[entry(3.0)]).is_err());
+    assert!(std::fs::read_dir(&blocked).unwrap().next().is_none());
+    let mut names: Vec<_> =
+        std::fs::read_dir(&dir).unwrap().map(|e| e.unwrap().file_name()).collect();
+    names.sort();
+    assert_eq!(names, ["blocked", "grids.brdc"]);
+}
+
 #[test]
 fn format_version_1_keeps_its_bytes_and_a_file_round_trips() {
     let bytes = golden();

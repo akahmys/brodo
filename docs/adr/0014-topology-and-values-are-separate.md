@@ -146,3 +146,14 @@ removed values back: a leaf made again took the old leaf's values, and a lower o
 tile merged them, while a root tile took the background. The human decided that the
 editor records the leaf-sized regions whose leaves it removes, and the commit takes them
 as the background: what the edit puts there, at every level, starts from the background.
+
+## Amendment: a grid's field is written through the grid
+
+- **Date**: 2026-10-27
+
+P5's review found that `Grid::parts_mut` handed out the field as `&mut Field<T>`, which a
+caller could replace with a field of another topology: every later use of the grid then
+failed as stale, and nothing could mend it, against the grid's promise that its field is
+never stale. The human decided, for 0.6.0, that `parts_mut` is removed and the grid writes
+its field itself: `Grid::par_update_leaves`, its closure given the topology, a leaf's number and
+its values; `Grid::leaf_mut`; and `Grid::set_tile`.

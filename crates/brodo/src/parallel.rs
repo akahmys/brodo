@@ -11,7 +11,8 @@ use crate::topology::{LeafNumber, Topology};
 /// Writes every leaf of `out` in parallel, calling `f` with the leaf's number and its 512
 /// values. `f` reads other fields by `&`, each checked against `t` (`Field::leaf`), and may
 /// fail. Every leaf is visited; the error returned is that of the lowest-numbered leaf that
-/// failed, whatever the thread count.
+/// failed, whatever the thread count. A failure undoes nothing: the leaves `f` wrote, the
+/// failed ones as far as it got among them, keep what it wrote.
 pub fn par_update<U, E, F>(t: &Topology, out: &mut Field<U>, f: F) -> Result<(), E>
 where
     U: Value,

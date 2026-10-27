@@ -83,10 +83,11 @@ pub fn euler<T: Value>(
         Connectivity::TwentySix => &TWENTY_SIX,
     };
     let numbers: Vec<LeafNumber> = t.leaf_numbers().collect();
-    let leaves: Vec<i64> = numbers
-        .par_iter()
-        .map(|n| leaf_vertices(t, f, *n, &meets, table))
-        .collect::<Result<_, _>>()?;
+    // Gathered in leaf order, then folded, so that the error is the lowest-numbered leaf's
+    // whatever the thread count, as `par_update` gives.
+    let leaves: Vec<Result<i64, AnalysisError>> =
+        numbers.par_iter().map(|n| leaf_vertices(t, f, *n, &meets, table)).collect();
+    let leaves = leaves.into_iter().collect::<Result<Vec<i64>, _>>()?;
     Ok(leaves.iter().sum::<i64>() + tile_edges(t, f, &meets, table)?)
 }
 

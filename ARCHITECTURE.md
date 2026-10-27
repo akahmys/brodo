@@ -101,7 +101,9 @@ pub struct Field<T> {
 - `Grid<T>` binds one `Topology` and one `Field<T>` for single-field use, with the merge
   rule chosen when it is made (the same-bits rule unless another is given). Its `edit`
   takes the edits as a closure, commits them and remaps the field in one step; if any part
-  fails, the grid is unchanged.
+  fails, the grid is unchanged. Its field is written through the grid (`par_update_leaves`,
+  `leaf_mut`, `set_tile`), never handed out to be replaced, so that it is always the
+  topology's (ADR-0014).
 - Topology changes (activation, removing a leaf, dilation, pruning, splitting and merging
   tiles) go through an editor (`TopologyEditor`) and take effect at `commit`, which
   returns a new topology and a `Remap` to it, and leaves the old topology usable. Every
@@ -230,6 +232,10 @@ fastest. A neighbour beyond the `i32` coordinate range is the background.
   [docs/formats.md](docs/formats.md) §3. A reader checks the whole file, every grid's
   buffer included, before it answers, and accepts only the bytes its writer puts: no gap,
   zero padding and unused words, nothing after the last grid (ADR-0016).
+- A cache file is written whole: to a hidden file beside it, flushed and renamed over it,
+  so that a reader, a mapping process among them, sees the old file or the new one; the
+  directory must be writable, and a process killed while writing may leave the hidden
+  file behind.
 - A cache file is read by copying it into an aligned buffer (`CacheFile::read`) or by
   mapping it into memory without a copy (`CacheFile::map`); both go through one parser.
   Mapping is brodo's only unsafe code, in one module (ADR-0008); while a file is mapped,

@@ -16,7 +16,6 @@ use std::error::Error;
 
 use brodo::error::TreeError;
 use brodo::grid::Grid;
-use brodo::parallel::par_update;
 use brodo::topology::{Location, TopologyEditor};
 use brodo::tree::{Coord, TileLevel};
 
@@ -137,15 +136,14 @@ fn apply(e: &mut TopologyEditor<'_>, edits: &[Edit]) -> Result<(), TreeError> {
 
 /// Takes the union with a sphere in every leaf, and sets every tile inside.
 fn union(g: &mut Grid<f32>, s: Sphere) -> Result<(), BoxError> {
-    let (t, f) = g.parts_mut();
-    par_update(t, f, |n, out| -> Result<(), BoxError> {
+    g.par_update_leaves(|t, n, out| -> Result<(), BoxError> {
         for (voxel, v) in t.leaf_voxels(n)?.zip(out.iter_mut()) {
             *v = v.min(clamped(distance(s, voxel)));
         }
         Ok(())
     })?;
-    for n in t.tile_numbers() {
-        f.set_tile(t, n, -BAND)?;
+    for n in g.topology().tile_numbers() {
+        g.set_tile(n, -BAND)?;
     }
     Ok(())
 }

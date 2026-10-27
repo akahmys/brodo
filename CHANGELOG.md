@@ -97,9 +97,17 @@ are recorded here when they change (V6).
   `TreeError::ArenaFull`.
 - `CacheFile::map`'s safety contract holds from the call on, the check's reads among
   those the file must not change under.
+- `cache::write` writes a hidden file beside the path, `.<name>.<process id>.tmp`, and
+  renames it over the path once flushed: written in place, a file another process mapped
+  changed under it, and a failed write lost the old file.
+- `euler` returns the lowest-numbered leaf's error whatever the thread count, as
+  `par_update` does; `par_update` states that a failure undoes nothing.
 
 ### Breaking
 
+- `Grid::parts_mut` is removed: a grid's field is written through `Grid::par_update_leaves`,
+  whose closure takes the topology, a leaf's number and its values, `Grid::leaf_mut` and
+  `Grid::set_tile`, so that it cannot be replaced by another topology's (ADR-0014).
 - A Hermite set has metadata of its own, `Produced::meta`: the conversion's lattice and
   unit, named `hermite`, without `sdf.version`. `Hermite::entries` refuses metadata
   stating the SDF convention, the new `HermiteError::ClaimsSdf`, and `CacheEntry::new`

@@ -5,8 +5,9 @@
 use std::sync::Arc;
 
 use crate::error::{FieldError, TreeError};
-use crate::field::{Field, MergeRule, Value, uniform};
-use crate::topology::{Topology, TopologyEditor};
+use crate::field::{Field, LEAF_VOXELS, MergeRule, Value, uniform};
+use crate::parallel::par_update;
+use crate::topology::{LeafNumber, TileNumber, Topology, TopologyEditor};
 use crate::tree::Coord;
 
 /// Why an edit of a grid was refused.
@@ -61,9 +62,26 @@ impl<T: Value> Grid<T> {
         &self.field
     }
 
-    /// Its topology, to read, and its field, to write.
-    pub fn parts_mut(&mut self) -> (&Topology, &mut Field<T>) {
-        (&self.topology, &mut self.field)
+    /// Writes every leaf in parallel, as `parallel::par_update` does, `f` given the
+    /// topology, the leaf's number and its 512 values. The field is written, never replaced,
+    /// so that it stays the topology's; as there, a failure undoes nothing.
+    pub fn par_update_leaves<E, F>(&mut self, f: F) -> Result<(), E>
+    where
+        E: Send + From<FieldError>,
+        F: Fn(&Topology, LeafNumber, &mut [T; LEAF_VOXELS]) -> Result<(), E> + Sync,
+    {
+        let t = &self.topology;
+        par_update(t, &mut self.field, |n, values| f(t, n, values))
+    }
+
+    /// A leaf's values, to write.
+    pub fn leaf_mut(&mut self, n: LeafNumber) -> Result<&mut [T; LEAF_VOXELS], FieldError> {
+        self.field.leaf_mut(&self.topology, n)
+    }
+
+    /// Sets a tile's value.
+    pub fn set_tile(&mut self, n: TileNumber, value: T) -> Result<(), FieldError> {
+        self.field.set_tile(&self.topology, n, value)
     }
 
     /// The value at a voxel.
@@ -100,12 +118,34 @@ mod tests {
     }
 
     #[test]
+    fn a_grid_writes_its_leaves_in_parallel_and_its_tiles() {
+        let mut g = Grid::new(0_u32);
+        g.edit(|e| {
+            e.activate([0, 0, 0])?;
+            e.activate([8, 0, 0])?;
+            e.add_tile(TileLevel::Lower, [16, 0, 0])
+        })
+        .unwrap();
+        g.par_update_leaves(|t, n, values| {
+            let o = t.leaf_origin(n)?;
+            values.fill(o[0].cast_unsigned() + 1);
+            Ok::<(), GridError>(())
+        })
+        .unwrap();
+        let n = g.topology().tile_numbers().next().unwrap();
+        g.set_tile(n, 7).unwrap();
+        let leaf = g.topology().leaf_numbers().nth(1).unwrap();
+        g.leaf_mut(leaf).unwrap()[1] = 5;
+        let at = |v| g.value_at(v).unwrap();
+        assert_eq!([at([0, 0, 0]), at([8, 0, 0]), at([9, 0, 0]), at([20, 0, 0])], [1, 9, 5, 7]);
+    }
+
+    #[test]
     fn an_edit_keeps_the_values_and_a_refused_one_changes_nothing() {
         let mut g = Grid::new(1.5_f32);
         g.edit(|e| e.add_tile(TileLevel::Lower, [0, 0, 0])).unwrap();
-        let (t, f) = g.parts_mut();
-        let n = t.tile_numbers().next().unwrap();
-        f.set_tile(t, n, -2.0).unwrap();
+        let n = g.topology().tile_numbers().next().unwrap();
+        g.set_tile(n, -2.0).unwrap();
         g.edit(|e| e.split_tile([3, 3, 3])).unwrap();
         assert_eq!(g.topology().leaf_count(), 1);
         assert_eq!(g.value_at([3, 3, 3]).map(f32::to_bits), Ok((-2.0_f32).to_bits()));
