@@ -62,7 +62,6 @@ fn freeze_error(e: &FreezeError) -> &'static str {
         FreezeError::Field(..) => "Field",
         FreezeError::Tree(..) => "Tree",
         FreezeError::TooLarge => "TooLarge",
-        FreezeError::Inconsistent => "Inconsistent",
         _ => "later",
     }
 }

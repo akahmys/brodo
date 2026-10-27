@@ -200,13 +200,16 @@ impl<'a, T: Stored> GridView<'a, T> {
         self.background
     }
 
+    /// The root entry of the voxel's 4096-region, if any.
+    fn root_entry(&self, v: Coord) -> Option<&'a RootEntry> {
+        let key = TileLevel::Root.origin(v);
+        let i = self.roots.binary_search_by(|e| e.key.map(|k| k.get()).cmp(&key)).ok()?;
+        self.roots.get(i)
+    }
+
     /// What holds the voxel.
     pub fn locate(&self, v: Coord) -> Result<ViewLocation, FormatError> {
-        let key = TileLevel::Root.origin(v);
-        let Ok(i) = self.roots.binary_search_by(|e| e.key.map(|k| k.get()).cmp(&key)) else {
-            return Ok(ViewLocation::Background);
-        };
-        let e = self.roots.get(i).ok_or(lost("root"))?;
+        let Some(e) = self.root_entry(v) else { return Ok(ViewLocation::Background) };
         if e.kind.get() == ROOT_TILE {
             return Ok(ViewLocation::Tile(e.index.get(), TileLevel::Root));
         }
@@ -237,11 +240,7 @@ impl<'a, T: Stored> GridView<'a, T> {
     /// root tile, a lower node its region of an upper node's tile, a leaf its region of a
     /// lower node's tile.
     pub(crate) fn holds_node(&self, level: TileLevel, v: Coord) -> Result<bool, FormatError> {
-        let key = TileLevel::Root.origin(v);
-        let Ok(i) = self.roots.binary_search_by(|e| e.key.map(|k| k.get()).cmp(&key)) else {
-            return Ok(false);
-        };
-        let e = self.roots.get(i).ok_or(lost("root"))?;
+        let Some(e) = self.root_entry(v) else { return Ok(false) };
         Ok(match level {
             TileLevel::Root => e.kind.get() != ROOT_TILE,
             TileLevel::Upper if e.kind.get() == ROOT_TILE => false,

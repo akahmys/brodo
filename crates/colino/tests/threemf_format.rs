@@ -3,6 +3,8 @@
 //! package, the XML or the model is its own error; damaged packages are refused or read
 //! safely. Packages are written by a small ZIP writer after PKWARE's APPNOTE.
 
+mod timed;
+
 use colino::error::ReadError;
 use colino::mesh::{Limits, Mesh};
 use colino::threemf::read;
@@ -344,11 +346,7 @@ fn a_long_name_placed_many_times_is_looked_up_once_in_time() {
             "<object id=\"{id}\"><components><component objectid=\"{below}\"/><component objectid=\"{below}\"/></components></object>"
         ));
     }
-    let (tx, rx) = std::sync::mpsc::channel();
-    std::thread::spawn(move || {
-        tx.send(one("<item objectid=\"19\"/>", &resources)).unwrap_or(());
-    });
-    let m = rx.recv_timeout(std::time::Duration::from_secs(60)).unwrap().unwrap();
+    let m = timed::in_time(move || one("<item objectid=\"19\"/>", &resources)).unwrap();
     assert_eq!((m.triangles.len(), m.groups.len()), (1 << 18, 1 << 18));
     assert_eq!(m.group_names.len(), 2);
 }
@@ -365,15 +363,8 @@ fn an_object_naming_itself_as_a_component_is_refused_in_time() {
         let text = m(&format!(
             "<resources><object id=\"1\"><components>{components}</components></object></resources><build><item objectid=\"1\"/></build>"
         ));
-        let (tx, rx) = std::sync::mpsc::channel();
-        std::thread::spawn(move || {
-            tx.send(read(&package(text.into_bytes()), ROOMY)).unwrap_or(());
-        });
-        let read = rx.recv_timeout(std::time::Duration::from_secs(60));
-        assert!(
-            matches!(read, Ok(Err(ReadError::NoObject { id: 1, .. }))),
-            "{components}: {read:?}"
-        );
+        let read = timed::in_time(move || read(&package(text.into_bytes()), ROOMY));
+        assert!(matches!(read, Err(ReadError::NoObject { id: 1, .. })), "{components}: {read:?}");
     }
 }
 

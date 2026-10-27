@@ -29,7 +29,7 @@ use brodo::topology::{LeafNumber, Topology};
 use brodo::tree::Coord;
 
 use crate::bvh::Bvh;
-use crate::convert::{Converted, Inside};
+use crate::convert::{Converted, Inside, Lattice};
 use crate::distance::{Point, cross, dot, sub};
 use crate::error::HermiteError;
 use crate::intersect::crossing;
@@ -47,36 +47,6 @@ pub struct Produced {
     pub meta: GridMeta,
     /// Crossed edges whose data came from the nearest triangle, none being hit.
     pub unhit: u64,
-}
-
-/// The grid's lattice: point v at `origin + h·v`, as conversion places voxel corners.
-struct Lattice {
-    origin: Point,
-    h: Point,
-}
-
-impl Lattice {
-    fn of(c: &Converted) -> Result<Lattice, HermiteError> {
-        let (mut origin, mut h) = ([0.0; 3], [0.0; 3]);
-        for (k, row) in c.meta.transform.iter().enumerate() {
-            let off_axis = row.iter().take(3).enumerate().any(|(j, x)| j != k && *x != 0.0);
-            let scale = row.get(k).copied().unwrap_or(0.0);
-            if off_axis || scale.partial_cmp(&0.0) != Some(std::cmp::Ordering::Greater) {
-                return Err(HermiteError::Transform);
-            }
-            (h[k], origin[k]) = (scale, row.get(3).copied().unwrap_or(0.0));
-        }
-        Ok(Lattice { origin, h })
-    }
-
-    fn world(&self, v: Coord) -> Point {
-        self.at(v.map(f64::from))
-    }
-
-    /// Point `v`, given in `f64` so that it may lie beyond the `i32` range.
-    fn at(&self, v: Point) -> Point {
-        [0, 1, 2].map(|k| self.origin[k] + self.h[k] * v[k])
-    }
 }
 
 /// The sign and place of the point after `v` along `axis`. Beyond the `i32` range lies
@@ -145,7 +115,7 @@ fn find(bvh: &Bvh, a: Point, b: Point, lower_inside: bool) -> Option<Found> {
 /// its accuracy, as `c` was made.
 pub fn hermite(mesh: &Mesh, c: &Converted) -> Result<Produced, HermiteError> {
     mesh.check_groups()?;
-    let lattice = Lattice::of(c)?;
+    let lattice = c.lattice().ok_or(HermiteError::Transform)?;
     // One tree of boxes serves the winding number, the crossings and the nearest triangles.
     let winding = Winding::new(mesh)?;
     let bvh = winding.bvh();

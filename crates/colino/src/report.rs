@@ -28,7 +28,7 @@ use brodo::analysis::{Connectivity, Label, Labels, label};
 use brodo::euler::euler;
 use brodo::tree::Coord;
 
-use crate::convert::{Converted, Inside};
+use crate::convert::{Converted, Inside, Lattice};
 use crate::distance::Point;
 use crate::error::ReportError;
 use crate::mesh::Mesh;
@@ -191,25 +191,15 @@ pub struct Report {
     pub located: bool,
 }
 
-/// The grid's voxel size on each axis, refused unless its transform is aligned with the
-/// axes and each size positive.
-fn voxel_sizes(c: &Converted) -> Result<[f64; 3], ReportError> {
-    let mut out = [0.0; 3];
-    for (k, h) in out.iter_mut().enumerate() {
-        let row = c.meta.transform.get(k).ok_or(ReportError::Transform)?;
-        let x = row.get(k).copied().unwrap_or(0.0);
-        let off_axis = row.iter().take(3).enumerate().any(|(j, y)| j != k && y.abs() > 0.0);
-        if off_axis || x.is_nan() || x <= 0.0 {
-            return Err(ReportError::Transform);
-        }
-        *h = x;
-    }
-    Ok(out)
+/// The grid's lattice, refused unless its transform is the axis-aligned one conversion
+/// writes.
+fn lattice(c: &Converted) -> Result<Lattice, ReportError> {
+    c.lattice().ok_or(ReportError::Transform)
 }
 
 /// The grid's voxel size, the least of its axes'.
 fn voxel_size(c: &Converted) -> Result<f64, ReportError> {
-    Ok(voxel_sizes(c)?.into_iter().fold(f64::INFINITY, f64::min))
+    Ok(lattice(c)?.h.into_iter().fold(f64::INFINITY, f64::min))
 }
 
 fn solid(v: f32) -> bool {
@@ -218,14 +208,10 @@ fn solid(v: f32) -> bool {
 
 /// The voxel holding a world point, or nothing beyond the `i32` range.
 fn voxel(c: &Converted, p: Point) -> Result<Option<Coord>, ReportError> {
-    let t = c.meta.transform;
-    let sizes = voxel_sizes(c)?;
+    let l = lattice(c)?;
     let mut out = [0_i32; 3];
     for (k, o) in out.iter_mut().enumerate() {
-        let row = t.get(k).ok_or(ReportError::Transform)?;
-        let h = sizes.get(k).copied().unwrap_or(1.0);
-        let index =
-            ((p.get(k).copied().unwrap_or(0.0) - row.get(3).copied().unwrap_or(0.0)) / h).floor();
+        let index = ((p[k] - l.origin[k]) / l.h[k]).floor();
         if !(f64::from(i32::MIN)..=f64::from(i32::MAX)).contains(&index) {
             return Ok(None);
         }

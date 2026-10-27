@@ -191,6 +191,43 @@ pub struct Converted {
     pub accuracy: Accuracy,
 }
 
+/// A conversion's lattice: voxel v's corner at `origin + h·v`, as conversion places it.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct Lattice {
+    pub(crate) origin: Point,
+    pub(crate) h: Point,
+}
+
+impl Lattice {
+    /// Voxel `v`'s corner.
+    pub(crate) fn world(&self, v: Coord) -> Point {
+        self.at(v.map(f64::from))
+    }
+
+    /// The point at `v` in index space, given in `f64` so that it may lie beyond the `i32`
+    /// range.
+    pub(crate) fn at(&self, v: Point) -> Point {
+        [0, 1, 2].map(|k| self.origin[k] + self.h[k] * v[k])
+    }
+}
+
+impl Converted {
+    /// Its lattice, read from its transform; none unless the transform is aligned with the
+    /// axes, an entry off the diagonal 0 and not NaN, and each voxel size positive.
+    pub(crate) fn lattice(&self) -> Option<Lattice> {
+        let (mut origin, mut h) = ([0.0; 3], [0.0; 3]);
+        for (k, row) in self.meta.transform.iter().enumerate() {
+            let off_axis = row.iter().take(3).enumerate().any(|(j, x)| j != k && *x != 0.0);
+            let scale = row.get(k).copied().unwrap_or(0.0);
+            if off_axis || scale.partial_cmp(&0.0) != Some(std::cmp::Ordering::Greater) {
+                return None;
+            }
+            (h[k], origin[k]) = (scale, row.get(3).copied().unwrap_or(0.0));
+        }
+        Some(Lattice { origin, h })
+    }
+}
+
 /// Index space's corners `lo` and `hi`, as `i64` cells' range; refused beyond `i32`.
 fn cell_range(lo: Point, hi: Point) -> Result<([i64; 3], [i64; 3]), ConvertError> {
     let limit = f64::from(i32::MAX) - 2.0 * 4096.0;

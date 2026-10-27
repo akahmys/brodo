@@ -114,6 +114,7 @@ are recorded here when they change (V6).
 
 ### Breaking
 
+- `FreezeError::Inconsistent` is removed: nothing made it.
 - `Converted` records the accuracy its winding numbers were found at, the new field
   `accuracy`, which `hermite` and the report's third layer follow: `hermite(mesh, c)` takes
   no accuracy of its own, and the third layer no longer uses β = 2 whatever the conversion

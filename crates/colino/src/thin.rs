@@ -35,7 +35,7 @@ use brodo::parallel::par_update;
 use brodo::topology::Topology;
 use brodo::tree::Coord;
 
-use crate::convert::Converted;
+use crate::convert::{Converted, Lattice};
 use crate::report::{Check, Invariants, Thin, ThinKind};
 
 /// A thin point: its kind, where it lies, and its thickness or width.
@@ -297,8 +297,8 @@ pub(crate) fn check(
     inside: &Inside<'_>,
     place: &Thin,
 ) -> Result<Check, AnalysisError> {
-    let m = c.meta.transform;
-    let (h, origin) = ([m[0][0], m[1][1], m[2][2]], [m[0][3], m[1][3], m[2][3]]);
+    // The report refused a transform conversion does not write before any place was found.
+    let Some(Lattice { h, origin }) = c.lattice() else { return Ok(Check::Unchecked) };
     let index = |p: f64, k: usize| (p - origin[k]) / h[k];
     let (mut lo, mut hi) = ([0_i32; 3], [0_i32; 3]);
     for k in 0..3 {

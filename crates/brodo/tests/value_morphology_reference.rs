@@ -3,6 +3,8 @@
 //! each takes the largest or smallest of itself and its 6 or 26 neighbours, a NaN among
 //! them winning, k times over; tiles and the background keep their values.
 
+mod timed;
+
 use brodo::analysis::Connectivity;
 use brodo::field::Field;
 use brodo::morphology::{dilate_values, erode_values};
@@ -146,12 +148,9 @@ fn the_largest_k_ends_once_the_values_settle() {
     let mut f = Field::new(&t, 0.0_f32);
     let n = t.leaf_numbers().next().unwrap();
     f.leaf_mut(&t, n).unwrap()[0] = 5.0;
-    let (tx, rx) = std::sync::mpsc::channel();
     let (t2, f2) = (t.clone(), f.clone());
-    std::thread::spawn(move || {
-        tx.send(dilate_values(&t2, &f2, Connectivity::TwentySix, u32::MAX)).unwrap_or(())
-    });
-    let all = rx.recv_timeout(std::time::Duration::from_secs(60)).unwrap().unwrap();
+    let all =
+        timed::in_time(move || dilate_values(&t2, &f2, Connectivity::TwentySix, u32::MAX)).unwrap();
     let some = dilate_values(&t, &f, Connectivity::TwentySix, 20).unwrap();
     let bits = |f: &Field<f32>| f.leaf(&t, n).unwrap().map(f32::to_bits);
     assert_eq!(bits(&all), bits(&some));

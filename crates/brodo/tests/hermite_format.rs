@@ -3,6 +3,8 @@
 //! bytes; each rule of the format, broken alone, is refused for that rule, in memory and
 //! from a file; a file's set is found by its keys and refused when they do not fit.
 
+mod timed;
+
 use brodo::cache::{CacheEntry, CacheFile, to_bytes};
 use brodo::error::{HermiteError, Rule};
 use brodo::field::Field;
@@ -22,6 +24,15 @@ struct Parts {
 impl Parts {
     fn make(self) -> Result<Hermite, HermiteError> {
         Hermite::new(self.topology, self.signs, self.axes, self.names)
+    }
+}
+
+/// Crossings on `t` holding no crossing anywhere.
+fn none(t: &Topology) -> Crossings {
+    Crossings {
+        fraction: Field::new(t, NO_CROSSING.0),
+        normal: Field::new(t, NO_CROSSING.1),
+        group: Field::new(t, NO_CROSSING.2),
     }
 }
 
@@ -61,11 +72,6 @@ fn parts(leaves: i32, tile: Option<Coord>, lo: i32, hi: i32) -> Parts {
     let topology = topology(leaves, tile);
     let inside = |v: Coord| v.iter().all(|c| (lo..hi).contains(c));
     let mut signs = Field::new(&topology, 0_u8);
-    let none = |t: &Topology| Crossings {
-        fraction: Field::new(t, NO_CROSSING.0),
-        normal: Field::new(t, NO_CROSSING.1),
-        group: Field::new(t, NO_CROSSING.2),
-    };
     let mut axes = [none(&topology), none(&topology), none(&topology)];
     for n in topology.leaf_numbers() {
         let voxels: Vec<Coord> = topology.leaf_voxels(n).unwrap().collect();
@@ -180,11 +186,6 @@ fn shell_with_hole() -> Parts {
     let topology = e.commit().unwrap().0;
     let inside = |v: Coord| v.iter().all(|c| (-7..136).contains(c));
     let mut signs = Field::new(&topology, 0_u8);
-    let none = |t: &Topology| Crossings {
-        fraction: Field::new(t, NO_CROSSING.0),
-        normal: Field::new(t, NO_CROSSING.1),
-        group: Field::new(t, NO_CROSSING.2),
-    };
     let mut axes = [none(&topology), none(&topology), none(&topology)];
     for n in topology.leaf_numbers() {
         let voxels: Vec<Coord> = topology.leaf_voxels(n).unwrap().collect();
@@ -223,11 +224,6 @@ fn parts_at(origins: &[Coord], inside: impl Fn(Coord) -> bool) -> Parts {
         Some(w)
     };
     let inside_at = |v: Option<Coord>| v.is_some_and(&inside);
-    let none = |t: &Topology| Crossings {
-        fraction: Field::new(t, NO_CROSSING.0),
-        normal: Field::new(t, NO_CROSSING.1),
-        group: Field::new(t, NO_CROSSING.2),
-    };
     let mut signs = Field::new(&topology, 0_u8);
     let mut axes = [none(&topology), none(&topology), none(&topology)];
     for n in topology.leaf_numbers() {
@@ -279,11 +275,6 @@ fn tiles(tiles: &[(TileLevel, Coord, u8)]) -> Parts {
         e.add_tile(*level, *o).unwrap();
     }
     let topology = e.commit().unwrap().0;
-    let none = |t: &Topology| Crossings {
-        fraction: Field::new(t, NO_CROSSING.0),
-        normal: Field::new(t, NO_CROSSING.1),
-        group: Field::new(t, NO_CROSSING.2),
-    };
     let mut signs = Field::new(&topology, 0_u8);
     for t in topology.tile_numbers() {
         let (level, o) = topology.tile(t).unwrap();
@@ -315,9 +306,7 @@ fn a_tiles_faces_cost_what_the_nodes_beside_them_hold() {
             }
         }
     }
-    let (tx, rx) = std::sync::mpsc::channel();
-    std::thread::spawn(move || tx.send(tiles(&all).make().is_ok()).unwrap_or(()));
-    assert_eq!(rx.recv_timeout(std::time::Duration::from_secs(60)), Ok(true));
+    assert!(timed::in_time(move || tiles(&all).make().is_ok()));
 }
 
 #[test]

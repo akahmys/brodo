@@ -9,6 +9,7 @@
 //! edge keeps its triangle's side; a face turned in, refused by the winding number beyond
 //! the band, gives by parity the cube's set as meant.
 
+mod boxes;
 mod common;
 
 use brodo::cache::to_bytes;
@@ -257,29 +258,12 @@ fn an_open_mesh_counts_its_edges_with_no_triangle_hit() {
     assert!(made(&holed, &o).unhit > 0);
 }
 
-/// An axis-aligned box from `lo` to `hi`, facing out, or in when `inward`.
-fn boxed(lo: Point, hi: Point, inward: bool) -> (Vec<Point>, Vec<[u32; 3]>) {
-    let vertices =
-        (0..8).map(|i| [0, 1, 2].map(|k| if i >> k & 1 == 1 { hi[k] } else { lo[k] })).collect();
-    let quads: [[u32; 4]; 6] =
-        [[0, 4, 6, 2], [1, 3, 7, 5], [0, 1, 5, 4], [2, 6, 7, 3], [0, 2, 3, 1], [4, 5, 7, 6]];
-    let mut triangles = Vec::new();
-    for [p, q, r, t] in quads {
-        if inward {
-            triangles.extend([[p, r, q], [p, t, r]]);
-        } else {
-            triangles.extend([[p, q, r], [p, r, t]]);
-        }
-    }
-    (vertices, triangles)
-}
-
 /// Boxes appended to one mesh, each its own group in order.
 fn boxes(parts: &[(Point, Point, bool)]) -> Mesh {
     let mut m = Mesh::default().with_unit(Some("millimeter".into()));
     m.group_names.push(String::new());
     for (g, (lo, hi, inward)) in (1_u32..).zip(parts) {
-        let (v, t) = boxed(*lo, *hi, *inward);
+        let (v, t) = boxes::boxed(*lo, *hi, *inward);
         let base = u32::try_from(m.vertices.len()).unwrap();
         m.vertices.extend(v);
         m.triangles.extend(t.iter().map(|t| t.map(|i| i + base)));

@@ -4,6 +4,7 @@
 //! turned faces keeps its inside below the hole; a line through two holes is outvoted;
 //! the bytes do not depend on the thread count.
 
+mod boxes;
 mod common;
 
 use brodo::analysis::{Connectivity, label};
@@ -164,17 +165,12 @@ fn the_bytes_by_parity_do_not_depend_on_the_thread_count() {
 
 /// Boxes from `lo` to `hi`, each of 12 triangles facing out, in one mesh.
 fn boxes(parts: &[([f64; 3], [f64; 3])]) -> Mesh {
-    let mut vertices = Vec::new();
-    let mut triangles = Vec::new();
-    let quads: [[u32; 4]; 6] =
-        [[0, 4, 6, 2], [1, 3, 7, 5], [0, 1, 5, 4], [2, 6, 7, 3], [0, 2, 3, 1], [4, 5, 7, 6]];
+    let (mut vertices, mut triangles) = (Vec::new(), Vec::new());
     for (lo, hi) in parts {
         let base = u32::try_from(vertices.len()).unwrap();
-        vertices
-            .extend((0..8).map(|i| [0, 1, 2].map(|k| if i >> k & 1 == 1 { hi[k] } else { lo[k] })));
-        for [p, q, r, t] in quads.map(|q| q.map(|i| i + base)) {
-            triangles.extend([[p, q, r], [p, r, t]]);
-        }
+        let (v, t) = boxes::boxed(*lo, *hi, false);
+        vertices.extend(v);
+        triangles.extend(t.iter().map(|t| t.map(|i| i + base)));
     }
     Mesh::new(vertices, triangles).with_unit(Some("millimeter".into()))
 }

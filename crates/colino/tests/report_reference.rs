@@ -182,6 +182,10 @@ fn a_transform_not_axis_aligned_is_refused() {
     let mut c = convert(&m, &Options::new(1.0)).unwrap();
     c.meta.transform[0][1] = 0.5;
     assert_eq!(report(&m, &c, &[("p".into(), [0.0; 3])]), Err(ReportError::Transform));
+    // An entry off the diagonal that is NaN is not 0 (refactoring after P5's review).
+    let mut nan = convert(&m, &Options::new(1.0)).unwrap();
+    nan.meta.transform[2][0] = f64::NAN;
+    assert_eq!(report(&m, &nan, &[]), Err(ReportError::Transform));
     // Axis-aligned, but with a voxel of no size or of negative size.
     for h in [0.0, -1.0] {
         let mut c = convert(&m, &Options::new(1.0)).unwrap();

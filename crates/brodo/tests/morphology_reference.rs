@@ -4,6 +4,8 @@
 //! active cell goes when one of its voxels is within k steps of a background voxel. The
 //! search knows nothing of cells' distances; the dense box is the background beyond.
 
+mod timed;
+
 use std::collections::VecDeque;
 
 use brodo::analysis::Connectivity;
@@ -229,13 +231,6 @@ fn an_upper_tile_is_split_where_it_must_go() {
     }
 }
 
-/// Runs `f` on its own thread, refused unless it ends within a minute.
-fn in_time<R: Send + 'static>(f: impl FnOnce() -> R + Send + 'static) -> R {
-    let (tx, rx) = std::sync::mpsc::channel();
-    std::thread::spawn(move || tx.send(f()).unwrap_or(()));
-    rx.recv_timeout(std::time::Duration::from_secs(60)).expect("ends within a minute")
-}
-
 /// The largest k ends (C4 of P5's review): eroding by more than the box's widest side
 /// removes no more, and a dilation whose new leaves a `u32` could not number is refused
 /// before any is made.
@@ -248,10 +243,10 @@ fn the_largest_k_ends_in_time() {
         e.add_tile(TileLevel::Lower, [64, 0, 0]).unwrap();
         e.commit().unwrap().0
     };
-    let eroded = in_time(move || {
+    let eroded = timed::in_time(move || {
         erode(&one(), Connectivity::Six, u32::MAX).map(|(t, _)| t.leaf_count() + t.tile_count())
     });
     assert_eq!(eroded, Ok(0));
-    let dilated = in_time(move || dilate(&one(), Connectivity::Six, u32::MAX).map(|_| ()));
+    let dilated = timed::in_time(move || dilate(&one(), Connectivity::Six, u32::MAX).map(|_| ()));
     assert_eq!(dilated, Err(brodo::error::TreeError::ArenaFull(brodo::error::NodeKind::Leaf)));
 }

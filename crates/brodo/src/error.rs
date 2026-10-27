@@ -115,9 +115,6 @@ pub enum FreezeError {
     /// background.
     #[error("the grid is too large for the frozen layout")]
     TooLarge,
-    /// The topology's lists and its tree disagree.
-    #[error("the topology's lists and its tree disagree")]
-    Inconsistent,
 }
 
 /// Why bytes were refused as a frozen grid (ARCHITECTURE.md §4.6).

@@ -3,6 +3,8 @@
 //! in the triangles is skipped and what would define shape otherwise, or reach outside the
 //! file, is refused; each damage is its own error; damaged text is refused or read safely.
 
+mod timed;
+
 use colino::error::ReadError;
 use colino::mesh::{Limits, Mesh};
 use colino::obj::read;
@@ -72,9 +74,7 @@ fn a_long_group_name_is_looked_up_once_in_time() {
     let mut text = format!("v 0 0 0\nv 1 0 0\nv 0 1 0\ng {name}\n");
     text.push_str(&"f 1 2 3\n".repeat(1 << 19));
     text.push_str(&format!("g other\nf 1 2 3\ng {name}\nf 1 2 3\n"));
-    let (tx, rx) = std::sync::mpsc::channel();
-    std::thread::spawn(move || tx.send(read_str(&text)).unwrap_or(()));
-    let m = rx.recv_timeout(std::time::Duration::from_secs(60)).unwrap().unwrap();
+    let m = timed::in_time(move || read_str(&text)).unwrap();
     assert_eq!(m.groups.len(), (1 << 19) + 2);
     assert_eq!(m.groups.last(), Some(&1));
     assert_eq!(m.groups.get(1 << 19), Some(&2));
