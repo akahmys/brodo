@@ -494,10 +494,10 @@ fn edited(edit: impl Fn(usize, &mut GridMeta)) -> Vec<CacheEntry> {
         edit(i, &mut m);
         let axis = set.axes().get(i.saturating_sub(1) / 3);
         let e = match (i, axis) {
-            (0, _) => CacheEntry::new(&m, t, set.signs()),
-            (i, Some(c)) if i % 3 == 1 => CacheEntry::new(&m, t, &c.fraction),
-            (i, Some(c)) if i % 3 == 2 => CacheEntry::new(&m, t, &c.normal),
-            (_, Some(c)) => CacheEntry::new(&m, t, &c.group),
+            (0, _) => CacheEntry::with_reserved_keys(&m, t, set.signs()),
+            (i, Some(c)) if i % 3 == 1 => CacheEntry::with_reserved_keys(&m, t, &c.fraction),
+            (i, Some(c)) if i % 3 == 2 => CacheEntry::with_reserved_keys(&m, t, &c.normal),
+            (_, Some(c)) => CacheEntry::with_reserved_keys(&m, t, &c.group),
             _ => unreachable!(),
         };
         out.push(e.unwrap());
@@ -568,7 +568,7 @@ fn a_file_with_a_broken_rule_or_another_topology_is_refused() {
     let mut wrong = Field::new(t, 0_u8);
     let n = t.leaf_numbers().next().unwrap();
     wrong.leaf_mut(t, n).unwrap()[index([3, 3, 3])] = 2;
-    entries[0] = CacheEntry::new(&m, t, &wrong).unwrap();
+    entries[0] = CacheEntry::with_reserved_keys(&m, t, &wrong).unwrap();
     let f = file(&entries);
     assert!(matches!(
         HermiteView::find(&f, "s"),
@@ -578,7 +578,8 @@ fn a_file_with_a_broken_rule_or_another_topology_is_refused() {
     m.extra.insert("hermite.field".into(), "x.normal".into());
     m.extra.retain(|k, _| !k.starts_with("hermite.group."));
     let mut entries = set.entries("s", &meta("s")).unwrap();
-    entries[2] = CacheEntry::new(&m, &other, &Field::new(&other, NO_CROSSING.1)).unwrap();
+    entries[2] =
+        CacheEntry::with_reserved_keys(&m, &other, &Field::new(&other, NO_CROSSING.1)).unwrap();
     assert!(matches!(
         HermiteView::find(&file(&entries), "s"),
         Err(HermiteError::OtherTopology("x.normal"))
@@ -647,10 +648,10 @@ fn unchecked(p: &Parts) -> Vec<CacheEntry> {
             }
         }
         let e = match (i, p.axes.get(i.saturating_sub(1) / 3)) {
-            (0, _) => CacheEntry::new(&m, t, &p.signs),
-            (i, Some(c)) if i % 3 == 1 => CacheEntry::new(&m, t, &c.fraction),
-            (i, Some(c)) if i % 3 == 2 => CacheEntry::new(&m, t, &c.normal),
-            (_, Some(c)) => CacheEntry::new(&m, t, &c.group),
+            (0, _) => CacheEntry::with_reserved_keys(&m, t, &p.signs),
+            (i, Some(c)) if i % 3 == 1 => CacheEntry::with_reserved_keys(&m, t, &c.fraction),
+            (i, Some(c)) if i % 3 == 2 => CacheEntry::with_reserved_keys(&m, t, &c.normal),
+            (_, Some(c)) => CacheEntry::with_reserved_keys(&m, t, &c.group),
             _ => unreachable!(),
         };
         out.push(e.unwrap());

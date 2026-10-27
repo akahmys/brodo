@@ -12,7 +12,8 @@
 mod common;
 
 use brodo::cache::to_bytes;
-use brodo::meta::GridMeta;
+use brodo::error::HermiteError;
+use brodo::meta::{GridMeta, SDF_KEY};
 use colino::convert::{Options, convert};
 use colino::distance::Point;
 use colino::hermite::{Produced, hermite};
@@ -535,4 +536,20 @@ fn a_normal_perpendicular_to_its_edge_keeps_its_triangle_s_side() {
         assert!(x.fraction.leaf(t, n).unwrap()[i] >= 0.0, "{v:?} has no crossing");
         assert_eq!(x.normal.leaf(t, n).unwrap()[i][2].to_bits(), 1.0_f32.to_bits(), "{v:?}");
     }
+}
+
+/// The set's own metadata (U1 of P5's review): the conversion's lattice and unit, named
+/// `hermite`, without the SDF convention's key, which `entries` refuses.
+#[test]
+fn the_set_is_written_with_its_own_metadata() {
+    let m = common::torus(20.0, 7.0, 32);
+    let o = Options::new(1.0).with_origin([0.25, -0.5, 3.0]);
+    let c = convert(&m, &o).unwrap();
+    let p = hermite(&m, &c, o.accuracy).unwrap();
+    assert_eq!(p.meta.name, "hermite");
+    assert_eq!((p.meta.voxel_size, p.meta.transform), (c.meta.voxel_size, c.meta.transform));
+    assert_eq!(p.meta.unit, c.meta.unit);
+    assert!(!p.meta.extra.contains_key(SDF_KEY));
+    assert!(p.set.entries("torus", &p.meta).is_ok());
+    assert!(matches!(p.set.entries("torus", &c.meta), Err(HermiteError::ClaimsSdf)));
 }

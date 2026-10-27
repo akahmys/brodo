@@ -32,8 +32,23 @@ pub struct CacheEntry {
 }
 
 impl CacheEntry {
-    /// Freezes a topology and a field on it, with its metadata, for a cache file.
+    /// Freezes a topology and a field on it, with its metadata, for a cache file. The
+    /// metadata may hold no key beginning `hermite.`: those are a Hermite set's, written by
+    /// `Hermite::entries`, so that a grid is not taken for one by mistake.
     pub fn new<T: Stored>(meta: &GridMeta, t: &Topology, f: &Field<T>) -> Result<Self, CacheError> {
+        if let Some(key) = meta.extra.keys().find(|k| k.starts_with(crate::hermite::PREFIX)) {
+            return Err(CacheError::ReservedKey(key.clone()));
+        }
+        Self::with_reserved_keys(meta, t, f)
+    }
+
+    /// As `new`, the metadata free to hold keys beginning `hermite.`: for a Hermite set's
+    /// own grids, or a file made on purpose to break its format, as a test of a reader.
+    pub fn with_reserved_keys<T: Stored>(
+        meta: &GridMeta,
+        t: &Topology,
+        f: &Field<T>,
+    ) -> Result<Self, CacheError> {
         meta.check()?;
         Ok(Self {
             meta: meta.clone(),

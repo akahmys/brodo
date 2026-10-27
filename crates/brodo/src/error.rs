@@ -225,6 +225,10 @@ pub enum CacheError {
         /// The limit given.
         limit: u64,
     },
+    /// The metadata holds a key beginning `hermite.`, which `CacheEntry::new` leaves to
+    /// Hermite data.
+    #[error("the metadata holds the key {0:?}, which Hermite data reserves")]
+    ReservedKey(String),
 }
 
 /// Which rule of the Hermite data format a set breaks (ADR-0032).
@@ -301,6 +305,10 @@ pub enum HermiteError {
     /// The metadata given for the entries already holds a key of the format.
     #[error("the metadata already holds the format's key {0:?}")]
     ReservedKey(String),
+    /// The metadata given for the entries states the SDF convention, `sdf.version`: a set
+    /// written with it would be taken for an SDF.
+    #[error("the metadata states the SDF convention, which a Hermite set does not keep")]
+    ClaimsSdf,
 }
 
 /// Why a slice could not be drawn or encoded (ARCHITECTURE.md §6.1).

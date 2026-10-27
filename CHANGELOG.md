@@ -90,6 +90,11 @@ are recorded here when they change (V6).
 
 ### Breaking
 
+- A Hermite set has metadata of its own, `Produced::meta`: the conversion's lattice and
+  unit, named `hermite`, without `sdf.version`. `Hermite::entries` refuses metadata
+  stating the SDF convention, the new `HermiteError::ClaimsSdf`, and `CacheEntry::new`
+  refuses a key beginning `hermite.`, the new `CacheError::ReservedKey`;
+  `CacheEntry::with_reserved_keys` writes one on purpose (ADR-0030).
 - A leaf or tile an edit puts where the same edit removed a leaf starts from the background
   (ADR-0014): a leaf made again had taken the removed leaf's values, and a lower or upper
   tile had merged them, refusing values not all equal.

@@ -218,3 +218,19 @@ not where it ends. The human decided that a name is the rest of its line, after 
 `outer`, and before an `endsolid` that ends the line, so that a solid written on one line
 reads. A name on the line after `solid` is no longer one, and a name after `endsolid` ends
 with its line.
+
+## Amendment: a Hermite set's metadata
+
+- **Date**: 2026-10-27
+
+P5's review found that a Hermite set had no metadata of its own: written with its
+conversion's, its ten grids were named `sdf` and stated the SDF convention, to be taken
+for SDFs, and metadata made anew lost the conversion's origin; nor did `CacheEntry::new`
+refuse the `hermite.` keys, so any grid could pass for a set's. The human decided:
+
+- `Produced::meta` is the set's metadata: the conversion's voxel size, transform and
+  unit, named `hermite`, without `sdf.version`.
+- `Hermite::entries` refuses metadata stating the SDF convention, `HermiteError::ClaimsSdf`.
+- `CacheEntry::new` refuses a key beginning `hermite.`, `CacheError::ReservedKey`;
+  `CacheEntry::with_reserved_keys` takes one, for a set's own entries and for files made
+  on purpose to break the format.

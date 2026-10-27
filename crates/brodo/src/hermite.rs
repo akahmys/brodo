@@ -51,7 +51,8 @@ const KEY_VERSION: &str = "hermite.version";
 const KEY_SET: &str = "hermite.set";
 const KEY_FIELD: &str = "hermite.field";
 const KEY_GROUP: &str = "hermite.group.";
-const PREFIX: &str = "hermite.";
+/// The keys a Hermite set's grids hold, written by `Hermite::entries` alone.
+pub(crate) const PREFIX: &str = "hermite.";
 
 /// The crossings on one axis's edges.
 #[derive(Debug, Clone)]
@@ -474,10 +475,14 @@ impl Hermite {
     }
 
     /// The ten cache entries of the set named `set`, in the order of `FIELDS`, each with
-    /// `meta` and the keys that tell it apart; `meta` may hold no key beginning `hermite.`.
+    /// `meta` and the keys that tell it apart; `meta` may hold no key beginning `hermite.`,
+    /// nor state the SDF convention (`SDF_KEY`).
     pub fn entries(&self, set: &str, meta: &GridMeta) -> Result<Vec<CacheEntry>, HermiteError> {
         if let Some(key) = meta.extra.keys().find(|k| k.starts_with(PREFIX)) {
             return Err(HermiteError::ReservedKey(key.clone()));
+        }
+        if meta.extra.contains_key(crate::meta::SDF_KEY) {
+            return Err(HermiteError::ClaimsSdf);
         }
         let keyed = |field: &str| {
             let mut m = meta.clone();
@@ -491,11 +496,23 @@ impl Hermite {
             sign_meta.extra.insert(format!("{KEY_GROUP}{id}"), name.clone());
         }
         let t = &self.topology;
-        let mut out = vec![CacheEntry::new(&sign_meta, t, &self.signs)?];
+        let mut out = vec![CacheEntry::with_reserved_keys(&sign_meta, t, &self.signs)?];
         for (axis, c) in ["x", "y", "z"].iter().zip(&self.axes) {
-            out.push(CacheEntry::new(&keyed(&format!("{axis}.fraction")), t, &c.fraction)?);
-            out.push(CacheEntry::new(&keyed(&format!("{axis}.normal")), t, &c.normal)?);
-            out.push(CacheEntry::new(&keyed(&format!("{axis}.group")), t, &c.group)?);
+            out.push(CacheEntry::with_reserved_keys(
+                &keyed(&format!("{axis}.fraction")),
+                t,
+                &c.fraction,
+            )?);
+            out.push(CacheEntry::with_reserved_keys(
+                &keyed(&format!("{axis}.normal")),
+                t,
+                &c.normal,
+            )?);
+            out.push(CacheEntry::with_reserved_keys(
+                &keyed(&format!("{axis}.group")),
+                t,
+                &c.group,
+            )?);
         }
         Ok(out)
     }

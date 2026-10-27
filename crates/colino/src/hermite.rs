@@ -23,6 +23,7 @@
 use brodo::error::{FieldError, Rule};
 use brodo::field::{Field, LEAF_VOXELS};
 use brodo::hermite::{Crossings, Hermite, NO_CROSSING};
+use brodo::meta::{GridMeta, SDF_KEY};
 use brodo::parallel::{par_reduce, par_update};
 use brodo::topology::{LeafNumber, Topology};
 use brodo::tree::Coord;
@@ -41,6 +42,9 @@ use crate::winding::{Accuracy, Winding};
 pub struct Produced {
     /// The set, in brodo's format.
     pub set: Hermite,
+    /// The set's metadata, to write it with (`Hermite::entries`): named `hermite`, on the
+    /// conversion's lattice, in its unit, without the SDF convention's key.
+    pub meta: GridMeta,
     /// Crossed edges whose data came from the nearest triangle, none being hit.
     pub unhit: u64,
 }
@@ -144,7 +148,10 @@ pub fn hermite(mesh: &Mesh, c: &Converted, accuracy: Accuracy) -> Result<Produce
             HermiteError::Format(e)
         }
     })?;
-    Ok(Produced { set, unhit })
+    let mut meta = c.meta.clone();
+    meta.name = "hermite".to_owned();
+    meta.extra.remove(SDF_KEY);
+    Ok(Produced { set, meta, unhit })
 }
 
 fn on_mesh(bvh: &Bvh, p: Point) -> bool {

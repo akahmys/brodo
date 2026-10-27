@@ -104,6 +104,7 @@ fn cache_error(e: &CacheError) -> &'static str {
         CacheError::Grid { .. } => "Grid",
         CacheError::NoGrid(..) => "NoGrid",
         CacheError::TooLarge => "TooLarge",
+        CacheError::ReservedKey(..) => "ReservedKey",
         CacheError::FileTooLarge { .. } => "FileTooLarge",
         _ => "later",
     }
@@ -138,6 +139,7 @@ fn hermite_error(e: &HermiteError) -> &'static str {
         HermiteError::BadGroupName(..) => "BadGroupName",
         HermiteError::BadGroupKey(..) => "BadGroupKey",
         HermiteError::ReservedKey(..) => "ReservedKey",
+        HermiteError::ClaimsSdf => "ClaimsSdf",
         _ => "later",
     }
 }

@@ -108,6 +108,21 @@ fn bounds_cover_leaves_and_tiles_and_an_empty_grid_has_none() {
     assert_eq!(Bounds::of(&t).unwrap(), Bounds::Box { min: [-8, 0, 0], max: [255, 127, 127] });
 }
 
+/// Keys beginning `hermite.` are a Hermite set's (U1 of P5's review): refused by `new`, so
+/// that a grid is not taken for one by mistake, and taken by `with_reserved_keys`, which a
+/// set's own entries and files made to break the format use.
+#[test]
+fn a_hermite_key_is_written_on_purpose_only() {
+    let t = Topology::new();
+    let f = Field::new(&t, 0.0_f32);
+    let m = meta("g", &[("hermite.set", "s")]);
+    assert!(
+        matches!(CacheEntry::new(&m, &t, &f), Err(CacheError::ReservedKey(k)) if k == "hermite.set")
+    );
+    assert!(CacheEntry::with_reserved_keys(&m, &t, &f).is_ok());
+    assert!(CacheEntry::new(&meta("g", &[("hermitage", "s")]), &t, &f).is_ok());
+}
+
 #[test]
 fn metadata_needs_a_unit_and_finite_sizes() {
     assert_eq!(GridMeta::new("g", [1.0; 3], "").map(|_| ()), Err(MetaError::EmptyUnit));
