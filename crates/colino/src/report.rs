@@ -191,17 +191,25 @@ pub struct Report {
     pub located: bool,
 }
 
-/// The grid's voxel size, the least of its axes'.
-fn voxel_size(c: &Converted) -> Result<f64, ReportError> {
-    let mut h = f64::INFINITY;
-    for (k, row) in c.meta.transform.iter().take(3).enumerate() {
+/// The grid's voxel size on each axis, refused unless its transform is aligned with the
+/// axes and each size positive.
+fn voxel_sizes(c: &Converted) -> Result<[f64; 3], ReportError> {
+    let mut out = [0.0; 3];
+    for (k, h) in out.iter_mut().enumerate() {
+        let row = c.meta.transform.get(k).ok_or(ReportError::Transform)?;
         let x = row.get(k).copied().unwrap_or(0.0);
-        if x.is_nan() || x <= 0.0 {
+        let off_axis = row.iter().take(3).enumerate().any(|(j, y)| j != k && y.abs() > 0.0);
+        if off_axis || x.is_nan() || x <= 0.0 {
             return Err(ReportError::Transform);
         }
-        h = h.min(x);
+        *h = x;
     }
-    Ok(h)
+    Ok(out)
+}
+
+/// The grid's voxel size, the least of its axes'.
+fn voxel_size(c: &Converted) -> Result<f64, ReportError> {
+    Ok(voxel_sizes(c)?.into_iter().fold(f64::INFINITY, f64::min))
 }
 
 fn solid(v: f32) -> bool {
@@ -211,14 +219,11 @@ fn solid(v: f32) -> bool {
 /// The voxel holding a world point, or nothing beyond the `i32` range.
 fn voxel(c: &Converted, p: Point) -> Result<Option<Coord>, ReportError> {
     let t = c.meta.transform;
+    let sizes = voxel_sizes(c)?;
     let mut out = [0_i32; 3];
     for (k, o) in out.iter_mut().enumerate() {
         let row = t.get(k).ok_or(ReportError::Transform)?;
-        let h = row.get(k).copied().unwrap_or(0.0);
-        let off_axis = row.iter().take(3).enumerate().any(|(j, x)| j != k && x.abs() > 0.0);
-        if off_axis || h.is_nan() || h <= 0.0 {
-            return Err(ReportError::Transform);
-        }
+        let h = sizes.get(k).copied().unwrap_or(1.0);
         let index =
             ((p.get(k).copied().unwrap_or(0.0) - row.get(3).copied().unwrap_or(0.0)) / h).floor();
         if !(f64::from(i32::MIN)..=f64::from(i32::MAX)).contains(&index) {

@@ -276,6 +276,16 @@ fn bad_options_and_a_missing_unit_are_refused() {
     assert!(matches!(refused(Options::new(0.0)), Some(ConvertError::BadOption(_))));
     assert!(matches!(refused(Options::new(f64::NAN)), Some(ConvertError::BadOption(_))));
     assert!(matches!(refused(Options::new(1.0).with_band(0)), Some(ConvertError::BadOption(_))));
+    // Sizes the field's f32 distances cannot hold: an edge below the normal range, and a
+    // band's half-width, the background, beyond f32.
+    for o in [
+        Options::new(1e-46),
+        Options::new(1e-39),
+        Options::new(1e39),
+        Options::new(1e38).with_band(4),
+    ] {
+        assert!(matches!(refused(o.clone()), Some(ConvertError::BadOption(_))), "{o:?}");
+    }
     assert!(matches!(
         refused(Options::new(1.0).with_origin([f64::INFINITY, 0.0, 0.0])),
         Some(ConvertError::BadOption(_))

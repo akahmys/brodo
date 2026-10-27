@@ -222,6 +222,11 @@ pub(crate) fn thin(bvh: &Bvh, inside: &Inside<'_>, h: f64) -> Vec<Thin> {
 /// The most voxels a place's box holds at h/2 for it to be checked (ADR-0028).
 const MOST_CHECKED: i64 = 1 << 26;
 
+/// The voxels at h/2 of the box of voxels `lo` to `hi`, excluded; none beyond `i64`.
+fn fine_voxels(lo: Coord, hi: Coord) -> Option<i64> {
+    (0..3).try_fold(1_i64, |n, k| n.checked_mul(2 * i64::from(hi[k]) - 2 * i64::from(lo[k])))
+}
+
 /// The solid in voxels `lo` to `hi`, excluded, as `solid` says: a topology of the leaves
 /// covering them, 1 where solid and 0 elsewhere, the background 0.
 fn boxed(
@@ -282,8 +287,7 @@ pub(crate) fn check(
             (lo[k], hi[k]) = (a as i32, b as i32);
         }
     }
-    let fine: i64 = (0..3).map(|k| 2 * i64::from(hi[k] - lo[k])).product();
-    if fine > MOST_CHECKED {
+    if fine_voxels(lo, hi).is_none_or(|n| n > MOST_CHECKED) {
         return Ok(Check::Unchecked);
     }
     let (t, f) = boxed(lo, hi, |v| Ok(c.field.value_at(&c.topology, v)? < 0.0))?;
@@ -292,4 +296,17 @@ pub(crate) fn check(
     let (t, f) = boxed(lo.map(|x| 2 * x), hi.map(|x| 2 * x), |v| Ok(inside.at(centre(v))))?;
     let fine = invariants(&t, &f)?;
     Ok(if coarse == fine { Check::Same(coarse) } else { Check::Changed { coarse, fine } })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_box_beyond_i64_at_h_over_2_has_no_count() {
+        assert_eq!(fine_voxels([0; 3], [1, 2, 3]), Some(48));
+        let far = i32::MAX / 4;
+        // Sides of 2^30 voxels, 2^31 at h/2: 2^93 voxels.
+        assert_eq!(fine_voxels([-far; 3], [far; 3]), None);
+    }
 }

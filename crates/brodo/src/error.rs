@@ -38,8 +38,8 @@ pub enum TreeError {
         /// The voxel given.
         voxel: Coord,
     },
-    /// An arena would hold more nodes than a `u32` numbers.
-    #[error("more {0:?} nodes than a u32 numbers")]
+    /// An arena would hold more nodes than a `u32` counts.
+    #[error("more {0:?} nodes than a u32 counts")]
     ArenaFull(NodeKind),
     /// A leaf number the tree or topology did not give.
     #[error("no leaf numbered {0}")]
@@ -313,6 +313,10 @@ pub enum SliceError {
     /// The range drawn holds no pixel.
     #[error("the slice's range holds no pixel")]
     EmptyRange,
+    /// The range drawn is wider or higher than a `u32` counts, or its image does not fit in
+    /// memory.
+    #[error("the slice's range holds more pixels than an image can")]
+    TooLarge,
     /// The colour map's range is not finite, or is empty (ARCHITECTURE.md §6.1).
     #[cfg(feature = "slice-png")]
     #[error("the colour map {0:?} has no finite, non-empty range")]

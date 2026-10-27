@@ -495,6 +495,15 @@ impl Walk<'_> {
     }
 }
 
+/// Refuses a topology whose units, the outside, each leaf voxel and each tile, a `u32` does
+/// not number, before any is made: the walk finds a voxel's unit as a leaf's first plus
+/// 512 times its number.
+fn fits_units(leaves: usize, tiles: usize) -> Result<(), AnalysisError> {
+    let wide = |n: usize| u64::try_from(n).unwrap_or(u64::MAX);
+    let units = wide(leaves).saturating_mul(512).saturating_add(wide(tiles)).saturating_add(1);
+    if units > u64::from(u32::MAX) { Err(AnalysisError::TooLarge) } else { Ok(()) }
+}
+
 /// Labels the voxels of `f` whose value meets `meets`, with the given connectivity.
 pub fn label<T: Value>(
     t: &Topology,
@@ -503,6 +512,7 @@ pub fn label<T: Value>(
     conn: Connectivity,
 ) -> Result<Labels, AnalysisError> {
     f.belongs_to(t)?;
+    fits_units(t.leaf_count(), t.tile_count())?;
     let root = RootGrid::new(t)?;
     let background = meets(f.background());
     let mut units = Units::default();
@@ -665,6 +675,15 @@ pub fn flood_fill<T: Value>(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn more_units_than_a_u32_numbers_are_refused_before_any_is_made() {
+        // The outside, 512 units a leaf and one a tile: 2^23 - 1 leaves leave 511 units.
+        let leaves = (1 << 23) - 1;
+        assert!(fits_units(leaves, 510).is_ok());
+        assert!(matches!(fits_units(leaves, 511), Err(AnalysisError::TooLarge)));
+        assert!(matches!(fits_units(1 << 23, 0), Err(AnalysisError::TooLarge)));
+    }
     use crate::topology::TopologyEditor;
 
     fn topology(edit: impl FnOnce(&mut TopologyEditor<'_>)) -> Topology {

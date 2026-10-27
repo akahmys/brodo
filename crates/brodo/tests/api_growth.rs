@@ -146,6 +146,7 @@ fn slice_error(e: &SliceError) -> &'static str {
     match e {
         SliceError::Field(..) => "Field",
         SliceError::EmptyRange => "EmptyRange",
+        SliceError::TooLarge => "TooLarge",
         #[cfg(feature = "slice-png")]
         SliceError::BadColorMap(..) => "BadColorMap",
         #[cfg(feature = "slice-png")]

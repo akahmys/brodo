@@ -322,9 +322,15 @@ pub struct Tree {
 }
 
 fn push<T>(arena: &mut Vec<T>, item: T, kind: NodeKind) -> Result<u32, TreeError> {
-    let id = u32::try_from(arena.len()).map_err(|_| TreeError::ArenaFull(kind))?;
+    let id = next_id(arena.len(), kind)?;
     arena.push(item);
     Ok(id)
+}
+
+/// The id of the next of `len` entries of an arena, refused unless the arena's count then
+/// still fits a `u32`, so that numbering every entry from 0 in `u32` never overflows.
+fn next_id(len: usize, kind: NodeKind) -> Result<u32, TreeError> {
+    u32::try_from(len).ok().filter(|id| *id < u32::MAX).ok_or(TreeError::ArenaFull(kind))
 }
 
 impl Tree {
@@ -691,6 +697,13 @@ mod tests {
     use proptest::prelude::*;
 
     use super::*;
+
+    #[test]
+    fn an_arena_holds_no_more_entries_than_a_u32_counts() {
+        let last = u32::MAX as usize - 1;
+        assert_eq!(next_id(last, NodeKind::Leaf), Ok(u32::MAX - 1));
+        assert_eq!(next_id(last + 1, NodeKind::Leaf), Err(TreeError::ArenaFull(NodeKind::Leaf)));
+    }
 
     #[test]
     fn mask_offsets_cross_word_boundaries() {

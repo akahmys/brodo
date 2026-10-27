@@ -55,6 +55,23 @@ are recorded here when they change (V6).
   `HermiteError::OtherTopology` (docs/formats.md §4.2, rule 3): the values beyond the
   signs' were reached by no node and checked by nothing. This refuses files version 1
   accepted; brodo writes none (ADR-0038).
+- colino's third layer leaves a place unchecked when its box at h/2 holds more voxels than
+  an `i64` counts, rather than overflowing the count.
+- colino's report refuses a transform not aligned with the axes, `ReportError::Transform`,
+  whether or not a point is placed: the third layer read only its diagonal.
+- A commit that removes a leaf and adds a root tile over it no longer fails a debug
+  assertion; the tile holds the background, as in a release build.
+- `slice::render` refuses a range wider or higher than a `u32` counts, or whose image does
+  not fit in memory, with the new `SliceError::TooLarge`, rather than `EmptyRange` or a
+  panic.
+- colino's conversion refuses a voxel size below `f32`'s normal range, or a band's
+  half-width beyond `f32`, `ConvertError::BadOption`: the field's distances could not hold
+  them.
+- A tree refuses a node or a leaf that would make its arena's count beyond a `u32`,
+  `TreeError::ArenaFull`, so that numbering every leaf never overflows.
+- `label` refuses a topology whose voxels and tiles a `u32` does not number before making
+  any unit, `AnalysisError::TooLarge`, rather than overflowing the walk's unit numbers.
+- colino's 3MF reader refuses a vertex number beyond a `u32`, rather than clamping it.
 
 ### Breaking
 

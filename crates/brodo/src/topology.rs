@@ -407,15 +407,10 @@ fn tile_source(
         (TileLevel::Lower | TileLevel::Root, Location::Background) => {
             return Ok(TileSource::Background);
         }
+        // A lower tile has no smaller tile, and nothing merges into a root tile: a root
+        // tile over a leaf is added where the edit removed the leaf.
         (TileLevel::Lower | TileLevel::Root, Location::Tile(..))
-        | (TileLevel::Root, Location::Leaf(_)) => {
-            // A lower tile has no smaller tile, and nothing merges into a root tile.
-            debug_assert!(
-                matches!(was, Location::Background),
-                "no edit makes {level:?} from {was:?}"
-            );
-            return Ok(TileSource::Background);
-        }
+        | (TileLevel::Root, Location::Leaf(_)) => return Ok(TileSource::Background),
     }
     // Only regions that were the background: an added tile, not a merge.
     if parts.get(start..).unwrap_or(&[]).iter().all(|p| matches!(p, Part::Background(_))) {
@@ -520,6 +515,20 @@ mod tests {
         let mut e = t.edit();
         f(&mut e);
         e.commit().unwrap()
+    }
+
+    #[test]
+    fn a_root_tile_added_where_an_edit_removed_a_leaf_holds_the_background() {
+        // The leaf at the root region's origin, where the new tile's source is looked for.
+        let (t, _) = commit_with(&Topology::new(), |e| {
+            e.activate([0, 0, 0]).unwrap();
+        });
+        let (after, remap) = commit_with(&t, |e| {
+            e.deactivate([0, 0, 0]).unwrap();
+            e.add_tile(TileLevel::Root, [8, 0, 0]).unwrap();
+        });
+        assert_eq!(after.tile(TileNumber(0)), Ok((TileLevel::Root, [0; 3])));
+        assert_eq!(remap.tile_sources(), [TileSource::Background]);
     }
 
     #[test]

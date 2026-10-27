@@ -664,8 +664,10 @@ fn place(mesh: &mut Mesh, v: &[[f64; 3]], t: &[[u32; 3]], m: &Transform) -> Resu
         mesh.vertices.push(q);
     }
     let flip = turns_inside_out(m);
+    let too_many = ReadError::TooLarge { what: "vertices", limit: u64::from(u32::MAX) };
     for [a, b, c] in t {
-        let [a, b, c] = [a, b, c].map(|i| base.saturating_add(*i));
+        let at = |i: &u32| base.checked_add(*i).ok_or(too_many.clone());
+        let [a, b, c] = [at(a)?, at(b)?, at(c)?];
         mesh.triangles.push(if flip { [a, c, b] } else { [a, b, c] });
     }
     Ok(())

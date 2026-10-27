@@ -11,6 +11,7 @@ lib colino mesh::tests::welding_keeps_each_triangles_group
 lib colino parity::tests::a_cube_is_inside_along_its_split_edges_whatever_its_faces
 lib colino parity::tests::a_line_on_an_edge_or_a_corner_counts_once_and_a_fold_none_or_twice
 lib colino surface::tests::counting_a_tetrahedron_ends_in_time
+lib colino thin::tests::a_box_beyond_i64_at_h_over_2_has_no_count
 lib colino winding::tests::approximating_a_small_soup_ends_in_time
 test api_growth every_enum_that_may_grow_is_matched_with_a_wildcard
 test api_growth every_struct_is_built_by_its_constructor_set_by_assignment_and_read_by_its_fields

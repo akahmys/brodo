@@ -188,8 +188,8 @@ fn a_transform_not_axis_aligned_is_refused() {
         c.meta.transform[1][1] = h;
         assert_eq!(report(&m, &c, &[("p".into(), [0.0; 3])]), Err(ReportError::Transform));
     }
-    // With no point to place, the transform is never read.
-    assert!(report(&m, &c, &[]).is_ok());
+    // With no point to place, the third layer reads it.
+    assert_eq!(report(&m, &c, &[]), Err(ReportError::Transform));
 }
 
 /// A point is placed by the grid's own origin: a sphere at x = 100 converted on a lattice

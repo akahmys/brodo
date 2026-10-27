@@ -139,6 +139,14 @@ impl Options {
         if self.band == 0 {
             return Err(ConvertError::BadOption("a band of no voxels"));
         }
+        // The field holds f32 distances: a voxel's edge must be one, not rounded to zero
+        // or below the normal range, and the band's half-width, the background, finite.
+        if self.voxel_size < f64::from(f32::MIN_POSITIVE) {
+            return Err(ConvertError::BadOption("a voxel size below f32's normal range"));
+        }
+        if f64::from(self.band) * self.voxel_size > f64::from(f32::MAX) {
+            return Err(ConvertError::BadOption("a band's half-width beyond f32"));
+        }
         if let Accuracy::Approximate { beta } = self.accuracy
             && !(beta.is_finite() && beta > 0.0)
         {

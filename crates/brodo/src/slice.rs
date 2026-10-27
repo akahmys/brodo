@@ -158,15 +158,19 @@ pub fn render<T: Value + Into<f64>>(
     map: ColorMap,
 ) -> Result<Image, SliceError> {
     map.check()?;
-    let width = u32::try_from(i64::from(slice.max[0]) - i64::from(slice.min[0]) + 1)
-        .map_err(|_| SliceError::EmptyRange)?;
-    let height = u32::try_from(i64::from(slice.max[1]) - i64::from(slice.min[1]) + 1)
-        .map_err(|_| SliceError::EmptyRange)?;
-    if width == 0 || height == 0 {
-        return Err(SliceError::EmptyRange);
-    }
+    let side = |k: usize| {
+        let n = i64::from(slice.max[k]) - i64::from(slice.min[k]) + 1;
+        if n <= 0 {
+            return Err(SliceError::EmptyRange);
+        }
+        u32::try_from(n).map_err(|_| SliceError::TooLarge)
+    };
+    let (width, height) = (side(0)?, side(1)?);
     let mut acc = ValueAccessor::new(t, f)?;
-    let mut pixels = Vec::with_capacity(width as usize * height as usize);
+    let count =
+        usize::try_from(u64::from(width) * u64::from(height)).map_err(|_| SliceError::TooLarge)?;
+    let mut pixels = Vec::new();
+    pixels.try_reserve_exact(count).map_err(|_| SliceError::TooLarge)?;
     for v in (slice.min[1]..=slice.max[1]).rev() {
         for u in slice.min[0]..=slice.max[0] {
             let voxel = slice.voxel(u, v);
@@ -178,7 +182,9 @@ pub fn render<T: Value + Into<f64>>(
         }
     }
     let w = width as usize;
-    let mut rgba = Vec::with_capacity(pixels.len() * 4);
+    let mut rgba = Vec::new();
+    let bytes = pixels.len().checked_mul(4).ok_or(SliceError::TooLarge)?;
+    rgba.try_reserve_exact(bytes).map_err(|_| SliceError::TooLarge)?;
     for (i, p) in pixels.iter().enumerate() {
         let (row, col) = (i / w, i % w);
         let rgb = match *p {
@@ -266,6 +272,18 @@ mod tests {
             [ColorMap::Diverging { limit: 3.0 }, ColorMap::Sequential { min: -1.0, max: 1.0 }]
         {
             assert_eq!(draw(map).unwrap().rgba.len(), 8 * 8 * 4, "{map:?}");
+        }
+    }
+
+    #[test]
+    fn a_range_too_large_to_hold_is_refused() {
+        let t = Topology::new();
+        let f = Field::new(&t, 1.0_f32);
+        let map = ColorMap::Diverging { limit: 3.0 };
+        // 2^32 pixels wide, beyond a u32 width; and 2^31 - 2 square, beyond any memory.
+        for (min, max) in [([i32::MIN, 0], [i32::MAX, 0]), ([0, 0], [i32::MAX - 2; 2])] {
+            let got = render(&t, &f, Slice { axis: Axis::Z, position: 0, min, max }, map);
+            assert!(matches!(got, Err(SliceError::TooLarge)), "{max:?}: {got:?}");
         }
     }
 
