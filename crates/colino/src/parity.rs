@@ -62,15 +62,11 @@ fn height(p: Point, k: usize, t: [Point; 3]) -> Option<f64> {
     Some((w[0] * q[0][2] + w[1] * q[1][2] + w[2] * q[2][2]) / det)
 }
 
-/// The mesh's box grown by 1 on every side, or nothing for a mesh with no triangle.
-fn reach(bvh: &Bvh) -> Option<(Point, Point)> {
-    let (lo, hi) = bvh.bounds()?;
-    Some((lo.map(|c| c - 1.0), hi.map(|c| c + 1.0)))
-}
-
 /// Whether `p` is inside the mesh `bvh` holds, by the parity count along the three axes.
+/// Each line runs across the mesh's box, `p` within it: the segment only finds the
+/// triangles whose boxes it meets, with the query's margin, and each is then tested whole.
 pub(crate) fn inside(bvh: &Bvh, p: Point) -> bool {
-    let Some((lo, hi)) = reach(bvh) else { return false };
+    let Some((lo, hi)) = bvh.bounds() else { return false };
     let mut votes = 0_i32;
     for k in 0..3 {
         let (mut a, mut b) = (p, p);
@@ -94,6 +90,44 @@ pub(crate) fn inside(bvh: &Bvh, p: Point) -> bool {
 mod tests {
     use super::*;
     use crate::mesh::Mesh;
+
+    /// An edge function of exactly 0 takes the sign the line moved by (ε, ε²) gives: the
+    /// first-order term −(b_y − a_y) ε where it is not 0, else the second (b_x − a_x) ε²;
+    /// an edge of no length, both 0, is 0.
+    #[test]
+    fn an_edge_through_the_line_takes_the_moved_lines_sign() {
+        assert_eq!(side([0.0, -1.0], [0.0, 1.0]), -1);
+        assert_eq!(side([0.0, 1.0], [0.0, -1.0]), 1);
+        assert_eq!(side([-1.0, 0.0], [1.0, 0.0]), 1);
+        assert_eq!(side([1.0, 0.0], [-1.0, 0.0]), -1);
+        assert_eq!(side([2.0, 2.0], [2.0, 2.0]), 0);
+        // Off the line, the function's own sign.
+        assert_eq!(side([1.0, 0.0], [1.0, 1.0]), 1);
+    }
+
+    /// Two quads across one axis and none across another: the votes tie, and a tie is
+    /// outside; a line crossing an odd number of times, through the third axis's one quad,
+    /// does not vote (W1 of P5's review).
+    #[test]
+    fn tied_votes_are_outside_and_an_odd_line_does_not_vote() {
+        // A unit square in the plane across axis `k` at `at`, as two triangles.
+        let quad = |k: usize, at: f64, v: &mut Vec<Point>, t: &mut Vec<[u32; 3]>| {
+            let base = u32::try_from(v.len()).unwrap();
+            for (u, w) in [(-0.5, -0.5), (0.5, -0.5), (0.5, 0.5), (-0.5, 0.5)] {
+                let mut p = [0.0; 3];
+                (p[k], p[(k + 1) % 3], p[(k + 2) % 3]) = (at, u, w);
+                v.push(p);
+            }
+            t.extend([[base, base + 1, base + 2], [base, base + 2, base + 3]]);
+        };
+        let (mut v, mut t) = (Vec::new(), Vec::new());
+        quad(0, -1.0, &mut v, &mut t);
+        quad(0, 1.0, &mut v, &mut t);
+        quad(1, 1.0, &mut v, &mut t);
+        let bvh = Bvh::new(&Mesh::new(v, t)).unwrap();
+        // x: two crossings, one above, inside; y: one, no vote; z: none, outside.
+        assert!(!inside(&bvh, [0.0, 0.0, 0.0]));
+    }
 
     /// Lines through a shared edge, a shared corner and a fold, counted by the triangles
     /// that hold them, every way each triangle can be turned.

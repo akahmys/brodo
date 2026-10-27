@@ -89,10 +89,8 @@ fn samples(t: [Point; 3], step: f64) -> Vec<Point> {
         let sections = (long / step).ceil().max(1.0) as u32;
         for i in 0..sections {
             let x = (f64::from(i) + 0.5) * long / f64::from(sections);
+            // Strictly within (0, long), x has a positive height: the section holds a point.
             let w = height(x);
-            if w.is_nan() || w <= 0.0 {
-                continue;
-            }
             #[expect(clippy::cast_possible_truncation, reason = "a count of parts, at least 1")]
             #[expect(clippy::cast_sign_loss, reason = "a count of parts, at least 1")]
             let parts = (w / step).ceil().max(1.0) as u32;
@@ -208,8 +206,8 @@ fn places(points: &[Found], kind: ThinKind, reach: f64) -> Vec<Thin> {
 /// The thin walls, then the narrow gaps, of the mesh `bvh` holds, sides found by `inside`,
 /// at voxel size `h`.
 pub(crate) fn thin(bvh: &Bvh, inside: &Inside<'_>, h: f64) -> Vec<Thin> {
-    let Some((lo, hi)) = bvh.bounds() else { return Vec::new() };
-    let reach = 2.0 * length(sub(hi, lo)) + 2.0 * h;
+    // A ray need reach no farther than the thinnest place it is looking for, 2h.
+    let reach = 2.0 * h;
     let found: Vec<Found> = (0..bvh.len())
         .into_par_iter()
         .map(|own| measure(bvh, inside, own, h, reach))
@@ -217,8 +215,10 @@ pub(crate) fn thin(bvh: &Bvh, inside: &Inside<'_>, h: f64) -> Vec<Thin> {
         .into_iter()
         .flatten()
         .collect();
-    let mut out = places(&found, ThinKind::Wall, 2.0 * h);
-    out.extend(places(&found, ThinKind::Gap, 2.0 * h));
+    // Points within 2h of each other, of one kind, are one place.
+    let join = 2.0 * h;
+    let mut out = places(&found, ThinKind::Wall, join);
+    out.extend(places(&found, ThinKind::Gap, join));
     out
 }
 
@@ -228,6 +228,29 @@ const MOST_CHECKED: i64 = 1 << 26;
 /// The voxels at h/2 of the box of voxels `lo` to `hi`, excluded; none beyond `i64`.
 fn fine_voxels(lo: Coord, hi: Coord) -> Option<i64> {
     (0..3).try_fold(1_i64, |n, k| n.checked_mul(2 * i64::from(hi[k]) - 2 * i64::from(lo[k])))
+}
+
+/// The voxels along one axis of the box holding a place from index `lo` to `hi`, grown by
+/// 2 on each side; none unless it lies within ±`i32::MAX` / 4, so that the box at h/2 does
+/// too.
+fn voxel_range(lo: f64, hi: f64) -> Option<(i32, i32)> {
+    let limit = f64::from(i32::MAX / 4);
+    let (a, b) = (lo.floor() - 2.0, hi.ceil() + 2.0);
+    if !(a.abs() < limit && b.abs() < limit) {
+        return None;
+    }
+    #[expect(clippy::cast_possible_truncation, reason = "within ±i32::MAX / 4, checked above")]
+    Some((a as i32, b as i32))
+}
+
+/// The centre of voxel `v` at h/2 on the lattice of voxel size `h` with corner `origin`.
+fn fine_centre(origin: Point, h: Point, v: Coord) -> Point {
+    [0, 1, 2].map(|k| origin[k] + (f64::from(v[k]) + 0.5) * h[k] / 2.0)
+}
+
+/// Whether a box of voxels `lo` to `hi` is checked: at most `MOST_CHECKED` voxels at h/2.
+fn checked(lo: Coord, hi: Coord) -> bool {
+    fine_voxels(lo, hi).is_some_and(|n| n <= MOST_CHECKED)
 }
 
 /// The solid in voxels `lo` to `hi`, excluded, as `solid` says: a topology of the leaves
@@ -277,26 +300,21 @@ pub(crate) fn check(
 ) -> Result<Check, AnalysisError> {
     let m = c.meta.transform;
     let (h, origin) = ([m[0][0], m[1][1], m[2][2]], [m[0][3], m[1][3], m[2][3]]);
-    let limit = f64::from(i32::MAX / 4);
     let index = |p: f64, k: usize| (p - origin[k]) / h[k];
     let (mut lo, mut hi) = ([0_i32; 3], [0_i32; 3]);
     for k in 0..3 {
-        let (a, b) = (index(place.lo[k], k).floor() - 2.0, index(place.hi[k], k).ceil() + 2.0);
-        if !(a.abs() < limit && b.abs() < limit) {
+        let Some(range) = voxel_range(index(place.lo[k], k), index(place.hi[k], k)) else {
             return Ok(Check::Unchecked);
-        }
-        #[expect(clippy::cast_possible_truncation, reason = "within ±i32::MAX / 4, checked above")]
-        {
-            (lo[k], hi[k]) = (a as i32, b as i32);
-        }
+        };
+        (lo[k], hi[k]) = range;
     }
-    if fine_voxels(lo, hi).is_none_or(|n| n > MOST_CHECKED) {
+    if !checked(lo, hi) {
         return Ok(Check::Unchecked);
     }
     let (t, f) = boxed(lo, hi, |v| Ok(c.field.value_at(&c.topology, v)? < 0.0))?;
     let coarse = invariants(&t, &f)?;
-    let centre = |v: Coord| [0, 1, 2].map(|k| origin[k] + (f64::from(v[k]) + 0.5) * h[k] / 2.0);
-    let (t, f) = boxed(lo.map(|x| 2 * x), hi.map(|x| 2 * x), |v| Ok(inside.at(centre(v))))?;
+    let (t, f) =
+        boxed(lo.map(|x| 2 * x), hi.map(|x| 2 * x), |v| Ok(inside.at(fine_centre(origin, h, v))))?;
     let fine = invariants(&t, &f)?;
     Ok(if coarse == fine { Check::Same(coarse) } else { Check::Changed { coarse, fine } })
 }
@@ -304,6 +322,60 @@ pub(crate) fn check(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The points of a triangle whose longest edge runs along x from the origin, sampled 2
+    /// apart (W2 of P5's review): sections at x = 1, 3, 5, 7, their heights 2, 10/3, 2 and
+    /// 2/3, split into 1, 2, 1 and 1 parts.
+    #[test]
+    fn a_triangle_is_sampled_by_sections_of_its_longest_edge() {
+        let t = [[0.0, 0.0, 0.0], [8.0, 0.0, 0.0], [2.0, 4.0, 0.0]];
+        let want = [[1.0, 1.0], [3.0, 5.0 / 6.0], [3.0, 2.5], [5.0, 1.0], [7.0, 1.0 / 3.0]];
+        let got = samples(t, 2.0);
+        assert_eq!(got.len(), want.len(), "{got:?}");
+        for (g, w) in got.iter().zip(want) {
+            assert!((g[0] - w[0]).abs() < 1e-12 && (g[1] - w[1]).abs() < 1e-12, "{g:?} {w:?}");
+            assert_eq!(g[2].to_bits(), 0.0_f64.to_bits());
+        }
+        // A triangle of no area has its centroid alone.
+        let flat = [[0.0, 0.0, 0.0], [3.0, 3.0, 3.0], [6.0, 6.0, 6.0]];
+        let line = [[1.0, 2.0, 3.0], [4.0, 2.0, 3.0], [7.0, 2.0, 3.0]];
+        assert_eq!(samples(line, 2.0), [[4.0, 2.0, 3.0]]);
+        assert_eq!(samples(flat, 2.0), [[3.0, 3.0, 3.0]]);
+    }
+
+    /// Only the voxels from `lo` to `hi`, excluded, are solid, though the leaves covering
+    /// them hold more.
+    #[test]
+    fn a_box_holds_its_voxels_alone() {
+        let (t, f) = boxed([1, 1, 1], [3, 3, 4], |_| Ok(true)).unwrap();
+        let solid: usize = t
+            .leaf_numbers()
+            .map(|n| f.leaf(&t, n).unwrap().iter().filter(|v| **v == 1).count())
+            .sum();
+        assert_eq!(solid, 2 * 2 * 3);
+    }
+
+    /// A place's box along one axis grows by 2 voxels on each side, and lies within
+    /// ±`i32::MAX` / 4; a box is checked up to `MOST_CHECKED` voxels at h/2.
+    #[test]
+    fn a_places_box_is_bounded_and_checked_up_to_its_limit() {
+        assert_eq!(voxel_range(1.5, 3.25), Some((-1, 6)));
+        let limit = f64::from(i32::MAX / 4);
+        assert_eq!(voxel_range(-limit + 3.0, 0.0), Some((-(i32::MAX / 4) + 1, 2)));
+        assert_eq!(voxel_range(-limit + 2.0, 0.0), None);
+        assert_eq!(voxel_range(0.0, limit - 3.0), Some((-2, i32::MAX / 4 - 1)));
+        assert_eq!(voxel_range(0.0, limit - 2.0), None);
+        // 2^26 voxels at h/2: 256 × 512 × 512, a box of 128 × 256 × 256 voxels.
+        assert!(checked([0; 3], [128, 256, 256]));
+        assert!(!checked([0; 3], [128, 256, 257]));
+    }
+
+    #[test]
+    fn a_voxel_at_h_over_2_is_sampled_at_its_centre() {
+        let c = fine_centre([1.0, -2.0, 0.5], [0.5, 1.0, 2.0], [2, -3, 0]);
+        let want: [f64; 3] = [1.625, -3.25, 1.0];
+        assert_eq!(c.map(f64::to_bits), want.map(f64::to_bits));
+    }
 
     #[test]
     fn a_box_beyond_i64_at_h_over_2_has_no_count() {

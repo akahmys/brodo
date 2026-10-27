@@ -255,3 +255,25 @@ fn a_cube_far_from_the_origin_has_no_thin_place() {
     let m = boxes(&[([far, 0.0, 0.0], [far + 10.0, 10.0, 10.0])]);
     assert_eq!(thin(&m, &options()), Vec::new());
 }
+
+/// At h = 0.5 on a lattice moved off the origin (W3, W4 of P5's review): two plates 0.6
+/// thick and 1.5 apart are two walls, their thin points farther apart than 2h, each
+/// measured, sampled h/2 apart over both faces, and checked where it lies.
+#[test]
+fn two_plates_at_half_a_voxel_are_two_walls_checked_where_they_lie() {
+    let (t, apart) = (0.6, 1.5);
+    let m = boxes(&[
+        ([-3.0, -3.0, 0.0], [3.0, 3.0, t]),
+        ([-3.0, -3.0, t + apart], [3.0, 3.0, 2.0 * t + apart]),
+    ]);
+    let o = Options::new(0.5).with_origin([7.3, -5.2, 3.1]);
+    let places = thin(&m, &o);
+    assert_eq!(places.len(), 2, "{places:?}");
+    for p in &places {
+        assert_eq!(p.kind, ThinKind::Wall);
+        assert!((p.least - t).abs() < 1e-9, "{}", p.least);
+        // Two faces of 36 each, a point every h/2 = 0.25: some 1150 points.
+        assert!(p.points > 1000, "{}", p.points);
+        assert!(matches!(p.check, Check::Same(i) if i.solid >= 1), "{:?}", p.check);
+    }
+}
