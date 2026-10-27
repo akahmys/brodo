@@ -457,6 +457,27 @@ mod tests {
         assert!(ties > 0, "no tie was decided");
     }
 
+    /// The tree's nearest triangle to a point is the one a scan of every triangle in
+    /// ascending order finds, ties among them.
+    #[test]
+    fn the_nearest_to_a_point_is_the_scans() {
+        let mut next = sequence();
+        let bvh = Bvh::new(&scattered(&mut next)).unwrap();
+        for _ in 0..400 {
+            let p = [next(), next(), next()].map(|x| x * 1.5);
+            let mut scan: Option<(f64, u32)> = None;
+            for i in 0..bvh.len() {
+                let Some(t) = bvh.corners(i) else { continue };
+                let d = squared(p, on_triangle(p, t));
+                if scan.is_none_or(|(e, _)| d < e) {
+                    scan = Some((d, i));
+                }
+            }
+            let found = bvh.nearest(p).map(|(d, i)| (d.to_bits(), i));
+            assert_eq!(found, scan.map(|(d, i)| (d.sqrt().to_bits(), i)), "{p:?}");
+        }
+    }
+
     /// The tree's first crossing of a segment is the least a scan of every triangle finds:
     /// for segments at random, most crossing nothing, and for segments through a
     /// triangle's centroid and on beyond it.

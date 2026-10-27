@@ -816,6 +816,30 @@ mod tests {
         assert!(!l.reaches_outside(centre) && l.reaches_outside(far));
     }
 
+    /// Labelling a leaf in each of 16 root regions ends at once: the walk takes an upper node's empty places whole,
+    /// and a mutant that split each of them into its 4096 lower places, the same labels
+    /// found by 10⁸ more steps, fails here, in the first test binary (TESTING.md T11).
+    #[test]
+    fn labelling_a_few_leaves_ends_in_time() {
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            // A leaf in each of 16 root regions, each holding an upper node of 32 767
+            // empty places.
+            let t = topology(|e| {
+                for i in 0..16 {
+                    e.activate([4096 * i, 0, 0]).unwrap();
+                }
+            });
+            let mut f = Field::new(&t, -1.0_f32);
+            for n in t.leaf_numbers() {
+                f.leaf_mut(&t, n).unwrap().fill(1.0);
+            }
+            tx.send(label(&t, &f, positive, Connectivity::Six).map(|l| l.count())).unwrap_or(());
+        });
+        let got = rx.recv_timeout(std::time::Duration::from_secs(20));
+        assert!(matches!(got, Ok(Ok(16))), "{got:?}");
+    }
+
     #[test]
     fn tiles_join_what_touches_them() {
         let t = topology(|e| {

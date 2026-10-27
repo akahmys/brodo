@@ -248,6 +248,47 @@ impl Winding {
 mod tests {
     use super::*;
 
+    /// A node's expansion is about its triangles' area-weighted centroid, and their
+    /// corners' mean when none has area: worked by hand, so that a broken expansion fails
+    /// here, in the first test binary, not in a slow test (TESTING.md T11).
+    #[test]
+    fn an_expansion_is_about_the_area_weighted_centroid() {
+        let near = |a: Point, b: Point| (0..3).all(|k| (a[k] - b[k]).abs() < 1e-12);
+        // Areas 2 and 0.5, centroids (2/3, 2/3, 0) and (1/3, 1/3, 1).
+        let big = [[0.0, 0.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0]];
+        let small = [[0.0, 0.0, 1.0], [1.0, 0.0, 1.0], [0.0, 1.0, 1.0]];
+        let e = Expansion::of(&[big, small]);
+        assert!(near(e.centre, [0.6, 0.6, 0.2]), "{:?}", e.centre);
+        let flat = |x: f64| [[x, 0.0, 0.0], [x, 0.0, 0.0], [x, 0.0, 0.0]];
+        assert!(near(Expansion::of(&[flat(1.0), flat(4.0)]).centre, [2.5, 0.0, 0.0]));
+    }
+
+    /// Far from an open box, a cube without its top, the approximation takes nodes whole:
+    /// its value differs from the exact sum's by the expansion's truncation, far more than
+    /// summing every triangle in another order would.
+    #[test]
+    fn far_away_the_approximation_takes_nodes_whole() {
+        let corner = |i: u32| [0, 1, 2].map(|k| if i >> k & 1 == 1 { 1.0 } else { -1.0 });
+        let faces: [[u32; 3]; 10] = [
+            [0, 2, 3],
+            [0, 3, 1],
+            [0, 1, 5],
+            [0, 5, 4],
+            [2, 6, 7],
+            [2, 7, 3],
+            [0, 4, 6],
+            [0, 6, 2],
+            [1, 3, 7],
+            [1, 7, 5],
+        ];
+        let w = Winding::new(&Mesh::new((0..8).map(corner).collect(), faces.to_vec())).unwrap();
+        let q = [30.0, 20.0, 10.0];
+        let (exact, near) =
+            (w.number(q, Accuracy::Exact), w.number(q, Accuracy::Approximate { beta: 2.0 }));
+        let off = (near - exact).abs();
+        assert!(off > 1e-12 && off < 1e-3 * exact.abs().max(1e-6), "{exact} {near}");
+    }
+
     /// The approximation over a few hundred triangles ends: a mutant that makes its walk
     /// down the tree loop for ever fails here within a minute, in the first test binary,
     /// before the tests that would only wait for it (TESTING.md T11).

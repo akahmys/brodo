@@ -92,3 +92,23 @@ pub fn on_triangle(p: Point, t: [Point; 3]) -> Point {
     let (v, w) = (vb * denom, vc * denom);
     [a[0] + ab[0] * v + ac[0] * w, a[1] + ab[1] * v + ac[1] * w, a[2] + ab[2] * v + ac[2] * w]
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The vector helpers on values worked by hand: a broken one fails here, in the first
+    /// test binary, before the tests that would only run slowly on it (TESTING.md T11).
+    #[test]
+    fn the_vector_helpers_give_what_is_worked_by_hand() {
+        let (a, b) = ([1.0, -2.0, 3.0], [4.0, 0.5, -1.0]);
+        let bits = |p: Point| p.map(f64::to_bits);
+        assert_eq!(bits(add(a, b)), bits([5.0, -1.5, 2.0]));
+        assert_eq!(bits(sub(a, b)), bits([-3.0, -2.5, 4.0]));
+        assert_eq!(bits(scale(a, 2.0)), bits([2.0, -4.0, 6.0]));
+        assert_eq!(bits(cross([1.0, 0.0, 0.0], [0.0, 1.0, 0.0])), bits([0.0, 0.0, 1.0]));
+        assert_eq!(dot(a, [2.0, 1.0, -1.0]).to_bits(), (-3.0_f64).to_bits());
+        assert_eq!(length([3.0, 4.0, 12.0]).to_bits(), 13.0_f64.to_bits());
+        assert_eq!(squared(a, b).to_bits(), (9.0_f64 + 6.25 + 16.0).to_bits());
+    }
+}
