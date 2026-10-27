@@ -373,4 +373,35 @@ mod tests {
         assert!(leaves.is_empty());
         assert_eq!(split.len(), 512 * 512 * 512 - 510 * 510 * 510);
     }
+
+    #[test]
+    fn the_box_holds_every_region() {
+        assert_eq!(bounds(&[]), None);
+        assert_eq!(bounds(&[([1, 2, 3], 2), ([-4, 5, 0], 1)]), Some(([-4, 2, 0], [3, 6, 5])));
+    }
+
+    /// A dilation is refused just where its new leaves could number more than a `u32`:
+    /// one region's by its shell, a region's at either end of the range by the box kept to
+    /// the range, and many regions' by the box holding them, taken when it holds exactly
+    /// `u32::MAX` cells.
+    #[test]
+    fn a_dilation_is_refused_just_beyond_a_u32s_count() {
+        let refused = |regions: &[([i64; 3], i64)], k| within_count(regions, k).is_err();
+        // Side 3: reach 811 (k = 6488) gives 1625³ − 27 cells, reach 812 (k = 6489) 1627³ − 27.
+        assert!(!refused(&[([0; 3], 3)], 6488));
+        assert!(refused(&[([0; 3], 3)], 6489));
+        // A cell at either end: the box keeps 1 + r of each side, 1625³ ≤ u32::MAX < 1626³.
+        let (first, last) = (i64::from(i32::MIN) / CELL, i64::from(i32::MAX) / CELL + 1);
+        for lo in [first, last - 1] {
+            assert!(!refused(&[([lo; 3], 1)], 8 * 1624), "{lo}");
+            assert!(refused(&[([lo; 3], 1)], 8 * 1625), "{lo}");
+        }
+        // Reach 100: two cells whose box is 255 × 257 × 65537 = u32::MAX cells, and copies
+        // of one whose shells are more.
+        let mut many = vec![([0, 0, 0], 1); 528];
+        many.push(([54, 56, 65336], 1));
+        assert!(!refused(&many, 800));
+        many.push(([54, 56, 65337], 1));
+        assert!(refused(&many, 800));
+    }
 }

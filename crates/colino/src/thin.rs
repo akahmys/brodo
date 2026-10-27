@@ -392,4 +392,20 @@ mod tests {
         // Sides of 2^30 voxels, 2^31 at h/2: 2^93 voxels.
         assert_eq!(fine_voxels([-far; 3], [far; 3]), None);
     }
+
+    /// Two points within reach, the first in the cell below the second's along each axis
+    /// in turn: they are one place, found by looking in the cells on both sides.
+    #[test]
+    fn points_within_reach_across_a_cell_boundary_are_one_place() {
+        for axis in 0..3 {
+            let at = |c: f64| {
+                let mut p = [0.5; 3];
+                p[axis] = c;
+                Found { kind: ThinKind::Wall, at: p, measure: 1.0 }
+            };
+            let got = places(&[at(-0.1), at(0.1)], ThinKind::Wall, 1.0);
+            assert_eq!(got.len(), 1, "axis {axis}: {got:?}");
+            assert_eq!(got[0].points, 2);
+        }
+    }
 }

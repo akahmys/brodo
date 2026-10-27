@@ -727,6 +727,10 @@ mod tests {
         let inside = l.label_at(&t, [3, 3, 3]).unwrap();
         let outside = l.label_at(&t, [100, 0, 0]).unwrap();
         assert_ne!(inside, outside);
+        // In the upper node, in no lower node: each of its lower regions is a unit.
+        for v in [[200, 200, 200], [4000, 300, 2000]] {
+            assert_eq!(l.label_at(&t, v), Ok(outside), "{v:?}");
+        }
         assert!(!l.reaches_outside(inside) && l.reaches_outside(outside));
         assert_eq!(l.label_at(&t, [-8, 0, 0]).unwrap(), Label::Excluded);
     }

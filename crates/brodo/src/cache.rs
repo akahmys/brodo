@@ -139,12 +139,12 @@ fn emit(entries: &[CacheEntry], out: &mut impl std::io::Write) -> Result<(), Cac
         ] {
             put_u32(&mut head, x);
         }
-        places.push((meta_at, grid_at));
+        places.push(grid_at);
     }
     out.write_all(&head)?;
     let mut written = head.len();
-    for ((e, m), (meta_at, grid_at)) in entries.iter().zip(&metas).zip(places) {
-        pad_to(out, meta_at * BLOCK, &mut written)?;
+    // Each metadata starts where the part before it ends, the head or a grid, at a block.
+    for ((e, m), grid_at) in entries.iter().zip(&metas).zip(places) {
         out.write_all(m)?;
         written += m.len();
         pad_to(out, grid_at * BLOCK, &mut written)?;
@@ -418,6 +418,24 @@ fn zero(bytes: &[u8]) -> bool {
     bytes.iter().all(|b| *b == 0)
 }
 
+/// Reads `source` to its end into `blocks`, from their start, growing them as it needs:
+/// the bytes read. A read interrupted is tried again.
+fn fill(source: &mut impl Read, blocks: &mut Vec<Block>) -> std::io::Result<usize> {
+    let mut filled = 0_usize;
+    loop {
+        if filled == blocks.len() * BLOCK {
+            blocks.resize(blocks.len() * 2, Block::new_zeroed());
+        }
+        let Some(free) = blocks.as_mut_bytes().get_mut(filled..) else { return Ok(filled) };
+        match source.read(free) {
+            Ok(0) => return Ok(filled),
+            Ok(n) => filled += n,
+            Err(e) if e.kind() == std::io::ErrorKind::Interrupted => {}
+            Err(e) => return Err(e),
+        }
+    }
+}
+
 impl CacheFile {
     /// Reads and checks a cache file of at most `limit` bytes; a longer one is refused by
     /// its length before any of it is read, and by the bytes read where its length says
@@ -434,20 +452,7 @@ impl CacheFile {
         // device, a pipe or a growing file may, up to the limit and one byte.
         let room = usize::try_from(length).unwrap_or(0).div_ceil(BLOCK) + 1;
         let mut blocks = vec![Block::new_zeroed(); room];
-        let mut source = file.take(limit.saturating_add(1));
-        let mut filled = 0_usize;
-        loop {
-            if filled == blocks.len() * BLOCK {
-                blocks.resize(blocks.len() * 2, Block::new_zeroed());
-            }
-            let Some(free) = blocks.as_mut_bytes().get_mut(filled..) else { break };
-            match source.read(free) {
-                Ok(0) => break,
-                Ok(n) => filled += n,
-                Err(e) if e.kind() == std::io::ErrorKind::Interrupted => {}
-                Err(e) => return Err(e.into()),
-            }
-        }
+        let filled = fill(&mut file.take(limit.saturating_add(1)), &mut blocks)?;
         let read = u64::try_from(filled).unwrap_or(u64::MAX);
         if read > limit {
             return Err(CacheError::FileTooLarge { length: read, limit });
@@ -500,5 +505,39 @@ impl CacheFile {
         let bytes =
             self.storage.bytes().get(e.grid.clone()).ok_or(CacheError::Truncated("grid"))?;
         GridView::new(bytes).map_err(|error| CacheError::Grid { index: i, error })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A source that gives `parts` in turn, each bytes or an error of a kind, then its end.
+    struct Parts(Vec<Result<Vec<u8>, std::io::ErrorKind>>);
+
+    impl Read for Parts {
+        fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+            if self.0.is_empty() {
+                return Ok(0);
+            }
+            match self.0.remove(0) {
+                Ok(b) => {
+                    buf[..b.len()].copy_from_slice(&b);
+                    Ok(b.len())
+                }
+                Err(kind) => Err(kind.into()),
+            }
+        }
+    }
+
+    #[test]
+    fn a_read_interrupted_is_tried_again_and_another_error_ends_it() {
+        use std::io::ErrorKind::{Interrupted, Other};
+        let mut blocks = vec![Block::new_zeroed(); 1];
+        let mut source = Parts(vec![Ok(vec![1; 16]), Err(Interrupted), Ok(vec![2; 16])]);
+        assert_eq!(fill(&mut source, &mut blocks).unwrap(), 32);
+        assert_eq!(&blocks.as_bytes()[..32], [[1; 16], [2; 16]].concat());
+        let mut source = Parts(vec![Ok(vec![1; 16]), Err(Other), Ok(vec![2; 16])]);
+        assert_eq!(fill(&mut source, &mut blocks).map_err(|e| e.kind()), Err(Other));
     }
 }

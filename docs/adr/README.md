@@ -70,3 +70,4 @@ A record is `Proposed` until the human accepts it.
 | [0040](0040-users-pin-a-release-tag-and-small-releases-are-cut-on-request.md) | Users pin a release tag, and small releases are cut on request |
 | [0041](0041-whether-brodos-files-get-media-type-names.md) | Whether brodo's files get media type names |
 | [0042](0042-a-frozen-view-thaws-into-a-topology-and-a-field.md) | A frozen view thaws into a topology and a field |
+| [0043](0043-a-test-holds-the-code-to-its-promises-not-to-its-implementation.md) | A test holds the code to its promises, not to its implementation |

@@ -109,6 +109,17 @@ fn a_plate_thinner_than_two_voxels_is_one_wall_its_thickness_measured() {
     }
 }
 
+/// At h = 4 (the final mutation run of P5): a plate 7 thick, within 2h but beyond 2 + h
+/// and h/2, is one wall, measured as the other walls are.
+#[test]
+fn a_plate_within_two_large_voxels_is_one_wall() {
+    let t = 7.0;
+    let places =
+        thin(&boxes(&[([-40.0, -40.0, -t / 2.0], [40.0, 40.0, t / 2.0])]), &Options::new(4.0));
+    assert_eq!(places.len(), 1, "{places:?}");
+    assert!((places[0].least - t).abs() < 1e-9, "{}", places[0].least);
+}
+
 #[test]
 fn a_gap_narrower_than_two_voxels_is_one_gap_its_width_measured() {
     for g in [0.5, 1.5] {
@@ -254,6 +265,12 @@ fn a_cube_far_from_the_origin_has_no_thin_place() {
     let far = 1e9;
     let m = boxes(&[([far, 0.0, 0.0], [far + 10.0, 10.0, 10.0])]);
     assert_eq!(thin(&m, &options()), Vec::new());
+    // A voxel small beside the coordinates (the final mutation run of P5): at h = 10⁻⁵ a
+    // cube 10 voxels wide near 1 has none either, the start taken from the coordinates,
+    // not from their product with the reach, which there falls within their rounding.
+    let h = 1e-5;
+    let m = boxes(&[([1.0; 3], [1.0 + 10.0 * h; 3])]);
+    assert_eq!(thin(&m, &Options::new(h).with_origin([1.0; 3])), Vec::new());
 }
 
 /// At h = 0.5 on a lattice moved off the origin (W3, W4 of P5's review): two plates 0.6

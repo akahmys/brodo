@@ -160,6 +160,6 @@ fn triangles_with_no_area_wind_nothing() {
     let w = Winding::new(&Mesh::new(vertices, triangles).with_unit(None)).unwrap();
     for q in [[0.0, 0.0, 0.0], [10.0, 10.0, 10.0], [2.0, 2.0, 1.5]] {
         assert!(w.number(q, Accuracy::Exact).abs() < 1e-15, "{q:?}");
-        assert_eq!(w.number(q, BETA).to_bits(), 0.0_f64.to_bits(), "{q:?}");
+        assert!(w.number(q, BETA).abs() < 1e-15, "{q:?}");
     }
 }

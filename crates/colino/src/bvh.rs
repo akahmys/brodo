@@ -273,7 +273,8 @@ impl Bvh {
     /// Of the triangles `keep` accepts, the one nearest the segment from `a` to `b` by
     /// `intersect::nearest`: the fraction of the segment's point nearest it, their squared
     /// distance, and its number, the lowest-numbered of equal distances, as a scan of every
-    /// triangle in ascending order finds. A node is passed only when its box lies farther
+    /// triangle in ascending order finds; of distances equal within their rounding, any one
+    /// may be found (ARCHITECTURE.md §5.1). A node is passed only when its box lies farther
     /// from the segment's box than the best distance so far by more than the rounding of
     /// distances at the tree's size, so that no triangle the scan would choose is left out.
     pub(crate) fn nearest_segment(

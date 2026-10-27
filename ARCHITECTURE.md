@@ -330,7 +330,9 @@ are in ADR-0030.
   ADR-0039) so that any producer can claim it.
 - Hermite data: a set in brodo's format (§4.9) on the conversion's topology, its signs
   found by the conversion's sign and its crossings found by a watertight edge test, with the count
-  of crossed edges no triangle was hit on beside it (ADR-0030).
+  of crossed edges no triangle was hit on beside it, whose crossing is the nearest triangle's:
+  of triangles whose distances to the edge are equal within their rounding, any one
+  (ADR-0030).
 - It reports changes; it does not repair a shape or refine a grid.
 
 ### 5.2 Topology report

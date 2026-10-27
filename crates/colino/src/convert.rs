@@ -83,11 +83,15 @@ impl<'a> Inside<'a> {
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct Options {
-    /// A voxel's edge, h, in the mesh's unit.
+    /// A voxel's edge, h, in the mesh's unit: finite, and no less than `f32::MIN_POSITIVE`,
+    /// so that the field's `f32` distances can hold it, or conversion is refused with
+    /// `ConvertError::BadOption`.
     pub voxel_size: f64,
     /// Where voxel 0's corner lies, in the mesh's world coordinates.
     pub origin: Point,
-    /// The band's half-width N, in voxels.
+    /// The band's half-width N, in voxels: at least 1, and N·h no more than `f32::MAX`,
+    /// the background the field holds, or conversion is refused with
+    /// `ConvertError::BadOption`.
     pub band: u32,
     /// How each winding number is found.
     pub accuracy: Accuracy,
@@ -433,4 +437,34 @@ fn inside(
         }
     }
     Ok(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Whether `check` takes options with this voxel size and band.
+    fn taken(voxel_size: f64, band: u32) -> bool {
+        let o = Options { band, ..Options::new(voxel_size) };
+        let checked = o.check();
+        assert!(matches!(checked, Ok(()) | Err(ConvertError::BadOption(_))), "{checked:?}");
+        checked.is_ok()
+    }
+
+    /// The voxel size and the band are refused beyond what `Options` documents and taken at
+    /// its edge: f32's least normal voxel size, and a band's half-width of f32's largest
+    /// value.
+    #[test]
+    fn options_are_taken_up_to_their_documented_limits() {
+        for h in [0.0, -1.0, f64::INFINITY, f64::NAN] {
+            assert!(!taken(h, 3), "{h}");
+        }
+        assert!(!taken(1.0, 0));
+        let least = f64::from(f32::MIN_POSITIVE);
+        assert!(taken(least, 1));
+        assert!(!taken(least / 2.0, 1));
+        let largest = f64::from(f32::MAX);
+        assert!(taken(largest, 1));
+        assert!(!taken(largest / 2.0, 3));
+    }
 }

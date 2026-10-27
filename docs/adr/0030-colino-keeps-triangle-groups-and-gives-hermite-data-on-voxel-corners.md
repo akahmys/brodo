@@ -254,3 +254,14 @@ over the next solid, and in a file whose lines end with a lone `\r`, read as one
 The human decided that a line ends at `\n`, `\r\n` or a lone `\r`, and that a name
 after `endsolid` ends before a `solid` on its line, as before the rule; such a name
 holding the word `solid` is cut there.
+
+## Amendment: a near tie of the nearest triangle
+
+- **Date**: 2026-10-28
+
+An edge crossed but hit by no triangle takes its crossing from the triangle nearest it,
+the lowest-numbered of equal distances, found through the BVH with a margin so that no
+triangle a scan would choose is passed. Three mutants that shrink the margin differ from
+the scan only where two distances are equal within their rounding, which no test can build
+(ADR-0043). The human decided that of triangles whose distances to the edge are equal
+within their rounding, any one may be taken (ARCHITECTURE.md §5.1).

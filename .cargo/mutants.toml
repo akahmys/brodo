@@ -7,28 +7,35 @@
 exclude_re = [
     # Only the sign of a crossing's height is read, and dividing by a determinant that is
     # not 0 gives it as multiplying does.
+    # [same]
     'parity\.rs:.*: replace / with \* in height$',
     # A line votes only when it crosses an even number of times, and then the count above
     # it and the count below have one parity, wherever a height of exactly 0 is counted.
+    # [same]
     'parity\.rs:.*: replace >= with < in inside$',
     # A section's width or the longest edge is 0 only for a triangle of no area, whose
     # sections hold no point, so the centroid is taken either way.
+    # [same]
     'thin\.rs:\d+:11: replace > with >= in samples$',
     # As above.
     'thin\.rs:\d+:25: replace > with >= in samples$',
     # A value of exactly +0 is a voxel centre outside and on the mesh; counting it solid
     # changes no invariant of a place's box.
+    # [same]
     'thin\.rs:.*: replace < with <= in check$',
     # Narrowing a box by the margin, or the closed bounds of a segment parallel to an axis,
     # changes what is entered only within rounding of a box's face; a crossing there is
     # found through the box of its own triangle.
+    # [same]
     'bvh\.rs:.*: replace \+ with - in entry$',
     # As above.
     'bvh\.rs:.*: replace < with <= in entry$',
     # As above.
     'bvh\.rs:.*: replace > with >= in entry$',
     # A smaller margin, or a node passed at an equal bound, prunes more only where distances
-    # tie within rounding; 160 000 queries agreed with a scan (P5's review, C6).
+    # tie within rounding, where any of the triangles may be found; 160 000 queries agreed
+    # with a scan (P5's review, C6).
+    # [open: ARCHITECTURE.md §5.1]
     'bvh\.rs:\d+:42: replace \* with / in Bvh::nearest_segment$',
     # As above.
     'bvh\.rs:.*: replace > with >= in Bvh::nearest_segment$',
@@ -36,22 +43,28 @@ exclude_re = [
     'bvh\.rs:\d+:74: replace \+ with - in Bvh::nearest_segment$',
     # A box entered exactly at the best crossing so far holds none nearer, so passing it
     # leaves the least the same.
+    # [same]
     'bvh\.rs:.*: replace > with >= in Bvh::first_crossing$',
     # `cell()` skips 13, so `26 - cell()` is never 13 and `<` and `<=` agree.
+    # [same]
     'manifest\.rs:.*: replace < with <= in Offset::opposite$',
     # x, y and z are each masked to `dim_log2` bits and shifted apart, so they share no
     # bit and `|` and `^` agree.
+    # [same]
     'tree\.rs:.*: replace \| with \^ in child_place$',
     # The last interval of a root axis holds no key: its cells, taken as empty regions rather than
     # the outside, still join the outside through cells unbounded along another axis.
+    # [same]
     'analysis\.rs:.*: replace \+ with \* in Axis::unbounded$',
     # As above.
     'analysis\.rs:.*: replace \+ with \- in Axis::unbounded$',
     # A region is classified at the root level only where an upper node or a root tile is, so
     # the guard always holds there.
+    # [same]
     'analysis\.rs:.*: replace match guard self\.t\.has_upper_node\(r\) with true in Walk<._>::classify$',
     # A child classified at a wrong level is split, and classified again at its own level when
     # its pairs are joined: the same units are joined.
+    # [same]
     'analysis\.rs:.*: replace > with >= in Walk<._>::kinds$',
     # As above.
     'analysis\.rs:.*: replace \+ with \* in Walk<._>::kinds$',
@@ -59,6 +72,7 @@ exclude_re = [
     'analysis\.rs:\d+:72: replace \+ with \- in Walk<._>::kinds$',
     # A touching pair is joined once whichever way it is walked; and a first non-zero step is
     # never zero, so `>` and `>=` agree on it.
+    # [same]
     'analysis\.rs:.*: replace > with < in Walk<._>::inside$',
     # As above.
     'analysis\.rs:.*: replace > with >= in Walk<._>::inside$',
@@ -68,16 +82,28 @@ exclude_re = [
     'analysis\.rs:.*: replace > with >= in Walk<._>::root$',
     # A step can leave the root grid only past its last cell, which is the outside, as the cell
     # it leaves is.
+    # [same]
     'analysis\.rs:.*: replace \|\| with \&\& in Walk<._>::root$',
     # 3 − d and 3 + d have the same parity.
+    # [same]
     'euler\.rs:.*: replace \- with \+ in table$',
     # The bits combined do not overlap, so `|` and `^` agree.
+    # [same]
     'euler\.rs:.*: replace \| with \^ in leaf_vertices$',
+    # The eight corners are listed in the opposite order, and their sum takes no order.
+    # [same]
+    'euler\.rs:.*: replace == with != in edge_vertices$',
+    # A vertex goes to the last tile meeting the condition on whose edge it lies rather than
+    # the first: every tile finds the same one, so the vertex is still summed once, and with
+    # no such tile, not at all, as before.
+    # [same]
+    'euler\.rs:.*: replace && with \|\| in tile_vertices$',
     # As above.
     'frozen\.rs:.*: replace \| with \^ in set$',
     # As above.
     'topology\.rs:.*: replace \| with \^ in morton$',
     # A wider scan finds the same cells, each still held to its exact distance in steps.
+    # [same]
     'morphology\.rs:.*: replace < with <= in removed$',
     # As above.
     'morphology\.rs:.*: replace \- with \+ in reach$',
@@ -86,19 +112,25 @@ exclude_re = [
     # As above.
     'morphology\.rs:.*: replace / with \* in reach$',
     # At c = lo the gap is c − lo, zero, as the other branch gives.
+    # [same]
     'morphology\.rs:.*: replace < with <= in around$',
     # The voxel joins its own neighbourhood, and the largest or smallest already starts from it.
+    # [same]
     'morphology\.rs:.*: replace > with >= in neighbourhood$',
     # The neighbourhood is symmetric, so negating the y or z offset gives the same set.
+    # [same]
     'morphology\.rs:\d+:32: replace \+ with \- in neighbourhood$',
     # As above.
     'morphology\.rs:\d+:44: replace \+ with \- in neighbourhood$',
     # At the threshold both branches give the same colour: white at 0, the middle colour at 0.5.
+    # [same]
     'slice\.rs:.*: replace < with <= in color$',
     # Bit 8 of a byte is zero, so the table gains nothing.
+    # [same]
     'topology\.rs:\d+:17: replace < with <=$',
     # Only slower (ADR-0023): the result is unchanged and the tests pass under the patient run's
     # 1800 s; a search or partition is only made less selective.
+    # [same]
     'topology\.rs:.*: replace match guard !old\.tree\.has_lower_node\(origin\) with false in tile_source$',
     # As above.
     'bvh\.rs:.*: replace <= with > in Bvh::nearest$',
@@ -126,12 +158,14 @@ exclude_re = [
     'bvh\.rs:\d+:17: replace >= with < in longest$',
     # The tree's partition changes, not its answer: every node's box still holds its triangles,
     # and ties go to the lowest triangle number.
+    # [same]
     'bvh\.rs:.*: replace \+ with \- in centre$',
     # As above.
     'bvh\.rs:.*: replace / with \* in centre$',
     # As above.
     'bvh\.rs:.*: replace \&\& with \|\| in longest$',
     # More cells are scanned at the range's ends, each held to the band or the winding number.
+    # [same]
     'convert\.rs:\d+:31: replace \- with \+ in cell_range$',
     # As above.
     'convert\.rs:\d+:23: replace \+ with \* in candidates$',
@@ -143,29 +177,37 @@ exclude_re = [
     'convert\.rs:.*: replace > with >= in inside$',
     # An inside tile lies at least the band inside the mesh's box, so narrowing the box by the
     # band leaves every one in.
+    # [same]
     'convert\.rs:.*: replace \- with \+ in inside$',
     # As above.
     'convert\.rs:\d+:74: replace \+ with \- in inside$',
     # A region holding no leaf has no surface within the band of any voxel, so its corner and its
     # centre lie on one side.
+    # [same]
     'convert\.rs:\d+:48: replace / with % in inside$',
     # A flat triangle's edges cover the segment between its farthest corners, so its nearest
     # point is unique and no tie arises.
+    # [same]
     'distance\.rs:.*: replace < with <= in on_triangle$',
     # Zero is refused by the arm before, so `<` and `<=` agree.
+    # [same]
     'obj\.rs:\d+:20: replace < with <= in face$',
     # In the complement's labelling the outside is the first unit, so its component is 0.
+    # [same]
     'report\.rs:.*: replace outside_component \-> u32 with 0$',
     # Swapping a triangle's up and down runs leaves every count, symmetric in them; u = v is
     # skipped as degenerate before.
+    # [same]
     'surface\.rs:.*: replace > with < in Surface::of$',
     # As above.
     'surface\.rs:.*: replace > with >= in Surface::of$',
     # An attribute with a prefix, kept, is never looked up: attributes are found by plain name.
+    # [same]
     'threemf\.rs:.*: replace \|\| with \&\& in attributes$',
     # Only the far-field expansion's accuracy changes, by its centre or where it is used: the
     # tests hold every sign to the exact sum and the error to the expansion's order, and passed
     # with eight times their cases (2026-10-22).
+    # [open: `Accuracy::Approximate`]
     'winding\.rs:.*: replace > with >= in Winding::approximate$',
     # As above.
     'winding\.rs:\d+:46: replace \* with \+ in Winding::approximate$',
@@ -179,6 +221,7 @@ exclude_re = [
     'winding\.rs:.*: replace > with == in Expansion::of$',
     # Only triangles with no area take these weights, and their moments are zero, or their NaN
     # centre sends the walk to the exact sum: the number is the same.
+    # [same]
     'winding\.rs:.*: replace > with >= in Expansion::of$',
     # As above.
     'winding\.rs:\d+:22: replace / with % in Expansion::of$',
@@ -186,11 +229,39 @@ exclude_re = [
     'winding\.rs:\d+:22: replace / with \* in Expansion::of$',
     # On a tie between the largest components of the segment's direction, either axis
     # serves: the test is watertight about each, and the paper asks only for the largest.
+    # [open: `intersect::crossing`]
     'intersect\.rs:\d+:23: replace > with >= in crossing$',
     # `limit` is det·D, with det and D already found not to be zero: it is zero only where
-    # the product underflows, below coordinates any test can reach.
+    # the product underflows, and then, negated or not, the range admits only an `along`
+    # of zero and gives 0/±0, NaN, either way.
+    # [same]
     'intersect\.rs:\d+:35: replace < with <= in crossing$',
     # Parallel segments: dividing by a zero denominator gives an infinite or NaN fraction,
     # which the range check leaves out, as skipping the division does.
+    # [same]
     'intersect\.rs:\d+:14: replace > with >= in segments$',
+    # The blocks start at one or more, so growing them by two rather than doubling reads the
+    # same bytes, only more slowly.
+    # [same]
+    'cache\.rs:.*: replace \* with \+ in fill$',
+    # The ray's start moves by at most a factor of two, still far above the rounding and far
+    # below the reach; the distance measured does not depend on it but for rounding.
+    # [open: `resolves`]
+    'thin\.rs:\d+:61: replace \+ with - in ray$',
+    # The distance measured moves by at most twice the ray's start, which `resolves` holds
+    # within 2⁻⁹ h.
+    # [open: `resolves`]
+    'thin\.rs:\d+:57: replace - with \+ in ray$',
+    # An inside region held within the range meets the background within it too, so a set
+    # whose edge beyond the range is passed over is still refused, at another point; which
+    # of its broken rules is named is not promised.
+    # [open: ARCHITECTURE.md §4.9]
+    'hermite\.rs:.*: replace match guard sign != 0 with false in check_tile_faces$',
+    # A voxel size of 0, below 0 or infinite passed over here is refused by the checks
+    # after, of f32's normal range and of the band's half-width, for another reason; the
+    # reason's words are not promised.
+    # [open: `ConvertError::BadOption`]
+    'convert\.rs:\d+:42: replace && with \|\| in Options::check$',
+    # As above.
+    'convert\.rs:\d+:61: replace > with >= in Options::check$',
 ]

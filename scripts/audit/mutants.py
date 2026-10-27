@@ -4,9 +4,11 @@
 With no argument, the gate's check of `.cargo/mutants.toml`, which holds the exceptions
 and nothing else: every pattern in
 `exclude_re` is a single-quoted string on a line of its own, under a comment saying why
-the mutants it matches are equivalent, and excludes at least one mutant, by cargo-mutants'
-own regex engine. A pattern that matches nothing is stale, like an unfulfilled
-`#[expect]`.
+the mutants it matches are equivalent under the contract, ending in its kind (TESTING.md
+T11, ADR-0043): `[same]`, `[open: WHERE]` or `[unreached: WHERE]`, WHERE a `NAME.md §N`
+or an item in backticks whose documentation says so, or `As above.` for the comment
+before; and it excludes at least one mutant, by cargo-mutants' own regex engine. A
+pattern that matches nothing is stale, like an unfulfilled `#[expect]`.
 
 With `--run [ARGS…]`, the milestone-close run: `cargo mutants --workspace` behind
 `rss_guard.py`, with its copies of the tree under `target/`. It fails when a mutant is
@@ -44,6 +46,10 @@ GUARD = ROOT / "scripts" / "audit" / "rss_guard.py"
 # A key at the start of a line: the file holds the exceptions only, so that a setting of
 # the run, which is a rule, is changed here with an ADR (AGENTS.md, "Changing the rules").
 SETTING = re.compile(r"^\s*[\w.\-\[]+\s*(=|\])")
+# An exclusion's kind, at the end of its comment (TESTING.md T11, ADR-0043): the same
+# result for every input, or a difference only where a promise leaves it open or only on
+# input a documented limit refuses, naming where that is written.
+KIND = re.compile(r"\[(same|(open|unreached): ([\w./-]+\.md §\d[\d.]*|`[^`]+`))\]$")
 # Thirty times the unmutated suite's largest peak, 32 MiB (2026-10-18, ADR-0023).
 GUARD_MIB = 1024
 # Two jobs: four, with no guard, took the machine down (ADR-0023).
@@ -72,21 +78,29 @@ def patterns() -> tuple[list[str], list[str]]:
     if len(starts) != 1 or not lines[starts[0]].rstrip().endswith("["):
         return [], ["  .cargo/mutants.toml: no 'exclude_re = [' line"]
     found, errors = [], []
-    previous = ""
+    comment: list[str] = []
+    kind = ""
     for n, raw in enumerate(lines[starts[0] + 1:], start=starts[0] + 2):
         line = raw.strip()
         if line == "]":
             return found, errors
         if line.startswith("#"):
-            previous = line
+            comment.append(line)
             continue
         if not (line.startswith("'") and line.endswith("',") and line.count("'") == 2):
             errors.append(f"  .cargo/mutants.toml:{n}: not a single-quoted pattern on its own line")
-        elif not previous.startswith("#"):
+        elif not comment:
             errors.append(f"  .cargo/mutants.toml:{n}: no comment above saying why it is equivalent")
         else:
-            found.append(line[1:-2])
-        previous = line
+            if comment != ["# As above."]:
+                ends = KIND.search(comment[-1])
+                kind = ends.group(1) if ends else ""
+            if kind:
+                found.append(line[1:-2])
+            else:
+                errors.append(f"  .cargo/mutants.toml:{n}: its comment does not end in its kind, "
+                              "[same], [open: WHERE] or [unreached: WHERE] (T11)")
+        comment = []
     return found, errors + ["  .cargo/mutants.toml: 'exclude_re' is not closed"]
 
 
@@ -107,7 +121,7 @@ def check() -> int:
     if errors:
         print("\n".join(errors))
         return 1
-    print(f"  PASS ({len(found)} patterns, each with its reason and a mutant; {every} mutants)")
+    print(f"  PASS ({len(found)} patterns, each with its reason, its kind and a mutant; {every} mutants)")
     return 0
 
 

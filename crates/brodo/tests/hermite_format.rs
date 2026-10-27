@@ -285,13 +285,54 @@ fn tiles(tiles: &[(TileLevel, Coord, u8)]) -> Parts {
     Parts { topology, signs, axes, names: Vec::new() }
 }
 
+/// The sign of `tiles` at `v`, the background's, 0, in none of them and beyond the range.
+fn sign_at(tiles: &[(TileLevel, Coord, u8)], v: [i64; 3]) -> u8 {
+    let holds = |(level, o, _): &&(TileLevel, Coord, u8)| {
+        (0..3).all(|k| (0..i64::from(level.edge())).contains(&(v[k] - i64::from(o[k]))))
+    };
+    tiles.iter().find(holds).map_or(0, |t| t.2)
+}
+
+/// That `tiles`, on no leaf, are refused by the owner rule (ARCHITECTURE.md §4.9): the
+/// error names a point and an axis on one of whose edges along it, to the next point or
+/// from the one before, the signs differ. Which of several such edges it names is not
+/// promised.
+fn refused_at_a_change(tiles: &[(TileLevel, Coord, u8)]) {
+    let named = rule(self::tiles(tiles).make());
+    let Ok((Some(at), Some(axis), Rule::Owner)) = named else { panic!("{named:?}") };
+    let at = at.map(i64::from);
+    let step = |d: i64| {
+        let mut v = at;
+        v[axis] += d;
+        sign_at(tiles, v)
+    };
+    assert!(step(-1) != step(0) || step(0) != step(1), "{named:?}");
+}
+
+/// An outside root tile, and beside its +x face, in an upper node, an inside lower tile:
+/// the signs change across the lower tile's faces, and the set is refused at one.
 #[test]
 fn a_root_tiles_face_reaches_the_tiles_of_the_node_beside_it() {
-    // An outside root tile, and beside its +x face, in an upper node, an inside lower tile:
-    // the root tile is checked first, and its face is found to meet the lower tile there,
-    // not left to the lower tile, whose own first change is on its +x face, at x = 4103.
-    let p = tiles(&[(TileLevel::Root, [0; 3], 0), (TileLevel::Lower, [4096, 136, 8], 1)]);
-    assert_eq!(rule(p.make()), Ok((Some([4095, 136, 8]), Some(0), Rule::Owner)));
+    refused_at_a_change(&[(TileLevel::Root, [0; 3], 0), (TileLevel::Lower, [4096, 136, 8], 1)]);
+}
+
+/// Tiles at the ends of the `i32` range (the final mutation run of P5): beyond them lies
+/// the background, sign 0, in no leaf (ARCHITECTURE.md §4.9), so an outside tile there is
+/// taken and an inside one refused at a change of sign.
+#[test]
+fn a_tile_at_an_end_of_the_range_meets_the_background_beyond() {
+    let (low, high) = ([i32::MIN, 0, 0], [i32::MAX - 7, 0, 0]);
+    for o in [low, high] {
+        assert!(tiles(&[(TileLevel::Lower, o, 0)]).make().is_ok(), "{o:?}");
+        refused_at_a_change(&[(TileLevel::Lower, o, 1)]);
+    }
+    refused_at_a_change(&[(TileLevel::Lower, low, 1), (TileLevel::Lower, [i32::MIN + 8, 0, 0], 1)]);
+}
+
+/// Two inside tiles side by side, the background around them: refused at a change of sign.
+#[test]
+fn inside_tiles_side_by_side_are_refused_at_a_change() {
+    refused_at_a_change(&[(TileLevel::Lower, [8, 0, 0], 1), (TileLevel::Lower, [16, 0, 0], 1)]);
 }
 
 #[test]
@@ -388,24 +429,10 @@ fn tiles_and_backgrounds_hold_the_values_of_no_crossing() {
     assert_eq!(rule(p.make()), Ok((None, Some(1), Rule::NoCrossing)));
 }
 
+/// One inside tile and no leaf: its faces own edges into the outside background.
 #[test]
 fn a_tile_face_owning_a_change_is_refused() {
-    // One inside tile and no leaf: its upper faces own edges into the outside background.
-    let empty = Topology::new();
-    let mut e = empty.edit();
-    e.add_tile(TileLevel::Lower, [8, 0, 0]).unwrap();
-    let topology = e.commit().unwrap().0;
-    let mut p = parts(0, None, 0, 0);
-    p.signs = Field::new(&topology, 0);
-    let t = topology.tile_numbers().next().unwrap();
-    p.signs.set_tile(&topology, t, 1).unwrap();
-    p.axes = std::array::from_fn(|_| Crossings {
-        fraction: Field::new(&topology, NO_CROSSING.0),
-        normal: Field::new(&topology, NO_CROSSING.1),
-        group: Field::new(&topology, NO_CROSSING.2),
-    });
-    p.topology = topology;
-    assert_eq!(rule(p.make()), Ok((Some([15, 0, 0]), Some(0), Rule::Owner)));
+    refused_at_a_change(&[(TileLevel::Lower, [8, 0, 0], 1)]);
 }
 
 #[test]
@@ -653,6 +680,33 @@ fn verdict<T>(r: Result<T, HermiteError>) -> Result<(), String> {
     r.map(|_| ()).map_err(|e| format!("{e:?}"))
 }
 
+/// Sets of tiles alone, by name, and whether they are taken.
+fn tile_sets() -> [(&'static str, Parts, bool); 3] {
+    [
+        (
+            "a root tile by a node's tile of its sign",
+            tiles(&[(TileLevel::Root, [0; 3], 0), (TileLevel::Upper, [4096, 128, 0], 0)]),
+            true,
+        ),
+        (
+            // The upper tile's +x neighbour lies in the second root tile, tile place 1,
+            // beyond the one upper node's number.
+            "an upper tile by a root tile",
+            tiles(&[
+                (TileLevel::Root, [0; 3], 0),
+                (TileLevel::Upper, [8064, 0, 0], 0),
+                (TileLevel::Root, [8192, 0, 0], 0),
+            ]),
+            true,
+        ),
+        (
+            "a root tile by a node's tile of the other sign",
+            tiles(&[(TileLevel::Root, [0; 3], 0), (TileLevel::Lower, [4096, 136, 8], 1)]),
+            false,
+        ),
+    ]
+}
+
 /// Sets taken and sets refused, written unchecked and read back: the file's check decides
 /// as the check in memory does.
 #[test]
@@ -681,18 +735,8 @@ fn a_file_decides_as_memory_does() {
         ("a tile's sign of 2", bad_tile, false),
         ("inside reaching the leaves' lower face", parts(3, Some([8, 8, 8]), 0, 20), false),
         ("a hole by a tile's face", shell_with_hole(), false),
-        (
-            "a root tile by a node's tile of its sign",
-            tiles(&[(TileLevel::Root, [0; 3], 0), (TileLevel::Upper, [4096, 128, 0], 0)]),
-            true,
-        ),
-        (
-            "a root tile by a node's tile of the other sign",
-            tiles(&[(TileLevel::Root, [0; 3], 0), (TileLevel::Lower, [4096, 136, 8], 1)]),
-            false,
-        ),
     ];
-    for (name, p, taken) in cases {
+    for (name, p, taken) in cases.into_iter().chain(tile_sets()) {
         let bytes = to_bytes(&unchecked(&p)).unwrap();
         let in_memory = verdict(p.make());
         assert_eq!(in_memory.is_ok(), taken, "{name}: {in_memory:?}");

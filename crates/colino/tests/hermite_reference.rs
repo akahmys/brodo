@@ -571,6 +571,28 @@ fn a_leaf_at_the_end_of_the_range_has_the_background_beyond() {
     assert_eq!(p.set.signs().value_at(p.set.topology(), [i32::MAX, 0, 0]), Ok(0));
 }
 
+/// A box across the end of the `i32` range (the final mutation run of P5): the
+/// conversion moved so that voxel x = `i32::MAX` lies at world x = 0, inside a box whose
+/// face is at 0.5. The edge from it to the point beyond the range, the background, crosses
+/// that face half way, and is hit.
+#[test]
+fn an_edge_to_beyond_the_range_crosses_where_the_mesh_does() {
+    let m = boxes(&[([-1.5, 2.5, 2.5], [0.5, 5.5, 5.5], false)]);
+    let mut c = convert(&m, &Options::new(1.0)).unwrap();
+    let empty = brodo::topology::Topology::new();
+    let mut e = empty.edit();
+    e.activate([i32::MAX - 7, 0, 0]).unwrap();
+    c.topology = e.commit().unwrap().0;
+    // Hermite data reads the conversion's topology, not its field's values.
+    c.field = brodo::field::Field::new(&c.topology, 3.0);
+    c.meta.transform[0][3] = -f64::from(i32::MAX);
+    let p = hermite(&m, &c).unwrap();
+    assert_eq!(p.unhit, 0);
+    let (t, x) = (p.set.topology(), &p.set.axes()[0]);
+    let half = x.fraction.value_at(t, [i32::MAX, 3, 3]).unwrap();
+    assert!((half - 0.5).abs() < 1e-6, "{half}");
+}
+
 /// Hermite data follows its conversion's accuracy (Q5 of P5's review): made from a
 /// conversion at a coarse β, every leaf point's sign is the winding number's at that β, as
 /// the conversion records it, not at β = 2.

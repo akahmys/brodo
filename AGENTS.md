@@ -94,7 +94,8 @@ It runs every check and then the tests. Read its last line, not the first.
 
 A rule is anything that states or enforces one: this file, the phase documents, the lint
 levels in `Cargo.toml`, `clippy.toml`, `rustfmt.toml`, `rust-toolchain.toml`, `deny.toml`,
-`.betterleaks.toml`, `.claude/settings.json`, the workflows in `.github/workflows/`, and
+`.betterleaks.toml`, `.claude/settings.json`, the workflows in `.github/workflows/`, the
+mutants excluded in `.cargo/mutants.toml`, and
 everything in `scripts/audit/` and `scripts/hooks/`, `scripts/audit/project.py` and
 exemption lists included.
 

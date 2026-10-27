@@ -18,6 +18,7 @@ RULE_FILES = re.compile(
     r"^(AGENTS|PLANNING|CODING|TESTING|AUDITING)\.md$"
     r"|^(clippy|rustfmt|rust-toolchain|deny)\.toml$|^\.betterleaks\.toml$"
     r"|^scripts/(audit|hooks)/|^\.claude/settings\.json$|^\.github/workflows/"
+    r"|^\.cargo/mutants\.toml$"
 )
 TEST_LIST = re.compile(r"^crates/[^/]+/test-list\.txt$")
 REMOVED = re.compile(r"^-(?!--)", re.MULTILINE)

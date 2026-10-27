@@ -156,12 +156,10 @@ fn tile_edges<T: Value>(
     sums.into_iter().sum()
 }
 
-/// Whether `p` lies on an edge of the region of edge `edge` at `o`: within it, and on its
-/// boundary along two axes or three.
+/// Whether `p`, a corner of one of the voxels of the region of edge `edge` at `o`, lies on
+/// an edge of it: on its boundary along two axes or three.
 fn on_edge(o: [i64; 3], edge: i64, p: [i64; 3]) -> bool {
-    let within = (0..3).all(|k| o[k] <= p[k] && p[k] <= o[k] + edge);
-    let bounding = (0..3).filter(|k| p[*k] == o[*k] || p[*k] == o[*k] + edge).count();
-    within && bounding >= 2
+    (0..3).filter(|k| p[*k] == o[*k] || p[*k] == o[*k] + edge).count() >= 2
 }
 
 /// The vertices on the edges of the region of edge `edge` at `o`, each once: each edge

@@ -287,3 +287,51 @@ fn a_small_tile_across_a_large_ones_edge_is_summed_by_the_large_one() {
         assert_eq!(euler(&t, &f, |v| v == 1, conn), Ok(expected), "{conn:?}");
     }
 }
+
+/// The same at the large tile's far edge, from the origin (the final mutation run of P5):
+/// the small tile's corner mid-way along the edge is summed there, and the two make one
+/// part under 26-connectivity, two under 6.
+#[test]
+fn a_small_tile_across_a_large_ones_far_edge_from_the_origin_is_summed() {
+    let empty = Topology::new();
+    let mut e = empty.edit();
+    e.add_tile(TileLevel::Upper, [0, 0, 0]).unwrap();
+    e.add_tile(TileLevel::Lower, [120, 128, 128]).unwrap();
+    let t = e.commit().unwrap().0;
+    let mut f = Field::new(&t, 0_u8);
+    for n in t.tile_numbers() {
+        f.set_tile(&t, n, 1).unwrap();
+    }
+    let chi = [Connectivity::TwentySix, Connectivity::Six].map(|c| euler(&t, &f, |v| v == 1, c));
+    assert_eq!(chi, [Ok(1), Ok(2)]);
+}
+
+/// Lower tiles placed where the vertices on their edges count (the final mutation run of
+/// P5): two meeting the condition across an edge only, off the origin, whose shared edge's
+/// vertices are summed once, and one meeting it beside one that does not, on whose edges
+/// the vertices of their shared face also lie. χ as the dense cells count it.
+#[test]
+fn tiles_across_an_edge_and_beside_one_not_meeting_count_as_the_dense_cells_do() {
+    let cases: [&[(Coord, f32)]; 3] = [
+        &[([-8, -8, -8], IN), ([0, 0, -8], IN)],
+        &[([-8, -8, 0], IN), ([0, -8, 0], OUT)],
+        &[([0, 0, 0], OUT), ([0, 8, 0], IN), ([8, 0, 0], IN)],
+    ];
+    for tiles in cases {
+        let empty = Topology::new();
+        let mut e = empty.edit();
+        for (v, _) in tiles {
+            e.add_tile(TileLevel::Lower, *v).unwrap();
+        }
+        let (t, _) = e.commit().unwrap();
+        let mut f = Field::new(&t, OUT);
+        for n in t.tile_numbers().collect::<Vec<_>>() {
+            let (_, o) = t.tile(n).unwrap();
+            f.set_tile(&t, n, tiles.iter().find(|(v, _)| *v == o).unwrap().1).unwrap();
+        }
+        for conn in [Connectivity::Six, Connectivity::TwentySix] {
+            let want = dense(|v| inside(f.value_at(&t, v).unwrap()), conn);
+            assert_eq!(euler(&t, &f, inside, conn), Ok(want), "{tiles:?} {conn:?}");
+        }
+    }
+}

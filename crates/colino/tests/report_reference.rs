@@ -239,6 +239,11 @@ fn a_mesh_too_far_from_the_origin_is_refused() {
     let m = sphere(2, 10.0, [far, 0.0, 0.0]);
     let c = convert(&m, &Options::new(1.0).with_origin([far, 0.0, 0.0])).unwrap();
     assert_eq!(report(&m, &c, &[]).map(|r| r.thin.len()), Err(ReportError::TooFar));
+    // The same in voxels, at h = 2⁻¹⁰: 10⁷ is beyond 2²¹, though not beyond 2³¹.
+    let (far, h) = (1e7, 1.0 / 1024.0);
+    let m = sphere(2, 0.01, [far, 0.0, 0.0]);
+    let c = convert(&m, &Options::new(h).with_origin([far, 0.0, 0.0])).unwrap();
+    assert_eq!(report(&m, &c, &[]).map(|r| r.thin.len()), Err(ReportError::TooFar));
     let near = sphere(2, 10.0, [1e9, 0.0, 0.0]);
     let c = convert(&near, &Options::new(1.0).with_origin([1e9, 0.0, 0.0])).unwrap();
     assert!(report(&near, &c, &[]).is_ok());

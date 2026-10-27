@@ -280,8 +280,14 @@ mod tests {
         let t = Topology::new();
         let f = Field::new(&t, 1.0_f32);
         let map = ColorMap::Diverging { limit: 3.0 };
-        // 2^32 pixels wide, beyond a u32 width; and 2^31 - 2 square, beyond any memory.
-        for (min, max) in [([i32::MIN, 0], [i32::MAX, 0]), ([0, 0], [i32::MAX - 2; 2])] {
+        // 2^32 pixels wide, beyond a u32 width; 2^31 - 2 square, beyond any memory; and
+        // 2^24 square, its pixels beyond memory though its width and height are not.
+        let ranges = [
+            ([i32::MIN, 0], [i32::MAX, 0]),
+            ([0, 0], [i32::MAX - 2; 2]),
+            ([0, 0], [(1 << 24) - 1; 2]),
+        ];
+        for (min, max) in ranges {
             let got = render(&t, &f, Slice { axis: Axis::Z, position: 0, min, max }, map);
             assert!(matches!(got, Err(SliceError::TooLarge)), "{max:?}: {got:?}");
         }

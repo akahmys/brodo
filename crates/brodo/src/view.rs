@@ -537,6 +537,37 @@ mod tests {
         crate::frozen::aligned(&b)
     }
 
+    /// Two tiles of `level`, each alone in its node in its own root region, frozen; then the
+    /// second's node, or the upper node above it, names the first's, which is emptied, so
+    /// that nothing beneath the node reached twice is reached twice (docs/formats.md §2.3).
+    fn empty_node_shared(level: TileLevel) -> Vec<crate::frozen::Block> {
+        let empty = Topology::new();
+        let mut e = empty.edit();
+        e.add_tile(level, [0, 0, 0]).unwrap();
+        e.add_tile(level, [4096, 0, 0]).unwrap();
+        let t = e.commit().unwrap().0;
+        let mut b = freeze(&t, &Field::new(&t, 0_u8)).unwrap().as_bytes().to_vec();
+        let at = |section: usize| word(&b, 36 + 4 * section) as usize * 32;
+        let (roots, uppers, lowers) = (at(0), at(1), at(2));
+        if level == TileLevel::Upper {
+            b[roots + 32 + 16..roots + 32 + 20].fill(0);
+            b[uppers + 4096..uppers + 4100].fill(0);
+        } else {
+            b[uppers + 8224 + 8192..uppers + 8224 + 8196].fill(0);
+            b[lowers + 512..lowers + 516].fill(0);
+        }
+        crate::frozen::aligned(&b)
+    }
+
+    #[test]
+    fn an_empty_node_reached_twice_is_refused() {
+        for level in [TileLevel::Upper, TileLevel::Lower] {
+            let b = empty_node_shared(level);
+            let view = GridView::<u8>::new(b.as_bytes()).unwrap();
+            assert_eq!(view.regions().err(), Some(FormatError::Shared), "{level:?}");
+        }
+    }
+
     #[test]
     fn a_node_or_tile_value_two_root_entries_share_is_refused_by_the_walk() {
         // Each entry names an index the counts allow, so the view's checks pass (§2.5);

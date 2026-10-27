@@ -198,3 +198,31 @@ gave no verdict. The human decided that a report with no `outcomes.json` and an 
 `mutants.json` reports no mutant, and that one with no `outcomes.json` and mutants listed
 still fails, as a lost report. Shown to fire on that run's reports: shard 156 failed
 before and passes after, and shard 155 with its `outcomes.json` removed still fails.
+
+## Amendment: the final run's missed mutants, and exclusions as rules
+
+- **Date**: 2026-10-28
+
+The run on `fa72208` (2026-10-27) missed 58 mutants. Run again under the guard on the
+tests written for them (2026-10-28), all but seven were caught; tests of a large tile's far
+edge from the origin and of a cube near 1 at h = 10⁻⁵ kill three more, each shown to fail
+with its mutant applied by hand. Some of the tests written for them held the code to more
+than it promises, a tolerance of 10⁻¹³ where none is documented among them, so the human
+decided how a test and an exclusion are held to the contract (ADR-0043), and that:
+
+- an exclusion is excluded as equivalent under the contract, its comment ending in its
+  kind, `[same]`, `[open: WHERE]` or `[unreached: WHERE]`, which `mutants.py` checks;
+- `.cargo/mutants.toml` is a rule file, as practice had kept it, every exclusion being
+  approved by the human and recorded here: AGENTS.md lists it and the `commit-msg` hook
+  asks an ADR of a commit that touches it, where an exclusion had needed no ADR;
+- the other four of the seven are excluded: `fill`'s growth, the order of
+  `edge_vertices`' corners, which of the tiles meeting the condition sums a vertex
+  as the same result, and the ray's start within a factor of two, as open by the
+  documentation of `resolves`;
+- five that the tests brought to their promises no longer tell apart are excluded: two
+  passing over a tile's edge beyond the range, refused elsewhere (ARCHITECTURE.md §4.9),
+  two letting a voxel size through to a later check that refuses it for another reason,
+  and one moving a measured distance within twice the ray's start.
+
+Shown to fire: a comment's kind removed failed the check for its pattern and those `As
+above.` after it, and a kind naming no document or item failed it.
