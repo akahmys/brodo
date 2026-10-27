@@ -18,8 +18,13 @@
 //! told apart. Each triangle's corners are vertices of their own; `Mesh::welded` joins
 //! equal ones.
 //!
-//! Groups (ADR-0030): in ASCII, each solid is a group, named by the words after `solid`
-//! joined by one space; a binary file's triangles are all in group 0.
+//! A name is the rest of its line, after `solid` or `endsolid`, its words joined by one
+//! space: it may hold the format's own words. On `solid`'s line, it ends before a `facet`
+//! the line goes on with `normal` or `outer`, and before an `endsolid` that ends the line,
+//! so that a solid written on one line reads.
+//!
+//! Groups (ADR-0030): in ASCII, each solid is a group, named by its name after `solid`; a
+//! binary file's triangles are all in group 0.
 
 use crate::error::ReadError;
 use crate::mesh::{Grouping, Limits, Mesh};
@@ -91,14 +96,36 @@ fn read_binary(bytes: &[u8], n: u64, limits: Limits) -> Result<Mesh, ReadError> 
     Ok(mesh)
 }
 
-/// The words of a text, numbered from 0.
-struct Words<'a> {
-    words: std::iter::Peekable<std::iter::Enumerate<std::str::SplitAsciiWhitespace<'a>>>,
+/// A word: its number from 0, the line it is on, from 0, and its text.
+type Word<'a> = (usize, usize, &'a str);
+
+/// The words of a text, numbered from 0, each with its line, read ahead as far as asked.
+struct Words<'a, I: Iterator<Item = Word<'a>>> {
+    words: I,
+    ahead: std::collections::VecDeque<Word<'a>>,
+    /// The line of the word taken last.
+    line: usize,
 }
 
-impl<'a> Words<'a> {
+impl<'a, I: Iterator<Item = Word<'a>>> Words<'a, I> {
+    /// The word `n` places ahead, not taken.
+    fn peek(&mut self, n: usize) -> Option<Word<'a>> {
+        while self.ahead.len() <= n {
+            let w = self.words.next()?;
+            self.ahead.push_back(w);
+        }
+        self.ahead.get(n).copied()
+    }
+
+    /// Takes the next word.
+    fn advance(&mut self) -> Option<(usize, &'a str)> {
+        let (at, line, w) = self.ahead.pop_front().or_else(|| self.words.next())?;
+        self.line = line;
+        Some((at, w))
+    }
+
     fn next(&mut self, expected: &'static str) -> Result<(usize, &'a str), ReadError> {
-        self.words.next().ok_or(ReadError::Unexpected {
+        self.advance().ok_or(ReadError::Unexpected {
             expected,
             at: usize::MAX,
             found: String::new(),
@@ -117,7 +144,11 @@ impl<'a> Words<'a> {
 
     /// Whether the next word is `keyword`, taking it if so.
     fn take_if(&mut self, keyword: &str) -> bool {
-        self.words.next_if(|(_, w)| w.eq_ignore_ascii_case(keyword)).is_some()
+        let is = self.peek(0).is_some_and(|(_, _, w)| w.eq_ignore_ascii_case(keyword));
+        if is {
+            self.advance();
+        }
+        is
     }
 
     fn number(&mut self) -> Result<f64, ReadError> {
@@ -128,17 +159,36 @@ impl<'a> Words<'a> {
             .ok_or_else(|| ReadError::BadNumber { at, found: w.to_owned() })
     }
 
-    /// Takes a solid's name: the words up to the next `stop`, or the end, joined by one
-    /// space.
-    fn name(&mut self, stops: &[&str]) -> String {
+    /// Takes a name: the rest of the line of the word taken last, joined by one space. A
+    /// solid's name ends before a `facet` its line goes on with `normal` or `outer`, and
+    /// before an `endsolid` that ends its line, so that a solid written on one line reads.
+    fn name(&mut self, solid: bool) -> String {
+        let line = self.line;
         let mut name = Vec::new();
-        while let Some((_, w)) =
-            self.words.next_if(|(_, w)| !stops.iter().any(|s| w.eq_ignore_ascii_case(s)))
+        while let Some((_, l, w)) = self.peek(0)
+            && l == line
         {
+            let after = self.peek(1).filter(|(_, l, _)| *l == line).map(|(_, _, w)| w);
+            let is = |a: &str, b: &str| a.eq_ignore_ascii_case(b);
+            let facet = is(w, "facet") && after.is_some_and(|a| is(a, "normal") || is(a, "outer"));
+            if solid && (facet || (is(w, "endsolid") && after.is_none())) {
+                break;
+            }
             name.push(w);
+            self.advance();
         }
         name.join(" ")
     }
+}
+
+/// The words of `text`, each with its line.
+fn words(text: &str) -> Words<'_, impl Iterator<Item = Word<'_>>> {
+    let words = text
+        .lines()
+        .enumerate()
+        .flat_map(|(line, l)| l.split_ascii_whitespace().map(move |w| (line, w)));
+    let words = words.enumerate().map(|(at, (line, w))| (at, line, w));
+    Words { words, ahead: std::collections::VecDeque::new(), line: 0 }
 }
 
 fn read_ascii(bytes: &[u8], limits: Limits) -> Result<Mesh, ReadError> {
@@ -149,12 +199,12 @@ fn read_ascii(bytes: &[u8], limits: Limits) -> Result<Mesh, ReadError> {
         return Err(ReadError::NotStl("neither the length of a binary file nor 'solid'"));
     }
     let text = std::str::from_utf8(bytes).map_err(|_| ReadError::NotText)?;
-    let mut words = Words { words: text.split_ascii_whitespace().enumerate().peekable() };
+    let mut words = words(text);
     let mut mesh = Mesh::default();
     let mut triangles = 0_u64;
     let mut grouping = Grouping::default();
     while words.take_if("solid") {
-        let name = words.name(&["facet", "endsolid"]);
+        let name = words.name(true);
         let before = mesh.triangles.len();
         while words.take_if("facet") {
             if words.take_if("normal") {
@@ -178,10 +228,10 @@ fn read_ascii(bytes: &[u8], limits: Limits) -> Result<Mesh, ReadError> {
             push(&mut mesh, [a, b, c])?;
         }
         words.keyword("endsolid")?;
-        words.name(&["solid"]);
+        words.name(false);
         grouping.take(&name, mesh.triangles.len() - before);
     }
-    match words.words.next() {
+    match words.advance() {
         None => {
             grouping.into(&mut mesh);
             Ok(mesh)

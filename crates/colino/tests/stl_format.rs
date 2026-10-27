@@ -102,6 +102,32 @@ fn each_ascii_solid_is_a_group_and_binary_has_none() {
     assert!(m.groups.is_empty() && m.group_names.is_empty());
 }
 
+/// A solid's name is the rest of its line (D5 of P5's review): it may hold the format's
+/// words, and ends early only where the line goes on with a triangle or ends the solid.
+#[test]
+fn a_solids_name_is_the_rest_of_its_line() {
+    let facet = "facet outer loop vertex 0 0 0 vertex 1 0 0 vertex 0 1 0 endloop endfacet";
+    let names = |text: &str| read(text.as_bytes(), ROOMY).map(|m| m.group_names);
+    let text = format!(
+        "solid my facet part\n{facet}\nendsolid my facet part\nsolid endsolid of it\n{facet}\nendsolid"
+    );
+    assert_eq!(
+        names(&text),
+        Ok(vec![String::new(), "my facet part".into(), "endsolid of it".into()])
+    );
+    // On one line: the name ends before the triangle, or before the end of the solid.
+    assert_eq!(
+        names(&format!("solid a b {facet} endsolid a b")),
+        Ok(vec![String::new(), "a b".into()])
+    );
+    assert_eq!(names("solid empty endsolid").map(|n| n.len()), Ok(0));
+    // A name on the line after solid is not a name.
+    assert!(matches!(
+        read(format!("solid\nname\n{facet}\nendsolid").as_bytes(), ROOMY),
+        Err(ReadError::Unexpected { expected: "endsolid", at: 1, .. })
+    ));
+}
+
 #[test]
 fn each_damage_is_its_own_error() {
     let t = tetrahedron();
@@ -147,10 +173,10 @@ fn each_damage_is_its_own_error() {
         read(cut.as_bytes(), ROOMY),
         Err(ReadError::Unexpected { expected: "endloop", .. })
     ));
-    let after = "solid endsolid trailing words";
+    let after = "solid\nendsolid trailing words";
     assert!(read(after.as_bytes(), ROOMY).is_ok(), "a name may follow endsolid");
-    // The words after endsolid, up to another solid, are its name, whatever they are.
-    let named = "solid facet outer loop vertex 0 0 0 vertex 1 0 0 vertex 0 1 0 endloop endfacet endsolid x\nfacet";
+    // The words after endsolid, to the end of its line, are its name, whatever they are.
+    let named = "solid facet outer loop vertex 0 0 0 vertex 1 0 0 vertex 0 1 0 endloop endfacet endsolid x facet";
     assert_eq!(read(named.as_bytes(), ROOMY).map(|m| m.triangles.len()), Ok(1));
     assert_eq!(read(&[b's', b'o', b'l', b'i', b'd', 0xff], ROOMY), Err(ReadError::NotText));
 }

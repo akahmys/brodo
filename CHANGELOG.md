@@ -75,6 +75,12 @@ are recorded here when they change (V6).
 
 ### Breaking
 
+- A leaf or tile an edit puts where the same edit removed a leaf starts from the background
+  (ADR-0014): a leaf made again had taken the removed leaf's values, and a lower or upper
+  tile had merged them, refusing values not all equal.
+- colino's ASCII STL reader takes a solid's name as the rest of its line (ADR-0030): a
+  name may now hold `facet` or `endsolid`, which it refused, but a name written on the
+  line after `solid` is refused, and the words after `endsolid` end with its line.
 - `Value` no longer carries `TYPE_CODE`: a type of a user's own implements `Value` with
   `same_bits` alone, and serves in a field, its parallel update, gathers and analyses. The
   code moves to the new `brodo::field::Stored: Value`, sealed, implemented for brodo's six

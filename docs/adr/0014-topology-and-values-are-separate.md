@@ -136,3 +136,13 @@ and `TileLevel::edge()` was made public. The examples, the benchmarks and the `.
 writer use them; tests, and the examples' checks, keep their own formulas, so that a
 reference stays independent of the code it checks.
 
+## Amendment: what an edit puts where it removed a leaf
+
+- **Date**: 2026-10-27
+
+P5's review found that a commit looked only at the old topology for each new leaf's and
+tile's source, so an edit that removed a leaf and put something in its region gave the
+removed values back: a leaf made again took the old leaf's values, and a lower or upper
+tile merged them, while a root tile took the background. The human decided that the
+editor records the leaf-sized regions whose leaves it removes, and the commit takes them
+as the background: what the edit puts there, at every level, starts from the background.

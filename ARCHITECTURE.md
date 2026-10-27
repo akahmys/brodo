@@ -116,6 +116,8 @@ pub struct Field<T> {
   was split from, or the background. For each new tile it records an old tile, the
   background, or the parts it merges: old leaves and old tiles, in one list for all merged
   tiles, each tile holding its range in it. A split leaf takes each field's own tile value.
+  A region whose leaf the edit removed is the background to the commit: a leaf or tile the
+  same edit puts there takes nothing of the removed values (ADR-0014).
 - A merge takes leaves and tiles at once, into a tile in a lower node (from a leaf) or in
   an upper node (from a lower node); a region that holds nothing refuses it, so a merge
   changes values, not which voxels are active. Merging into a root tile is not built.

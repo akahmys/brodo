@@ -206,3 +206,15 @@ and exact arithmetic kept: the paper scales the third coordinate by 1/D, and wit
 now kept unscaled and compared with det·D, one division made at the end, which on integer
 coordinates agrees with exact arithmetic. A test holds that case.
 
+## Amendment: an ASCII STL solid's name
+
+- **Date**: 2026-10-27
+
+P5's review found that the STL reader took a solid's name as its words up to the next
+`facet` or `endsolid`, so a valid file whose name held either word was refused. The
+Library of Congress's description (fdd000506) says the `solid` record can include a name,
+not where it ends. The human decided that a name is the rest of its line, after `solid` or
+`endsolid`; on `solid`'s line it ends before a `facet` the line goes on with `normal` or
+`outer`, and before an `endsolid` that ends the line, so that a solid written on one line
+reads. A name on the line after `solid` is no longer one, and a name after `endsolid` ends
+with its line.

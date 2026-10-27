@@ -2,7 +2,7 @@
 //! the Morton order of their origins (ARCHITECTURE.md §4.2, ADR-0014). It is edited only
 //! through a `TopologyEditor`, whose commit gives a new topology and the `Remap` to it.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::error::TreeError;
@@ -284,7 +284,7 @@ impl Topology {
 
     /// An editor of a copy of this topology, which stays usable with its fields.
     pub fn edit(&self) -> TopologyEditor<'_> {
-        TopologyEditor { old: self, tree: self.tree.clone() }
+        TopologyEditor { old: self, tree: self.tree.clone(), removed: BTreeSet::new() }
     }
 }
 
@@ -323,6 +323,9 @@ impl Path {
 pub struct TopologyEditor<'a> {
     old: &'a Topology,
     tree: Tree,
+    /// The origins of the leaf-sized regions whose leaves the edit removed: what the commit
+    /// puts there takes nothing of the old values.
+    removed: BTreeSet<Coord>,
 }
 
 impl TopologyEditor<'_> {
@@ -332,9 +335,14 @@ impl TopologyEditor<'_> {
     }
 
     /// Removes the leaf holding the voxel, and the nodes it leaves empty
-    /// (`Tree::deactivate`); in a tile it is refused.
+    /// (`Tree::deactivate`); in a tile it is refused. A leaf or tile the same edit puts in
+    /// its region takes nothing of the removed leaf's values: it starts from the background.
     pub fn deactivate(&mut self, v: Coord) -> Result<Deactivation, TreeError> {
-        self.tree.deactivate(v)
+        let d = self.tree.deactivate(v)?;
+        if matches!(d, Deactivation::Removed(_)) {
+            self.removed.insert(TileLevel::Lower.origin(v));
+        }
+        Ok(d)
     }
 
     /// Makes the region of the given level holding the voxel a tile (`Tree::add_tile`).
@@ -357,14 +365,16 @@ impl TopologyEditor<'_> {
 
     /// The edited topology, with a new stamp, and the remap to it from the old one. Where
     /// each new value comes from is found by locating each new leaf's and tile's origin in
-    /// the old topology, and each region a merged tile covers. The tree's arenas are
-    /// rebuilt, so nothing a merge left unreachable outlives the commit.
+    /// the old topology, and each region a merged tile covers, but for the regions whose
+    /// leaves the edit removed, which are the background. The tree's arenas are rebuilt, so
+    /// nothing a merge left unreachable outlives the commit.
     pub fn commit(self) -> Result<(Topology, Remap), TreeError> {
         let new = Topology::from_tree(self.tree.compacted()?)?;
+        let old = Before { old: self.old, tree: &self.old.tree, removed: &self.removed };
         let leaves = new
             .leaves
             .iter()
-            .map(|o| match self.old.locate(*o) {
+            .map(|o| match old.locate(*o) {
                 Location::Leaf(n) => LeafSource::Leaf(n),
                 Location::Tile(t, _) => LeafSource::Split(t),
                 Location::Background => LeafSource::Background,
@@ -374,7 +384,7 @@ impl TopologyEditor<'_> {
         let tiles = new
             .tiles
             .iter()
-            .map(|(l, o)| tile_source(self.old, *l, *o, &mut parts))
+            .map(|(l, o)| tile_source(&old, *l, *o, &mut parts))
             .collect::<Result<_, _>>()?;
         let remap = Remap { from: self.old.stamp, to: new.stamp, leaves, tiles, parts };
         Ok((new, remap))
@@ -384,9 +394,28 @@ impl TopologyEditor<'_> {
 /// Leaf-sized regions in a lower node's region.
 const LOWER_REGIONS: u32 = 4096;
 
+/// The old topology as an edit leaves it to its commit: the regions whose leaves the edit
+/// removed are the background.
+struct Before<'a> {
+    old: &'a Topology,
+    /// The old topology's tree, for what its nodes hold.
+    tree: &'a Tree,
+    removed: &'a BTreeSet<Coord>,
+}
+
+impl Before<'_> {
+    fn locate(&self, v: Coord) -> Location {
+        if self.removed.contains(&TileLevel::Lower.origin(v)) {
+            Location::Background
+        } else {
+            self.old.locate(v)
+        }
+    }
+}
+
 /// Where a new tile at `level` and `origin` comes from, pushing a merged tile's parts.
 fn tile_source(
-    old: &Topology,
+    old: &Before<'_>,
     level: TileLevel,
     origin: Coord,
     parts: &mut Vec<Part>,
@@ -423,7 +452,7 @@ fn tile_source(
 
 /// The parts of a new upper-level tile: what held each leaf-sized region of its lower
 /// node's region, the empty ones counted together.
-fn upper_parts(old: &Topology, origin: Coord, parts: &mut Vec<Part>) {
+fn upper_parts(old: &Before<'_>, origin: Coord, parts: &mut Vec<Part>) {
     let mut empty = 0;
     for i in 0..LOWER_REGIONS {
         let at = [i % 16, i / 16 % 16, i / 256].map(|c| c.cast_signed() * 8);
@@ -474,8 +503,8 @@ pub enum Part {
     Leaf(LeafNumber),
     /// An old leaf-sized tile: 512 voxels of one value.
     Tile(TileNumber),
-    /// This many leaf-sized regions that were the background: activated in the same commit
-    /// as the merge.
+    /// This many leaf-sized regions that were the background, or whose leaves the edit
+    /// removed: activated in the same commit as the merge.
     Background(u32),
 }
 
@@ -518,17 +547,29 @@ mod tests {
     }
 
     #[test]
-    fn a_root_tile_added_where_an_edit_removed_a_leaf_holds_the_background() {
-        // The leaf at the root region's origin, where the new tile's source is looked for.
+    fn what_an_edit_puts_where_it_removed_a_leaf_holds_the_background() {
+        // The leaf at the regions' origin, where each new tile's source is looked for.
         let (t, _) = commit_with(&Topology::new(), |e| {
             e.activate([0, 0, 0]).unwrap();
+            e.activate([8, 0, 0]).unwrap();
         });
-        let (after, remap) = commit_with(&t, |e| {
+        for level in [TileLevel::Lower, TileLevel::Upper, TileLevel::Root] {
+            let (after, remap) = commit_with(&t, |e| {
+                e.deactivate([0, 0, 0]).unwrap();
+                if level != TileLevel::Lower {
+                    e.deactivate([8, 0, 0]).unwrap();
+                }
+                e.add_tile(level, [0, 0, 0]).unwrap();
+            });
+            assert_eq!(after.tile(TileNumber(0)), Ok((level, [0; 3])));
+            assert_eq!(remap.tile_sources(), [TileSource::Background], "{level:?}");
+        }
+        // A leaf removed and made again.
+        let (_, remap) = commit_with(&t, |e| {
             e.deactivate([0, 0, 0]).unwrap();
-            e.add_tile(TileLevel::Root, [8, 0, 0]).unwrap();
+            e.activate([0, 0, 0]).unwrap();
         });
-        assert_eq!(after.tile(TileNumber(0)), Ok((TileLevel::Root, [0; 3])));
-        assert_eq!(remap.tile_sources(), [TileSource::Background]);
+        assert_eq!(remap.leaf_sources(), [LeafSource::Background, LeafSource::Leaf(LeafNumber(1))]);
     }
 
     #[test]

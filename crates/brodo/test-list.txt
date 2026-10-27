@@ -36,13 +36,13 @@ lib brodo slice::tests::equal_and_opposite_neighbours_are_both_on_the_contour
 lib brodo slice::tests::zeros_among_positives_are_off_the_contour
 lib brodo topology::tests::a_commit_keeps_no_arena_entry_a_merge_left
 lib brodo topology::tests::a_commit_leaves_the_old_topology_as_it_was
-lib brodo topology::tests::a_root_tile_added_where_an_edit_removed_a_leaf_holds_the_background
 lib brodo topology::tests::a_split_records_the_tile_each_new_part_came_from
 lib brodo topology::tests::leaf_voxels_follow_the_order_of_a_leafs_values
 lib brodo topology::tests::leaves_are_numbered_in_morton_order
 lib brodo topology::tests::neighbours_beyond_the_coordinate_range_are_the_background
 lib brodo topology::tests::neighbours_cross_root_boundaries_and_meet_tiles
 lib brodo topology::tests::tiles_are_numbered_in_morton_order_across_levels
+lib brodo topology::tests::what_an_edit_puts_where_it_removed_a_leaf_holds_the_background
 lib brodo tree::tests::a_tile_is_refused_where_anything_is
 lib brodo tree::tests::activation_inside_a_tile_changes_nothing
 lib brodo tree::tests::an_arena_holds_no_more_entries_than_a_u32_counts
