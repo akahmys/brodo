@@ -158,7 +158,7 @@ fn signs(
         for (v, x) in voxels(t, n)?.zip(values) {
             let p = lattice.world(v);
             let d = bvh.nearest(p).map(|(d, _)| d);
-            *x = u8::from(d == Some(0.0) || inside.at_distance(p, d));
+            *x = u8::from(inside.at_distance(p, d));
         }
         Ok::<(), FieldError>(())
     })?;

@@ -247,6 +247,19 @@ fn the_largest_k_ends_in_time() {
         erode(&one(), Connectivity::Six, u32::MAX).map(|(t, _)| t.leaf_count() + t.tile_count())
     });
     assert_eq!(eroded, Ok(0));
+    // Two leaves 8 000 000 voxels apart, their box's side no bound on the reach: each is
+    // found by the background beside it (the re-review of P5's fixes).
+    let apart = || {
+        let empty = Topology::new();
+        let mut e = empty.edit();
+        e.activate([0, 0, 0]).unwrap();
+        e.activate([8_000_000, 0, 0]).unwrap();
+        e.commit().unwrap().0
+    };
+    let eroded = timed::in_time(move || {
+        erode(&apart(), Connectivity::TwentySix, u32::MAX).map(|(t, _)| t.leaf_count())
+    });
+    assert_eq!(eroded, Ok(0));
     let dilated = timed::in_time(move || dilate(&one(), Connectivity::Six, u32::MAX).map(|_| ()));
     assert_eq!(dilated, Err(brodo::error::TreeError::ArenaFull(brodo::error::NodeKind::Leaf)));
 }

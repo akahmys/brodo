@@ -280,7 +280,12 @@ impl Walk<'_> {
                 b
             }
         };
-        let u = base + place(o, level);
+        // Units beyond a `u32` set the overflow the labelling is then refused for; the walk
+        // goes on with unit 0, its labels never read.
+        let Some(u) = base.checked_add(place(o, level)) else {
+            self.units.overflow = true;
+            return 0;
+        };
         if let Some(m) = self.units.meets.get_mut(u as usize) {
             *m = self.background;
         }

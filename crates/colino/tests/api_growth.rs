@@ -82,6 +82,7 @@ fn report_error(e: &ReportError) -> &'static str {
         ReportError::Mesh(..) => "Mesh",
         ReportError::Analysis(..) => "Analysis",
         ReportError::Transform => "Transform",
+        ReportError::TooFar => "TooFar",
         _ => "later",
     }
 }

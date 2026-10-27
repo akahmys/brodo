@@ -154,8 +154,12 @@ fn emit(entries: &[CacheEntry], out: &mut impl std::io::Write) -> Result<(), Cac
     Ok(())
 }
 
+/// The cache files this process has begun to write, numbering their hidden files.
+static WRITES: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
 /// Writes a cache file holding `entries`. The bytes go to a hidden file beside `path`,
-/// `.<name>.<process id>.tmp`, flushed to the disk and then renamed over `path`: a reader,
+/// `.<name>.<process id>.<n>.tmp`, n counting the process's writes so that two at once do
+/// not share it, made new, flushed to the disk and then renamed over `path`: a reader,
 /// a process mapping the old file among them, sees the old file or the new one whole, and a
 /// write that fails leaves the old one. The directory must be writable; a process killed
 /// while writing may leave the hidden file behind.
@@ -166,10 +170,12 @@ pub fn write(path: &Path, entries: &[CacheEntry]) -> Result<(), CacheError> {
     })?;
     let mut hidden = std::ffi::OsString::from(".");
     hidden.push(name);
-    hidden.push(format!(".{}.tmp", std::process::id()));
+    let n = WRITES.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    hidden.push(format!(".{}.{n}.tmp", std::process::id()));
     let temp = path.with_file_name(hidden);
     let written = (|| -> Result<(), CacheError> {
-        let mut file = std::io::BufWriter::new(std::fs::File::create(&temp)?);
+        let made = std::fs::OpenOptions::new().write(true).create_new(true).open(&temp)?;
+        let mut file = std::io::BufWriter::new(made);
         emit(entries, &mut file)?;
         file.flush()?;
         file.get_ref().sync_all()?;

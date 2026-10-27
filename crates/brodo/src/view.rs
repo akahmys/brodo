@@ -356,28 +356,32 @@ impl<'a, T: Stored> GridView<'a, T> {
             }
             seen.upper(e.index.get())?;
             let u = self.uppers.get(e.index.get() as usize).ok_or(lost("root"))?;
+            // The places are walked in order, so each child's and tile's number is its
+            // node's first plus those met so far, not counted again from the masks.
+            let (mut tile, mut child) = (Next::from(u.first_tile), Next::from(u.first_child));
             for p in 0..UPPER_PLACES {
                 let at = offset(key, unplace(p, 5), TileLevel::Upper.edge_log2());
                 if is_set(&u.tiles, p) {
-                    let i = nth(u.first_tile, &u.tiles, p, "upper node")?;
+                    let i = tile.take("upper node")?;
                     seen.tile(i)?;
                     tiles.push((TileLevel::Upper, at, i));
                 }
                 if !is_set(&u.children, p) {
                     continue;
                 }
-                let n = nth(u.first_child, &u.children, p, "upper node")?;
+                let n = child.take("upper node")?;
                 seen.lower(n)?;
                 let l = self.lowers.get(n as usize).ok_or(lost("upper node"))?;
+                let (mut tile, mut leaf) = (Next::from(l.first_tile), Next::from(l.first_child));
                 for q in 0..LOWER_PLACES {
                     let leaf_at = offset(at, unplace(q, 4), TileLevel::Lower.edge_log2());
                     if is_set(&l.tiles, q) {
-                        let i = nth(l.first_tile, &l.tiles, q, "lower node")?;
+                        let i = tile.take("lower node")?;
                         seen.tile(i)?;
                         tiles.push((TileLevel::Lower, leaf_at, i));
                     }
                     if is_set(&l.children, q) {
-                        let i = nth(l.first_child, &l.children, q, "lower node")?;
+                        let i = leaf.take("lower node")?;
                         let slot = leaves.get_mut(i as usize).ok_or(lost("lower node"))?;
                         if slot.replace(leaf_at).is_some() {
                             return Err(FormatError::Shared);
@@ -388,6 +392,24 @@ impl<'a, T: Stored> GridView<'a, T> {
         }
         let leaves = leaves.into_iter().collect::<Option<Vec<_>>>().ok_or(lost("leaf value"))?;
         Ok(Regions { leaves, tiles })
+    }
+}
+
+/// The number of a node's next child or tile in a walk of its places in order: its first
+/// plus those met so far.
+struct Next(u32);
+
+impl From<U32> for Next {
+    fn from(first: U32) -> Self {
+        Next(first.get())
+    }
+}
+
+impl Next {
+    fn take(&mut self, what: &'static str) -> Result<u32, FormatError> {
+        let n = self.0;
+        self.0 = n.checked_add(1).ok_or(lost(what))?;
+        Ok(n)
     }
 }
 

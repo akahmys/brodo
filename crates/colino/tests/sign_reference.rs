@@ -175,10 +175,10 @@ fn boxes(parts: &[([f64; 3], [f64; 3])]) -> Mesh {
     Mesh::new(vertices, triangles).with_unit(Some("millimeter".into()))
 }
 
-/// Voxel centres on the mesh, at distance exactly 0 (N1, N2 of P5's review): two boxes
-/// sharing a face, every face on a plane of centres. Such a point takes the parity count's
-/// sign under either sign, so the two convert alike, and an inside one holds a negative
-/// value, so that the solid `v < 0` is one part, not two.
+/// Voxel centres on the mesh, at distance exactly 0 (N1, N2 of P5's review, and its
+/// re-review): two boxes sharing a face, every face on a plane of centres. Such a point is
+/// inside under either sign, so the two convert alike, and holds a negative value, so that
+/// the solid `v < 0` is one part, not two.
 #[test]
 fn a_point_on_the_mesh_takes_one_sign_and_an_inside_one_is_below_zero() {
     let m = boxes(&[([0.5; 3], [4.5; 3]), ([4.5, 0.5, 0.5], [8.5, 4.5, 4.5])]);
@@ -190,4 +190,34 @@ fn a_point_on_the_mesh_takes_one_sign_and_an_inside_one_is_below_zero() {
     assert!(on_shared_face < 0.0, "{on_shared_face}");
     let solid = label(&c.topology, &c.field, |v| v < 0.0, Connectivity::TwentySix).unwrap();
     assert_eq!(solid.count(), 1);
+}
+
+/// Centres on the mesh are inside on every face alike, and on a face buried in another
+/// part (the re-review of P5's fixes): a box with every face on a plane of centres holds
+/// all 27 of its centres, under either sign, and two boxes overlapping, one's face across
+/// the other, are one part with no cavity.
+#[test]
+fn a_point_on_any_face_is_inside_and_overlapping_parts_stay_one() {
+    let solid = |c: &Converted, v: Coord| c.field.value_at(&c.topology, v).unwrap() < 0.0;
+    let cube = boxes(&[([0.5; 3], [2.5; 3])]);
+    for o in [Options::new(1.0), parity(1.0)] {
+        let c = convert(&cube, &o).unwrap();
+        let mut n = 0;
+        for z in -1..5 {
+            for y in -1..5 {
+                for x in -1..5 {
+                    n += usize::from(solid(&c, [x, y, z]));
+                }
+            }
+        }
+        assert_eq!(n, 27, "{:?}", o.sign);
+    }
+    let pair = boxes(&[([0.5; 3], [4.5; 3]), ([2.5, 0.5, 0.5], [6.5, 4.5, 4.5])]);
+    let c = convert(&pair, &Options::new(1.0)).unwrap();
+    assert!(solid(&c, [2, 2, 2]));
+    assert_eq!(
+        label(&c.topology, &c.field, |v| v < 0.0, Connectivity::TwentySix).unwrap().count(),
+        1
+    );
+    assert_eq!(label(&c.topology, &c.field, |v| v >= 0.0, Connectivity::Six).unwrap().count(), 1);
 }

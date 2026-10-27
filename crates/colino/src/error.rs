@@ -246,4 +246,8 @@ pub enum ReportError {
     /// The grid's transform is not the axis-aligned one conversion writes.
     #[error("the grid's transform is not axis-aligned with positive voxel sizes")]
     Transform,
+    /// The mesh lies farther than 2³¹ voxels from the world's origin, where the third
+    /// layer's rays could not tell a thin place from rounding.
+    #[error("the mesh lies too far from the origin, in voxels, for its thin places to be found")]
+    TooFar,
 }

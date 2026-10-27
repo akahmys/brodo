@@ -202,6 +202,15 @@ fn places(points: &[Found], kind: ThinKind, reach: f64) -> Vec<Thin> {
     by_root.into_values().collect()
 }
 
+/// Whether the rays can measure the mesh `bvh` holds at voxel size `h`: its coordinates lie
+/// within 2³¹ voxels of the world's origin, so that a ray's start off its own triangle,
+/// 2⁻⁴⁰ of the coordinates (`ray`), stays within 2⁻⁹ h, far below the 2h it reaches.
+pub(crate) fn resolves(bvh: &Bvh, h: f64) -> bool {
+    let Some((lo, hi)) = bvh.bounds() else { return true };
+    let largest = lo.iter().chain(&hi).fold(0.0_f64, |m, c| m.max(c.abs()));
+    largest <= h * 2_f64.powi(31)
+}
+
 /// The thin walls, then the narrow gaps, of the mesh `bvh` holds, sides found by `inside`,
 /// at voxel size `h`.
 pub(crate) fn thin(bvh: &Bvh, inside: &Inside<'_>, h: f64) -> Vec<Thin> {

@@ -243,3 +243,14 @@ P5's review found that the triangles after an OBJ `g` naming no group took group
 the last `o`'s name. The specification says only that group information is optional and
 that the default group is named `default`. The human decided that a `g` naming no group
 is as none: the triangles after it take the last `o`'s name, failing that group 0.
+
+## Amendment: line ends and a name after `endsolid`
+
+- **Date**: 2026-10-27
+
+The re-review of P5's fixes found that the rule above lost every solid after the first,
+with no error, in a file of solids on one line, the name after `endsolid` running on
+over the next solid, and in a file whose lines end with a lone `\r`, read as one line.
+The human decided that a line ends at `\n`, `\r\n` or a lone `\r`, and that a name
+after `endsolid` ends before a `solid` on its line, as before the rule; such a name
+holding the word `solid` is cut there.

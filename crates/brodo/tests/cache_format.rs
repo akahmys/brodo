@@ -185,6 +185,39 @@ fn a_file_is_replaced_whole() {
     assert_eq!(names, ["blocked", "grids.brdc"]);
 }
 
+/// Writes to one path from several threads at once each replace the file whole (the
+/// re-review of P5's fixes): every read finds one write's bytes, and nothing is left beside
+/// the file once they end.
+#[test]
+fn writes_at_once_each_replace_the_file_whole() {
+    let dir = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("written_at_once");
+    let _fresh = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("grids.brdc");
+    let t = build(&[[3, 3, 3], [40, 0, 0]], &[]);
+    let files: Vec<Vec<u8>> = (0..8)
+        .map(|i| {
+            to_bytes(&[CacheEntry::new(&meta("g", &[]), &t, &Field::new(&t, i as f32)).unwrap()])
+                .unwrap()
+        })
+        .collect();
+    std::thread::scope(|s| {
+        for i in 0..8_usize {
+            let (t, path) = (&t, &path);
+            s.spawn(move || {
+                for _ in 0..25 {
+                    let f = Field::new(t, i as f32);
+                    write(path, &[CacheEntry::new(&meta("g", &[]), t, &f).unwrap()]).unwrap();
+                }
+            });
+        }
+    });
+    let last = std::fs::read(&path).unwrap();
+    assert!(files.contains(&last), "the file is none of the writes");
+    let names: Vec<_> = std::fs::read_dir(&dir).unwrap().map(|e| e.unwrap().file_name()).collect();
+    assert_eq!(names, ["grids.brdc"]);
+}
+
 #[test]
 fn format_version_1_keeps_its_bytes_and_a_file_round_trips() {
     let bytes = golden();

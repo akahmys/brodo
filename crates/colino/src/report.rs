@@ -21,7 +21,7 @@
 //! Layer 3, local risk: places thinner, or gaps narrower, than two voxels, found from the
 //! mesh along its triangles' normals (`colino::thin`), each with its box; there a
 //! conversion may have opened a wall or closed a gap. Sides are found by the conversion's
-//! sign, the winding number's at Barill et al.'s β = 2. Each place is checked by its box's
+//! sign, at its accuracy (`Converted::accuracy`). Each place is checked by its box's
 //! invariants at h and at h/2, sampled by that sign.
 
 use brodo::analysis::{Connectivity, Label, Labels, label};
@@ -33,7 +33,7 @@ use crate::distance::Point;
 use crate::error::ReportError;
 use crate::mesh::Mesh;
 use crate::surface::Surface;
-use crate::thin::{check, thin};
+use crate::thin::{check, resolves, thin};
 use crate::winding::Winding;
 
 /// Betti numbers: components, tunnels and cavities.
@@ -270,6 +270,21 @@ fn pairs(regions: &[Region]) -> [Vec<Pair>; 2] {
     [together, apart]
 }
 
+/// The third layer: the thin places of `mesh`, each checked in `converted`.
+fn third_layer(mesh: &Mesh, converted: &Converted) -> Result<Vec<Thin>, ReportError> {
+    let winding = Winding::new(mesh)?;
+    let inside = Inside::new(&winding, converted.sign, converted.accuracy);
+    let h = voxel_size(converted)?;
+    if !resolves(winding.bvh(), h) {
+        return Err(ReportError::TooFar);
+    }
+    let mut places = thin(winding.bvh(), &inside, h);
+    for place in &mut places {
+        place.check = check(converted, &inside, place)?;
+    }
+    Ok(places)
+}
+
 /// The report on `converted`, the conversion of `mesh`, with the named points `regions`.
 pub fn report(
     mesh: &Mesh,
@@ -303,12 +318,7 @@ pub fn report(
         })
         .collect::<Result<Vec<_>, ReportError>>()?;
     let [together, apart] = pairs(&regions);
-    let winding = Winding::new(mesh)?;
-    let inside = Inside::new(&winding, converted.sign, converted.accuracy);
-    let mut thin = thin(winding.bvh(), &inside, voxel_size(converted)?);
-    for place in &mut thin {
-        place.check = check(converted, &inside, place)?;
-    }
+    let thin = third_layer(mesh, converted)?;
     Ok(Report {
         solid: Betti { components, tunnels, cavities },
         complement: Betti {

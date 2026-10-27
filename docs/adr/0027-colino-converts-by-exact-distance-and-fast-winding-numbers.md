@@ -143,3 +143,15 @@ being the distance from a cell's centre to its corners, so that no cell is kept 
 voxels all lie beyond the band; a candidate stays a leaf when one of its voxels' values
 lies within the band. The leaves are the same either way. ARCHITECTURE.md §5.1 states the
 rule.
+
+## Amendment: a point on the mesh, again
+
+- **Date**: 2026-10-27
+
+The re-review of P5's fixes found that the parity count's sign at a point on the mesh,
+the amendment above, split overlapping parts: a voxel centre on one part's face, buried in
+another, came out outside, its lines' votes tied against it, and two overlapping boxes
+labelled as two solids; and that it put a box's centres on its lower faces inside and on
+its upper ones outside, by the side the lines are moved to; and that Hermite data took
+such a point as inside. The human decided that a point at distance exactly 0 is inside,
+whichever sign is asked for, as Hermite data takes it.

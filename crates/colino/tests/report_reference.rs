@@ -186,6 +186,12 @@ fn a_transform_not_axis_aligned_is_refused() {
     let mut nan = convert(&m, &Options::new(1.0)).unwrap();
     nan.meta.transform[2][0] = f64::NAN;
     assert_eq!(report(&m, &nan, &[]), Err(ReportError::Transform));
+    // An infinite voxel size, or an origin not finite (the re-review of P5's fixes).
+    for (row, col, x) in [(0, 0, f64::INFINITY), (1, 3, f64::NAN), (2, 3, f64::NEG_INFINITY)] {
+        let mut c = convert(&m, &Options::new(1.0)).unwrap();
+        c.meta.transform[row][col] = x;
+        assert_eq!(report(&m, &c, &[]), Err(ReportError::Transform), "[{row}][{col}] = {x}");
+    }
     // Axis-aligned, but with a voxel of no size or of negative size.
     for h in [0.0, -1.0] {
         let mut c = convert(&m, &Options::new(1.0)).unwrap();
@@ -222,4 +228,18 @@ fn a_negative_zero_is_not_solid() {
     let at = origin.map(|x| f64::from(x) + 0.5);
     let r = report(&m, &c, &[("surface".into(), at)]).unwrap();
     assert!(matches!(r.regions[0].place, Place::Complement { .. }), "{:?}", r.regions[0]);
+}
+
+/// A mesh farther than 2³¹ voxels from the world's origin is refused (the re-review of
+/// P5's fixes): there a ray's start off its triangle would pass the 2h it reaches, and the
+/// report would find no thin place where there may be one. The lattice moves with it.
+#[test]
+fn a_mesh_too_far_from_the_origin_is_refused() {
+    let far = 1e10;
+    let m = sphere(2, 10.0, [far, 0.0, 0.0]);
+    let c = convert(&m, &Options::new(1.0).with_origin([far, 0.0, 0.0])).unwrap();
+    assert_eq!(report(&m, &c, &[]).map(|r| r.thin.len()), Err(ReportError::TooFar));
+    let near = sphere(2, 10.0, [1e9, 0.0, 0.0]);
+    let c = convert(&near, &Options::new(1.0).with_origin([1e9, 0.0, 0.0])).unwrap();
+    assert!(report(&near, &c, &[]).is_ok());
 }

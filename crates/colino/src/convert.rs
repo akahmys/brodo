@@ -64,13 +64,17 @@ impl<'a> Inside<'a> {
     }
 
     /// Whether `p`, at distance `d` from the mesh, is inside. A point on the mesh, at
-    /// distance exactly 0, takes the parity count's sign whatever the sign asked for: its
-    /// lines moved by (ε, ε²) decide it, where the winding number's solid angles would turn
-    /// on the sign of a rounded zero.
+    /// distance exactly 0, is inside whatever the sign asked for, as Hermite data takes it:
+    /// on a face buried in another part, on any face of a box, and on a face two parts
+    /// share alike, where the winding number would turn on a rounded zero's sign and
+    /// parity on the side its lines are moved to.
     pub(crate) fn at_distance(&self, p: Point, d: Option<f64>) -> bool {
+        if d == Some(0.0) {
+            return true;
+        }
         match self.sign {
-            Sign::Winding if d != Some(0.0) => self.winding.number(p, self.accuracy) >= 0.5,
-            Sign::Winding | Sign::Parity => parity::inside(self.winding.bvh(), p),
+            Sign::Winding => self.winding.number(p, self.accuracy) >= 0.5,
+            Sign::Parity => parity::inside(self.winding.bvh(), p),
         }
     }
 }
@@ -213,16 +217,19 @@ impl Lattice {
 
 impl Converted {
     /// Its lattice, read from its transform; none unless the transform is aligned with the
-    /// axes, an entry off the diagonal 0 and not NaN, and each voxel size positive.
+    /// axes, an entry off the diagonal 0 and not NaN, each voxel size positive and finite,
+    /// and the origin finite.
     pub(crate) fn lattice(&self) -> Option<Lattice> {
         let (mut origin, mut h) = ([0.0; 3], [0.0; 3]);
         for (k, row) in self.meta.transform.iter().enumerate() {
             let off_axis = row.iter().take(3).enumerate().any(|(j, x)| j != k && *x != 0.0);
             let scale = row.get(k).copied().unwrap_or(0.0);
-            if off_axis || scale.partial_cmp(&0.0) != Some(std::cmp::Ordering::Greater) {
+            let at = row.get(3).copied().unwrap_or(0.0);
+            let positive = scale.partial_cmp(&0.0) == Some(std::cmp::Ordering::Greater);
+            if off_axis || !positive || !scale.is_finite() || !at.is_finite() {
                 return None;
             }
-            (h[k], origin[k]) = (scale, row.get(3).copied().unwrap_or(0.0));
+            (h[k], origin[k]) = (scale, at);
         }
         Some(Lattice { origin, h })
     }

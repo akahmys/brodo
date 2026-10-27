@@ -121,6 +121,23 @@ fn a_solids_name_is_the_rest_of_its_line() {
         Ok(vec![String::new(), "a b".into()])
     );
     assert_eq!(names("solid empty endsolid").map(|n| n.len()), Ok(0));
+    // Two solids on one line, and lines ended by a lone `\r`, the old Macintosh ending
+    // (the re-review of P5's fixes): each solid reads, its triangle its own.
+    let both =
+        |text: &str| read(text.as_bytes(), ROOMY).map(|m| (m.triangles.len(), m.group_names));
+    let two = vec![String::new(), "a".into(), "b".into()];
+    assert_eq!(
+        both(&format!("solid a {facet} endsolid a solid b {facet} endsolid b")),
+        Ok((2, two.clone()))
+    );
+    assert_eq!(
+        both(&format!("solid a\r{facet}\rendsolid a\rsolid b\r{facet}\rendsolid b\r")),
+        Ok((2, two.clone()))
+    );
+    assert_eq!(
+        both(&format!("solid a\r\n{facet}\r\nendsolid a\r\nsolid b\r\n{facet}\r\nendsolid b")),
+        Ok((2, two))
+    );
     // A name on the line after solid is not a name.
     assert!(matches!(
         read(format!("solid\nname\n{facet}\nendsolid").as_bytes(), ROOMY),

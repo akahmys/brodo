@@ -19,9 +19,10 @@
 //! equal ones.
 //!
 //! A name is the rest of its line, after `solid` or `endsolid`, its words joined by one
-//! space: it may hold the format's own words. On `solid`'s line, it ends before a `facet`
-//! the line goes on with `normal` or `outer`, and before an `endsolid` that ends the line,
-//! so that a solid written on one line reads.
+//! space: it may hold the format's own words. A line ends at `\n`, `\r\n` or a lone `\r`.
+//! On `solid`'s line, a name ends before a `facet` the line goes on with `normal` or
+//! `outer`, and before an `endsolid` that ends the line; on `endsolid`'s, before a `solid`;
+//! so that solids written on one line read.
 //!
 //! Groups (ADR-0030): in ASCII, each solid is a group, named by its name after `solid`; a
 //! binary file's triangles are all in group 0.
@@ -161,7 +162,8 @@ impl<'a, I: Iterator<Item = Word<'a>>> Words<'a, I> {
 
     /// Takes a name: the rest of the line of the word taken last, joined by one space. A
     /// solid's name ends before a `facet` its line goes on with `normal` or `outer`, and
-    /// before an `endsolid` that ends its line, so that a solid written on one line reads.
+    /// before an `endsolid` that ends its line; an `endsolid`'s before a `solid`; so that
+    /// solids written on one line read.
     fn name(&mut self, solid: bool) -> String {
         let line = self.line;
         let mut name = Vec::new();
@@ -171,7 +173,12 @@ impl<'a, I: Iterator<Item = Word<'a>>> Words<'a, I> {
             let after = self.peek(1).filter(|(_, l, _)| *l == line).map(|(_, _, w)| w);
             let is = |a: &str, b: &str| a.eq_ignore_ascii_case(b);
             let facet = is(w, "facet") && after.is_some_and(|a| is(a, "normal") || is(a, "outer"));
-            if solid && (facet || (is(w, "endsolid") && after.is_none())) {
+            let ends = if solid {
+                facet || (is(w, "endsolid") && after.is_none())
+            } else {
+                is(w, "solid")
+            };
+            if ends {
                 break;
             }
             name.push(w);
@@ -183,8 +190,9 @@ impl<'a, I: Iterator<Item = Word<'a>>> Words<'a, I> {
 
 /// The words of `text`, each with its line.
 fn words(text: &str) -> Words<'_, impl Iterator<Item = Word<'_>>> {
+    // A line ends at `\n`, `\r\n` or a lone `\r`, the old Macintosh ending.
     let words = text
-        .lines()
+        .split(['\n', '\r'])
         .enumerate()
         .flat_map(|(line, l)| l.split_ascii_whitespace().map(move |w| (line, w)));
     let words = words.enumerate().map(|(at, (line, w))| (at, line, w));

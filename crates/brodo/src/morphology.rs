@@ -42,20 +42,25 @@ fn reach(k: u32) -> i64 {
     if k == 0 { 0 } else { (i64::from(k) - 1) / CELL + 1 }
 }
 
-/// The offsets, in cells, of the other cells within k steps of a cell.
-fn offsets(k: u32, conn: Connectivity) -> Vec<[i64; 3]> {
-    let r = reach(k);
-    let mut out = Vec::new();
-    for z in -r..=r {
-        for y in -r..=r {
-            for x in -r..=r {
-                if [x, y, z] != [0; 3] && steps([x, y, z], conn) <= i64::from(k) {
-                    out.push([x, y, z]);
+/// Whether `visit` holds for an offset, in cells, of another cell within k steps of a
+/// cell: the offsets are taken shell by shell outwards, each shell the cells `rho` from the
+/// cell along their farthest axis, so that the first offset `visit` holds for ends it, and
+/// no list of them is made.
+fn any_within(k: u32, conn: Connectivity, mut visit: impl FnMut([i64; 3]) -> bool) -> bool {
+    for rho in 1..=reach(k) {
+        for z in -rho..=rho {
+            for y in -rho..=rho {
+                let on_shell = z.abs() == rho || y.abs() == rho;
+                let xs: Vec<i64> = if on_shell { (-rho..=rho).collect() } else { vec![-rho, rho] };
+                for x in xs {
+                    if steps([x, y, z], conn) <= i64::from(k) && visit([x, y, z]) {
+                        return true;
+                    }
                 }
             }
         }
     }
-    out
+    false
 }
 
 /// A cell's origin from its index, or nothing beyond the `i32` range.
@@ -117,7 +122,10 @@ fn around(lo: [i64; 3], side: i64, k: u32, conn: Connectivity, mut visit: impl F
     }
 }
 
-/// The topology with a leaf at every background cell within k steps of a leaf or tile.
+/// The topology with a leaf at every background cell within k steps of a leaf or tile. It
+/// makes as many leaves as k asks, and holds them while it does, about a k³/512th of a
+/// region's shell for each region: a dilation whose new leaves a `u32` could not number is
+/// refused before any is made, but one that merely needs more memory than there is is not.
 pub fn dilate(t: &Topology, conn: Connectivity, k: u32) -> Result<(Topology, Remap), TreeError> {
     within_count(&regions(t)?, k)?;
     let mut e = t.edit();
@@ -176,9 +184,12 @@ fn grown(t: &Topology, conn: Connectivity, k: u32) -> Result<BTreeSet<Coord>, Tr
     Ok(cells)
 }
 
-/// Whether a background cell, or the space beyond the `i32` range, lies within k steps.
-fn near_background(t: &Topology, cell: [i64; 3], near: &[[i64; 3]]) -> bool {
-    near.iter().any(|d| origin(add(cell, *d)).is_none_or(|o| t.locate(o) == Location::Background))
+/// Whether a background cell, or the space beyond the `i32` range, lies within k steps;
+/// the nearest are looked at first, so a cell by the background is found at once.
+fn near_background(t: &Topology, cell: [i64; 3], k: u32, conn: Connectivity) -> bool {
+    any_within(k, conn, |d| {
+        origin(add(cell, d)).is_none_or(|o| t.locate(o) == Location::Background)
+    })
 }
 
 /// The topology without every leaf within k steps of a background cell; a larger tile is
@@ -207,11 +218,10 @@ fn removed(
     conn: Connectivity,
     k: u32,
 ) -> Result<(Vec<Coord>, BTreeSet<Coord>), TreeError> {
-    let near = offsets(k, conn);
     let mut leaves = Vec::new();
     for n in t.leaf_numbers() {
         let o = t.leaf_origin(n)?;
-        if near_background(t, index(o), &near) {
+        if near_background(t, index(o), k, conn) {
             leaves.push(o);
         }
     }
@@ -232,7 +242,7 @@ fn removed(
                 };
                 for x in xs {
                     let cell = add(lo, [x, y, z]);
-                    if near_background(t, cell, &near) {
+                    if near_background(t, cell, k, conn) {
                         split.extend(origin(cell));
                     }
                 }
