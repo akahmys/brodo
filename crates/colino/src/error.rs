@@ -172,13 +172,19 @@ pub enum MeshError {
     /// Group 0 is named other than `""`.
     #[error("group 0 is named, but it is no group")]
     GroupZeroNamed,
+    /// A triangle's vertex has a coordinate that is not finite: NaN or an infinity.
+    #[error("vertex {vertex} has a coordinate that is not finite")]
+    NotFinite {
+        /// The vertex's index.
+        vertex: u32,
+    },
 }
 
 /// Why a mesh could not be converted.
 #[derive(Debug, Clone, PartialEq, thiserror::Error)]
 #[non_exhaustive]
 pub enum ConvertError {
-    /// The mesh names a vertex it lacks.
+    /// The mesh names a vertex it lacks, or holds one that is not finite.
     #[error(transparent)]
     Mesh(#[from] MeshError),
     /// The tree refused an edit.
@@ -205,7 +211,8 @@ pub enum ConvertError {
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum HermiteError {
-    /// The mesh names a vertex it lacks, or its groups do not fit it.
+    /// The mesh names a vertex it lacks, holds one that is not finite, or its groups do not
+    /// fit it.
     #[error(transparent)]
     Mesh(#[from] MeshError),
     /// A field refused a read or write.
@@ -227,7 +234,7 @@ pub enum HermiteError {
 #[derive(Debug, Clone, PartialEq, thiserror::Error)]
 #[non_exhaustive]
 pub enum ReportError {
-    /// The mesh names a vertex it lacks.
+    /// The mesh names a vertex it lacks, or holds one that is not finite.
     #[error(transparent)]
     Mesh(#[from] MeshError),
     /// Labelling or the Euler characteristic was refused.

@@ -76,6 +76,13 @@ are recorded here when they change (V6).
   sign is asked for, where the winding number turned on a rounded zero's sign; an inside
   voxel whose distance rounds to zero holds −`f32::MIN_POSITIVE`, not −0, so that `v < 0`
   finds it and parts sharing a face are one solid (ADR-0027).
+- colino's third layer starts each ray off its own triangle by 2⁻⁴⁰ of the coordinates
+  it works with, rather than 10⁻⁹ of the mesh's size: far from the origin the start was
+  lost to rounding and the ray crossed its own face, and on a large mesh it could pass
+  over walls thinner than the start.
+- colino refuses a mesh whose triangles reach a vertex that is not finite, the new
+  `MeshError::NotFinite`: a mesh made by hand with a NaN converted without an error, and
+  the BVH's sort lost its total order.
 
 ### Breaking
 

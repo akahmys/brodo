@@ -245,3 +245,13 @@ fn the_places_do_not_depend_on_the_thread_count() {
     };
     assert_eq!(run(1), run(8));
 }
+
+/// The ray's start off its own triangle follows the coordinates' size (N3 of P5's review):
+/// a cube far from the origin has no thin place, where a start of reach·10⁻⁹, lost to
+/// rounding there, crossed the ray's own face and measured walls as thin as rounding.
+#[test]
+fn a_cube_far_from_the_origin_has_no_thin_place() {
+    let far = 1e9;
+    let m = boxes(&[([far, 0.0, 0.0], [far + 10.0, 10.0, 10.0])]);
+    assert_eq!(thin(&m, &options()), Vec::new());
+}

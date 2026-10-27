@@ -11,7 +11,7 @@ use brodo::topology::Location;
 use brodo::tree::Coord;
 use colino::convert::{Converted, Options, convert};
 use colino::distance::{Point, on_segment, squared};
-use colino::error::ConvertError;
+use colino::error::{ConvertError, MeshError};
 use colino::mesh::Mesh;
 use colino::winding::{Accuracy, Winding};
 use proptest::prelude::*;
@@ -294,6 +294,14 @@ fn bad_options_and_a_missing_unit_are_refused() {
         refused(Options::new(1.0).with_accuracy(Accuracy::Approximate { beta: 0.0 })),
         Some(ConvertError::BadOption(_))
     ));
+    // A vertex not finite, in a mesh made by hand: refused, not converted (N4 of P5's review).
+    for x in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+        let mut bad = m.clone();
+        let vertex = bad.triangles[0][1];
+        bad.vertices[vertex as usize][2] = x;
+        let refused = convert(&bad, &Options::new(1.0)).err();
+        assert_eq!(refused, Some(ConvertError::Mesh(MeshError::NotFinite { vertex })), "{x}");
+    }
     let bare = m.clone().with_unit(None);
     assert_eq!(convert(&bare, &Options::new(1.0)).err(), Some(ConvertError::NoUnit));
     assert!(convert(&bare, &Options::new(1.0).with_unit(Some("inch".into()))).is_ok());

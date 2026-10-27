@@ -81,6 +81,9 @@ fn corners(mesh: &Mesh) -> Result<Vec<[Point; 3]>, MeshError> {
         for (corner, index) in c.iter_mut().zip(*t) {
             let at = usize::try_from(index).ok().and_then(|i| mesh.vertices.get(i));
             *corner = *at.ok_or(MeshError::BadIndex { triangle, index })?;
+            if !corner.iter().all(|x| x.is_finite()) {
+                return Err(MeshError::NotFinite { vertex: index });
+            }
         }
         out.push(c);
     }

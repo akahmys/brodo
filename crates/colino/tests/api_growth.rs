@@ -47,6 +47,7 @@ fn mesh_error(e: &MeshError) -> &'static str {
         MeshError::GroupCount { .. } => "GroupCount",
         MeshError::UnnamedGroup { .. } => "UnnamedGroup",
         MeshError::GroupZeroNamed => "GroupZeroNamed",
+        MeshError::NotFinite { .. } => "NotFinite",
         _ => "later",
     }
 }

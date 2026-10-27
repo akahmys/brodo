@@ -109,10 +109,13 @@ fn samples(t: [Point; 3], step: f64) -> Vec<Point> {
 }
 
 /// The distance from `x` along `d` to the nearest triangle, within `reach`. The ray starts
-/// `reach`·10⁻⁹ beyond `x`, off the plane of `x`'s own triangle, so that it does not cross
-/// it nor the triangles in its plane.
+/// off the plane of `x`'s own triangle, so that it does not cross it nor the triangles in
+/// its plane: by 2⁻⁴⁰ of the largest coordinate the crossing is worked with, some 4096
+/// times its rounding, which neither vanishes far from the origin nor grows with the mesh's
+/// size alone.
 fn ray(bvh: &Bvh, x: Point, d: Point, reach: f64) -> Option<f64> {
-    let start = 1e-9 * reach;
+    let largest = x.iter().fold(reach, |m, c| m.max(c.abs() + reach));
+    let start = largest * (-40.0_f64).exp2();
     let (a, b) = (add(x, scale(d, start)), add(x, scale(d, reach)));
     bvh.first_crossing(a, b).map(|s| start + s * (reach - start))
 }
