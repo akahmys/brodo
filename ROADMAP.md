@@ -271,21 +271,29 @@ built.
         colino's vector helpers in `distance.rs`, the tree's box in `Bvh::bounds`
   - [x] Benchmarks within their baselines, both crates, at loads of 1.7 and 1.5
         (2026-10-26)
-  - [ ] A review of the logic and algorithms of both crates, chosen by the human
+  - [x] A review of the logic and algorithms of both crates, chosen by the human
         (2026-10-26), what P5 wrote or rewrote first; each defect fixed on its own, with
         its test. Three passes, by module, by concern and by workflow, found 53 items
         (2026-10-26): readers of untrusted bytes that hang or exhaust memory on small
         files (3MF, cache, Hermite, OBJ), parts sharing a face split in two, a Hermite set
-        written beside its SDF claiming the SDF's convention, and costs beyond the band
-  - [ ] A review again of what the fixes changed, chosen by the human (2026-10-26)
+        written beside its SDF claiming the SDF's convention, and costs beyond the band.
+        Fixed or decided by the human (2026-10-27), M2 set aside as B-023
+  - [x] A review again of what the fixes changed, chosen by the human (2026-10-26): three
+        read-only passes (2026-10-27), on brodo, colino and the documents, found a point on
+        the mesh splitting overlapping parts, solids lost from one-line and CR-only STL,
+        erosion endless on far leaves, writes at once sharing a hidden file and 13
+        documents behind the code; each fixed or decided
   - [x] R12, a frozen view thawed into a topology and a field (ADR-0042), scheduled by
         the human (2026-10-26), after the review's fixes to the Hermite reader: landed
         (2026-10-27), `GridView::thaw`, `thaw_on` and `same_topology`
-  - [ ] Refactoring across the crates, its candidates listed for the human to choose
-  - [ ] The public API tidied in 0.6.0, already breaking for `Stored`:
-        `FreezeError::Inconsistent` removed among it
+  - [x] Refactoring across the crates, its candidates listed for the human to choose:
+        the conversion's lattice read once, the tests' boxes and clock shared, the view's
+        root lookup shared (2026-10-27)
+  - [x] The public API tidied in 0.6.0, already breaking for `Stored`:
+        `FreezeError::Inconsistent` removed among it (2026-10-27)
   - [ ] Mutation run, after the review and the refactoring; a run on `9940bd5`
-        (2026-10-26) shows where tests are weak
+        (2026-10-26 to 27) showed where tests were weak, each missed mutant since killed by
+        a test or excluded with its reason
 - [ ] **Accepted when** a badly oriented mesh converts with the new sign, layer 3 finds
       thin walls and narrow gaps, and each cost above is measured, kept where it helps
 
