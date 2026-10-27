@@ -110,3 +110,13 @@ sign. A closed mesh is not affected, its inside being the same at every point of
 region. The human decided that this is stated, not changed: an open mesh's inside is not
 defined, the report counts its open edges, and refining the regions whose corners
 disagree would add leaves and time to every conversion.
+
+## Amendment: a conversion records its accuracy
+
+- **Date**: 2026-10-27
+
+P5's review found that `Converted` recorded the sign a conversion used but not the
+accuracy its winding numbers were found at: Hermite data took the accuracy as an argument
+of its own, unchecked against the conversion's, and the report's third layer always used
+β = 2. The human decided that `Converted::accuracy` records it, and that Hermite data and
+the report follow it, as they follow `Converted::sign`; `hermite` takes no accuracy.

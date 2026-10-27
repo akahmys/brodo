@@ -186,6 +186,9 @@ pub struct Converted {
     pub meta: GridMeta,
     /// The sign the conversion used, which Hermite data from it uses too.
     pub sign: Sign,
+    /// The accuracy its winding numbers were found at, which Hermite data and the report's
+    /// third layer use too.
+    pub accuracy: Accuracy,
 }
 
 /// Index space's corners `lo` and `hi`, as `i64` cells' range; refused beyond `i32`.
@@ -281,7 +284,7 @@ pub fn convert(mesh: &Mesh, o: &Options) -> Result<Converted, ConvertError> {
     }
     meta.extra.insert(SDF_KEY.to_owned(), SDF_VERSION.to_owned());
     meta.check()?;
-    Ok(Converted { topology: t, field: f, meta, sign: o.sign })
+    Ok(Converted { topology: t, field: f, meta, sign: o.sign, accuracy: o.accuracy })
 }
 
 /// The topology and field without the candidates holding no value inside the band.

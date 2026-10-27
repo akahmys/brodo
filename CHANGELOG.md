@@ -114,6 +114,10 @@ are recorded here when they change (V6).
 
 ### Breaking
 
+- `Converted` records the accuracy its winding numbers were found at, the new field
+  `accuracy`, which `hermite` and the report's third layer follow: `hermite(mesh, c)` takes
+  no accuracy of its own, and the third layer no longer uses β = 2 whatever the conversion
+  used (ADR-0027).
 - colino's OBJ reader takes a `g` naming no group as none: the triangles after it take the
   last `o`'s name, where they took group 0 (ADR-0030).
 - `Grid::parts_mut` is removed: a grid's field is written through `Grid::par_update_leaves`,

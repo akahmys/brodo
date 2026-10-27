@@ -3,7 +3,7 @@
 //! the mesh crosses it, its normal and its group.
 //!
 //! A leaf point's sign is found as the conversion found its voxels' (`Converted::sign`):
-//! the winding number's, at the accuracy given, or the parity count's; a point at distance
+//! the winding number's, at the conversion's accuracy, or the parity count's; a point at distance
 //! zero from the mesh is inside. Tiles, inside regions, are inside, and the
 //! background outside. Signs are found first, then each edge whose stored signs differ is
 //! tested against every triangle with area near it (`intersect::crossing`): the hit nearest
@@ -34,7 +34,7 @@ use crate::distance::{Point, cross, dot, sub};
 use crate::error::HermiteError;
 use crate::intersect::crossing;
 use crate::mesh::Mesh;
-use crate::winding::{Accuracy, Winding};
+use crate::winding::Winding;
 
 /// A mesh's Hermite data, with the count of crossed edges no triangle was hit on.
 #[derive(Debug, Clone)]
@@ -141,16 +141,16 @@ fn find(bvh: &Bvh, a: Point, b: Point, lower_inside: bool) -> Option<Found> {
     near.map(|(fraction, _, triangle)| Found { fraction, triangle, hit: false })
 }
 
-/// Hermite data for `mesh` on its conversion `c`, signs by `c`'s sign, winding numbers at
-/// `accuracy`, as `c` was made.
-pub fn hermite(mesh: &Mesh, c: &Converted, accuracy: Accuracy) -> Result<Produced, HermiteError> {
+/// Hermite data for `mesh` on its conversion `c`, signs by `c`'s sign and winding numbers at
+/// its accuracy, as `c` was made.
+pub fn hermite(mesh: &Mesh, c: &Converted) -> Result<Produced, HermiteError> {
     mesh.check_groups()?;
     let lattice = Lattice::of(c)?;
     // One tree of boxes serves the winding number, the crossings and the nearest triangles.
     let winding = Winding::new(mesh)?;
     let bvh = winding.bvh();
     let t = &c.topology;
-    let signs = signs(t, &lattice, bvh, &Inside::new(&winding, c.sign, accuracy))?;
+    let signs = signs(t, &lattice, bvh, &Inside::new(&winding, c.sign, c.accuracy))?;
     let mut unhit = 0_u64;
     let mut axes = Vec::with_capacity(3);
     for axis in 0..3 {

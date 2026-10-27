@@ -185,7 +185,8 @@ fn every_struct_is_built_by_its_constructor_set_by_assignment_and_read_by_its_fi
     assert_eq!((c.meta.unit.as_str(), c.topology.leaf_count() > 0), ("mm", true));
     assert_eq!(c.sign, Sign::Parity);
     assert!(c.field.value_at(&c.topology, [0, 0, 0]).unwrap() < 0.0);
-    let produced = hermite(&mesh, &c, Accuracy::Exact).unwrap();
+    assert_eq!(c.accuracy, options.accuracy);
+    let produced = hermite(&mesh, &c).unwrap();
     assert_eq!((produced.unhit, produced.set.group_names().len()), (0, 0));
     let r = report(&mesh, &c, &[("inside".to_owned(), [0.2, 0.2, 0.2])]).unwrap();
     assert_eq!((r.solid.components, r.euler, r.regions[0].name.as_str()), (1, 1, "inside"));

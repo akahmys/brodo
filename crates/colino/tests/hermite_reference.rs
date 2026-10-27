@@ -62,7 +62,7 @@ fn turned_cube(r: f64, centre: Point, a: f64, b: f64) -> Mesh {
 
 fn made(m: &Mesh, o: &Options) -> Produced {
     let c = convert(m, o).unwrap();
-    hermite(m, &c, o.accuracy).unwrap()
+    hermite(m, &c).unwrap()
 }
 
 /// The turned cube's faces in exact arithmetic, as far as `f64` goes.
@@ -132,7 +132,7 @@ fn a_turned_cube_crosses_each_edge_where_its_faces_plane_does() {
     let cube = Cube::new(6.3, [0.37, -0.21, 0.13], 0.4, 0.7);
     let m = turned_cube(cube.r, cube.centre, cube.a, cube.b);
     let o = Options::new(0.5).with_accuracy(Accuracy::Exact);
-    let p = hermite(&m, &convert(&m, &o).unwrap(), o.accuracy);
+    let p = hermite(&m, &convert(&m, &o).unwrap());
     // Brodo's check refuses a normal pointing in, among the rest.
     assert!(p.is_ok(), "{p:?}");
     let p = p.unwrap();
@@ -224,7 +224,7 @@ fn every_band_keeps_crossed_edges_owned_by_leaves() {
         for m in [common::sphere(3, 9.7, [0.3, 0.1, -0.2]), common::torus(12.0, 4.1, 32)] {
             let o = Options::new(0.7).with_band(band);
             let c = convert(&m, &o).unwrap();
-            assert!(hermite(&m, &c, o.accuracy).is_ok(), "band {band}");
+            assert!(hermite(&m, &c).is_ok(), "band {band}");
         }
     }
 }
@@ -362,7 +362,7 @@ fn a_transform_not_axis_aligned_is_refused() {
     let o = Options::new(1.0);
     let mut c = convert(&m, &o).unwrap();
     c.meta.transform[0][1] = 0.5;
-    assert!(matches!(hermite(&m, &c, o.accuracy), Err(colino::error::HermiteError::Transform)));
+    assert!(matches!(hermite(&m, &c), Err(colino::error::HermiteError::Transform)));
 }
 
 #[test]
@@ -375,7 +375,7 @@ fn a_triangle_turned_in_still_gives_normals_pointing_out() {
     m.groups[0] = 1;
     m.group_names = vec![String::new(), "turned".into()];
     let o = Options::new(0.5).with_accuracy(Accuracy::Exact);
-    let p = hermite(&m, &convert(&m, &o).unwrap(), o.accuracy);
+    let p = hermite(&m, &convert(&m, &o).unwrap());
     assert!(p.is_ok(), "{p:?}");
     let p = p.unwrap();
     let t = p.set.topology();
@@ -407,7 +407,7 @@ fn a_face_turned_in_is_refused_beyond_the_band_and_counted_within_it() {
     }
     let run = |band| {
         let o = Options::new(0.5).with_band(band).with_accuracy(Accuracy::Exact);
-        hermite(&m, &convert(&m, &o).unwrap(), o.accuracy)
+        hermite(&m, &convert(&m, &o).unwrap())
     };
     assert!(matches!(run(3), Err(colino::error::HermiteError::SignOutsideBand(_))));
     let wide = run(6);
@@ -427,7 +427,7 @@ fn a_face_turned_in_gives_the_cubes_hermite_data_by_parity() {
     let o = Options::new(0.5).with_sign(colino::convert::Sign::Parity);
     let meta = GridMeta::new("cube", [0.5; 3], "millimeter").unwrap();
     let set = |m: &Mesh| {
-        let p = hermite(m, &convert(m, &o).unwrap(), o.accuracy).unwrap();
+        let p = hermite(m, &convert(m, &o).unwrap()).unwrap();
         (to_bytes(&p.set.entries("cube", &meta).unwrap()).unwrap(), p.unhit)
     };
     let (broken, unhit) = set(&m);
@@ -545,7 +545,7 @@ fn the_set_is_written_with_its_own_metadata() {
     let m = common::torus(20.0, 7.0, 32);
     let o = Options::new(1.0).with_origin([0.25, -0.5, 3.0]);
     let c = convert(&m, &o).unwrap();
-    let p = hermite(&m, &c, o.accuracy).unwrap();
+    let p = hermite(&m, &c).unwrap();
     assert_eq!(p.meta.name, "hermite");
     assert_eq!((p.meta.voxel_size, p.meta.transform), (c.meta.voxel_size, c.meta.transform));
     assert_eq!(p.meta.unit, c.meta.unit);
@@ -567,6 +567,37 @@ fn a_leaf_at_the_end_of_the_range_has_the_background_beyond() {
     let (t, r) = e.commit().unwrap();
     c.field = c.field.remap(&r, &brodo::field::uniform).unwrap();
     c.topology = t;
-    let p = hermite(&m, &c, o.accuracy).unwrap();
+    let p = hermite(&m, &c).unwrap();
     assert_eq!(p.set.signs().value_at(p.set.topology(), [i32::MAX, 0, 0]), Ok(0));
 }
+
+/// Hermite data follows its conversion's accuracy (Q5 of P5's review): made from a
+/// conversion at a coarse β, every leaf point's sign is the winding number's at that β, as
+/// the conversion records it, not at β = 2.
+#[test]
+fn signs_follow_the_conversions_accuracy() {
+    let m = common::torus(9.0, 3.5, 24);
+    let coarse = Accuracy::Approximate { beta: BETA };
+    let o = Options::new(1.0).with_accuracy(coarse);
+    let c = convert(&m, &o).unwrap();
+    assert_eq!(c.accuracy, coarse);
+    let p = hermite(&m, &c).unwrap();
+    let w = colino::winding::Winding::new(&m).unwrap();
+    let t = p.set.topology();
+    let mut apart = 0;
+    for n in t.leaf_numbers() {
+        let signs = p.set.signs().leaf(t, n).unwrap();
+        for (v, s) in t.leaf_voxels(n).unwrap().zip(signs) {
+            let at = v.map(f64::from);
+            let inside = w.number(at, coarse) >= 0.5;
+            assert_eq!(*s, u8::from(inside), "{v:?}");
+            apart +=
+                usize::from(inside != (w.number(at, Accuracy::Approximate { beta: 2.0 }) >= 0.5));
+        }
+    }
+    // The coarse β decides some point otherwise than β = 2, so the test tells them apart.
+    assert!(apart > 0);
+}
+
+/// A β coarse enough to decide some points otherwise than β = 2.
+const BETA: f64 = 0.3;

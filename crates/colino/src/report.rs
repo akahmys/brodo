@@ -34,7 +34,7 @@ use crate::error::ReportError;
 use crate::mesh::Mesh;
 use crate::surface::Surface;
 use crate::thin::{check, thin};
-use crate::winding::{Accuracy, Winding};
+use crate::winding::Winding;
 
 /// Betti numbers: components, tunnels and cavities.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -318,7 +318,7 @@ pub fn report(
         .collect::<Result<Vec<_>, ReportError>>()?;
     let [together, apart] = pairs(&regions);
     let winding = Winding::new(mesh)?;
-    let inside = Inside::new(&winding, converted.sign, Accuracy::Approximate { beta: 2.0 });
+    let inside = Inside::new(&winding, converted.sign, converted.accuracy);
     let mut thin = thin(winding.bvh(), &inside, voxel_size(converted)?);
     for place in &mut thin {
         place.check = check(converted, &inside, place)?;

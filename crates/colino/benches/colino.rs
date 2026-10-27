@@ -150,18 +150,12 @@ impl Data {
             repeated(
                 "hermite_sphere_r50",
                 1,
-                Box::new(|| {
-                    let o = Options::new(1.0);
-                    Ok(hermite(&self.mesh, c, o.accuracy)?.unhit as f64)
-                }),
+                Box::new(|| Ok(hermite(&self.mesh, c)?.unhit as f64)),
             ),
             repeated(
                 "hermite_holed_r50",
                 1,
-                Box::new(|| {
-                    let o = Options::new(1.0);
-                    Ok(hermite(&self.holed, &self.holed_converted, o.accuracy)?.unhit as f64)
-                }),
+                Box::new(|| Ok(hermite(&self.holed, &self.holed_converted)?.unhit as f64)),
             ),
             repeated(
                 "convert_slab_320",
