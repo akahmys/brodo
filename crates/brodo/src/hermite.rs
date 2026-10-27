@@ -431,6 +431,8 @@ impl Source for Owned<'_> {
 impl Hermite {
     /// A set of `signs` and the crossings on each axis, x, y and z, all on `topology`, with
     /// the group table `group_names`, indexed by id; refused unless it keeps to the format.
+    /// A refused set's parts are dropped, not handed back: a caller who would mend them
+    /// clones them first.
     pub fn new(
         topology: Topology,
         signs: Field<u8>,
