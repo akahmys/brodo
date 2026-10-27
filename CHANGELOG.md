@@ -24,6 +24,10 @@ are recorded here when they change (V6).
   the new `FormatError::OtherTopology`; `GridView::same_topology` is public. Thawing walks
   the view's nodes once, so its cost follows the buffer, and refuses a view whose nodes,
   leaves or tile values are reached twice, `FormatError::Shared` (ADR-0042, R12).
+- `euler` sums the tiles' edge vertices in parallel, keeping no set of them: on a sphere
+  of radius 400 voxels converted by colino, 1.8 to 2.7 s against 4.5 to 5.5 s, and 532 MB
+  at most against 857 MB, the old and new code run in turn on a loaded machine
+  (2026-10-27).
 - Faster, with the same output: Hermite data's unhit edges, labelling, `commit`'s leaf
   manifest and `freeze`; Hermite data holds no work field over every leaf (ROADMAP.md §2,
   P5's costs).

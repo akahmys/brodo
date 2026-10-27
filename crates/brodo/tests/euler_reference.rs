@@ -241,3 +241,49 @@ fn large_tiles_count_by_their_edges() {
         assert_eq!(at_corner(level, None, Some([e, e, e])), [1, 2], "{level:?} and a leaf");
     }
 }
+
+/// A small tile against a large one's face (M1 of P5's review): the small tile's corners
+/// lie inside the large tile's face, on no edge of it, so the small tile sums them though
+/// the large one holds the first of their voxels. The two make one box: χ = 1.
+#[test]
+fn a_small_tile_on_a_large_ones_face_sums_its_own_corners() {
+    let empty = Topology::new();
+    let mut e = empty.edit();
+    e.add_tile(TileLevel::Upper, [0, 0, 0]).unwrap();
+    e.add_tile(TileLevel::Lower, [128, 8, 8]).unwrap();
+    let t = e.commit().unwrap().0;
+    let mut f = Field::new(&t, 0_u8);
+    for n in t.tile_numbers() {
+        f.set_tile(&t, n, 1).unwrap();
+    }
+    for conn in [Connectivity::Six, Connectivity::TwentySix] {
+        assert_eq!(euler(&t, &f, |v| v == 1, conn), Ok(1), "{conn:?}");
+    }
+}
+
+/// A small tile touching a large one's far edge mid-way, across it (M1 of P5's review):
+/// the small tile's corners there lie on the large tile's edge, and the large tile, holding
+/// the first of their voxels, sums them; along the rest of the edge the voxels do not
+/// change, and its vertices add nothing. One part under 26-connectivity, two under 6.
+#[test]
+fn a_small_tile_across_a_large_ones_edge_is_summed_by_the_large_one() {
+    let empty = Topology::new();
+    let mut e = empty.edit();
+    e.add_tile(TileLevel::Upper, [-128, -128, -128]).unwrap();
+    e.add_tile(TileLevel::Lower, [-8, 0, 0]).unwrap();
+    let t = e.commit().unwrap().0;
+    let mut f = Field::new(&t, 0_u8);
+    for n in t.tile_numbers() {
+        f.set_tile(&t, n, 1).unwrap();
+    }
+    // Within the reference's box, the large tile's corner and the small tile.
+    let dense_box = |v: Coord| {
+        let large = v.iter().all(|c| *c < 0);
+        let small = (-8..0).contains(&v[0]) && v[1..].iter().all(|c| (0..8).contains(c));
+        large || small
+    };
+    for conn in [Connectivity::Six, Connectivity::TwentySix] {
+        let expected = dense(dense_box, conn);
+        assert_eq!(euler(&t, &f, |v| v == 1, conn), Ok(expected), "{conn:?}");
+    }
+}

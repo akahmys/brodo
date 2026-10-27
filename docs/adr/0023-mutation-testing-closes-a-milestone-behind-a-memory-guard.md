@@ -129,3 +129,14 @@ each case, and caught all 7. Its 16 timeouts before any failed test, in `winding
 of them in about 13 minutes: GitHub's runners had made them outrun twice the unmutated
 suite's time.
 
+## Amendment: two exclusions withdrawn
+
+- **Date**: 2026-10-27
+
+P5's review rewrote `euler`'s sum over the tiles' edges (M1): each tile sums, in
+parallel, the vertices on its edges that it is the first meeting tile to hold. Two
+mutants had been excluded as equivalent, each leaving a tile's far edges unvisited, on
+the ground that another tile touching such an edge visits it on its near side. That no
+longer holds: the vertex is the first tile's to sum, and a small tile touching a large
+one's far edge mid-way is lost. A test of that case kills both, and the human decided
+that the two exclusions are withdrawn.

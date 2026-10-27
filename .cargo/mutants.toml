@@ -48,11 +48,6 @@ exclude_re = [
     'frozen\.rs:.*: replace \| with \^ in set$',
     # As above.
     'topology\.rs:.*: replace \| with \^ in morton$',
-    # Only edges on a tile's far sides go unvisited; such an edge's vertices add to χ only where
-    # another tile meeting the condition touches the edge, and it lies on that tile's near side.
-    'euler\.rs:\d+:49: replace \+ with \* in tile_edges$',
-    # As above.
-    'euler\.rs:\d+:54: replace % with / in tile_edges$',
     # A wider scan finds the same cells, each still held to its exact distance in steps.
     'morphology\.rs:.*: replace < with <= in removed$',
     # As above.

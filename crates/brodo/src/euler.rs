@@ -9,15 +9,13 @@
 //! parallel; elsewhere the voxels meeting the condition are the tiles that meet it, and
 //! only the vertices on their edges can add anything.
 
-use std::collections::BTreeSet;
-
 use rayon::prelude::*;
 
 use crate::analysis::{AnalysisError, Connectivity};
 use crate::field::{Field, Value};
 use crate::gather::{GATHER_EDGE, GATHER_VOXELS, gather};
 use crate::manifest::Offset;
-use crate::topology::{LeafNumber, Location, Topology};
+use crate::topology::{LeafNumber, Location, TileNumber, Topology};
 use crate::tree::Coord;
 
 /// The cells a vertex owns: their dimension, and the voxels around each among its 8, as
@@ -143,50 +141,95 @@ fn voxel(v: [i64; 3]) -> Option<Coord> {
 }
 
 /// The sum over the vertices on the edges of the tiles that meet the condition, each once,
-/// leaving out those touching a leaf, which the leaves count.
+/// leaving out those touching a leaf, which the leaves count. The tiles are summed in
+/// parallel; a vertex on several tiles' edges is summed by the first of them among its 8
+/// voxels, x fastest, so that no set of vertices is kept.
 fn tile_edges<T: Value>(
     t: &Topology,
     f: &Field<T>,
-    meets: &impl Fn(T) -> bool,
+    meets: &(impl Fn(T) -> bool + Sync),
     table: &[i8; 256],
 ) -> Result<i64, AnalysisError> {
-    let mut vertices = BTreeSet::new();
-    for n in t.tile_numbers() {
-        if !meets(f.tile(t, n)?) {
-            continue;
-        }
-        let (level, origin) = t.tile(n)?;
-        let edge = i64::from(level.edge());
-        let o = origin.map(i64::from);
-        for axis in 0..3 {
-            let (u, w) = ((axis + 1) % 3, (axis + 2) % 3);
-            for du in [0, edge] {
-                for dw in [0, edge] {
-                    for along in 0..=edge {
-                        let mut p = o;
-                        p[axis] += along;
-                        p[u] += du;
-                        p[w] += dw;
-                        vertices.insert(p);
-                    }
+    let numbers: Vec<TileNumber> = t.tile_numbers().collect();
+    let sums: Vec<Result<i64, AnalysisError>> =
+        numbers.par_iter().map(|n| tile_vertices(t, f, *n, meets, table)).collect();
+    sums.into_iter().sum()
+}
+
+/// Whether `p` lies on an edge of the region of edge `edge` at `o`: within it, and on its
+/// boundary along two axes or three.
+fn on_edge(o: [i64; 3], edge: i64, p: [i64; 3]) -> bool {
+    let within = (0..3).all(|k| o[k] <= p[k] && p[k] <= o[k] + edge);
+    let bounding = (0..3).filter(|k| p[*k] == o[*k] || p[*k] == o[*k] + edge).count();
+    within && bounding >= 2
+}
+
+/// The vertices on the edges of the region of edge `edge` at `o`, each once: each edge
+/// without its ends, then the eight corners.
+fn edge_vertices(o: [i64; 3], edge: i64) -> Vec<[i64; 3]> {
+    let mut out = Vec::new();
+    for axis in 0..3 {
+        let (u, w) = ((axis + 1) % 3, (axis + 2) % 3);
+        for du in [0, edge] {
+            for dw in [0, edge] {
+                for along in 1..edge {
+                    let mut p = o;
+                    p[axis] += along;
+                    p[u] += du;
+                    p[w] += dw;
+                    out.push(p);
                 }
             }
         }
     }
+    for corner in 0..8_usize {
+        let at = |k: usize| if corner >> k & 1 == 1 { edge } else { 0 };
+        out.push([o[0] + at(0), o[1] + at(1), o[2] + at(2)]);
+    }
+    out
+}
+
+/// The sum over the vertices on tile `n`'s edges that it is the first to hold, if it meets
+/// the condition.
+fn tile_vertices<T: Value>(
+    t: &Topology,
+    f: &Field<T>,
+    n: TileNumber,
+    meets: &impl Fn(T) -> bool,
+    table: &[i8; 256],
+) -> Result<i64, AnalysisError> {
+    if !meets(f.tile(t, n)?) {
+        return Ok(0);
+    }
+    let (level, origin) = t.tile(n)?;
+    let edge = i64::from(level.edge());
+    let o = origin.map(i64::from);
     let mut sum = 0_i64;
-    'vertex: for p in vertices {
+    'vertex: for p in edge_vertices(o, edge) {
         let mut pattern = 0_usize;
+        let mut first = None;
         for bit in 0..8_usize {
             let step = |k: usize| i64::from(bit >> k & 1 == 1);
             let v = [p[0] - 1 + step(0), p[1] - 1 + step(1), p[2] - 1 + step(2)];
             let value = match voxel(v).map(|c| t.locate(c)) {
                 Some(Location::Leaf(_)) => continue 'vertex,
-                Some(Location::Tile(m, _)) => f.tile(t, m)?,
+                Some(Location::Tile(m, _)) => {
+                    let value = f.tile(t, m)?;
+                    if first.is_none() && meets(value) {
+                        let (l, at) = t.tile(m)?;
+                        if on_edge(at.map(i64::from), i64::from(l.edge()), p) {
+                            first = Some(m);
+                        }
+                    }
+                    value
+                }
                 Some(Location::Background) | None => f.background(),
             };
             pattern |= usize::from(meets(value)) << bit;
         }
-        sum += i64::from(table[pattern]);
+        if first == Some(n) {
+            sum += i64::from(table[pattern]);
+        }
     }
     Ok(sum)
 }
