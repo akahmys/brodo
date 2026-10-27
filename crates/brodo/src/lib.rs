@@ -2,6 +2,11 @@
 //!
 //! The design is in the repository's `ARCHITECTURE.md` §4.
 
+// A leaf's values start at its number times 512, which a `usize` of 64 bits holds for every
+// leaf number a `u32` gives; brodo builds for 64-bit targets alone.
+#[cfg(not(target_pointer_width = "64"))]
+compile_error!("brodo builds for 64-bit targets alone");
+
 pub mod accessor;
 pub mod analysis;
 pub mod cache;

@@ -109,3 +109,12 @@ Three details of the format were left to its implementation. The owner decided:
 - A normal is of unit length when its length differs from 1 by no more than 1e-6. A unit
   `f64` vector rounded to `f32` errs by about 1e-7.
 
+## Amendment: versions read, and thawing
+
+- **Date**: 2026-10-27
+
+P5's review found two decisions of this record overtaken. d's reader accepting "its own
+version only" gave way to ADR-0038: a release that raises a version still reads the one
+before it; every format is at version 1, so nothing read changed. And e's function turning
+a frozen grid back into a topology and fields, which waited for a user's request, was
+asked for (R12) and built as `GridView::thaw` and `thaw_on` (ADR-0042).

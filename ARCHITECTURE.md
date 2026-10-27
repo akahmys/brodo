@@ -194,8 +194,10 @@ fastest. A neighbour beyond the `i32` coordinate range is the background.
 
 - `freeze()` packs tree and values into one contiguous byte buffer, read as
   `GridView<'a>` without copying, through `zerocopy`.
-- Links between nodes are offsets from the start, in 32-byte units. Every structure is
-  32-byte aligned, little-endian, and laid out in `u32` words.
+- The header places each section by its offset from the start, in 32-byte blocks; a link
+  between nodes is a number within its section: a node's first child and first tile, the
+  rest found from its masks. Every structure is 32-byte aligned, little-endian, and laid out
+  in `u32` words.
 - Layout version 1: a header, the root table, upper nodes, lower nodes, leaf values and
   tile values, in that order; its bytes are in [docs/formats.md](docs/formats.md) §2.
 - A node's masks number its children's places in Morton order, so that its children,
@@ -203,8 +205,8 @@ fastest. A neighbour beyond the `i32` coordinate range is the background.
   below the place; no list of child numbers is stored. Tile values follow the same rule.
 - A view is made only from a buffer it has checked whole: alignment, magic number,
   version, value type, every section within the buffer, and every node's children and
-  tiles within their sections. It accepts its own layout version only; any other is a
-  typed error naming it.
+  tiles within their sections. It accepts the layout versions ADR-0038 keeps, version 1
+  alone so far; any other is a typed error naming it.
 - A view thaws into an owned `Topology` and `Field<T>` (`GridView::thaw`), or into a field
   on a topology holding its leaves and tiles (`thaw_on`), by walking its nodes once and
   refusing a node, a leaf or a tile value reached twice; the topology numbers them in its
@@ -230,8 +232,10 @@ fastest. A neighbour beyond the `i32` coordinate range is the background.
 - The cache profile, format version 1: a header, a directory, then each grid's metadata
   and frozen buffer (§4.6) on block boundaries; its bytes are in
   [docs/formats.md](docs/formats.md) §3. A reader checks the whole file, every grid's
-  buffer included, before it answers, and accepts only the bytes its writer puts: no gap,
-  zero padding and unused words, nothing after the last grid (ADR-0016).
+  buffer included, before it answers: no gap between the parts, zero padding and unused
+  words in the header, the directory and the metadata, nothing after the last grid, and
+  each buffer as docs/formats.md §2.5 checks it, which leaves some of its writer's rules
+  unchecked (ADR-0016, ADR-0038).
 - A cache file is written whole: to a hidden file beside it, flushed and renamed over it,
   so that a reader, a mapping process among them, sees the old file or the new one; the
   directory must be writable, and a process killed while writing may leave the hidden
@@ -310,7 +314,10 @@ are in ADR-0030.
   small holes, and in cavities; within a missing cap's sag a line across finds nothing
   (ADR-0027).
 - Output: leaves only in a band of ±N voxels around the surface (N = 3 by default), values
-  signed distances clamped to ±N·h; negative tiles inside, each region classified once,
+  signed distances clamped to ±N·h. A leaf-sized cell is a candidate when it overlaps a
+  triangle's box grown by N voxels and its centre lies within (N + 4√3)·h of the triangle,
+  its centre's distance to a corner being 4√3·h; it stays a leaf when one of its voxels
+  lies within the band; negative tiles inside, each region classified once,
   from the root region down, by its centre's sign; the positive background outside. Beyond
   the band of an open mesh, where the inside is not defined, the boundary the signs give
   across a hole follows the regions, as coarse as the tiles there. No dense grid: memory follows
@@ -333,7 +340,8 @@ are in ADR-0030.
 - Connectivity: the solid 26, its complement 6. The complement's β₀ is counted and held
   by tests to duality with the solid's β₂; its β₁ and β₂ are the solid's by duality, since
   under this pairing each lattice vertex adds as much to the complement's χ as to the
-  solid's (ADR-0028).
+  solid's: β₁ the solid's, β₂ the solid's components less one, or, by convention, 1 when
+  there is no solid, where duality would give 0 (ADR-0028).
 - Reference for layer 1: the input's V − E + F when, welded, it is a closed 2-manifold,
   the solid's χ being half the surface's; otherwise none, the report saying why. Layer 3's
   check stands in for it where it is thin, for any input.

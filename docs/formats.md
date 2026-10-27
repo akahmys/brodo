@@ -130,7 +130,8 @@ children bit gives the leaf, a tiles bit the tile, neither the background.
 
 A reader refuses a buffer, before reading any value, unless:
 
-1. its length is a multiple of 32 and at least 96;
+1. its length is a multiple of 32 and at least 96, and, read in place, it begins at a
+   32-byte boundary in memory; a reader that copies it aligns the copy;
 2. the magic, version 1, and the value type and size are those the reader asks for;
 3. blocks × 32 is the buffer's length;
 4. each section, in the order of the table, starts at or after the end of the one before,
@@ -141,8 +142,10 @@ A reader refuses a buffer, before reading any value, unless:
    tile + its tiles bits ≤ the tile count, and no place has both bits; in every lower node
    the same, against the leaf count and the tile count.
 
-Padding, the background's bytes beyond its size, the order of nodes and whether every
-node and leaf is reached are not checked.
+Padding, the background's bytes beyond its size, the order of nodes, whether every node and
+leaf is reached, and three more of the writer's rules, that a node with no child or tile
+holds 0 for each first, that root tiles take tile places in table order, and that each
+section starts at the block right after the one before, are not checked.
 
 ## 3. The cache profile, format version 1
 
@@ -225,7 +228,9 @@ edges from v to v + x̂, v + ŷ and v + ẑ. A set is ten grids of a cache file 
 Each grid's free pairs hold `hermite.version` = `1`, `hermite.set` = the set's name and
 `hermite.field` = its field. The sign grid holds the group table: `hermite.group.<id>` =
 the group's name, for ids 1, 2, … with no gap, the id in decimal with no leading zero;
-group 0, named `""`, has no key. Other grids and other keys are free.
+group 0, named `""`, has no key. Keys beginning `hermite.` are the format's: a writer puts
+no other, and a reader reads the group table from the sign grid alone and leaves every
+other key unread. Other grids and other keys are free.
 
 An edge with no crossing holds **no crossing**: fraction −1, normal (0, 0, 0), group 0, as
 bits.

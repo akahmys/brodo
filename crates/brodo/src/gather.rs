@@ -1,7 +1,7 @@
 //! The gather (ARCHITECTURE.md §4.4, ADR-0015): a leaf and one ghost layer from its 26
 //! neighbours, copied into a dense 10³ array, or one to three layers into a caller's `Vec`
 //! (`gather_wide`). A neighbour that is not a leaf gives its tile's value or the
-//! background. A leaf of 8³ reaches only its 26 neighbours up to seven layers; a read
+//! background. A leaf of 8³ reaches only its 26 neighbours up to eight layers; a read
 //! beyond the window goes through `ValueAccessor`, faster there than `Field::value_at`.
 
 use crate::error::FieldError;

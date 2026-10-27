@@ -72,3 +72,16 @@ re-encoding, which also refuses a key twice or out of order and an empty box's n
 corners. Any other file is `CacheError::Inconsistent`, naming the part. The bytes written
 did not change, so the format version stayed 1 (TESTING.md V6); only files brodo did not
 write are refused.
+
+## Amendment: what the design says the readers check
+
+- **Date**: 2026-10-27
+
+P5's review found three statements of this record the formats outgrew. "Links are offsets
+in 32-byte units": offsets in blocks place a buffer's sections, and a link between nodes is
+a number within its section. "Every file carries … the grid count": a bare frozen buffer is
+a file of its own too, with one grid and no count (docs/formats.md §2). And the 2026-10-18
+amendment's reader "accepts only the bytes the writer puts" held for the cache file's own
+parts, but a grid's buffer is checked as docs/formats.md §2.5 says, which leaves its
+padding, the order of its nodes and some of its writer's rules unchecked, B-022 keeping
+them for a later version (ADR-0038). ARCHITECTURE.md §4.6 and §4.7 state each as it is.

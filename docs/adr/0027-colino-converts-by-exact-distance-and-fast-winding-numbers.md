@@ -131,3 +131,15 @@ of five, the approximation holds for a mesh whose size lies between 10⁻⁴⁵ 
 the exact sum between 10⁻¹⁰⁰ and 10¹⁰⁰ (2026-10-27). The human decided that the range is
 stated, not enforced or widened by scaling the coordinates, which would change the bits
 of every result.
+
+## Amendment: the candidate cells
+
+- **Date**: 2026-10-27
+
+P5's review found that the rule this record decided for candidate cells, those
+overlapping a triangle's box grown by N·h, was not the code's: a cell overlapping the box
+is a candidate only when its centre also lies within (N + 4√3)·h of the triangle, 4√3·h
+being the distance from a cell's centre to its corners, so that no cell is kept whose
+voxels all lie beyond the band; a candidate stays a leaf when one of its voxels' values
+lies within the band. The leaves are the same either way. ARCHITECTURE.md §5.1 states the
+rule.

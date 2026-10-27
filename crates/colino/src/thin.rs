@@ -4,11 +4,10 @@
 //! Points are sampled on every triangle with area, about h/2 apart: at every h/2 along its
 //! longest edge, the middles of its section's parts no longer than h/2. A sliver has points
 //! along its length only, and turning a triangle over samples the same points. From each,
-//! the
-//! nearest other triangle is found along the triangle's normal, both ways, by the watertight
-//! test through the tree (`Bvh::first_crossing`): a single ray each way, from just off the triangle's plane,
-//! the shape diameter function of Shapira et al. without its cone, as Cabiddu and Attene
-//! describe it (Computers & Graphics 66, 2017, §2.2). A side whose midpoint is inside, by
+//! the nearest other triangle within 2h is found along the triangle's normal, both ways, by
+//! the watertight test through the tree (`Bvh::first_crossing`): a single ray each way, from
+//! just off the triangle's plane, the shape diameter function of Shapira et al. without its
+//! cone, as Cabiddu and Attene describe it (Computers & Graphics 66, 2017, §2.2). A side whose midpoint is inside, by
 //! the conversion's sign, is a wall that thick, otherwise a gap that wide; below 2h, the
 //! point is thin. Thin points of one kind within 2h of each other are one place, so that a
 //! wall's two sides are one. Points are measured in parallel, each on its own, and joined

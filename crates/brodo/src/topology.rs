@@ -519,8 +519,9 @@ pub struct Remap {
 }
 
 impl Remap {
-    /// The parts of a merged tile's source; none for any other source or another remap's
-    /// range.
+    /// The parts in range `r`, a merged tile's (`TileSource::Merged`). The range is not
+    /// checked against this remap: one from another remap gives whatever parts lie there,
+    /// and none beyond this remap's parts.
     pub fn parts(&self, r: PartRange) -> &[Part] {
         self.parts.get(r.start as usize..r.end as usize).unwrap_or(&[])
     }
