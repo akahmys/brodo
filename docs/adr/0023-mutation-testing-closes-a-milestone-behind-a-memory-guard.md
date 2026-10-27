@@ -153,3 +153,14 @@ arm of the labelling's `classify` and the early return of its `inside`, a guard 
 section's height never met, the parity lines' growth of the box. The human decided that
 twelve that no test can tell from the original are excluded, each with its reason, and
 that the exclusion for `inside`'s early return, gone, is withdrawn.
+
+## Amendment: every mutant reported
+
+- **Date**: 2026-10-27
+
+The run on `9940bd5` (2026-10-27) had results from 78 shards of 80: two were cut off at
+the six hours a job may run, and the verdict, taking the reports it was given, did not see
+them missing. The human decided that a verdict on a sharded run's reports, `mutants.py
+--report` and `--patient --from`, fails unless they report every mutant `cargo mutants
+--list` gives with the run's arguments, `--shard` aside, naming how many are in no report.
+Shown to fire by two reports made by hand of `grid.rs`'s twelve mutants, one dropped.

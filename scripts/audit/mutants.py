@@ -12,15 +12,19 @@ With `--run [ARGS…]`, the milestone-close run: `cargo mutants --workspace` beh
 `rss_guard.py`, with its copies of the tree under `target/`. It fails when a mutant is
 missed, or when a mutant timed out before any test failed, since only a failed test shows
 that the timeout was the mutant's doing. ARGS go to cargo-mutants (`-f <file>`,
-`--iterate`, `--shard k/n`). With `--report DIR [DIR…]`, the same verdict on reports
-already written, one or a shard each, taken together.
+`--iterate`, `--shard k/n`). With `--report DIR [DIR…] [-- ARGS]`, the same verdict on
+reports already written, one or a shard each, taken together, which also fails unless they
+report every mutant `cargo mutants --list` gives with ARGS but `--shard`, so that a shard
+cut off or lost shows (ADR-0023).
 
 With `--run --patient`, the mutants the last report shows timing out before any test
 failed run again, alone, under `PATIENT_TIMEOUT` seconds each, into `out/mutants/patient`:
 one caught is killed; one whose tests all pass is only slower, and is listed in
 `.cargo/mutants.toml` as equivalent with that reason; one still timing out fails. The
 verdict is the last report's missed mutants and the patient run's (ADR-0023). With
-`--patient --from DIR [DIR…] [-- ARGS]`, the reports are those, a sharded run's.
+`--patient --from DIR [DIR…] [-- ARGS]`, the reports are those, a sharded run's, held to
+every mutant as `--report` holds them; a `--shard k/n` among ARGS runs one of n parts of
+the timeouts, so that they run again in parallel (ADR-0034).
 """
 
 import json
@@ -30,6 +34,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+from typing import Optional
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 CONFIG = ROOT / ".cargo" / "mutants.toml"
@@ -148,13 +153,14 @@ def escaped(name: str) -> str:
 
 def patient(args: list[str]) -> int:
     """The last report's unexplained timeouts, run again under `PATIENT_TIMEOUT`."""
-    reports = [OUT / "mutants.out"]
+    reports, whole = [OUT / "mutants.out"], None
     if args[:1] == ["--from"]:
         rest = args[1:]
         split = rest.index("--") if "--" in rest else len(rest)
         reports, args = [Path(d).resolve() for d in rest[:split]], rest[split + 1:]
-    failures_before = verdicts(reports)
-    missed = [f for f in failures_before if f.startswith("  missed")]
+        whole = args
+    failures_before = verdicts(reports, whole)
+    missed = [f for f in failures_before if not f.startswith("  timed out before any test")]
     prefix = "  timed out before any test failed: "
     slow = [f.removeprefix(prefix) for f in failures_before if f.startswith(prefix)]
     if not slow:
@@ -178,12 +184,45 @@ def patient(args: list[str]) -> int:
     return report(missed + failures + guarded(PATIENT_OUT))
 
 
-def verdicts(outs: list[Path]) -> list[str]:
-    """What several reports, the shards of one run, show was not caught, each once."""
+def verdicts(outs: list[Path], args: Optional[list[str]]) -> list[str]:
+    """What several reports, the shards of one run, show was not caught, each once, and,
+    given the run's ARGS, the mutants none of them reports."""
     seen: list[str] = []
     for out in outs:
         seen += [f for f in verdict(out) if f not in seen]
-    return seen
+    return seen + (unreported(outs, args) if args is not None else [])
+
+
+def unshard(args: list[str]) -> list[str]:
+    """ARGS without `--shard k/n`: what the whole run, every shard of it, lists."""
+    out, skip = [], False
+    for a in args:
+        if skip:
+            skip = False
+        elif a == "--shard":
+            skip = True
+        elif not a.startswith("--shard="):
+            out.append(a)
+    return out
+
+
+def unreported(outs: list[Path], args: list[str]) -> list[str]:
+    """The mutants `cargo mutants --list` gives with ARGS, `--shard` aside, that no report
+    holds: a shard cut off, lost or never run."""
+    listed = subprocess.run(
+        ["cargo", "mutants", "--list", "--workspace", FEATURES, *unshard(args)],
+        cwd=ROOT, capture_output=True, text=True, check=True,
+    ).stdout.splitlines()
+    reported = set()
+    for out in outs:
+        for o in json.loads((out / "outcomes.json").read_text())["outcomes"]:
+            if o["scenario"] != "Baseline":
+                reported.add(o["scenario"]["Mutant"]["name"])
+    missing = [n for n in listed if n not in reported]
+    print(f"  {len(listed) - len(missing)} of {len(listed)} mutants listed are reported")
+    if not missing:
+        return []
+    return [f"  in no report, {len(missing)} mutants, such as: {missing[0]}"]
 
 
 def verdict(out: Path) -> list[str]:
@@ -220,7 +259,9 @@ def main() -> int:
     if sys.argv[1:2] == ["--run"]:
         return run(sys.argv[2:])
     if sys.argv[1:2] == ["--report"] and len(sys.argv) >= 3:
-        return report(verdicts([Path(d).resolve() for d in sys.argv[2:]]))
+        rest = sys.argv[2:]
+        split = rest.index("--") if "--" in rest else len(rest)
+        return report(verdicts([Path(d).resolve() for d in rest[:split]], rest[split + 1:]))
     return check()
 
 

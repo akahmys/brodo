@@ -366,7 +366,9 @@ implementation (PLANNING.md §2).
 - Before registering on crates.io: `publish`, and each crate's description and keywords
   naming its function (sparse volume, VDB, SDF, level set, voxel). Both names were found
   unregistered on 2026-10-16, per the design.
-- Requests from users. Held until one asks: merging into a root tile (ADR-0014). From a
+- Requests from users. Held until one asks: merging into a root tile (ADR-0014); a public
+  way to read a bare frozen buffer, a file of its own, into an aligned buffer, which only
+  tests now do (P5's review, S1, 2026-10-27). From a
   user keeping time-stepped fields on brodo's tree, received 2026-10-20 against v0.2.0,
   highest priority first, each with its proposed answer:
   - R2, `[f64; 3]` as a value type, frozen files included: done (ADR-0029).

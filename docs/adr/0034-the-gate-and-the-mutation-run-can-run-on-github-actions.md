@@ -109,3 +109,16 @@ about four hours for the heaviest, and to running the patient timeouts in its la
 Whether 1800 s suffices on GitHub's runners, slower than the owner's machine, the next
 run shows.
 
+## Amendment: 160 shards, and the timeouts in 20 parts
+
+- **Date**: 2026-10-27
+
+At 80 shards, about 46 mutants each, the run on `9940bd5` (2026-10-27) lost two shards of
+colino's heaviest to the six hours a job may run, and the one last job running the
+timeouts again under 1800 s each was cut off too. GitHub Free runs 20 jobs at once, six
+hours each, a matrix of 256 jobs at most (docs.github.com, Actions limits, read
+2026-10-27). The human decided that `mutants.yml` defaults to 160 shards, about 23
+mutants each, and runs the timeouts again in a matrix of 20 jobs, each one twentieth of
+them by `--shard k/20` and each holding the shards' reports to every mutant listed
+(ADR-0023); the timeout multiplier stays 2.0. With 20 jobs at once, a run's wall time
+stays near its whole work over 20.

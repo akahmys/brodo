@@ -49,3 +49,14 @@ decided that a target whose input has such a structure starts from the committed
 under `crates/brodo/tests/data/` as seeds (TESTING.md §3). Held by nothing; the
 milestone's checklist lists the fuzz round.
 
+## Amendment: a 3MF package's seeds
+
+- **Date**: 2026-10-27
+
+P5's review found that the 3MF target started from random bytes and earlier runs' corpus
+alone: a ZIP archive holding XML, its model part reached only once the archive's records
+and the package's relationships hold, is a structure random bytes rarely reach, as a
+cache file is. The human decided that it starts from seeds too: two packages committed
+under `crates/colino/tests/data/`, a mesh placed by components and by build items, its
+model part stored in one and deflated in the other, which a Format-tier test holds to
+the packages they are made from and reads.

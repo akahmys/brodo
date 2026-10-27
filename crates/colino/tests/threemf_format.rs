@@ -742,3 +742,37 @@ fn limits_hold_at_their_exact_values() {
     let three = ROOMY.with_triangles(3);
     assert!(matches!(read(&placed, three), Err(ReadError::TooLarge { what: "triangles", .. })));
 }
+
+/// The packages the 3MF fuzz target starts from (TESTING.md §3, ADR-0006): a mesh object,
+/// an assembly placing it twice by components, and two build items, one moved, its model
+/// part stored in one and deflated in the other. Each is committed and reads to its 12
+/// triangles, so that a seed that no longer reads, or no longer matches what the format
+/// needs, fails here.
+fn seeds() -> [(&'static str, Vec<u8>); 2] {
+    let (v, t) = tetra();
+    let body = format!(
+        "<resources>{}<object id=\"2\" name=\"pair\"><components><component objectid=\"1\"/>\
+         <component objectid=\"1\" transform=\"1 0 0 0 1 0 0 0 1 2 0 0\"/></components></object>\
+         </resources><build><item objectid=\"2\"/>\
+         <item objectid=\"1\" transform=\"0 1 0 -1 0 0 0 0 1 0 0 5\"/></build>",
+        mesh_object(1, "model", &v, &t)
+    );
+    let part = model("unit=\"millimeter\"", &body);
+    let packed = zip(&[
+        stored("[Content_Types].xml", TYPES.as_bytes()),
+        stored("_rels/.rels", RELS.as_bytes()),
+        deflated("3D/3dmodel.model", &part),
+    ]);
+    [("threemf_seed_stored.3mf", package(part)), ("threemf_seed_deflated.3mf", packed)]
+}
+
+#[test]
+fn the_fuzz_seeds_are_committed_and_read() {
+    let data = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data");
+    for (name, bytes) in seeds() {
+        let committed = std::fs::read(data.join(name)).unwrap();
+        assert!(committed == bytes, "{name} differs from the package it is made from");
+        let m = read(&committed, ROOMY).unwrap();
+        assert_eq!(m.triangles.len(), 12, "{name}");
+    }
+}

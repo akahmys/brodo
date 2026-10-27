@@ -10,7 +10,8 @@ overrides `rustflags` in any cargo configuration, so no configuration outside th
 repository can switch a lint off.
 
 Not in it: the fuzzer and Miri, which build on nightly, and the mutation run, which takes
-hours; TESTING.md T6, T7 and T11 say when they run.
+hours, its verdict by `scripts/audit/mutants.py` holding a sharded run's reports to every
+mutant `cargo mutants --list` gives; TESTING.md T6, T7 and T11 say when they run.
 
 The project's own settings (layers, application crates, modules that parse untrusted
 input, the unsafe module, targets) are in [`scripts/audit/project.py`](scripts/audit/project.py),
