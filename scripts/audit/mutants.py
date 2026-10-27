@@ -12,10 +12,10 @@ With `--run [ARGS…]`, the milestone-close run: `cargo mutants --workspace` beh
 `rss_guard.py`, with its copies of the tree under `target/`. It fails when a mutant is
 missed, or when a mutant timed out before any test failed, since only a failed test shows
 that the timeout was the mutant's doing. ARGS go to cargo-mutants (`-f <file>`,
-`--iterate`, `--shard k/n`). With `--report DIR [DIR…] [-- ARGS]`, the same verdict on
-reports already written, one or a shard each, taken together, which also fails unless they
-report every mutant `cargo mutants --list` gives with ARGS but `--shard`, so that a shard
-cut off or lost shows (ADR-0023).
+`--iterate`, `--shard k/n`). With `--report DIR [DIR…] [-- [ARGS]]`, the same verdict on
+reports already written, one or a shard each, taken together; given `--`, the whole run's
+ARGS after it, it also fails unless they report every mutant `cargo mutants --list` gives
+with ARGS but `--shard`, so that a shard cut off or lost shows (ADR-0023).
 
 With `--run --patient`, the mutants the last report shows timing out before any test
 failed run again, alone, under `PATIENT_TIMEOUT` seconds each, into `out/mutants/patient`:
@@ -168,7 +168,12 @@ def patient(args: list[str]) -> int:
     pattern = "^(" + "|".join(escaped(n) for n in slow) + ")$"
     mutants(["--timeout", PATIENT_TIMEOUT, "--re", pattern, *args], PATIENT_OUT)
     failures = []
-    outcomes = json.loads((PATIENT_OUT / "mutants.out" / "outcomes.json").read_text())
+    written = PATIENT_OUT / "mutants.out" / "outcomes.json"
+    if not written.exists() and "--shard" in args:
+        # A part of the timeouts with none of them to run writes no report.
+        print("  this part holds none of the timeouts")
+        return report(missed)
+    outcomes = json.loads(written.read_text())
     for o in outcomes["outcomes"]:
         if o["scenario"] == "Baseline":
             continue
@@ -260,7 +265,9 @@ def main() -> int:
         return run(sys.argv[2:])
     if sys.argv[1:2] == ["--report"] and len(sys.argv) >= 3:
         rest = sys.argv[2:]
-        split = rest.index("--") if "--" in rest else len(rest)
+        if "--" not in rest:
+            return report(verdicts([Path(d).resolve() for d in rest], None))
+        split = rest.index("--")
         return report(verdicts([Path(d).resolve() for d in rest[:split]], rest[split + 1:]))
     return check()
 

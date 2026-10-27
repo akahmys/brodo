@@ -145,7 +145,7 @@ that the two exclusions are withdrawn.
 
 - **Date**: 2026-10-27
 
-The run on `9940bd5` (2026-10-27) missed 72 mutants, all in code P5 wrote or rewrote.
+The run on `9940bd5` (2026-10-26 to 27) missed 72 mutants, all in code P5 wrote or rewrote.
 Most are now killed by tests written for them, each shown to fail with its mutant applied
 by hand; the hand-applied runs went behind `rss_guard.py` once one, a voxel of no size let
 through, grew until the machine went down. Dead code that held others is gone: the level-3
@@ -158,7 +158,7 @@ that the exclusion for `inside`'s early return, gone, is withdrawn.
 
 - **Date**: 2026-10-27
 
-The run on `9940bd5` (2026-10-27) had results from 78 shards of 80: two were cut off at
+The run on `9940bd5` (2026-10-26 to 27) had results from 78 shards of 80: two were cut off at
 the six hours a job may run, and the verdict, taking the reports it was given, did not see
 them missing. The human decided that a verdict on a sharded run's reports, `mutants.py
 --report` and `--patient --from`, fails unless they report every mutant `cargo mutants
@@ -175,3 +175,14 @@ without end and took the machine down (2026-10-27). The human decided that a mut
 applied by hand runs behind `rss_guard.py` too, set as cargo's runner as `mutants.py`
 sets it, the command stated in TESTING.md §3; held by nothing. Run so, the same mutant
 was stopped at 1086 MiB.
+
+## Amendment: when reports are held to every mutant
+
+- **Date**: 2026-10-27
+
+The re-review of P5's fixes found that `--report` held any reports to the whole
+workspace's list, so a report of one file's run, or of `--iterate`, always failed, and
+that a part of the timeouts run again with none of them to run might write no report and
+fail reading it. The human decided that `--report` holds the reports to every mutant only
+when given `--`, the whole run's arguments after it, as the workflow gives them, and that
+a part with none of the timeouts passes with the missed mutants alone.
