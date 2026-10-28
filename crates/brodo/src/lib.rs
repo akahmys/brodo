@@ -9,6 +9,8 @@ compile_error!("brodo builds for 64-bit targets alone");
 
 pub mod accessor;
 pub mod analysis;
+#[cfg(feature = "archive")]
+pub mod archive;
 pub mod cache;
 pub mod error;
 pub mod euler;

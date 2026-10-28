@@ -14,8 +14,24 @@ use brodo::tree::TileLevel;
 use brodo::view::{GridView, ViewLocation};
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
-const GOLDEN: [&str; 4] =
-    ["frozen_v1_f32.bin", "frozen_v1_f64x3.bin", "cache_v1.bin", "hermite_v1.bin"];
+/// The golden files, the archive's where the crate reads it.
+const GOLDEN: &[&str] = &[
+    "frozen_v1_f32.bin",
+    "frozen_v1_f64x3.bin",
+    "cache_v1.bin",
+    "hermite_v1.bin",
+    #[cfg(feature = "archive")]
+    "archive_v1.bin",
+];
+
+/// A cache file as the crates read the bytes: a cache file's, or an archive's decompressed.
+fn cache_file(bytes: &[u8]) -> Result<CacheFile, brodo::error::CacheError> {
+    #[cfg(feature = "archive")]
+    if bytes.starts_with(b"BRDA") {
+        return brodo::archive::from_bytes(bytes, u64::MAX);
+    }
+    CacheFile::from_bytes(bytes)
+}
 
 /// A 32-byte aligned copy of some bytes, as a file read into memory would be.
 #[derive(FromBytes, IntoBytes, Immutable, KnownLayout, Clone, Copy)]
@@ -203,7 +219,7 @@ fn crates_read(bytes: &[u8]) -> Vec<String> {
             || GridView::<[f64; 3]>::new(bytes).is_ok();
         return vec![if accepted { "accepted" } else { "refused" }.to_owned()];
     }
-    let Ok(file) = CacheFile::from_bytes(bytes) else { return vec!["refused".to_owned()] };
+    let Ok(file) = cache_file(bytes) else { return vec!["refused".to_owned()] };
     let mut out = vec!["accepted".to_owned()];
     let mut sets: Vec<String> = (0..file.grid_count())
         .filter_map(|i| file.meta(i).unwrap().extra.get("hermite.set").cloned())
@@ -252,7 +268,7 @@ fn the_document_s_reader_reads_every_golden_file_as_the_crates_do() {
             same_grid(aligned(&bytes).as_bytes(), grids[0].0, &grids[0].1);
             continue;
         }
-        let file = CacheFile::from_bytes(&bytes).unwrap();
+        let file = cache_file(&bytes).unwrap();
         assert_eq!(grids.len(), file.grid_count(), "{name}: grid count");
         for (i, (code, lines)) in grids.iter().enumerate() {
             assert_eq!(*code, file.value_type(i).unwrap(), "{name}: grid {i}'s type");
@@ -300,7 +316,8 @@ fn the_document_s_reader_refuses_a_hermite_field_holding_values_no_node_reaches(
 fn damaged_words(bytes: &[u8]) -> Vec<usize> {
     let word = |at: usize| u32::from_le_bytes(bytes[at..at + 4].try_into().unwrap()) as usize;
     let mut starts = vec![0];
-    if bytes.starts_with(b"BRDC") {
+    // A cache file's metadata and buffers; an archive's metadata and chunk tables.
+    if bytes.starts_with(b"BRDC") || bytes.starts_with(b"BRDA") {
         for i in 0..word(8).min(2) {
             starts.push(word(32 * (1 + i)) * 32);
             starts.push(word(32 * (1 + i) + 8) * 32);
@@ -317,7 +334,7 @@ fn damaged_words(bytes: &[u8]) -> Vec<usize> {
 #[test]
 fn the_document_s_reader_accepts_and_refuses_damaged_files_as_the_crates_do() {
     let mut cases = 0;
-    for golden in GOLDEN {
+    for golden in GOLDEN.iter().copied() {
         let path = data(golden);
         let bytes = std::fs::read(&path).unwrap();
         let mut patches = String::new();

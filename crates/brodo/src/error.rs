@@ -189,11 +189,11 @@ pub enum CacheError {
     /// The topology refused a lookup by number.
     #[error(transparent)]
     Tree(#[from] TreeError),
-    /// Not a cache file.
-    #[error("magic number {0:#010x} is not a cache file's")]
+    /// Not a file of the kind read: a cache file, or an archive.
+    #[error("magic number {0:#010x} is not that of the kind of file read")]
     BadMagic(u32),
     /// A format version this build does not read (ADR-0016).
-    #[error("cache format version {0} is not read by this build")]
+    #[error("format version {0} is not read by this build")]
     UnsupportedVersion(u32),
     /// The file ends before a part of it does.
     #[error("the file ends before its {0} does")]
@@ -219,7 +219,8 @@ pub enum CacheError {
     /// bytes, 128 GiB (docs/formats.md §3).
     #[error("the file is too large for its u32 fields")]
     TooLarge,
-    /// The file is longer than the reader's limit, and was not read beyond it (ADR-0036).
+    /// The file is longer than the reader's limit, and was not read beyond it, or an
+    /// archive would decompress to a cache file longer than it, and was not (ADR-0036).
     #[error("the file holds {length} bytes or more, more than the limit of {limit}")]
     FileTooLarge {
         /// The file's length, or, where it reported less, the bytes read before the limit
@@ -228,6 +229,17 @@ pub enum CacheError {
         /// The limit given.
         limit: u64,
     },
+    /// An archive's chunk does not decompress to the length its table states.
+    #[error("grid {index}'s chunk {chunk} does not decompress to its length")]
+    Decompress {
+        /// The grid's place in the file.
+        index: usize,
+        /// The chunk's place in the grid's table.
+        chunk: usize,
+    },
+    /// An archive's grid is not cut into chunks as its writer cuts it (docs/formats.md §8.3).
+    #[error("grid {0} is not cut into chunks as the format cuts it")]
+    Chunks(usize),
     /// The metadata holds a key beginning `hermite.`, which `CacheEntry::new` leaves to
     /// Hermite data.
     #[error("the metadata holds the key {0:?}, which Hermite data reserves")]

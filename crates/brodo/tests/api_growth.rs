@@ -106,6 +106,8 @@ fn cache_error(e: &CacheError) -> &'static str {
         CacheError::TooLarge => "TooLarge",
         CacheError::ReservedKey(..) => "ReservedKey",
         CacheError::FileTooLarge { .. } => "FileTooLarge",
+        CacheError::Decompress { .. } => "Decompress",
+        CacheError::Chunks(..) => "Chunks",
         _ => "later",
     }
 }

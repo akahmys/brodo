@@ -285,6 +285,98 @@ def cache(b):
     return out
 
 
+def lz4(src, n):
+    """§8.3: one LZ4 block, as `lz4_Block_format.md` describes it, of `n` bytes."""
+    out, i = bytearray(), 0
+
+    def length(first):
+        nonlocal i
+        total = first
+        while first == 15:
+            need(i < len(src), "lz4 length")
+            first = 15 if src[i] == 255 else 0
+            total += src[i]
+            i += 1
+        return total
+
+    while True:
+        need(i < len(src), "lz4 token")
+        token = src[i]
+        i += 1
+        literals = length(token >> 4)
+        need(i + literals <= len(src) and len(out) + literals <= n, "lz4 literals")
+        out += src[i : i + literals]
+        i += literals
+        if i == len(src):
+            break
+        need(i + 2 <= len(src), "lz4 offset")
+        offset = src[i] | src[i + 1] << 8
+        i += 2
+        need(0 < offset <= len(out), "lz4 offset")
+        match = length(token & 15) + 4
+        need(len(out) + match <= n, "lz4 match")
+        for _ in range(match):
+            out.append(out[-offset])
+    need(len(out) == n, "lz4 length")
+    return bytes(out)
+
+
+def cuts(g):
+    """§8.3: a frozen buffer's chunks' lengths, in blocks."""
+    size, leaves, start, total = u32(g, 12), u32(g, 28), u32(g, 48), len(g) // BLOCK
+    leaf = 512 * size // BLOCK
+    end = start + leaves * leaf
+    marks = [0] + list(range(start, end, 512 * leaf)) + [end, total]
+    return [b - a for a, b in zip(marks, marks[1:]) if b > a]
+
+
+def archive(b):
+    """§8, checked as §8.4 says: the cache file it decompresses into, and the chunks' lengths."""
+    need(len(b) % BLOCK == 0, "length")
+    need(len(b) >= BLOCK and b[0:4] == b"BRDA", "magic")
+    need(u32(b, 4) == 1, "version")
+    count = u32(b, 8)
+    need(u32(b, 12) == 1 and u32(b, 16) == 512 and b[20:32] == b"\0" * 12, "header")
+    after, grids = (count + 1) * BLOCK, []
+    need(after <= len(b), "directory")
+    for i in range(count):
+        d = 32 * (1 + i)
+        meta_at, meta_len, table_at, chunks, grid_blocks, code = (u32(b, d + 4 * k) for k in range(6))
+        need(b[d + 24 : d + 32] == b"\0" * 8, "directory")
+        parts = [(meta_at * BLOCK, meta_at * BLOCK + meta_len)]
+        need(parts[0][0] == after and parts[0][1] <= len(b), "metadata place")
+        table = table_at * BLOCK
+        need(table == -(-parts[0][1] // BLOCK) * BLOCK and table + 8 * chunks <= len(b), "table place")
+        parts.append((table, table + 8 * chunks))
+        listed = []
+        for k in range(chunks):
+            raw, n = u32(b, table + 8 * k), u32(b, table + 8 * k + 4)
+            start = -(-parts[-1][1] // BLOCK) * BLOCK
+            need(raw > 0 and start + n <= len(b), "chunk")
+            parts.append((start, start + n))
+            listed.append((raw, b[start : start + n]))
+        need(sum(r for r, _ in listed) == grid_blocks, "chunk table")
+        end = -(-parts[-1][1] // BLOCK) * BLOCK
+        for (_, a), (z, _) in zip(parts, parts[1:] + [(end, end)]):
+            need(b[a:z] == b"\0" * (z - a), "padding")
+        meta = b[parts[0][0] : parts[0][1]]
+        grids.append((meta, grid_blocks, code, listed))
+        after = end
+    need(after == len(b), "end")
+    # The cache file of the same grids, §3, its frozen buffers decompressed.
+    head, body, at = [b"BRDC", struct.pack("<II", 1, count), b"\0" * 20], [], 1 + count
+    for meta, grid_blocks, code, listed in grids:
+        grid_at = at + -(-len(meta) // BLOCK)
+        head.append(struct.pack("<5I", at, len(meta), grid_at, grid_blocks, code) + b"\0" * 12)
+        body.append(meta + b"\0" * (-len(meta) % BLOCK))
+        body.extend(lz4(c, raw * BLOCK) for raw, c in listed)
+        at = grid_at + grid_blocks
+    out = cache(b"".join(head + body))
+    for (_, g), (_, _, _, listed) in zip(out, grids):
+        need(cuts(g.b) == [r for r, _ in listed], "chunks")
+    return out
+
+
 def group_table(pairs):
     """§4.1: the names by id, group 0 first; [] when there is no group key."""
     by_id = {}
@@ -381,7 +473,7 @@ def read(path, brief, b=None):
         if b[0:4] == b"BRDG":
             grids, sets = [(None, Grid(b))], []
         else:
-            grids = cache(b)
+            grids = archive(b) if b[0:4] == b"BRDA" else cache(b)
             sets = sorted({dict(m["pairs"]).get(b"hermite.set") for m, _ in grids} - {None})
         verdicts = []
         for name in sets:

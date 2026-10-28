@@ -6,6 +6,13 @@ are recorded here when they change (V6).
 
 ## Unreleased
 
+- The archive profile, under the new feature `archive`: `archive::write` and `to_bytes`
+  store grids with their metadata, each frozen buffer in chunks of 512 leaves compressed
+  by `lz4_flex`'s block format, and `archive::read` and `from_bytes` read one back as the
+  `CacheFile` of the same grids, checked whole first, as docs/formats.md §8.4 states
+  (ADR-0016). Archive format version 1. `CacheError` gains `Decompress` and `Chunks`;
+  `BadMagic` and `UnsupportedVersion` now name no profile in their messages.
+
 ## 0.6.0 (2026-10-28)
 
 Closes P5: colino's sign without orientation, by parity, and its topology report's third

@@ -16,7 +16,8 @@ on its tree.
 - **Files**: `freeze` packs a grid into one aligned buffer, read in place as a
   `GridView`; the cache profile stores several grids with their metadata, read by copy or
   by memory mapping (feature `mmap`, on by default), checked whole first, as
-  docs/formats.md §3.4 states.
+  docs/formats.md §3.4 states; the archive profile compresses them, and is read back as
+  the same cache file (feature `archive`, opted into).
 - **Hermite data**: signs on a grid's voxel corners and, on each edge whose ends differ,
   where a surface crosses it, its normal and its group, as a format any producer writes
   and any reader checks.

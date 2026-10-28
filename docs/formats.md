@@ -296,7 +296,8 @@ samples shifted by −h/2.
 ## 6. Versions
 
 Each format carries its own version: the frozen layout in its header, the cache profile in
-its header, Hermite data and the SDF convention in free pairs. A release that raises a
+its header, the archive profile in its header, Hermite data and the SDF convention in free
+pairs. A release that raises a
 version still reads the one before it and can write it on request; a version older than
 that is refused, naming it (ADR-0038). Every format is at version 1, the first.
 
@@ -305,7 +306,8 @@ code added (§1.1), which a reader that does not know it refuses; and a reader's
 that refuses only what brodo's writer never wrote, so that every file brodo wrote at that
 version is still read. Any other change to the bytes or to what a reader takes raises the
 version. A cache file of version 1 holds frozen buffers of version 1 (§3.4), so raising the
-frozen layout's version raises the cache profile's; Hermite data and the SDF convention
+frozen layout's version raises the cache profile's, and the cache profile's raises the
+archive profile's (§8); Hermite data and the SDF convention
 carry versions of their own.
 
 ## 7. Test vectors
@@ -318,4 +320,75 @@ The golden files in `crates/brodo/tests/data/`, written by brodo's Format-tier t
 | `frozen_v1_f32.bin` | a bare frozen buffer of `f32`: leaves, and a tile at each level |
 | `frozen_v1_f64x3.bin` | a bare frozen buffer of three `f64`, the same tree |
 | `cache_v1.bin` | a cache file of two grids, `f32` and three `f32`, with bounds and a free pair |
+| `archive_v1.bin` | an archive of the same two grids as `cache_v1.bin` |
 | `hermite_v1.bin` | a cache file holding one Hermite set, `golden`, on one leaf, with two named groups |
+
+## 8. The archive profile, format version 1
+
+Grids with their metadata in one file, each frozen buffer cut into chunks compressed apart
+(ARCHITECTURE.md §4.7). Media type `application/vnd.brodo.archive; version=1`, stated and not
+registered (ADR-0041). It is read back as the cache file (§3) of the same grids: a reader
+decompresses each grid's chunks, in order, into its frozen buffer, and checks the cache
+file so made as §3.4 does. Every part's place follows from those before it, with no gap.
+
+| Part | At | Size |
+| :--- | :--- | :--- |
+| header | block 0 | 1 block |
+| directory | block 1 | 1 block per grid |
+| per grid, in directory order: metadata, §3.3 | the block after the previous part | its length, zero-padded to a block |
+| then its chunk table | the block after its metadata | 8 bytes a chunk, zero-padded to a block |
+| then each chunk, in order | the block after the previous part | its compressed length, zero-padded to a block |
+
+### 8.1 Header, one block
+
+| Byte | Field | Value |
+| :--- | :--- | :--- |
+| 0 | magic | the bytes `BRDA` |
+| 4 | version | `u32` 1 |
+| 8 | grid count | `u32` |
+| 12 | codec | `u32` 1: the LZ4 block format |
+| 16 | leaves a chunk | `u32` 512 |
+| 20 | unused | 12 bytes, zero |
+
+### 8.2 Directory entry, one block
+
+| Byte | Field |
+| :--- | :--- |
+| 0 | metadata offset, `u32` blocks |
+| 4 | metadata length, `u32` bytes |
+| 8 | chunk table offset, `u32` blocks |
+| 12 | chunk count, `u32` |
+| 16 | frozen buffer length, `u32` blocks |
+| 20 | value type, `u32` code, §1.1 |
+| 24 | unused, 8 bytes, zero |
+
+### 8.3 Chunks
+
+A chunk table entry is the chunk's length before compression, `u32` blocks, then its
+length compressed, `u32` bytes. A grid's frozen buffer (§2) is cut at its leaf values
+section's start, every 512 leaves within it (512 × 512 × value size bytes), and at that
+section's end, 512 × value size bytes a leaf on from its start; a piece of no bytes is
+left out, so the first chunk holds the header, the root table and the nodes, and the last
+the tile values, if there are any. Each chunk is one LZ4 block, as the LZ4 project's
+`lz4_Block_format.md` describes it: no frame, no checksum, no stated length, the length
+before compression taken from the table.
+
+### 8.4 What a reader checks
+
+A reader refuses a file, before answering anything, unless:
+
+1. its length is a multiple of 32;
+2. the magic and version 1, codec 1, 512 leaves a chunk, and the header's unused bytes zero;
+3. for each grid: the directory's unused words zero; its metadata at the block right after
+   the previous part, (count + 1) × 32 for the first, its chunk table at the block right
+   after the metadata and each chunk at the block right after the part before it, all
+   ending within the file; the bytes between parts zero;
+4. its chunks' lengths before compression, none zero, add up to its frozen buffer's
+   length, and each chunk decompresses to exactly its length;
+5. the cache file so made passes §3.4;
+6. each grid's chunks are cut as §8.3 cuts its frozen buffer;
+7. the last grid's last chunk ends, padded, where the file ends, or, with no grid, the
+   header does.
+
+That a chunk's compressed bytes are those brodo's compressor gives is not checked: another
+compressor's valid LZ4 block of the same bytes is read (ADR-0016).

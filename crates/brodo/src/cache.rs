@@ -25,10 +25,10 @@ const VERSION: u32 = 1;
 /// A grid ready to be written: its metadata, bounds, value type and frozen buffer.
 #[derive(Debug, Clone)]
 pub struct CacheEntry {
-    meta: GridMeta,
-    bounds: Bounds,
-    value_type: u32,
-    frozen: FrozenGrid,
+    pub(crate) meta: GridMeta,
+    pub(crate) bounds: Bounds,
+    pub(crate) value_type: u32,
+    pub(crate) frozen: FrozenGrid,
 }
 
 impl CacheEntry {
@@ -59,11 +59,11 @@ impl CacheEntry {
     }
 }
 
-fn u32_of(n: usize) -> Result<u32, CacheError> {
+pub(crate) fn u32_of(n: usize) -> Result<u32, CacheError> {
     u32::try_from(n).map_err(|_| CacheError::TooLarge)
 }
 
-fn put_u32(out: &mut Vec<u8>, x: u32) {
+pub(crate) fn put_u32(out: &mut Vec<u8>, x: u32) {
     out.extend_from_slice(&x.to_le_bytes());
 }
 
@@ -75,7 +75,7 @@ fn put_str(out: &mut Vec<u8>, s: &str) -> Result<(), CacheError> {
 }
 
 /// A grid's metadata and bounds, as stored.
-fn encode_meta(m: &GridMeta, b: Bounds) -> Result<Vec<u8>, CacheError> {
+pub(crate) fn encode_meta(m: &GridMeta, b: Bounds) -> Result<Vec<u8>, CacheError> {
     let mut out = Vec::new();
     put_str(&mut out, &m.name)?;
     put_str(&mut out, &m.unit)?;
@@ -106,33 +106,42 @@ pub fn to_bytes(entries: &[CacheEntry]) -> Result<Vec<u8>, CacheError> {
 }
 
 /// Writes zeros to `out` from `*written` bytes to `to`.
-fn pad_to(out: &mut impl std::io::Write, to: usize, written: &mut usize) -> std::io::Result<()> {
+pub(crate) fn pad_to(
+    out: &mut impl std::io::Write,
+    to: usize,
+    written: &mut usize,
+) -> std::io::Result<()> {
     let zeros = to.saturating_sub(*written);
     *written = to.max(*written);
     out.write_all(&vec![0; zeros])
 }
 
-/// Writes the file holding `entries` to `out`, part by part, so that no copy of the whole
-/// is made.
-fn emit(entries: &[CacheEntry], out: &mut impl std::io::Write) -> Result<(), CacheError> {
-    let metas =
-        entries.iter().map(|e| encode_meta(&e.meta, e.bounds)).collect::<Result<Vec<_>, _>>()?;
+/// A grid as the cache file places it: its metadata's length in bytes, its frozen buffer's
+/// in blocks, and its value type.
+pub(crate) struct Part {
+    pub(crate) meta_len: usize,
+    pub(crate) grid_blocks: usize,
+    pub(crate) value_type: u32,
+}
+
+/// The header and directory of a cache file of `parts`, and the block each grid's frozen
+/// buffer starts at; each metadata starts at the block after the part before it.
+pub(crate) fn head(parts: &[Part]) -> Result<(Vec<u8>, Vec<usize>), CacheError> {
     let mut head = Vec::new();
-    for x in [MAGIC, VERSION, u32_of(entries.len())?, 0, 0, 0, 0, 0] {
+    for x in [MAGIC, VERSION, u32_of(parts.len())?, 0, 0, 0, 0, 0] {
         put_u32(&mut head, x);
     }
-    let mut at = 1 + entries.len();
+    let mut at = 1 + parts.len();
     let mut places = Vec::new();
-    for (e, m) in entries.iter().zip(&metas) {
-        let grid_blocks = e.frozen.as_bytes().len() / BLOCK;
-        let (meta_at, grid_at) = (at, at + m.len().div_ceil(BLOCK));
-        at = grid_at + grid_blocks;
+    for p in parts {
+        let (meta_at, grid_at) = (at, at + p.meta_len.div_ceil(BLOCK));
+        at = grid_at + p.grid_blocks;
         for x in [
             u32_of(meta_at)?,
-            u32_of(m.len())?,
+            u32_of(p.meta_len)?,
             u32_of(grid_at)?,
-            u32_of(grid_blocks)?,
-            e.value_type,
+            u32_of(p.grid_blocks)?,
+            p.value_type,
             0,
             0,
             0,
@@ -141,6 +150,25 @@ fn emit(entries: &[CacheEntry], out: &mut impl std::io::Write) -> Result<(), Cac
         }
         places.push(grid_at);
     }
+    u32_of(at)?;
+    Ok((head, places))
+}
+
+/// Writes the file holding `entries` to `out`, part by part, so that no copy of the whole
+/// is made.
+fn emit(entries: &[CacheEntry], out: &mut impl std::io::Write) -> Result<(), CacheError> {
+    let metas =
+        entries.iter().map(|e| encode_meta(&e.meta, e.bounds)).collect::<Result<Vec<_>, _>>()?;
+    let parts: Vec<_> = entries
+        .iter()
+        .zip(&metas)
+        .map(|(e, m)| Part {
+            meta_len: m.len(),
+            grid_blocks: e.frozen.as_bytes().len() / BLOCK,
+            value_type: e.value_type,
+        })
+        .collect();
+    let (head, places) = head(&parts)?;
     out.write_all(&head)?;
     let mut written = head.len();
     // Each metadata starts where the part before it ends, the head or a grid, at a block.
@@ -164,6 +192,15 @@ static WRITES: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(
 /// write that fails leaves the old one. The directory must be writable; a process killed
 /// while writing may leave the hidden file behind.
 pub fn write(path: &Path, entries: &[CacheEntry]) -> Result<(), CacheError> {
+    replace(path, |out| emit(entries, out))
+}
+
+/// Writes the bytes `emit` gives to a hidden file beside `path` and renames it over
+/// `path`, as `write` states.
+pub(crate) fn replace(
+    path: &Path,
+    emit: impl FnOnce(&mut std::io::BufWriter<std::fs::File>) -> Result<(), CacheError>,
+) -> Result<(), CacheError> {
     use std::io::Write;
     let name = path.file_name().ok_or_else(|| {
         std::io::Error::new(std::io::ErrorKind::InvalidInput, "the path names no file")
@@ -176,7 +213,7 @@ pub fn write(path: &Path, entries: &[CacheEntry]) -> Result<(), CacheError> {
     let written = (|| -> Result<(), CacheError> {
         let made = std::fs::OpenOptions::new().write(true).create_new(true).open(&temp)?;
         let mut file = std::io::BufWriter::new(made);
-        emit(entries, &mut file)?;
+        emit(&mut file)?;
         file.flush()?;
         file.get_ref().sync_all()?;
         drop(file);
@@ -191,13 +228,13 @@ pub fn write(path: &Path, entries: &[CacheEntry]) -> Result<(), CacheError> {
 }
 
 /// Reads bytes in order, refusing to read past their end.
-struct Cursor<'a> {
-    rest: &'a [u8],
-    what: &'static str,
+pub(crate) struct Cursor<'a> {
+    pub(crate) rest: &'a [u8],
+    pub(crate) what: &'static str,
 }
 
 impl<'a> Cursor<'a> {
-    fn take(&mut self, n: usize) -> Result<&'a [u8], CacheError> {
+    pub(crate) fn take(&mut self, n: usize) -> Result<&'a [u8], CacheError> {
         let (a, b) = self.rest.split_at_checked(n).ok_or(CacheError::Truncated(self.what))?;
         self.rest = b;
         Ok(a)
@@ -207,7 +244,7 @@ impl<'a> Cursor<'a> {
         <[u8; 4]>::try_from(self.take(4)?).map_err(|_| CacheError::Truncated(self.what))
     }
 
-    fn u32(&mut self) -> Result<u32, CacheError> {
+    pub(crate) fn u32(&mut self) -> Result<u32, CacheError> {
         Ok(u32::from_le_bytes(self.word()?))
     }
 
@@ -283,7 +320,7 @@ pub(crate) struct Entry {
     bounds: Bounds,
     value_type: u32,
     /// The frozen buffer's byte range in the file.
-    grid: std::ops::Range<usize>,
+    pub(crate) grid: std::ops::Range<usize>,
 }
 
 /// A cache file read into a 32-byte aligned buffer and checked whole.
@@ -302,7 +339,7 @@ pub(crate) enum Storage {
 }
 
 impl Storage {
-    fn bytes(&self) -> &[u8] {
+    pub(crate) fn bytes(&self) -> &[u8] {
         match self {
             Storage::Copied(blocks) => blocks.as_bytes(),
             #[cfg(feature = "mmap")]
@@ -329,7 +366,7 @@ fn check_grid(bytes: &[u8], value_type: u32) -> Result<(), FormatError> {
 
 /// A range of `len` bytes from block `at`, which must be byte `expected`, where the writer
 /// puts it, and end within `total`.
-fn range(
+pub(crate) fn range(
     at: u32,
     len: usize,
     expected: usize,
@@ -416,7 +453,7 @@ pub(crate) fn index(all: &[u8]) -> Result<Vec<Entry>, CacheError> {
     Ok(grids)
 }
 
-fn zero(bytes: &[u8]) -> bool {
+pub(crate) fn zero(bytes: &[u8]) -> bool {
     bytes.iter().all(|b| *b == 0)
 }
 

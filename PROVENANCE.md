@@ -18,6 +18,7 @@ papers, public documentation and permissively licensed code (S1, S2) may appear 
 | :--- | :--- | :--- |
 | `crates/brodo/src/accessor.rs` | ARCHITECTURE.md §4.4, ADR-0015 only | value accessors: reads and leaf-only writes from a cached path |
 | `crates/brodo/src/analysis.rs` | ARCHITECTURE.md §4.5, ADR-0013 only; union-find and breadth-first search as textbook material | connected-component labelling and flood fill on the sparse tree |
+| `crates/brodo/src/archive.rs` | ARCHITECTURE.md §4.7, ADR-0016; the LZ4 project's `lz4_Block_format.md`, for the block format docs/formats.md §8.3 names; `lz4_flex` 0.14's API only | the archive profile: writing grids in compressed chunks and reading them back as a cache file |
 | `crates/brodo/src/cache.rs` | ARCHITECTURE.md §4.7, ADR-0016 only | the cache profile: writing and checking a file of grids with their metadata |
 | `crates/brodo/src/error.rs` | none | the crate's error types |
 | `crates/brodo/src/euler.rs` | ARCHITECTURE.md §4.5, ADR-0024; the Euler–Poincaré formula over a voxel complex as stated by Sánchez-Cruz et al. (2013, J. Appl. Res. Technol. 11(1), 65–78); a sum over 2×2×2 neighbourhoods as ImageJ Ops' documentation of `EulerCharacteristic26N` describes it | the Euler characteristic of the voxels meeting a condition, under 6- or 26-connectivity |

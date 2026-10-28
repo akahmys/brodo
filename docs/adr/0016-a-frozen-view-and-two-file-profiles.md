@@ -103,3 +103,21 @@ decompressed within twice that copy, on every grid. The human decided:
 - Byte shuffling comes only with quantisation (ROADMAP.md P6).
 - No smaller codec is offered for now; when `ruzstd` implements its higher levels, it is
   measured again (ROADMAP.md §4).
+
+## Amendment: the archive profile's file
+
+- **Date**: 2026-10-29 (second)
+
+Before the archive profile was built, the human decided four points:
+
+- An archive is read back as a `CacheFile`: its chunks are decompressed, in parallel, into
+  the bytes the cache profile would hold for the same grids, and those are checked as a
+  cache file is, so that one reader's checks and one set of views serve both profiles.
+- It carries no checksum, as the cache file carries none: a reader checks structure, and
+  a flipped bit in a value goes unseen, left to the transport; a later version may add one.
+- A reader checks what the writer puts down to how each grid is cut into chunks, their
+  places and their padding, but not that a chunk's compressed bytes are the ones the
+  writer's compressor would give, which would cost a compression per read and refuse files
+  of an older `lz4_flex`; docs/formats.md states the gap.
+- It is built under the `archive` feature, opted into (ADR-0036), so that `lz4_flex` reaches
+  only a user who asks for it.

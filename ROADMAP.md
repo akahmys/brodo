@@ -15,7 +15,8 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   held to them (ADR-0043). Its mutation run missed none of 3557; two baselines were
   recorded again, a sync's cost and a change of code placement (ADR-0019).
 - **Next**: P6 (§2), brodo's archives and quantisation, 0.7.0, each step a spike and an
-  ADR before it is built; B-005 answered, `lz4_flex` (ADR-0016), the archive profile next. OpenVDB files follow as
+  ADR before it is built; B-005 answered, `lz4_flex`, and the archive profile built (ADR-0016);
+  value quantisation next. OpenVDB files follow as
   P7 (split by the human, 2026-10-28).
 - **Unresolved problems**: `cache_map_x256` runs 8 to 10 % behind its baseline of
   2026-10-17 at v0.3.0 and now alike, run in turn (2026-10-23); a first run straight after
@@ -322,7 +323,8 @@ spike and an ADR before it is built.
 
 - [x] B-005: the archive's compressor, pure Rust, its dependency approved: `lz4_flex`
       (ADR-0016, 2026-10-29)
-- [ ] The archive profile (ARCHITECTURE.md §4.7), its reader in `UNTRUSTED_INPUT` and fuzzed
+- [x] The archive profile (ARCHITECTURE.md §4.7), its reader in `UNTRUSTED_INPUT` and fuzzed
+      (2026-10-29)
 - [ ] Value quantisation in the archive, 16-bit float and 8-bit range, with byte shuffling
 - [ ] Retrospective and refactoring; fuzz round, the new reader included; Miri run;
       benchmarks, the archive's with baselines; mutation run (ADR-0023), as the human

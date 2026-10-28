@@ -11,7 +11,7 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4.13"
-brodo = { path = "../crates/brodo" }
+brodo = { path = "../crates/brodo", features = ["archive"] }
 colino = { path = "../crates/colino" }
 zerocopy = { version = "0.8.63", features = ["derive"] }
 
@@ -29,6 +29,13 @@ bench = false
 [[bin]]
 name = "cache_file"
 path = "fuzz_targets/cache_file.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "archive"
+path = "fuzz_targets/archive.rs"
 test = false
 doc = false
 bench = false

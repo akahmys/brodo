@@ -9,6 +9,7 @@ publish.workspace = true
 readme = "README.md"
 
 [dependencies]
+lz4_flex = { workspace = true, optional = true }
 memmap2 = { workspace = true, optional = true }
 png = { workspace = true, optional = true }
 rayon.workspace = true
@@ -17,6 +18,9 @@ zerocopy.workspace = true
 
 [features]
 default = ["mmap"]
+# Writing and reading the archive profile (ARCHITECTURE.md §4.7, ADR-0016); opted into
+# (ADR-0036), so that `lz4_flex` reaches only a user who asks for it.
+archive = ["dep:lz4_flex"]
 # Reading a cache file by memory mapping (ARCHITECTURE.md §4.7, ADR-0008); on by default,
 # left out with the unsafe module by a user who never maps (ADR-0036).
 mmap = ["dep:memmap2"]

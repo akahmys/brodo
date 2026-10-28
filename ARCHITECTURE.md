@@ -223,7 +223,7 @@ fastest. A neighbour beyond the `i32` coordinate range is the background.
 | Profile | For | Content | Read by |
 | :--- | :--- | :--- | :--- |
 | **cache** | passing between processes, replaying frame caches | the `GridView` buffer, uncompressed | memory mapping, no copy |
-| **archive** (P6, not built) | storing, shipping | metadata, topology and value blocks in chunks of 512 leaves by default, each compressed by `lz4_flex`'s block format (ADR-0016) | decompressing chunks, in parallel, into a `GridView` (one copy) |
+| **archive** | storing, shipping | metadata, topology and value blocks in chunks of 512 leaves by default, each compressed by `lz4_flex`'s block format (ADR-0016) | decompressing chunks, in parallel, into a `GridView` (one copy) |
 
 - A cache file holds a header (magic number, format version, grid count) and, per grid, its
   name, value type, voxel size and unit, affine transform, bounding box and free
@@ -250,6 +250,14 @@ fastest. A neighbour beyond the `i32` coordinate range is the background.
   mapping it into memory without a copy (`CacheFile::map`); both go through one parser.
   Mapping is brodo's only unsafe code, in one module (ADR-0008); while a file is mapped,
   the caller keeps it unchanged.
+- The archive profile, format version 1, under the feature `archive`, opted into: a
+  header, a directory, then each grid's metadata, its chunk table and its chunks on block
+  boundaries; its bytes are in [docs/formats.md](docs/formats.md) §8. A reader
+  decompresses the chunks in parallel into the cache file of the same grids and checks it
+  as a cache file, so that an archive is read as a `CacheFile` (`archive::read`); it also
+  checks how each grid is cut into chunks, but not that a chunk's compressed bytes are
+  brodo's compressor's. It carries no checksum (ADR-0016). It is written whole, as a
+  cache file is.
 - (P6, not built.) The archive can decompress only the chunks a region needs, and can quantise values
   (16-bit float, 8-bit range), byte-shuffled before compression.
 - (P7, not built.) OpenVDB files (`.vdb`) are read through the `vdb-rs` crate into brodo's tree and written
