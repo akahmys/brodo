@@ -394,18 +394,36 @@ mod tests {
     }
 
     /// Two points within reach, the first in the cell below the second's along each axis
-    /// in turn: they are one place, found by looking in the cells on both sides.
+    /// in turn, at a reach of 1 and of 4: they are one place, as ARCHITECTURE.md §5.2
+    /// promises of points within 2h, found by looking in the cells on both sides.
     #[test]
     fn points_within_reach_across_a_cell_boundary_are_one_place() {
-        for axis in 0..3 {
-            let at = |c: f64| {
-                let mut p = [0.5; 3];
-                p[axis] = c;
-                Found { kind: ThinKind::Wall, at: p, measure: 1.0 }
-            };
-            let got = places(&[at(-0.1), at(0.1)], ThinKind::Wall, 1.0);
-            assert_eq!(got.len(), 1, "axis {axis}: {got:?}");
-            assert_eq!(got[0].points, 2);
+        for reach in [1.0, 4.0] {
+            for axis in 0..3 {
+                let at = |c: f64| {
+                    let mut p = [0.5; 3];
+                    p[axis] = c * reach;
+                    Found { kind: ThinKind::Wall, at: p, measure: 1.0 }
+                };
+                let got = places(&[at(-0.1), at(0.1)], ThinKind::Wall, reach);
+                assert_eq!(got.len(), 1, "reach {reach}, axis {axis}: {got:?}");
+                assert_eq!(got[0].points, 2);
+            }
         }
+    }
+
+    /// Joining points into places ends: a mutant that makes finding a root loop for ever
+    /// fails here within a minute, in the first test binary, before the tests that would
+    /// only wait for it (TESTING.md T11). Three points in a row are one place
+    /// (ARCHITECTURE.md §5.2).
+    #[test]
+    fn joining_three_points_ends_in_time() {
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let at = |x: f64| Found { kind: ThinKind::Gap, at: [x, 0.0, 0.0], measure: 1.0 };
+            let got = places(&[at(0.0), at(1.0), at(2.0)], ThinKind::Gap, 1.0);
+            tx.send(got.iter().map(|t| t.points).collect::<Vec<_>>()).unwrap_or(());
+        });
+        assert_eq!(rx.recv_timeout(std::time::Duration::from_secs(60)), Ok(vec![3]));
     }
 }

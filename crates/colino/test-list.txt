@@ -23,6 +23,7 @@ lib colino thin::tests::a_box_holds_its_voxels_alone
 lib colino thin::tests::a_places_box_is_bounded_and_checked_up_to_its_limit
 lib colino thin::tests::a_triangle_is_sampled_by_sections_of_its_longest_edge
 lib colino thin::tests::a_voxel_at_h_over_2_is_sampled_at_its_centre
+lib colino thin::tests::joining_three_points_ends_in_time
 lib colino thin::tests::points_within_reach_across_a_cell_boundary_are_one_place
 lib colino winding::tests::an_expansion_is_about_the_area_weighted_centroid
 lib colino winding::tests::approximating_a_small_soup_ends_in_time

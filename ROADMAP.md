@@ -17,8 +17,8 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   (ADR-0034, ADR-0007).
 - **Next**: P5 (§2), colino's milestone: its costs measured and those that helped kept
   (2026-10-25), B-016's sign without orientation and layer 3 (B-020) built
-  (2026-10-26), tests and promises held to the contract (2026-10-28); next the mutation
-  run's verdict, then the benchmarks and the human's acceptance.
+  (2026-10-26), tests and promises held to the contract and the mutation run passed
+  (2026-10-28); next the benchmarks and the human's acceptance.
 - **Unresolved problems**: `cache_map_x256` runs 8 to 10 % behind its baseline of
   2026-10-17 at v0.3.0 and now alike, run in turn (2026-10-23); a first run straight after
   the fuzz round and Miri failed at +13 %. Machine drift is the likely cause, not shown. Miri's Stacked Borrows reports undefined behaviour in
@@ -292,11 +292,12 @@ built.
         root lookup shared (2026-10-27)
   - [x] The public API tidied in 0.6.0, already breaking for `Stored`:
         `FreezeError::Inconsistent` removed among it (2026-10-27)
-  - [ ] Mutation run, after the review and the refactoring; a run on `9940bd5`
+  - [x] Mutation run, after the review and the refactoring; a run on `9940bd5`
         (2026-10-26 to 27) showed where tests were weak, each missed mutant since killed by
         a test or excluded with its reason; the run on `fa72208` (2026-10-27) missed 58,
-        killed or excluded under the contract (ADR-0043); run again on `90342e7`
-        (2026-10-28)
+        killed or excluded under the contract (ADR-0043); the run on `90342e7`
+        (2026-10-28) missed none of 3557, two timeouts in `thin.rs` since killed by tests,
+        and the 13 mutants of the code changed after it caught (2026-10-28)
   - [x] Tests and exclusions held to the contract, not the implementation (ADR-0043),
         chosen by the human after tests written for mutants pinned more than the code
         promises (2026-10-28): T12, a test asserts a promise; T11's exclusions name where
