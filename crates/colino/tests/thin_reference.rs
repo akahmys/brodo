@@ -80,6 +80,11 @@ fn options() -> Options {
     Options::new(1.0)
 }
 
+/// How closely a thin place's least is promised at voxel size `h` (`Thin::least`).
+fn measured(h: f64) -> f64 {
+    h / 256.0
+}
+
 #[test]
 fn a_plate_thinner_than_two_voxels_is_one_wall_its_thickness_measured() {
     for t in [0.5, 1.5] {
@@ -87,7 +92,7 @@ fn a_plate_thinner_than_two_voxels_is_one_wall_its_thickness_measured() {
         assert_eq!(places.len(), 1, "{t}: {places:?}");
         let p = places[0];
         assert_eq!(p.kind, ThinKind::Wall);
-        assert!((p.least - t).abs() < 1e-9, "{t}: {}", p.least);
+        assert!((p.least - t).abs() < measured(1.0), "{t}: {}", p.least);
         // At 0.5 the conversion opens holes in the plate; at h/2 it is whole. At 1.5 both
         // see one plate.
         let plate = invariants(1, 1, 1);
@@ -110,14 +115,14 @@ fn a_plate_thinner_than_two_voxels_is_one_wall_its_thickness_measured() {
 }
 
 /// At h = 4 (the final mutation run of P5): a plate 7 thick, within 2h but beyond 2 + h
-/// and h/2, is one wall, measured as the other walls are.
+/// and h/2, is one wall, measured as promised.
 #[test]
 fn a_plate_within_two_large_voxels_is_one_wall() {
     let t = 7.0;
     let places =
         thin(&boxes(&[([-40.0, -40.0, -t / 2.0], [40.0, 40.0, t / 2.0])]), &Options::new(4.0));
     assert_eq!(places.len(), 1, "{places:?}");
-    assert!((places[0].least - t).abs() < 1e-9, "{}", places[0].least);
+    assert!((places[0].least - t).abs() < measured(4.0), "{}", places[0].least);
 }
 
 #[test]
@@ -127,7 +132,7 @@ fn a_gap_narrower_than_two_voxels_is_one_gap_its_width_measured() {
         assert_eq!(places.len(), 1, "{g}: {places:?}");
         let p = places[0];
         assert_eq!(p.kind, ThinKind::Gap);
-        assert!((p.least - g).abs() < 1e-9, "{g}: {}", p.least);
+        assert!((p.least - g).abs() < measured(1.0), "{g}: {}", p.least);
         // At 0.5 the conversion closes the gap, joining the boxes; at 1.5 they stay apart.
         if g < 1.0 {
             assert!(
@@ -239,10 +244,10 @@ fn turned_triangles_find_the_same_places_by_parity() {
         assert_eq!(as_meant.len(), 1);
         assert_eq!(broken.len(), as_meant.len());
         // The rays cross a turned triangle with its corners in another order, so its
-        // crossing's last bits may differ; everything else is the same.
+        // crossing may differ within what is promised; everything else is the same.
         for (b, a) in broken.iter().zip(&as_meant) {
             assert_eq!((b.kind, b.lo, b.hi, b.points), (a.kind, a.lo, a.hi, a.points));
-            assert!((b.least - a.least).abs() < 1e-9, "{} {}", b.least, a.least);
+            assert!((b.least - a.least).abs() < 2.0 * measured(1.0), "{} {}", b.least, a.least);
         }
     }
 }
@@ -288,7 +293,7 @@ fn two_plates_at_half_a_voxel_are_two_walls_checked_where_they_lie() {
     assert_eq!(places.len(), 2, "{places:?}");
     for p in &places {
         assert_eq!(p.kind, ThinKind::Wall);
-        assert!((p.least - t).abs() < 1e-9, "{}", p.least);
+        assert!((p.least - t).abs() < measured(0.5), "{}", p.least);
         // Two faces of 36 each, a point every h/2 = 0.25: some 1150 points.
         assert!(p.points > 1000, "{}", p.points);
         assert!(matches!(p.check, Check::Same(i) if i.solid >= 1), "{:?}", p.check);

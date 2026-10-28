@@ -130,9 +130,10 @@ pub struct Invariants {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub enum Check {
-    /// The invariants at h are those at h/2.
+    /// The invariants at h are those at h/2; it does not show the topology unchanged, h/2
+    /// being a finer sampling, not the shape itself.
     Same(Invariants),
-    /// They differ: the conversion has changed the topology there.
+    /// They differ: the conversion at h has likely changed the topology there.
     Changed {
         /// At h, the conversion's.
         coarse: Invariants,
@@ -161,7 +162,7 @@ pub struct Thin {
     pub least: f64,
     /// The thin points it holds, of those sampled h/2 apart.
     pub points: u64,
-    /// Whether the conversion changed the topology there.
+    /// What reconverting its box at h/2 says of the topology there.
     pub check: Check,
 }
 
@@ -179,7 +180,7 @@ pub struct Report {
     /// The input's reference.
     pub reference: Reference,
     /// The grid's χ less the reference's, when there is a reference: nonzero when the
-    /// conversion may have changed the topology.
+    /// conversion has changed the topology; zero does not show it has not.
     pub euler_change: Option<i64>,
     /// The named points, in the order given.
     pub regions: Vec<Region>,

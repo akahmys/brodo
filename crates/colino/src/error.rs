@@ -131,9 +131,9 @@ pub enum ReadError {
     /// The mesh holds more than the limits allow.
     #[error("more {what} than the limit of {limit}")]
     TooLarge {
-        /// Triangles or vertices.
+        /// Triangles, vertices or bytes.
         what: &'static str,
-        /// The limit given.
+        /// The limit given, or `u32::MAX` where a mesh cannot number more.
         limit: u64,
     },
 }
@@ -206,7 +206,8 @@ pub enum ConvertError {
     /// Neither the mesh nor the options give a unit.
     #[error("no unit: the mesh states none and the options give none")]
     NoUnit,
-    /// The mesh reaches beyond the voxel coordinates brodo holds.
+    /// The mesh reaches beyond the voxel coordinates brodo holds: a triangle's box, grown by
+    /// the band, lies farther than `i32::MAX` − 8192 voxels from voxel 0 along an axis.
     #[error("the mesh reaches beyond the grid's i32 voxel coordinates")]
     OutOfRange,
 }
@@ -228,8 +229,8 @@ pub enum HermiteError {
     /// The grid's transform is not the axis-aligned one conversion writes.
     #[error("the grid's transform is not axis-aligned with positive voxel sizes")]
     Transform,
-    /// The winding number's inside changes beyond the band, across an edge no leaf point
-    /// owns: a badly oriented mesh, whose sign the winding number cannot give (B-016).
+    /// The conversion's sign, by the winding number or by parity, changes beyond the band,
+    /// across an edge no leaf point owns: a mesh whose sign it cannot give there (B-016).
     #[error("the signs change beyond the band, at point {0:?}: is the mesh badly oriented?")]
     SignOutsideBand(brodo::tree::Coord),
 }
@@ -248,7 +249,8 @@ pub enum ReportError {
     #[error("the grid's transform is not axis-aligned with positive voxel sizes")]
     Transform,
     /// The mesh lies farther than 2³¹ voxels from the world's origin, where the third
-    /// layer's rays could not tell a thin place from rounding.
+    /// layer's rays could not tell a thin place from rounding. Measured from the world's
+    /// origin, not the grid's, so a conversion that succeeded may be reported on with it.
     #[error("the mesh lies too far from the origin, in voxels, for its thin places to be found")]
     TooFar,
 }

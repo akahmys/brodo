@@ -150,7 +150,8 @@ pub enum Accuracy {
     /// whole. They report β = 2 thresholds at 1/2 as the exact sum does; how far the
     /// number lies from the exact sum is not promised.
     Approximate {
-        /// The accuracy parameter, β.
+        /// The accuracy parameter, β: finite and positive, or a conversion is refused with
+        /// `ConvertError::BadOption`.
         beta: f64,
     },
 }

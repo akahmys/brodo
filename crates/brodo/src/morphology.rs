@@ -122,10 +122,14 @@ fn around(lo: [i64; 3], side: i64, k: u32, conn: Connectivity, mut visit: impl F
     }
 }
 
-/// The topology with a leaf at every background cell within k steps of a leaf or tile. It
-/// makes as many leaves as k asks, and holds them while it does, about a k³/512th of a
-/// region's shell for each region: a dilation whose new leaves a `u32` could not number is
-/// refused before any is made, but one that merely needs more memory than there is is not.
+/// The topology with a leaf at every background cell within k steps of a leaf or tile, none
+/// beyond the `i32` range. It makes as many leaves as k asks, and holds them while it does,
+/// about a k³/512th of a region's shell for each region. A dilation whose new leaves a
+/// `u32` could not number is refused as `TreeError::ArenaFull(NodeKind::Leaf)` before any is
+/// made, the count bounded by the cells of every region's shell, overlaps counted twice, or
+/// by those of the box holding the regions grown by k's reach and kept to the range,
+/// whichever is fewer: one whose leaves would fit may be refused when that bound does not.
+/// One that merely needs more memory than there is is not refused.
 pub fn dilate(t: &Topology, conn: Connectivity, k: u32) -> Result<(Topology, Remap), TreeError> {
     within_count(&regions(t)?, k)?;
     let mut e = t.edit();
@@ -192,8 +196,9 @@ fn near_background(t: &Topology, cell: [i64; 3], k: u32, conn: Connectivity) -> 
     })
 }
 
-/// The topology without every leaf within k steps of a background cell; a larger tile is
-/// split where its cells within reach must go.
+/// The topology without every leaf within k steps of a background cell, the space beyond
+/// the `i32` range counted as background; a larger tile is split where its cells within
+/// reach must go.
 pub fn erode(t: &Topology, conn: Connectivity, k: u32) -> Result<(Topology, Remap), TreeError> {
     // Every cell of the box holding the regions lies within its widest side's steps of the
     // background beyond it: a larger k removes no more.
@@ -374,16 +379,17 @@ mod tests {
         assert_eq!(split.len(), 512 * 512 * 512 - 510 * 510 * 510);
     }
 
+    /// The box `dilate`'s documented bound grows by k's reach holds every region.
     #[test]
     fn the_box_holds_every_region() {
         assert_eq!(bounds(&[]), None);
         assert_eq!(bounds(&[([1, 2, 3], 2), ([-4, 5, 0], 1)]), Some(([-4, 2, 0], [3, 6, 5])));
     }
 
-    /// A dilation is refused just where its new leaves could number more than a `u32`:
-    /// one region's by its shell, a region's at either end of the range by the box kept to
-    /// the range, and many regions' by the box holding them, taken when it holds exactly
-    /// `u32::MAX` cells.
+    /// `dilate`'s documented bound: a dilation is refused just where it passes a `u32`'s
+    /// count, one region's by its shell, a region's at either end of the range by the box
+    /// kept to the range, and many regions' by the box holding them, taken when it holds
+    /// exactly `u32::MAX` cells.
     #[test]
     fn a_dilation_is_refused_just_beyond_a_u32s_count() {
         let refused = |regions: &[([i64; 3], i64)], k| within_count(regions, k).is_err();

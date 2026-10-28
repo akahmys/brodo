@@ -8,9 +8,7 @@ use crate::topology::Topology;
 use crate::tree::Coord;
 
 /// The key in `GridMeta::extra` that marks a grid as a narrow-band SDF written to brodo's
-/// convention (ADR-0039): voxel v sampled at the image of v + ½, signed distances negative
-/// inside in the grid's unit, leaves in a band of N voxels with values clamped to ±N·h,
-/// inside tiles −N·h and the background +N·h. Its value is the convention's version.
+/// convention, docs/formats.md §5 (ADR-0039). Its value is the convention's version.
 pub const SDF_KEY: &str = "sdf.version";
 
 /// The version of the SDF convention this brodo states.
@@ -22,7 +20,8 @@ pub const SDF_VERSION: &str = "1";
 pub struct GridMeta {
     /// The grid's name.
     pub name: String,
-    /// A voxel's size along x, y and z, in `unit`.
+    /// A voxel's size along x, y and z, in `unit`, as its writer states it: the transform
+    /// alone places the voxels, and nothing checks that the two agree.
     pub voxel_size: [f64; 3],
     /// The unit of length, a non-empty string brodo does not interpret.
     pub unit: String,

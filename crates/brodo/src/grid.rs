@@ -89,8 +89,8 @@ impl<T: Value> Grid<T> {
         self.field.value_at(&self.topology, v)
     }
 
-    /// Edits the topology with `f`, commits it and remaps the field. If `f` or the commit
-    /// fails, the grid is unchanged.
+    /// Edits the topology with `f`, commits it and remaps the field. If `f`, the commit or
+    /// the remap fails, the grid is unchanged.
     pub fn edit<R>(
         &mut self,
         f: impl FnOnce(&mut TopologyEditor<'_>) -> Result<R, TreeError>,

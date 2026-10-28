@@ -155,7 +155,8 @@ impl<T> Cell<T> {
 
 /// Writes `f` on `t` as one ASCII `.vtu`, its values named `name`.
 ///
-/// `name` is one or more printable ASCII characters or spaces, none of `<>&"'`.
+/// `name` is one or more printable ASCII characters or spaces, none of `<>&"'`. A name,
+/// field or value refused, an infinite one among them, writes nothing to `out`.
 pub fn write_vtu<T: VtkValue, W: Write>(
     t: &Topology,
     f: &Field<T>,

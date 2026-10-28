@@ -308,7 +308,8 @@ fn blocks(bytes: usize) -> usize {
 }
 
 /// Packs a topology and a field on it into a frozen grid (ARCHITECTURE.md §4.6). The bytes
-/// depend only on the topology and the values.
+/// depend only on the levels and places of the leaves and tiles and on the values: not on
+/// the topology's stamp, its edits' history or the thread count.
 pub fn freeze<T: Stored>(t: &Topology, f: &Field<T>) -> Result<FrozenGrid, FreezeError> {
     f.belongs_to(t)?;
     let plan = plan(t)?;

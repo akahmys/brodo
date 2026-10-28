@@ -277,8 +277,8 @@ A grid of `f32` is an SDF written to this convention when its free pairs hold
 - voxel v is sampled at the image of v + ½ under the transform, its centre;
 - its value is the signed distance there to the surface, in the grid's unit, negative
   inside;
-- leaves lie within a band of N voxels of the surface, their values clamped to ±N·h, h
-  the voxel size;
+- the voxel size is the same along x, y and z, h;
+- leaves lie within a band of N voxels of the surface, their values clamped to ±N·h;
 - inside tiles hold −N·h; the background is +N·h, which gives N·h to a reader.
 
 A Hermite set on the same tree places its points at the voxels' corners, the SDF's

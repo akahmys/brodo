@@ -34,7 +34,7 @@ a discretisation, its user's.
 
 | Crate | Contents |
 | :--- | :--- |
-| `brodo` | The sparse tree, `Topology`, `Field<T>`, `Grid<T>`, topology editing and `Remap`, `LeafManifest`, `ValueAccessor`, leaf-parallel updates and gather, topology analysis, `GridView`, the file profiles, the Hermite data format, OpenVDB files, checking output (slice PNG, VTK) |
+| `brodo` | The sparse tree, `Topology`, `Field<T>`, `Grid<T>`, topology editing and `Remap`, `LeafManifest`, `ValueAccessor`, leaf-parallel updates and gather, topology analysis, `GridView`, the file profiles, the Hermite data format, OpenVDB files (P6, not built), checking output (slice PNG, VTK) |
 | `colino` | Meshes to narrow-band SDFs on brodo's tree, and the topology report |
 | `piatto` | A viewer of cache-profile files, as a library and a thin windowed program; built only when needed (ADR-0018) |
 
@@ -104,11 +104,13 @@ pub struct Field<T> {
   fails, the grid is unchanged. Its field is written through the grid (`par_update_leaves`,
   `leaf_mut`, `set_tile`), never handed out to be replaced, so that it is always the
   topology's (ADR-0014).
-- Topology changes (activation, removing a leaf, dilation, pruning, splitting and merging
-  tiles) go through an editor (`TopologyEditor`) and take effect at `commit`, which
+- Topology changes (activation, removing a leaf, dilation, splitting and merging tiles)
+  go through an editor (`TopologyEditor`) and take effect at `commit`, which
   returns a new topology and a `Remap` to it, and leaves the old topology usable. Every
   field on the old topology is remapped by it. Removing a leaf removes the nodes it leaves
-  empty; in a tile it is refused (ADR-0025). Every tile in a region becomes leaves by one
+  empty; in a tile it is refused (ADR-0025). Pruning is merging: `merge` turns the child
+  holding a voxel into one tile, its values merged by the remap's rule; there is no
+  whole-tree prune, which a caller builds from `merge` and `deactivate`. Every tile in a region becomes leaves by one
   `split_tile` per leaf origin in it that a tile holds, in one editor, so one `Remap`; there
   is no operation of its own until a benchmark shows the calls cost (ROADMAP.md §4, R8).
 - Every topology carries a stamp unique in the process. A field records the stamp of the
@@ -176,8 +178,9 @@ fastest. A neighbour beyond the `i32` coordinate range is the background.
   are found on a grid compressed along each axis around the root's keys, so enclosed
   background stays apart from the outside. Adjacency between regions of different sizes
   is found by descending the levels with an explicit stack, never voxel by voxel over a
-  large region. Components are numbered in the order of their first unit, so labels do
-  not depend on anything but the input.
+  large region. Components are numbered in the order of their first unit, the outside
+  first, so labels do not depend on anything but the input, and a component holding the
+  outside is component 0.
 - The Euler characteristic χ of the voxels meeting a condition (ADR-0024): of the closed
   unit cubes under 26-connectivity, of the open ones under 6. Each lattice vertex owns
   the cells on its positive side, so χ sums a table of its 2×2×2 pattern; a vertex
@@ -186,7 +189,8 @@ fastest. A neighbour beyond the `i32` coordinate range is the background.
   holding the background is unbounded and refused.
 - Dilation and erosion (ADR-0025), by k steps, 6- or 26-connected. Of a topology, on
   whole leaves: dilating adds a leaf at every background cell within reach of a leaf or
-  tile, eroding removes every leaf within reach of the background, splitting a larger
+  tile, eroding removes every leaf within reach of the background, beyond the `i32` range
+  the background as everywhere (§4.3), splitting a larger
   tile where it must; each returns its `Remap`. Of values on a fixed topology: a max or a
   min over the neighbourhood, k times, written to leaf voxels only.
 
@@ -219,7 +223,7 @@ fastest. A neighbour beyond the `i32` coordinate range is the background.
 | Profile | For | Content | Read by |
 | :--- | :--- | :--- | :--- |
 | **cache** | passing between processes, replaying frame caches | the `GridView` buffer, uncompressed | memory mapping, no copy |
-| **archive** | storing, shipping | metadata, topology and value blocks in compressed chunks of hundreds to thousands of leaves | decompressing chunks, in parallel, into a `GridView` (one copy) |
+| **archive** (P6, not built) | storing, shipping | metadata, topology and value blocks in compressed chunks of hundreds to thousands of leaves | decompressing chunks, in parallel, into a `GridView` (one copy) |
 
 - A cache file holds a header (magic number, format version, grid count) and, per grid, its
   name, value type, voxel size and unit, affine transform, bounding box and free
@@ -246,9 +250,9 @@ fastest. A neighbour beyond the `i32` coordinate range is the background.
   mapping it into memory without a copy (`CacheFile::map`); both go through one parser.
   Mapping is brodo's only unsafe code, in one module (ADR-0008); while a file is mapped,
   the caller keeps it unchanged.
-- The archive can decompress only the chunks a region needs, and can quantise values
+- (P6, not built.) The archive can decompress only the chunks a region needs, and can quantise values
   (16-bit float, 8-bit range), byte-shuffled before compression.
-- OpenVDB files (`.vdb`) are read through the `vdb-rs` crate into brodo's tree and written
+- (P6, not built.) OpenVDB files (`.vdb`) are read through the `vdb-rs` crate into brodo's tree and written
   by brodo, for level sets and scalar density first.
 
 ### 4.8 Value types
@@ -306,7 +310,9 @@ are in ADR-0030.
   ADR-0031).
 - Grid: the caller's voxel size, on the world's lattice unless given another origin; each
   voxel sampled at its centre (ADR-0027).
-- Distance: exact, to the nearest triangle through a BVH of axis-aligned boxes.
+- Distance: to the nearest triangle, through a BVH of axis-aligned boxes, worked in `f64`
+  to within the rounding of the coordinates and stored as the nearest `f32`; an outside
+  voxel whose distance rounds to zero holds +0.
 - Sign: inside where the generalised winding number is 1/2 or more, by Barill et al.'s
   far-field approximation (β = 2, second order) or the exact sum, by default; or, as an
   option that does not depend on orientation, where most of the three lines through the
@@ -325,7 +331,9 @@ are in ADR-0030.
   lies within the band; negative tiles inside, each region classified once,
   from the root region down, by its centre's sign; the positive background outside. Beyond
   the band of an open mesh, where the inside is not defined, the boundary the signs give
-  across a hole follows the regions, as coarse as the tiles there. No dense grid: memory follows
+  across a hole follows the regions, as coarse as the tiles there. The same mesh and
+  options give the same topology and the same field bytes whatever the thread count. No
+  dense grid: memory follows
   the band's volume, at 3000³ resolution as well. These are brodo's SDF convention, version
   1, which the grid's `extra` names under the key `sdf.version` (`brodo::meta::SDF_KEY`,
   ADR-0039) so that any producer can claim it.
@@ -363,7 +371,8 @@ are in ADR-0030.
   can be missed. Each place is checked in its box, grown by 2h and aligned to the voxels:
   the solid at h, the conversion's, and at h/2, the voxel centres the conversion's sign puts
   inside, compared by χ and by the solid's and the rest's components; differing, the
-  conversion changed the topology there. A box of more than 2²⁶ voxels at h/2 is not
+  conversion has likely changed the topology there, and agreeing does not show it has
+  not. A box of more than 2²⁶ voxels at h/2 is not
   checked, and says so (ADR-0028).
 - The report is a structure serialisable with `serde` behind the feature `serde`: what may
   have changed, where it may lie (layer 3), and by how much.

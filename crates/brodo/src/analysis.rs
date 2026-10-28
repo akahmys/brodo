@@ -65,7 +65,9 @@ pub enum AnalysisError {
 /// A voxel's label.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Label {
-    /// The component, numbered in the order of its first unit.
+    /// The component, numbered in the order of its first unit: the outside, then each
+    /// leaf's voxels by leaf number, x fastest, then the tiles by tile number, then the
+    /// empty regions. A component holding the outside is component 0.
     Component(u32),
     /// The voxel's value does not meet the condition.
     Excluded,
@@ -515,6 +517,13 @@ fn fits_units(leaves: usize, tiles: usize) -> Result<(), AnalysisError> {
 }
 
 /// Labels the voxels of `f` whose value meets `meets`, with the given connectivity.
+///
+/// Refused as `TooLarge`, before any label is made, when the outside, 512 units for each
+/// leaf and one for each tile are more than a `u32` numbers, about 8.4 million leaves, or
+/// when the empty regions found as it walks bring them past it; and as `TooSpread` when
+/// the compressed root grid would exceed 2²² cells: along each axis it holds every root
+/// region holding a key, those beside it, and the gaps between, four intervals for each
+/// lone key place, so some 40 lone key places along every axis reach it. The labels hold four bytes per leaf voxel.
 pub fn label<T: Value>(
     t: &Topology,
     f: &Field<T>,

@@ -440,7 +440,8 @@ impl CacheFile {
     /// Reads and checks a cache file of at most `limit` bytes; a longer one is refused by
     /// its length before any of it is read, and by the bytes read where its length says
     /// less than it holds, as a device's, a pipe's or a growing file's can: no more than
-    /// `limit` + 1 bytes are read (ADR-0036).
+    /// `limit` + 1 bytes are read (ADR-0036). A read interrupted is tried again; another
+    /// error ends it as `CacheError::Io`.
     pub fn read(path: &Path, limit: u64) -> Result<Self, CacheError> {
         let file = std::fs::File::open(path)?;
         let length = file.metadata()?.len();
@@ -489,7 +490,10 @@ impl CacheFile {
         Ok(&self.entry(i)?.meta)
     }
 
-    /// The voxels a grid's leaves and tiles cover.
+    /// The bounds the file states for a grid: its writer's box of the voxels its leaves and
+    /// tiles cover, not checked against the grid (docs/formats.md §3.4), so a file from
+    /// another writer may state others. `Bounds::of` on the grid's thawed topology gives
+    /// the true ones.
     pub fn bounds(&self, i: usize) -> Result<Bounds, CacheError> {
         Ok(self.entry(i)?.bounds)
     }
@@ -530,6 +534,8 @@ mod tests {
         }
     }
 
+    /// `CacheFile::read`'s promise, held through the loop it reads with: a read
+    /// interrupted is tried again, another error ends it.
     #[test]
     fn a_read_interrupted_is_tried_again_and_another_error_ends_it() {
         use std::io::ErrorKind::{Interrupted, Other};

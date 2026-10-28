@@ -112,7 +112,8 @@ pub enum FreezeError {
     #[error(transparent)]
     Tree(#[from] TreeError),
     /// A count or offset does not fit the layout's `u32` words, or a value its header's
-    /// background.
+    /// background: a buffer is at most 2³² blocks of 32 bytes, 128 GiB, some 60 million
+    /// leaves of `f32` (docs/formats.md §2).
     #[error("the grid is too large for the frozen layout")]
     TooLarge,
 }
@@ -210,7 +211,8 @@ pub enum CacheError {
     /// No grid has this place in the file.
     #[error("no grid numbered {0}")]
     NoGrid(usize),
-    /// A length does not fit the format's `u32` fields.
+    /// A length does not fit the format's `u32` fields: a file is at most 2³² blocks of 32
+    /// bytes, 128 GiB (docs/formats.md §3).
     #[error("the file is too large for its u32 fields")]
     TooLarge,
     /// The file is longer than the reader's limit, and was not read beyond it (ADR-0036).

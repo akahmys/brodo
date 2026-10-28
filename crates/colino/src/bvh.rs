@@ -2,7 +2,8 @@
 //! for the triangle nearest a point. A node's triangles are split in two at the median of
 //! their centres along the box's longest side, down to a few a leaf; building and walking
 //! use an explicit stack. Of triangles at one distance, the lowest-numbered is nearest, so
-//! that the answer does not depend on the walk; so too for the triangle nearest a segment.
+//! that the answer does not depend on the walk; for the triangle nearest a segment,
+//! ARCHITECTURE.md §5.1 says which is taken.
 
 use crate::distance::{Point, on_triangle, squared};
 use crate::error::MeshError;

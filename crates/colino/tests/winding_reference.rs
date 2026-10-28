@@ -78,6 +78,8 @@ fn closed_surfaces_wind_once_inside_and_not_outside() {
         ] {
             let want = if inside { 1.0 } else { 0.0 };
             assert!((w.number(q, Accuracy::Exact) - want).abs() < 1e-12, "{q:?}");
+            // Beyond the promise (T12): at β = 2 Barill et al. report the approximation
+            // thresholds as the exact sum does, held here so that a change to it is seen.
             assert!((w.number(q, BETA) - want).abs() < 0.01, "{q:?}: {}", w.number(q, BETA));
         }
     }
@@ -143,6 +145,7 @@ proptest! {
             let approx = w.number(q, BETA);
             let far = w.number(q, Accuracy::Approximate { beta: 1e9 });
             prop_assert!((far - exact).abs() < 1e-9, "β huge: {} against {}", far, exact);
+            // Beyond the promise (T12), as above: the sign agrees away from 1/2.
             if (exact - 0.5).abs() >= 0.05 {
                 prop_assert_eq!(approx >= 0.5, exact >= 0.5, "{} against {} at {:?}", approx, exact, q);
             }

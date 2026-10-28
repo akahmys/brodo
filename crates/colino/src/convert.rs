@@ -12,7 +12,11 @@
 //! voxels), upper node (128³), lower node (8³): a region holding no leaf holds no part of
 //! the surface, so one winding number at its centre decides it, and an inside region
 //! becomes one tile holding −N·h. Regions are looked at only where they overlap the mesh's
-//! box grown by N·h; beyond it lies the background, +N·h.
+//! box grown by N·h; beyond it lies the background, +N·h. A mesh with no triangle converts
+//! to the background alone.
+//!
+//! The same mesh and options give the same topology and the same field bytes whatever the
+//! thread count (ARCHITECTURE.md §5.1).
 
 use std::collections::BTreeSet;
 
@@ -87,7 +91,8 @@ pub struct Options {
     /// so that the field's `f32` distances can hold it, or conversion is refused with
     /// `ConvertError::BadOption`.
     pub voxel_size: f64,
-    /// Where voxel 0's corner lies, in the mesh's world coordinates.
+    /// Where voxel 0's corner lies, in the mesh's world coordinates: finite, or conversion
+    /// is refused with `ConvertError::BadOption`.
     pub origin: Point,
     /// The band's half-width N, in voxels: at least 1, and N·h no more than `f32::MAX`,
     /// the background the field holds, or conversion is refused with
