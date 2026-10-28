@@ -154,7 +154,10 @@ pub struct Thin {
     pub lo: Point,
     /// The greatest corner.
     pub hi: Point,
-    /// Its least thickness or width, in the mesh's unit.
+    /// Its least thickness or width, in the mesh's unit: the least, over its thin points,
+    /// of the distance from a point along its triangle's normal to the next triangle, to
+    /// within 2⁻⁸ h, h the voxel size; where within that it lies is not promised. A
+    /// thickness no sampled point reaches along its normal is not measured.
     pub least: f64,
     /// The thin points it holds, of those sampled h/2 apart.
     pub points: u64,

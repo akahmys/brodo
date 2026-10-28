@@ -1,6 +1,6 @@
 # ADR-0043: A test holds the code to its promises, not to its implementation
 
-- **Status**: Accepted
+- **Status**: Amended
 - **Date**: 2026-10-28
 
 ## Context
@@ -43,3 +43,27 @@ The human decided, on 2026-10-28:
   difference is left open, and a promise too loose to say so is tightened in its
   document, not in a test.
 - The tests the review found are brought to their promises.
+
+## Amendment: a promise's homes
+
+- **Date**: 2026-10-28
+
+A review of every promise against ARCHITECTURE.md §1 (2026-10-28) found that nothing said
+where a promise lives: T12 let a unit test rest on a private item's documentation, so a
+doc comment written beside the code made it a promise, and T11's WHERE was checked for its
+form only, so seven exclusions rested on a private function, on sections that said
+nothing of what they left open, or on items silent about it. The human decided that:
+
+- a promise has three homes, ARCHITECTURE.md for behaviour, docs/formats.md for bytes and
+  a public item's rustdoc for its API (AGENTS.md); a private item's documentation
+  promises nothing;
+- an exclusion's WHERE is one of them, a section that exists or a public item by its path,
+  whose text says "not promised" for `open` or "refused" for `unreached`: silence leaves
+  nothing open. `mutants.py` checks each;
+- a unit test of a private item holds it to its documentation only where a public promise
+  rests on it, naming that promise.
+
+The seven are now grounded in words written where a user reads them: §4.9 and §5.1, and
+the documentation of `Thin::least`, `Accuracy::Approximate`, `crossing` and `BadOption`.
+Shown to fire: before those words were written the check failed on all seven, and on a
+module or an item that is not public.

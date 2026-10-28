@@ -44,6 +44,11 @@ If a rule and the design seem to conflict, stop and ask the human.
 | [crates/brodo/README.md](crates/brodo/README.md) | What does the crate do, and how is it used? | Rules, design |
 | [crates/colino/README.md](crates/colino/README.md) | What does the crate do, and how is it used? | Rules, design |
 
+A promise to a user, what the code may be held to by a test or an excluded mutant
+(TESTING.md T11, T12), has three homes: ARCHITECTURE.md for behaviour, docs/formats.md for
+bytes, and a public item's rustdoc for its API, each fact in one of them and the others
+linking to it. A private item's documentation describes the code and promises nothing.
+
 A crate's README is its documentation's front page, read in by `include_str!` in a
 `#![doc]` attribute of its `lib.rs`, so that its code runs as a doctest in the gate's
 `cargo test`; that every crate has one, read in so, `scripts/audit/documents.py` checks.

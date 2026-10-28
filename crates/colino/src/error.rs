@@ -199,7 +199,8 @@ pub enum ConvertError {
     /// The grid's metadata was refused.
     #[error(transparent)]
     Meta(#[from] brodo::error::MetaError),
-    /// An option outside what conversion takes.
+    /// An option outside what conversion takes. Which of several is named, and the words
+    /// naming it, are not promised.
     #[error("bad option: {0}")]
     BadOption(&'static str),
     /// Neither the mesh nor the options give a unit.

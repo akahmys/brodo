@@ -207,7 +207,7 @@ exclude_re = [
     # Only the far-field expansion's accuracy changes, by its centre or where it is used: the
     # tests hold every sign to the exact sum and the error to the expansion's order, and passed
     # with eight times their cases (2026-10-22).
-    # [open: `Accuracy::Approximate`]
+    # [open: `colino::winding::Accuracy::Approximate`]
     'winding\.rs:.*: replace > with >= in Winding::approximate$',
     # As above.
     'winding\.rs:\d+:46: replace \* with \+ in Winding::approximate$',
@@ -229,7 +229,7 @@ exclude_re = [
     'winding\.rs:\d+:22: replace / with \* in Expansion::of$',
     # On a tie between the largest components of the segment's direction, either axis
     # serves: the test is watertight about each, and the paper asks only for the largest.
-    # [open: `intersect::crossing`]
+    # [open: `colino::intersect::crossing`]
     'intersect\.rs:\d+:23: replace > with >= in crossing$',
     # `limit` is det·D, with det and D already found not to be zero: it is zero only where
     # the product underflows, and then, negated or not, the range admits only an `along`
@@ -245,12 +245,13 @@ exclude_re = [
     # [same]
     'cache\.rs:.*: replace \* with \+ in fill$',
     # The ray's start moves by at most a factor of two, still far above the rounding and far
-    # below the reach; the distance measured does not depend on it but for rounding.
-    # [open: `resolves`]
+    # below the reach; the distance measured does not depend on it but for rounding, within
+    # the 2⁻⁸ h a thin place's least is measured to.
+    # [open: `colino::report::Thin::least`]
     'thin\.rs:\d+:61: replace \+ with - in ray$',
     # The distance measured moves by at most twice the ray's start, which `resolves` holds
-    # within 2⁻⁹ h.
-    # [open: `resolves`]
+    # within 2⁻⁹ h, within the 2⁻⁸ h a thin place's least is measured to.
+    # [open: `colino::report::Thin::least`]
     'thin\.rs:\d+:57: replace - with \+ in ray$',
     # An inside region held within the range meets the background within it too, so a set
     # whose edge beyond the range is passed over is still refused, at another point; which
@@ -260,7 +261,7 @@ exclude_re = [
     # A voxel size of 0, below 0 or infinite passed over here is refused by the checks
     # after, of f32's normal range and of the band's half-width, for another reason; the
     # reason's words are not promised.
-    # [open: `ConvertError::BadOption`]
+    # [open: `colino::error::ConvertError::BadOption`]
     'convert\.rs:\d+:42: replace && with \|\| in Options::check$',
     # As above.
     'convert\.rs:\d+:61: replace > with >= in Options::check$',

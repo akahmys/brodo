@@ -147,7 +147,8 @@ pub enum Accuracy {
     /// Every triangle's solid angle, summed.
     Exact,
     /// Barill et al.'s approximation: a node farther than `beta` times its radius taken
-    /// whole. They report β = 2 thresholds at 1/2 as the exact sum does.
+    /// whole. They report β = 2 thresholds at 1/2 as the exact sum does; how far the
+    /// number lies from the exact sum is not promised.
     Approximate {
         /// The accuracy parameter, β.
         beta: f64,

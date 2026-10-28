@@ -5,10 +5,13 @@ With no argument, the gate's check of `.cargo/mutants.toml`, which holds the exc
 and nothing else: every pattern in
 `exclude_re` is a single-quoted string on a line of its own, under a comment saying why
 the mutants it matches are equivalent under the contract, ending in its kind (TESTING.md
-T11, ADR-0043): `[same]`, `[open: WHERE]` or `[unreached: WHERE]`, WHERE a `NAME.md §N`
-or an item in backticks whose documentation says so, or `As above.` for the comment
-before; and it excludes at least one mutant, by cargo-mutants' own regex engine. A
-pattern that matches nothing is stale, like an unfulfilled `#[expect]`.
+T11, ADR-0043): `[same]`, `[open: WHERE]` or `[unreached: WHERE]`, or `As above.` for the
+comment before. WHERE is a promise's home: `ARCHITECTURE.md §N` or `docs/formats.md §N`,
+a section that exists, or a public item by its path in backticks, `crate::module::Item`
+or `crate::module::Type::member`, in a public module; and its text says so in words, "not
+promised" for `open`, "refused" for `unreached`. The pattern excludes at least one mutant,
+by cargo-mutants' own regex engine. A pattern that matches nothing is stale, like an
+unfulfilled `#[expect]`.
 
 With `--run [ARGS…]`, the milestone-close run: `cargo mutants --workspace` behind
 `rss_guard.py`, with its copies of the tree under `target/`. It fails when a mutant is
@@ -50,6 +53,12 @@ SETTING = re.compile(r"^\s*[\w.\-\[]+\s*(=|\])")
 # result for every input, or a difference only where a promise leaves it open or only on
 # input a documented limit refuses, naming where that is written.
 KIND = re.compile(r"\[(same|(open|unreached): ([\w./-]+\.md §\d[\d.]*|`[^`]+`))\]$")
+# A promise's homes (AGENTS.md, "Which document answers what"), and the words its text
+# uses for each kind (ADR-0043).
+HOMES = ("ARCHITECTURE.md", "docs/formats.md")
+SAYS = {"open": "not promised", "unreached": "refused"}
+DEFINES = r"^\s*pub(?:\(crate\))? (?:struct|enum|trait|type|fn|const|static) {}\b"
+MEMBER = r"^\s*(?:pub (?:fn|const) {0}\b|pub {0}\s*:|{0}\s*[({{,]|{0}\s*$)"
 # Thirty times the unmutated suite's largest peak, 32 MiB (2026-10-18, ADR-0023).
 GUARD_MIB = 1024
 # Two jobs: four, with no guard, took the machine down (ADR-0023).
@@ -95,6 +104,9 @@ def patterns() -> tuple[list[str], list[str]]:
             if comment != ["# As above."]:
                 ends = KIND.search(comment[-1])
                 kind = ends.group(1) if ends else ""
+                wrong = unsaid(ends.group(2), ends.group(3)) if ends and ends.group(2) else None
+                if wrong:
+                    errors.append(f"  .cargo/mutants.toml:{n}: {wrong} (T11)")
             if kind:
                 found.append(line[1:-2])
             else:
@@ -102,6 +114,63 @@ def patterns() -> tuple[list[str], list[str]]:
                               "[same], [open: WHERE] or [unreached: WHERE] (T11)")
         comment = []
     return found, errors + ["  .cargo/mutants.toml: 'exclude_re' is not closed"]
+
+
+def section(home: str, number: str) -> Optional[str]:
+    """The text of section `number` of document `home`, to the next heading as high."""
+    lines = (ROOT / home).read_text().splitlines()
+    for i, line in enumerate(lines):
+        heading = re.match(r"^(#+) " + re.escape(number) + r"\b", line)
+        if heading:
+            depth = len(heading.group(1))
+            rest = lines[i + 1:]
+            ends = [j for j, l in enumerate(rest) if re.match(r"^#{1,%d} " % depth, l)]
+            return "\n".join(rest[:ends[0]] if ends else rest)
+    return None
+
+
+def documented(path: str) -> Optional[str]:
+    """The documentation of a public item, `crate::module::Item[::member]`; nothing when the
+    module is not public or the item is not found."""
+    parts = path.split("::")
+    if len(parts) not in (3, 4):
+        return None
+    src = ROOT / "crates" / parts[0] / "src"
+    if not (src / "lib.rs").exists() or f"pub mod {parts[1]};" not in (src / "lib.rs").read_text():
+        return None
+    lines = (src / f"{parts[1]}.rs").read_text().splitlines()
+    at = next((i for i, l in enumerate(lines) if re.match(DEFINES.format(parts[2]), l)), None)
+    if at is None or "pub(crate)" in lines[at]:
+        return None
+    if len(parts) == 4:
+        at = next((i for i, l in enumerate(lines[at:], start=at)
+                   if re.match(MEMBER.format(re.escape(parts[3])), l)), None)
+        if at is None:
+            return None
+    doc = []
+    for line in reversed(lines[:at]):
+        stripped = line.strip()
+        if stripped.startswith("///"):
+            doc.append(stripped[3:])
+        elif not stripped.startswith("#["):
+            break
+    return " ".join(reversed(doc))
+
+
+def unsaid(kind: str, where: str) -> Optional[str]:
+    """What is wrong with an exclusion's WHERE: not a promise's home, or not saying so."""
+    if where.startswith("`"):
+        text, home = documented(where.strip("`")), f"public item {where}"
+    else:
+        name, number = where.split(" §")
+        text = section(name, number) if name in HOMES else None
+        home = where
+    if text is None:
+        return f"{where} is not a promise's home: {', '.join(HOMES)} or a public item"
+    words = SAYS[kind]
+    if words not in " ".join(text.split()):
+        return f"{home} does not say \"{words}\""
+    return None
 
 
 def count(*args: str) -> int:

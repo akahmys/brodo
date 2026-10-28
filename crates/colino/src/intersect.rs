@@ -33,7 +33,8 @@ pub(crate) fn edge(a: f64, b: f64, c: f64, d: f64) -> f64 {
 
 /// Where the segment from `a` to `b` crosses triangle `t`: the fraction `s` in [0, 1] with
 /// the crossing at `a + s (b − a)`. Nothing when it misses, lies in the triangle's plane,
-/// or the triangle has no area, or `a` is `b`.
+/// or the triangle has no area, or `a` is `b`. The fraction's rounding, and which axis
+/// the direction is sheared onto where its largest components tie, are not promised.
 pub fn crossing(a: Point, b: Point, t: [Point; 3]) -> Option<f64> {
     let d = sub(b, a);
     let mut kz = 0;

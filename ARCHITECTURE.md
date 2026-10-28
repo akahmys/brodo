@@ -280,7 +280,8 @@ are in ADR-0030.
   edge with no crossing, every tile and the background hold fraction −1, normal zero and
   group 0, by bits; the signs' background is 0.
 - A set is checked whole when made and when read; a broken rule is a typed error naming
-  the point, the axis and the rule.
+  the point, the axis and the rule. Of several broken rules, which is named is not
+  promised.
 - In a cache file, a set is ten grids told apart by keys in `GridMeta::extra`, the sign
   grid holding the group table ([docs/formats.md](docs/formats.md) §4). A reader reads a
   set as ten `GridView`s, without a copy, the shared topology checked by comparing their
@@ -331,8 +332,8 @@ are in ADR-0030.
 - Hermite data: a set in brodo's format (§4.9) on the conversion's topology, its signs
   found by the conversion's sign and its crossings found by a watertight edge test, with the count
   of crossed edges no triangle was hit on beside it, whose crossing is the nearest triangle's:
-  of triangles whose distances to the edge are equal within their rounding, any one
-  (ADR-0030).
+  of triangles whose distances to the edge are equal within their rounding, which is taken
+  is not promised (ADR-0030).
 - It reports changes; it does not repair a shape or refine a grid.
 
 ### 5.2 Topology report
