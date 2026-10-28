@@ -223,7 +223,7 @@ fastest. A neighbour beyond the `i32` coordinate range is the background.
 | Profile | For | Content | Read by |
 | :--- | :--- | :--- | :--- |
 | **cache** | passing between processes, replaying frame caches | the `GridView` buffer, uncompressed | memory mapping, no copy |
-| **archive** (P6, not built) | storing, shipping | metadata, topology and value blocks in compressed chunks of hundreds to thousands of leaves | decompressing chunks, in parallel, into a `GridView` (one copy) |
+| **archive** (P6, not built) | storing, shipping | metadata, topology and value blocks in chunks of 512 leaves by default, each compressed by `lz4_flex`'s block format (ADR-0016) | decompressing chunks, in parallel, into a `GridView` (one copy) |
 
 - A cache file holds a header (magic number, format version, grid count) and, per grid, its
   name, value type, voxel size and unit, affine transform, bounding box and free

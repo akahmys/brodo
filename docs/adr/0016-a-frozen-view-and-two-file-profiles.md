@@ -85,3 +85,21 @@ amendment's reader "accepts only the bytes the writer puts" held for the cache f
 parts, but a grid's buffer is checked as docs/formats.md §2.5 says, which leaves its
 padding, the order of its nodes and some of its writer's rules unchecked, B-022 keeping
 them for a later version (ADR-0038). ARCHITECTURE.md §4.6 and §4.7 state each as it is.
+
+## Amendment: the archive's compressor
+
+- **Date**: 2026-10-29
+
+B-005 asked for the archive's default compressor and whether it is pure Rust.
+`spikes/archive/` compressed four frozen grids in chunks and decompressed them in parallel
+into a `GridView` (its REPORT.md). `ruzstd` 0.9.1, the pure-Rust zstd, implemented only its
+fastest level; against C zstd 1 it compressed the SDFs 17 to 31 % larger, and it
+decompressed 4.5 to 11 times slower than a plain copy into a `GridView`. Only `lz4_flex`
+decompressed within twice that copy, on every grid. The human decided:
+
+- Each chunk is compressed with `lz4_flex` 0.14's block format, unshuffled, by default 512
+  leaves a chunk. `lz4_flex` was approved as a dependency (CODING.md Rule 20), without its
+  `frame` feature, so that `twox-hash` is not pulled in.
+- Byte shuffling comes only with quantisation (ROADMAP.md P6).
+- No smaller codec is offered for now; when `ruzstd` implements its higher levels, it is
+  measured again (ROADMAP.md §4).

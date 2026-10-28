@@ -15,7 +15,7 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   held to them (ADR-0043). Its mutation run missed none of 3557; two baselines were
   recorded again, a sync's cost and a change of code placement (ADR-0019).
 - **Next**: P6 (§2), brodo's archives and quantisation, 0.7.0, each step a spike and an
-  ADR before it is built; first B-005, the archive's compressor. OpenVDB files follow as
+  ADR before it is built; B-005 answered, `lz4_flex` (ADR-0016), the archive profile next. OpenVDB files follow as
   P7 (split by the human, 2026-10-28).
 - **Unresolved problems**: `cache_map_x256` runs 8 to 10 % behind its baseline of
   2026-10-17 at v0.3.0 and now alike, run in turn (2026-10-23); a first run straight after
@@ -320,7 +320,8 @@ Split from P5 by the human on 2026-10-25, and OpenVDB files from it into P7 on 2
 so that the archive, within brodo alone, is not held by `vdb-rs`'s checks. Each step is a
 spike and an ADR before it is built.
 
-- [ ] B-005: the archive's compressor, pure Rust, its dependency approved
+- [x] B-005: the archive's compressor, pure Rust, its dependency approved: `lz4_flex`
+      (ADR-0016, 2026-10-29)
 - [ ] The archive profile (ARCHITECTURE.md §4.7), its reader in `UNTRUSTED_INPUT` and fuzzed
 - [ ] Value quantisation in the archive, 16-bit float and 8-bit range, with byte shuffling
 - [ ] Retrospective and refactoring; fuzz round, the new reader included; Miri run;
@@ -357,17 +358,18 @@ implementation (PLANNING.md §2).
 | B-018 | Does model checking with Kani join the closing checks? | Not now (owner, 2026-10-23): it fits only integer bit work and `view.rs`'s small helpers, already fuzzed and mutation-tested, and cannot reach rayon or the memory mapping; this milestone's defects were numeric and in design claims. Revisited by a spike if Miri-unreachable unsafe code grows, an integer coordinate bug escapes the tests, or before 1.0 |
 | B-003 | Do level-set operations (CSG, redistancing) belong in brodo? | No, until shown to be general |
 | B-004 | Does a shared IR schema crate live in this repository? | Undecided; for brodo's users to agree, not for brodo to anticipate |
-| B-005 | What is the archive profile's default compressor, and is it pure Rust (CODING.md Rule 12)? | Zstd, LZ4 when decompression speed is asked for; whether a pure-Rust implementation suffices is to be measured |
 | B-006 | Does `vdb-rs` pass Rules 12 and 13 (no C, permissive licence) on every target, and is it written apart from OpenVDB's source rather than translated from it, which would carry MPL-2.0 (ADR-0007)? | To be checked before it is added |
 | B-013 | Which crates handle `piatto`'s window, input and GUI parts? | `winit` and `egui`, to be measured against Rules 12 and 13 (ADR-0018) |
 
-`spikes/sign/` answered B-016 (ADR-0027); `spikes/thin/` and `spikes/recheck/` B-020 (ADR-0028); `spikes/value/` B-017 (ADR-0029). No spike is running. `spikes/remap/` answered B-001 and B-008, and `spikes/merge/` B-010
+`spikes/sign/` answered B-016 (ADR-0027); `spikes/thin/` and `spikes/recheck/` B-020 (ADR-0028); `spikes/value/` B-017 (ADR-0029); `spikes/archive/` B-005, `lz4_flex` (ADR-0016). No spike is running. `spikes/remap/` answered B-001 and B-008, and `spikes/merge/` B-010
 (ADR-0014); `spikes/vtk/` answered B-012 (ADR-0018); `spikes/bench/` B-007 (ADR-0019); `spikes/threads/` B-014, rayon kept (ADR-0015); `spikes/dilate/` B-011, no mask (ADR-0025); `spikes/ghost/` B-002, one to three layers (ADR-0015); `spikes/mutants/` the audit review's proposal C (ADR-0023).
 
 ## 4. Administrative items still open
 
 - Dependencies, each to be approved before it is added (CODING.md Rule 20): after
   P1, for `piatto` if it is built: a GPU, window and GUI stack (B-013).
+- A smaller codec for the archive: `ruzstd` measured again as `spikes/archive/` did, once
+  it implements levels above its fastest (0.9.1 does not; ADR-0016, 2026-10-29).
 - Before any distribution: confirm the licence terms for that form of distribution
   (ADR-0007).
 - Making the repository public, which the owner decides later (2026-10-24). Readiness is
