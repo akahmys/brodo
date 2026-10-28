@@ -34,7 +34,7 @@ a discretisation, its user's.
 
 | Crate | Contents |
 | :--- | :--- |
-| `brodo` | The sparse tree, `Topology`, `Field<T>`, `Grid<T>`, topology editing and `Remap`, `LeafManifest`, `ValueAccessor`, leaf-parallel updates and gather, topology analysis, `GridView`, the file profiles, the Hermite data format, OpenVDB files (P6, not built), checking output (slice PNG, VTK) |
+| `brodo` | The sparse tree, `Topology`, `Field<T>`, `Grid<T>`, topology editing and `Remap`, `LeafManifest`, `ValueAccessor`, leaf-parallel updates and gather, topology analysis, `GridView`, the file profiles, the Hermite data format, OpenVDB files (P7, not built), checking output (slice PNG, VTK) |
 | `colino` | Meshes to narrow-band SDFs on brodo's tree, and the topology report |
 | `piatto` | A viewer of cache-profile files, as a library and a thin windowed program; built only when needed (ADR-0018) |
 
@@ -252,7 +252,7 @@ fastest. A neighbour beyond the `i32` coordinate range is the background.
   the caller keeps it unchanged.
 - (P6, not built.) The archive can decompress only the chunks a region needs, and can quantise values
   (16-bit float, 8-bit range), byte-shuffled before compression.
-- (P6, not built.) OpenVDB files (`.vdb`) are read through the `vdb-rs` crate into brodo's tree and written
+- (P7, not built.) OpenVDB files (`.vdb`) are read through the `vdb-rs` crate into brodo's tree and written
   by brodo, for level sets and scalar density first.
 
 ### 4.8 Value types
@@ -407,7 +407,7 @@ In `brodo`, each behind a cargo feature:
 
 ### 6.2 `piatto`
 
-Not built until a user asks for a viewer or for drawing to embed, grids too large for VTK and `.vdb` must be looked at, or P6 finds `.vdb` cannot be written (ADR-0018); the slice as PNG and VTK serve meanwhile. The design
+Not built until a user asks for a viewer or for drawing to embed, grids too large for VTK and `.vdb` must be looked at, or P7 finds `.vdb` cannot be written (ADR-0018); the slice as PNG and VTK serve meanwhile. The design
 it would follow:
 
 - Reads a cache-profile file (§4.7) by memory mapping.

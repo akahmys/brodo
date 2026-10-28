@@ -14,8 +14,9 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   view thawed (ADR-0042); and the promises given three homes, tests and excluded mutants
   held to them (ADR-0043). Its mutation run missed none of 3557; two baselines were
   recorded again, a sync's cost and a change of code placement (ADR-0019).
-- **Next**: P6 (§2), brodo's archives, quantisation and OpenVDB files, each step a spike
-  and an ADR before it is built; first B-005, the archive's compressor.
+- **Next**: P6 (§2), brodo's archives and quantisation, 0.7.0, each step a spike and an
+  ADR before it is built; first B-005, the archive's compressor. OpenVDB files follow as
+  P7 (split by the human, 2026-10-28).
 - **Unresolved problems**: `cache_map_x256` runs 8 to 10 % behind its baseline of
   2026-10-17 at v0.3.0 and now alike, run in turn (2026-10-23); a first run straight after
   the fuzz round and Miri failed at +13 %. Machine drift is the likely cause, not shown. Miri's Stacked Borrows reports undefined behaviour in
@@ -313,23 +314,32 @@ built.
       `sign_reference.rs`, `thin_reference.rs` and the costs' measurements; accepted
       2026-10-28
 
-### P6 — brodo: archives, quantisation, OpenVDB files
+### P6 — brodo: archives and quantisation
 
-Split from P5 by the human on 2026-10-25. Each step is a spike and an ADR before it is
-built.
+Split from P5 by the human on 2026-10-25, and OpenVDB files from it into P7 on 2026-10-28,
+so that the archive, within brodo alone, is not held by `vdb-rs`'s checks. Each step is a
+spike and an ADR before it is built.
 
 - [ ] B-005: the archive's compressor, pure Rust, its dependency approved
 - [ ] The archive profile (ARCHITECTURE.md §4.7), its reader in `UNTRUSTED_INPUT` and fuzzed
 - [ ] Value quantisation in the archive, 16-bit float and 8-bit range, with byte shuffling
+- [ ] Retrospective and refactoring; fuzz round, the new reader included; Miri run;
+      benchmarks, the archive's with baselines; mutation run (ADR-0023), as the human
+      chooses (ADR-0033)
+- [ ] **Accepted when** archives round-trip within their stated error
+
+### P7 — brodo: OpenVDB files
+
+Split from P6 by the human on 2026-10-28. Each step is a spike and an ADR before it is
+built.
+
 - [ ] `.vdb`: B-006 for reading through `vdb-rs`; writing only if the format can be learnt
       within AGENTS.md S1, as the human decides
 - [ ] Retrospective and refactoring; fuzz round, the new readers included; Miri run;
-      benchmarks, the archive's with baselines; mutation run (ADR-0023), as the human
-      chooses (ADR-0033)
-- [ ] **Accepted when** archives round-trip within their stated error, and `.vdb` files
-      are read as B-006 decides
+      benchmarks; mutation run (ADR-0023), as the human chooses (ADR-0033)
+- [ ] **Accepted when** `.vdb` files are read as B-006 decides
 
-### After P6
+### After P7
 
 STEP is not read (ADR-0031). `piatto` is held (§2, B-021).
 
@@ -343,7 +353,7 @@ implementation (PLANNING.md §2).
 | B-023 | Does Hermite data hold its crossings sparsely, only on the edges that hold one, rather than nine dense fields over every leaf? | Not yet: found by P5's review (M2): the fields take about 61 bytes a voxel and writing them about three times as much, so that a sphere of radius 1500 voxels does not fit in 32 GB, read against a measurement of 613 MB at radius 200 (2026-10-26). It changes the Hermite format, so it waits for a spike and a version raised (ADR-0038); the owner set it aside for P5 (2026-10-27) |
 | B-022 | Does a later version of the frozen layout and the cache profile check what version 1's readers leave unchecked: padding and the background's bytes beyond its size, the order of nodes, whether every node and leaf is reached, and a cache file's bounds against its grid (docs/formats.md §2.5, §3.4)? | Not yet: found writing the format document (ADR-0037); each check a reader adds refuses files version 1 accepts, so it waits for a version raised for another reason (ADR-0038). Now for `GridView::new` and the cache reader alone: the Hermite reader and thawing refuse nodes reached twice and leaves never reached at version 1 (ADR-0038's amendment of 2026-10-27, ADR-0042). For the links, one pass would do: each node's `first_child` and `first_tile`, where it has children or tiles, the end of the previous such node's, the last end the count, so that no child is shared or unreached |
 | B-019 | Does `colino` move to a repository of its own? | Not now (owner, 2026-10-23; ADR-0012 keeps two crates in one repository): changes span both, as P3's Hermite format and producer did, and before 1.0 a split would turn each into two releases, duplicate the rules and their audit, and take colino's tests out of brodo's gate. Revisited when brodo's API and formats settle (1.0), both are on crates.io, colino needs what brodo's rules forbid, or others maintain it |
-| B-021 | Does brodo build `piatto`? | Not now (owner, 2026-10-24; ADR-0018): no user has asked for a viewer, the slice as PNG and VTK for ParaView serve checking, `.vdb` from P6 would open in common tools, and a GPU, window and GUI stack is costly. Revisited when a user asks for a viewer or for drawing to embed, grids too large for VTK and `.vdb` must be looked at, or P6 finds `.vdb` cannot be written |
+| B-021 | Does brodo build `piatto`? | Not now (owner, 2026-10-24; ADR-0018): no user has asked for a viewer, the slice as PNG and VTK for ParaView serve checking, `.vdb` from P7 would open in common tools, and a GPU, window and GUI stack is costly. Revisited when a user asks for a viewer or for drawing to embed, grids too large for VTK and `.vdb` must be looked at, or P6 finds `.vdb` cannot be written |
 | B-018 | Does model checking with Kani join the closing checks? | Not now (owner, 2026-10-23): it fits only integer bit work and `view.rs`'s small helpers, already fuzzed and mutation-tested, and cannot reach rayon or the memory mapping; this milestone's defects were numeric and in design claims. Revisited by a spike if Miri-unreachable unsafe code grows, an integer coordinate bug escapes the tests, or before 1.0 |
 | B-003 | Do level-set operations (CSG, redistancing) belong in brodo? | No, until shown to be general |
 | B-004 | Does a shared IR schema crate live in this repository? | Undecided; for brodo's users to agree, not for brodo to anticipate |
