@@ -6,6 +6,13 @@ are recorded here when they change (V6).
 
 ## Unreleased
 
+## 0.6.0 (2026-10-28)
+
+Closes P5: colino's sign without orientation, by parity, and its topology report's third
+layer, the places thinner or gaps narrower than two voxels; the costs a review found,
+each measured and kept where it helped; and the promises users rely on, each in its home
+and held by tests to it, not to the code.
+
 - `brodo::tree::Tree` is no longer public: a topology is built and read through
   `Topology` and `TopologyEditor`, and the tree's own leaf numbers and orders bound the
   code to no user (ADR-0036). How colino's `bvh`, `distance`, `intersect` and `winding`

@@ -8,18 +8,14 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: P4 accepted by the human and closed as 0.5.0 (2026-10-25): the API's shape
-  (ADR-0035), shown by `api_growth.rs` to take a field or a variant without breaking a user;
-  readers and checking output behind features, a read limit, `map` an `unsafe fn`
-  (ADR-0036); `docs/formats.md` held by its reader (ADR-0037); the SDF convention's key
-  (ADR-0039). Its mutation run, the first on GitHub Actions, missed 148 mutants behind
-  opt-in features until the run took every feature (ADR-0023). The repository is public
-  (ADR-0034, ADR-0007).
-- **Next**: P5 (§2), colino's milestone: its costs measured and those that helped kept
-  (2026-10-25), B-016's sign without orientation and layer 3 (B-020) built
-  (2026-10-26), tests and promises held to the contract and the mutation run passed
-  (2026-10-28), the benchmarks within their baselines (2026-10-28); next the human's
-  acceptance.
+- **Done**: P5 accepted by the human and closed as 0.6.0 (2026-10-28): a sign without
+  orientation, `Sign::Parity` (ADR-0027); the report's third layer, thin walls and narrow
+  gaps (ADR-0028); the costs a review found, measured and kept where they helped; a frozen
+  view thawed (ADR-0042); and the promises given three homes, tests and excluded mutants
+  held to them (ADR-0043). Its mutation run missed none of 3557; two baselines were
+  recorded again, a sync's cost and a change of code placement (ADR-0019).
+- **Next**: P6 (§2), brodo's archives, quantisation and OpenVDB files, each step a spike
+  and an ADR before it is built; first B-005, the archive's compressor.
 - **Unresolved problems**: `cache_map_x256` runs 8 to 10 % behind its baseline of
   2026-10-17 at v0.3.0 and now alike, run in turn (2026-10-23); a first run straight after
   the fuzz round and Miri failed at +13 %. Machine drift is the likely cause, not shown. Miri's Stacked Borrows reports undefined behaviour in
@@ -266,7 +262,7 @@ built.
         1.69 s; of radius 400, 9.5 s, at loads near 3 (2026-10-26)
   - [x] Checking them by a local reconversion at h/2 (ADR-0028): the three invariants of
         each place's box at h and at h/2, a box beyond 2²⁶ voxels at h/2 unchecked
-- [ ] Retrospective and refactoring; benchmarks; mutation run (ADR-0023). Chosen by the
+- [x] Retrospective and refactoring; benchmarks; mutation run (ADR-0023). Chosen by the
       human for this content (ADR-0033): no fuzz round or Miri run, unless a step adds a
       reader of untrusted bytes or unsafe code
   - [x] Retrospective, its proposals decided by the human (2026-10-26); refactoring:
@@ -312,8 +308,10 @@ built.
         and tests rely on that nothing promised, and a format version whose meaning had
         changed; a promise given three homes (AGENTS.md), each finding written in its
         home or decided (ADR-0043, ADR-0038, ADR-0036)
-- [ ] **Accepted when** a badly oriented mesh converts with the new sign, layer 3 finds
-      thin walls and narrow gaps, and each cost above is measured, kept where it helps
+- [x] **Accepted when** a badly oriented mesh converts with the new sign, layer 3 finds
+      thin walls and narrow gaps, and each cost above is measured, kept where it helps:
+      `sign_reference.rs`, `thin_reference.rs` and the costs' measurements; accepted
+      2026-10-28
 
 ### P6 — brodo: archives, quantisation, OpenVDB files
 

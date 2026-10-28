@@ -25,8 +25,8 @@ Pin a release tag, not a branch or a revision:
 
 ```toml
 [dependencies]
-brodo = { git = "https://github.com/akahmys/brodo", tag = "v0.5.0" }
-colino = { git = "https://github.com/akahmys/brodo", tag = "v0.5.0" }
+brodo = { git = "https://github.com/akahmys/brodo", tag = "v0.6.0" }
+colino = { git = "https://github.com/akahmys/brodo", tag = "v0.6.0" }
 ```
 
 Every crate in one process that uses brodo should pin the same tag: two pins of different
