@@ -321,8 +321,8 @@ are in ADR-0030.
   (ε, ε²). A point on the mesh, at distance exactly 0, is inside whichever is asked for, as
   in Hermite data, and an inside voxel whose distance rounds to zero holds
   −`f32::MIN_POSITIVE`, so that `v < 0` finds it. The winding number holds where parts
-  pass into each other or walls are doubled; parity holds where faces are turned, across
-  small holes, and in cavities; within a missing cap's sag a line across finds nothing
+  pass into each other or walls are doubled; parity holds where faces are turned, at a
+  point across a hole at most one of its three lines passes through, and in cavities; within a missing cap's sag a line across finds nothing
   (ADR-0027).
 - Output: leaves only in a band of ±N voxels around the surface (N = 3 by default), values
   signed distances clamped to ±N·h. A leaf-sized cell is a candidate when it overlaps a

@@ -46,8 +46,9 @@ pub enum Sign {
     Winding,
     /// Inside where most of the lines through the point along the three axes cross the
     /// mesh an odd number of times, a line crossing an odd number of times not voting and a
-    /// tie outside. Does not depend on the triangles' orientation and holds across small
-    /// holes; fails where parts pass into each other or walls are doubled (ADR-0027).
+    /// tie outside. Does not depend on the triangles' orientation and holds at a point across
+    /// a hole at most one of its three lines passes through; fails where parts pass into
+    /// each other or walls are doubled (ADR-0027).
     Parity,
 }
 

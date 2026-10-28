@@ -72,4 +72,7 @@ brodo at the same version. A review of the promises against ARCHITECTURE.md §1
 (2026-10-28) found it, with a reader's rebuilding checks that §2.5 did not list. The human
 decided that within a version only those two kinds of change are made, each recorded in
 CHANGELOG.md, any other raising the version; that a cache file's version fixes its frozen
-buffers'; and that the checks a reader rebuilding the tree adds are listed (§2.6).
+buffers'; and that the checks a reader rebuilding the tree adds are listed (§2.6). The
+first made under that rule refuses a cache file whose bounds' least corner passes its
+greatest, which brodo never wrote, in the crate's reader and in the document's,
+`scripts/audit/formats.py`.

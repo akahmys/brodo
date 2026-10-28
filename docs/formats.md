@@ -158,7 +158,9 @@ value twice, or reaches no leaf the leaf count holds.
 ## 3. The cache profile, format version 1
 
 Grids with their metadata in one file (ARCHITECTURE.md §4.7). Media type
-`application/vnd.brodo.cache; version=1`, stated and not registered (ADR-0041).
+`application/vnd.brodo.cache; version=1`, stated and not registered (ADR-0041). Every
+part's place follows from those before it, with no gap, so that the same grids give the
+same bytes whoever writes them; a file of no grid is its header alone.
 
 | Part | At | Size |
 | :--- | :--- | :--- |
@@ -207,10 +209,10 @@ A reader refuses a file, before answering anything, unless:
    the block right after the metadata, both ending within the file; the bytes between them
    zero;
 4. its metadata: strings valid UTF-8 with zero padding; the bounds kind 0 or 1, an empty
-   box's corners zero; keys strictly ascending; no byte left over; the unit not empty; the
+   box's corners zero and a box's least corner at or below its greatest along each axis; keys strictly ascending; no byte left over; the unit not empty; the
    voxel size finite and positive; the transform finite;
 5. its frozen buffer passes §2.5 with the directory's value type;
-6. the last grid's buffer ends where the file ends.
+6. the last grid's buffer ends where the file ends, or, with no grid, the header does.
 
 The bounds are not checked against the grid.
 

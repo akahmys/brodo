@@ -241,6 +241,7 @@ def metadata(b):
     corners = list(struct.unpack("<6i", c.take(24)))
     need(kind in (0, 1), "bounds kind")
     need(kind == 1 or corners == [0] * 6, "empty bounds")
+    need(kind == 0 or all(corners[k] <= corners[k + 3] for k in range(3)), "bounds")
     m["bounds"] = corners if kind == 1 else None
     pairs = []
     for _ in range(c.u32()):

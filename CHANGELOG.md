@@ -14,6 +14,9 @@ are recorded here when they change (V6).
   `FormatError::UnknownValueType`, not as `WrongValueType { expected: 0, .. }`; code
   matching that needs the new variant. docs/formats.md §6 now says what may change within
   a format version, and §2.6 what a reader rebuilding the tree also refuses (ADR-0038).
+- A cache file whose bounds' least corner passes its greatest along an axis is refused,
+  `CacheError::Inconsistent("bounds")` (docs/formats.md §3.4, rule 4). This refuses files
+  version 1 accepted; brodo writes none.
 - colino's topology report has its third layer: `Report::thin`, the places thinner, or
   gaps narrower, than two voxels, each a `Thin` with its kind (`ThinKind::Wall` or `Gap`),
   box, least thickness or width and count of points, found from the mesh along its

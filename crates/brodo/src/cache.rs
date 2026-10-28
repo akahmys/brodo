@@ -245,7 +245,9 @@ fn decode_meta(bytes: &[u8]) -> Result<(GridMeta, Bounds), CacheError> {
     let [x0, y0, z0, x1, y1, z1] = corners;
     let bounds = match kind {
         0 => Bounds::Empty,
-        1 => Bounds::Box { min: [x0, y0, z0], max: [x1, y1, z1] },
+        1 if x0 <= x1 && y0 <= y1 && z0 <= z1 => {
+            Bounds::Box { min: [x0, y0, z0], max: [x1, y1, z1] }
+        }
         _ => return Err(CacheError::Inconsistent("bounds")),
     };
     let mut extra = std::collections::BTreeMap::new();

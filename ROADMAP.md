@@ -17,7 +17,8 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   (ADR-0034, ADR-0007).
 - **Next**: P5 (§2), colino's milestone: its costs measured and those that helped kept
   (2026-10-25), B-016's sign without orientation and layer 3 (B-020) built
-  (2026-10-26); next its closing checks.
+  (2026-10-26), tests and promises held to the contract (2026-10-28); next the mutation
+  run's verdict, then the benchmarks and the human's acceptance.
 - **Unresolved problems**: `cache_map_x256` runs 8 to 10 % behind its baseline of
   2026-10-17 at v0.3.0 and now alike, run in turn (2026-10-23); a first run straight after
   the fuzz round and Miri failed at +13 %. Machine drift is the likely cause, not shown. Miri's Stacked Borrows reports undefined behaviour in
@@ -293,7 +294,19 @@ built.
         `FreezeError::Inconsistent` removed among it (2026-10-27)
   - [ ] Mutation run, after the review and the refactoring; a run on `9940bd5`
         (2026-10-26 to 27) showed where tests were weak, each missed mutant since killed by
-        a test or excluded with its reason
+        a test or excluded with its reason; the run on `fa72208` (2026-10-27) missed 58,
+        killed or excluded under the contract (ADR-0043); run again on `90342e7`
+        (2026-10-28)
+  - [x] Tests and exclusions held to the contract, not the implementation (ADR-0043),
+        chosen by the human after tests written for mutants pinned more than the code
+        promises (2026-10-28): T12, a test asserts a promise; T11's exclusions name where
+        their difference is left open, checked by `mutants.py`
+  - [x] A review of every promise against ARCHITECTURE.md §1, chosen by the human
+        (2026-10-28): three read-only passes, on brodo, colino and the formats with how
+        promises are governed, found promises in conflict with the code, behaviour users
+        and tests rely on that nothing promised, and a format version whose meaning had
+        changed; a promise given three homes (AGENTS.md), each finding written in its
+        home or decided (ADR-0043, ADR-0038, ADR-0036)
 - [ ] **Accepted when** a badly oriented mesh converts with the new sign, layer 3 finds
       thin walls and narrow gaps, and each cost above is measured, kept where it helps
 
@@ -376,7 +389,9 @@ implementation (PLANNING.md §2).
   unregistered on 2026-10-16, per the design.
 - Requests from users. Held until one asks: merging into a root tile (ADR-0014); a public
   way to read a bare frozen buffer, a file of its own, into an aligned buffer, which only
-  tests now do (P5's review, S1, 2026-10-27). From a
+  tests now do (P5's review, S1, 2026-10-27); a bound on a conversion's leaves, refused
+  with a typed error before memory runs out, where now the caller bounds the cost by
+  choosing h (the review of the promises, 2026-10-28). From a
   user keeping time-stepped fields on brodo's tree, received 2026-10-20 against v0.2.0,
   highest priority first, each with its proposed answer:
   - R2, `[f64; 3]` as a value type, frozen files included: done (ADR-0029).

@@ -247,6 +247,47 @@ fn word(bytes: &[u8], w: usize) -> u32 {
     u32::from_le_bytes(bytes[w * 4..w * 4 + 4].try_into().unwrap())
 }
 
+/// A file of no grid is its header alone (docs/formats.md §3), and is read as such.
+#[test]
+fn a_file_of_no_grid_is_its_header() {
+    let bytes = to_bytes(&[]).unwrap();
+    assert_eq!(bytes.len(), 32);
+    assert_eq!(CacheFile::from_bytes(&bytes).unwrap().grid_count(), 0);
+    let mut longer = bytes.clone();
+    longer.extend([0; 32]);
+    assert!(matches!(CacheFile::from_bytes(&longer), Err(CacheError::Inconsistent("end"))));
+}
+
+/// Bounds that say nothing of a grid are refused (docs/formats.md §3.4, rule 4): an empty
+/// box's corners not zero, and a box whose least corner passes its greatest.
+#[test]
+fn bounds_that_contradict_themselves_are_refused() {
+    // Grid 0's metadata: the name "g" and the unit "mm", 8 bytes each, the voxel size and
+    // the transform, 120 bytes, then the bounds kind and the six corners.
+    let at = |b: &[u8]| usize::try_from(word(b, 8)).unwrap() * 8 + 34;
+    let read = |b: &[u8]| CacheFile::from_bytes(b).map(|_| ());
+    let empty = Topology::new();
+    let field = Field::new(&empty, 0.0_f32);
+    let bytes = to_bytes(&[CacheEntry::new(&meta("g", &[]), &empty, &field).unwrap()]).unwrap();
+    assert_eq!(word(&bytes, at(&bytes)), 0, "kind");
+    assert!(read(&bytes).is_ok());
+    assert!(matches!(
+        read(&with_word(&bytes, at(&bytes) + 1, 1)),
+        Err(CacheError::Inconsistent(_))
+    ));
+    let t = build(&[[3, 3, 3]], &[]);
+    let field = Field::new(&t, 0.0_f32);
+    let bytes = to_bytes(&[CacheEntry::new(&meta("g", &[]), &t, &field).unwrap()]).unwrap();
+    let k = at(&bytes);
+    assert_eq!(word(&bytes, k), 1, "kind");
+    assert!(read(&bytes).is_ok());
+    let past = word(&bytes, k + 4) + 1;
+    assert!(matches!(
+        read(&with_word(&bytes, k + 1, past)),
+        Err(CacheError::Inconsistent("bounds"))
+    ));
+}
+
 #[test]
 fn each_check_refuses_its_damage() {
     let g = golden();
