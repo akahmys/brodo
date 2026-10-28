@@ -18,7 +18,8 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
 - **Next**: P5 (§2), colino's milestone: its costs measured and those that helped kept
   (2026-10-25), B-016's sign without orientation and layer 3 (B-020) built
   (2026-10-26), tests and promises held to the contract and the mutation run passed
-  (2026-10-28); next the benchmarks and the human's acceptance.
+  (2026-10-28), the benchmarks within their baselines (2026-10-28); next the human's
+  acceptance.
 - **Unresolved problems**: `cache_map_x256` runs 8 to 10 % behind its baseline of
   2026-10-17 at v0.3.0 and now alike, run in turn (2026-10-23); a first run straight after
   the fuzz round and Miri failed at +13 %. Machine drift is the likely cause, not shown. Miri's Stacked Borrows reports undefined behaviour in
@@ -292,6 +293,9 @@ built.
         root lookup shared (2026-10-27)
   - [x] The public API tidied in 0.6.0, already breaking for `Stored`:
         `FreezeError::Inconsistent` removed among it (2026-10-27)
+  - [x] Benchmarks again at the close (2026-10-28): colino's within their baselines;
+        brodo's `cache_write_x8` and `gather` behind, the sync of review G1 and a change
+        of code placement, recorded again by the owner's decision (ADR-0019)
   - [x] Mutation run, after the review and the refactoring; a run on `9940bd5`
         (2026-10-26 to 27) showed where tests were weak, each missed mutant since killed by
         a test or excluded with its reason; the run on `fa72208` (2026-10-27) missed 58,

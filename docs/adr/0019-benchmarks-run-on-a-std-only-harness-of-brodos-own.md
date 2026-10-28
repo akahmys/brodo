@@ -149,3 +149,27 @@ five-minute load average is above 4.0 as well, `SETTLED_LOAD`, for up to ten min
 than two, the report's header naming both loads, and that its documentation says dates are
 UTC. A five-minute load of 4.0 would not have held back the run at 3.46. Shown to fire:
 with `SETTLED_LOAD` at 0.5, a run at loads of 2.51 and 4.13 was refused, naming both.
+
+## Amendment: two baselines moved at P5's close
+
+- **Date**: 2026-10-28
+
+P5's closing run failed two of brodo's items in both runs, `cache_write_x8` at +689 and
++678 % and `gather` at +15.0 and +14.9 %, against baselines of 2026-10-17. Benchmarked
+commit by commit from `9940bd5`, the last run within them, at five-minute loads of 3.2 to
+4.0, each moved at one commit, none of which recorded a benchmark as T10 asks:
+
+- `cache_write_x8`, 5.2 to 43 ms at `e25e1a9`: `cache::write` syncs the hidden file to the
+  disk before renaming it over the path, as the owner chose for review G1, `sync_all`
+  being `F_FULLFSYNC` on macOS, about 4.6 ms a file. Unsynced, a crash could leave the
+  renamed file without its bytes in place of a good one.
+- `gather`, 3.09 to 3.58 ms at `68543d9`, which touched no code on its path: `gather` and
+  `sources` disassembled, at the two commits, to the same 287 lines, only their addresses
+  differing, the first moving from 4 to 52 bytes past a 64-byte boundary. A change in code
+  placement, not in the code.
+
+The owner decided that the sync stays and both rows are recorded again, `--record
+cache_write_x8` and `--record gather`, at loads of 1.44 and 1.41: 43 486 750 and
+3 468 083 ns. A run then put every item within its baseline, the two at +0.8 and −2.0 %,
+and −0.6 and −0.2 %. Code placement alone moves an item by as much as 15 %, which the
+10 % tolerance cannot tell from a change in the code; it is read by disassembling, as here.
