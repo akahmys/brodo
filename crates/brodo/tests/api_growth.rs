@@ -72,6 +72,7 @@ fn format_error(e: &FormatError) -> &'static str {
         FormatError::Truncated(..) => "Truncated",
         FormatError::BadMagic(..) => "BadMagic",
         FormatError::UnsupportedVersion(..) => "UnsupportedVersion",
+        FormatError::UnknownValueType(..) => "UnknownValueType",
         FormatError::WrongValueType { .. } => "WrongValueType",
         FormatError::Inconsistent(..) => "Inconsistent",
         FormatError::Shared => "Shared",

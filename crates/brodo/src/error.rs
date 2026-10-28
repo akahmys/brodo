@@ -134,6 +134,9 @@ pub enum FormatError {
     /// A layout version this build does not read (ADR-0016).
     #[error("layout version {0} is not read by this build")]
     UnsupportedVersion(u32),
+    /// The values are of a type no brodo type code names.
+    #[error("the values are of type {0}, which this brodo does not know")]
+    UnknownValueType(u32),
     /// The values are of another type.
     #[error("the values are of type {found}, not {expected}")]
     WrongValueType {
@@ -146,7 +149,8 @@ pub enum FormatError {
     #[error("the {0} section is inconsistent")]
     Inconsistent(&'static str),
     /// Walking the nodes from the root table reaches a node, a leaf or a tile value twice,
-    /// which a reader walking the whole tree refuses (docs/formats.md §4.2, rule 11).
+    /// which a reader walking the whole tree refuses (docs/formats.md §2.6, and §4.2, rule
+    /// 11).
     #[error("a node, leaf or tile value is reached twice from the root table")]
     Shared,
     /// A topology asked to hold a view's values does not hold the view's leaves and tiles.

@@ -358,7 +358,10 @@ impl TopologyEditor<'_> {
         self.tree.split_tile(v).map(|_| ())
     }
 
-    /// Merges the child holding the voxel into a tile at `level` (`Tree::merge`).
+    /// Merges the child holding the voxel into a tile at `level`: a leaf into a tile in its
+    /// lower node (`Lower`), or a lower node into a tile in its upper node (`Upper`), which
+    /// every place of the lower node must fill, with leaves or tiles (ADR-0014). Merging into
+    /// a root tile is not built.
     pub fn merge(&mut self, level: TileLevel, v: Coord) -> Result<(), TreeError> {
         self.tree.merge(level, v)
     }

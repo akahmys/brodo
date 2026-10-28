@@ -59,3 +59,17 @@ reached by no node and checked by nothing. The human decided that such a set is 
 the ten fields holding as many leaves and as many tiles (§4.2, rule 3,
 `HermiteError::OtherTopology`), at version 1, as for shared nodes: brodo writes no such
 set.
+
+## Amendment: what changes within a version
+
+- **Date**: 2026-10-28
+
+Version 1 of the frozen layout and of Hermite data changed twice without a raise: type code
+6 was added, which brodo 0.2.0 refuses, and Hermite rules 3 and 11 were added, refusing
+files version 1 had taken that brodo never wrote. docs/formats.md said only that a release
+reads the version before it, so a reader written from an earlier text could disagree with
+brodo at the same version. A review of the promises against ARCHITECTURE.md §1
+(2026-10-28) found it, with a reader's rebuilding checks that §2.5 did not list. The human
+decided that within a version only those two kinds of change are made, each recorded in
+CHANGELOG.md, any other raising the version; that a cache file's version fixes its frozen
+buffers'; and that the checks a reader rebuilding the tree adds are listed (§2.6).

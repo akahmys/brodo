@@ -6,6 +6,14 @@ are recorded here when they change (V6).
 
 ## Unreleased
 
+- `brodo::tree::Tree` is no longer public: a topology is built and read through
+  `Topology` and `TopologyEditor`, and the tree's own leaf numbers and orders bound the
+  code to no user (ADR-0036). How colino's `bvh`, `distance`, `intersect` and `winding`
+  work, as their modules tell it, is not promised; what their functions give is.
+- A grid whose type code no value type has is refused as the new
+  `FormatError::UnknownValueType`, not as `WrongValueType { expected: 0, .. }`; code
+  matching that needs the new variant. docs/formats.md §6 now says what may change within
+  a format version, and §2.6 what a reader rebuilding the tree also refuses (ADR-0038).
 - colino's topology report has its third layer: `Report::thin`, the places thinner, or
   gaps narrower, than two voxels, each a `Thin` with its kind (`ThinKind::Wall` or `Gap`),
   box, least thickness or width and count of points, found from the mesh along its

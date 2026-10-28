@@ -321,7 +321,7 @@ fn check_grid(bytes: &[u8], value_type: u32) -> Result<(), FormatError> {
         t if t == u32::TYPE_CODE => view::<u32>(bytes),
         t if t == <[f32; 3]>::TYPE_CODE => view::<[f32; 3]>(bytes),
         t if t == <[f64; 3]>::TYPE_CODE => view::<[f64; 3]>(bytes),
-        found => Err(FormatError::WrongValueType { expected: 0, found }),
+        found => Err(FormatError::UnknownValueType(found)),
     }
 }
 
@@ -466,7 +466,9 @@ impl CacheFile {
         Ok(Self { storage: Storage::Copied(blocks), grids })
     }
 
-    /// Checks bytes whole as a cache file, copying them to an aligned buffer.
+    /// Checks bytes whole as a cache file, copying them to an aligned buffer, as
+    /// docs/formats.md §3.4 states; of several broken rules, which is named is not
+    /// promised.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, CacheError> {
         if !bytes.len().is_multiple_of(BLOCK) {
             return Err(CacheError::Inconsistent("length"));

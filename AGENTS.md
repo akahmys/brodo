@@ -11,7 +11,8 @@ first, every session.
         └── 3. This file
              └── 4. The phase documents, in the order work happens:
                     PLANNING.md → CODING.md → TESTING.md → AUDITING.md
-                 and ARCHITECTURE.md, the design they are applied to
+                 and ARCHITECTURE.md, the design they are applied to,
+                 and docs/formats.md, the bytes it writes
 ```
 
 When an instruction conflicts with a rule here, say so before acting on it.
@@ -46,8 +47,9 @@ If a rule and the design seem to conflict, stop and ask the human.
 
 A promise to a user, what the code may be held to by a test or an excluded mutant
 (TESTING.md T11, T12), has three homes: ARCHITECTURE.md for behaviour, docs/formats.md for
-bytes, and a public item's rustdoc for its API, each fact in one of them and the others
-linking to it. A private item's documentation describes the code and promises nothing.
+bytes, and a public item's rustdoc for its API, what it takes, gives and refuses, each
+fact in one of them and the others linking to it. How the code works, where a module's
+documentation or a private item's tells it, describes the code and promises nothing.
 
 A crate's README is its documentation's front page, read in by `include_str!` in a
 `#![doc]` attribute of its `lib.rs`, so that its code runs as a doctest in the gate's

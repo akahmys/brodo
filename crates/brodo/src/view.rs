@@ -131,7 +131,9 @@ fn sections<'a, T>(h: &Header, bytes: &'a [u8]) -> Result<[&'a [u8]; 5], FormatE
 }
 
 impl<'a, T: Stored> GridView<'a, T> {
-    /// Checks `bytes` whole as a frozen grid of `T` values and reads it in place.
+    /// Checks `bytes` whole as a frozen grid of `T` values and reads it in place, as
+    /// docs/formats.md §2.5 states; a broken rule is refused with the `FormatError` whose
+    /// documentation names it, and of several, which is named is not promised.
     pub fn new(bytes: &'a [u8]) -> Result<Self, FormatError> {
         if bytes.as_ptr().align_offset(BLOCK) != 0 || !bytes.len().is_multiple_of(BLOCK) {
             return Err(FormatError::Misaligned);

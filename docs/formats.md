@@ -146,7 +146,14 @@ Padding, the background's bytes beyond its size, the order of nodes, whether eve
 leaf is reached, and four more of the writer's rules, that a node with no child or tile
 holds 0 for each first, that root tiles take tile places in table order, that the other
 tile places go to the nodes in node order, and that each section starts at the block right
-after the one before, are not checked.
+after the one before, are not checked here: a producer meets them, since a reader that
+rebuilds the tree (§2.6) refuses some.
+
+### 2.6 What a reader rebuilding the tree also checks
+
+A reader that walks the whole tree from the root table, to rebuild it or to list its
+leaves and tiles, also refuses a buffer in which the walk reaches a node, a leaf or a tile
+value twice, or reaches no leaf the leaf count holds.
 
 ## 3. The cache profile, format version 1
 
@@ -231,7 +238,7 @@ Each grid's free pairs hold `hermite.version` = `1`, `hermite.set` = the set's n
 the group's name, for ids 1, 2, … with no gap, the id in decimal with no leading zero;
 group 0, named `""`, has no key. Keys beginning `hermite.` are the format's: a writer puts
 no other, and a reader reads the group table from the sign grid alone and leaves every
-other key unread. Other grids and other keys are free.
+other key unread. A set's grids hold no `sdf.version` (§5); other grids and other keys are free.
 
 An edge with no crossing holds **no crossing**: fraction −1, normal (0, 0, 0), group 0, as
 bits.
@@ -257,7 +264,7 @@ unless:
    if v and w have the same sign, the edge holds no crossing; otherwise its fraction lies
    in [0, 1], its normal's length, worked in `f64`, is within 10⁻⁶ of 1, its component
    along a is not negative when v is inside and not positive when v is outside, and its
-   group is below the table's length, or is 0 when the table is empty;
+   group is 0 or an id the table names;
 10. for every leaf point v and axis a, the point u = v − â, when in no leaf, has v's sign;
 11. walking the sign grid's nodes from its root table, as §2.4 does, reaches every leaf, and
     no upper node, lower node, leaf or tile value twice.
@@ -290,6 +297,14 @@ Each format carries its own version: the frozen layout in its header, the cache 
 its header, Hermite data and the SDF convention in free pairs. A release that raises a
 version still reads the one before it and can write it on request; a version older than
 that is refused, naming it (ADR-0038). Every format is at version 1, the first.
+
+Within a version only two changes are made, each recorded in CHANGELOG.md: a value type
+code added (§1.1), which a reader that does not know it refuses; and a reader's rule added
+that refuses only what brodo's writer never wrote, so that every file brodo wrote at that
+version is still read. Any other change to the bytes or to what a reader takes raises the
+version. A cache file of version 1 holds frozen buffers of version 1 (§3.4), so raising the
+frozen layout's version raises the cache profile's; Hermite data and the SDF convention
+carry versions of their own.
 
 ## 7. Test vectors
 

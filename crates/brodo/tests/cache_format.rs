@@ -265,10 +265,7 @@ fn each_check_refuses_its_damage() {
     // A type code no value type has: refused as such, not read as any type.
     assert!(matches!(
         read(&with_word(&g, 12, 7)),
-        Err(CacheError::Grid {
-            index: 0,
-            error: FormatError::WrongValueType { expected: 0, found: 7 }
-        })
+        Err(CacheError::Grid { index: 0, error: FormatError::UnknownValueType(7) })
     ));
     // The name's first byte made invalid UTF-8.
     let mut bad = g.clone();

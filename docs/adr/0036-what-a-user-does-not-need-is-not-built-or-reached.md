@@ -1,6 +1,6 @@
 # ADR-0036: What a user does not need is not built or reached
 
-- **Status**: Accepted
+- **Status**: Amended
 - **Date**: 2026-10-25
 
 ## Context
@@ -52,3 +52,15 @@ with the change that makes `map` an `unsafe fn`, in the same commit:
 
 Each change is breaking and listed in CHANGELOG.md for 0.5.0. The review finds no option
 that weakens a check and no parsing before one, so none is changed for that.
+
+## Amendment: the tree behind the topology
+
+- **Date**: 2026-10-28
+
+`brodo::tree::Tree` was public, its documentation binding the orders it walks leaves and
+nodes in and a leaf numbering of its own, though every user in ARCHITECTURE.md §1 builds and
+reads a topology through `Topology` and `TopologyEditor`. A review of the promises
+(2026-10-28) found it. The human decided that `Tree` is crate-private; its three methods
+only tests called are built for tests alone. How a module's code works, as its
+documentation tells it, promises nothing (AGENTS.md), so colino's `bvh`, `distance`,
+`intersect` and `winding` stay public for what their functions give.

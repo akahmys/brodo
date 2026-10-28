@@ -313,7 +313,7 @@ pub enum Activation {
 /// A merge leaves arena entries the root no longer reaches; queries walk from the root, and
 /// `compacted` drops them.
 #[derive(Debug, Clone, Default)]
-pub struct Tree {
+pub(crate) struct Tree {
     root: BTreeMap<Coord, RootEntry>,
     upper: Vec<Upper>,
     lower: Vec<Lower>,
@@ -357,11 +357,13 @@ impl Tree {
     }
 
     /// The number of leaves.
+    #[cfg(test)]
     pub fn leaf_count(&self) -> usize {
         self.reached_lower().map(|(_, n)| n.children.count()).sum()
     }
 
     /// The number of tiles at a level.
+    #[cfg(test)]
     pub fn tile_count(&self, level: TileLevel) -> usize {
         match level {
             TileLevel::Root => self.root.values().filter(|e| matches!(e, RootEntry::Tile)).count(),
@@ -371,6 +373,7 @@ impl Tree {
     }
 
     /// A leaf's origin, its smallest voxel.
+    #[cfg(test)]
     pub fn leaf_origin(&self, leaf: LeafId) -> Result<Coord, TreeError> {
         self.leaves.get(to_usize(leaf.0)).copied().ok_or(TreeError::UnknownLeaf(leaf.0))
     }

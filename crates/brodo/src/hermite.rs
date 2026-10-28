@@ -625,7 +625,9 @@ fn grids_of(file: &CacheFile, set: &str) -> Result<Vec<usize>, HermiteError> {
 
 impl<'a> HermiteView<'a> {
     /// The set named `set` in `file`, its ten grids found by their keys and checked whole:
-    /// the format's version, metadata that agree, one topology, and the values.
+    /// the format's version, metadata that agree, one topology, and the values, as
+    /// docs/formats.md §4.2 states; of several broken rules, which is named is not
+    /// promised.
     pub fn find(file: &'a CacheFile, set: &str) -> Result<HermiteView<'a>, HermiteError> {
         let at = grids_of(file, set)?;
         let [sign_at, x @ ..] = at.as_slice() else { return Err(HermiteError::Missing("sign")) };
