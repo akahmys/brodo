@@ -18,6 +18,7 @@ use crate::cache::{
 };
 use crate::error::CacheError;
 use crate::frozen::{BLOCK, Block, Header};
+use crate::quantise::{self, Kind, Quantised};
 
 /// "BRDA", read as a little-endian `u32`.
 const MAGIC: u32 = u32::from_le_bytes(*b"BRDA");
@@ -30,12 +31,49 @@ const CHUNK_LEAVES: usize = 512;
 /// Bytes a chunk table entry.
 const ENTRY: usize = 8;
 
-/// Each chunk's length in blocks, as docs/formats.md §8.3 cuts a frozen buffer: at its leaf
-/// values' start, every `CHUNK_LEAVES` leaves within them and at their end, leaving out a
-/// piece of no bytes. The buffer is one `GridView::new` accepts.
-fn cuts(frozen: &[u8]) -> Result<Vec<usize>, CacheError> {
+/// How a grid's leaf values are stored in an archive (docs/formats.md §8.5, ADR-0016). The
+/// background and the tiles are stored exact whatever the encoding.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[non_exhaustive]
+pub enum Encoding {
+    /// As they are, read back bit for bit.
+    #[default]
+    Exact,
+    /// Each scalar as the IEEE 754 binary16 nearest it, ties to even, byte-shuffled: read
+    /// back within 2⁻¹¹ × |x| + 2⁻²⁵ of x. For floating value types only; a NaN or a value
+    /// beyond ±65504 is refused.
+    Binary16,
+    /// Each scalar as 8 bits over its component's range across the grid's leaf values:
+    /// read back within a 510th of the range, to rounding. For floating value types only; a
+    /// NaN, an infinity or a range wider than an `f64` holds is refused.
+    EightBit,
+}
+
+impl Encoding {
+    /// Its code in a directory entry.
+    fn code(self) -> u32 {
+        match self {
+            Self::Exact => 0,
+            Self::Binary16 => 1,
+            Self::EightBit => 2,
+        }
+    }
+}
+
+/// A chunk: its length in blocks of the frozen buffer, and whether it holds leaf values.
+type Piece = (usize, bool);
+
+/// Each chunk of a frozen buffer, as docs/formats.md §8.3 cuts it: at its leaf values'
+/// start, every `CHUNK_LEAVES` leaves within them and at their end, leaving out a piece of
+/// no bytes. The buffer is one `GridView::new` accepts.
+fn cuts(frozen: &[u8]) -> Result<Vec<Piece>, CacheError> {
+    cut(frozen, frozen.len() / BLOCK)
+}
+
+/// The chunks of a frozen buffer of `total` blocks whose header begins `head`.
+fn cut(head: &[u8], total: usize) -> Result<Vec<Piece>, CacheError> {
     let bad = || CacheError::Inconsistent("grid");
-    let (h, _) = Header::ref_from_prefix(frozen).map_err(|_| bad())?;
+    let (h, _) = Header::ref_from_prefix(head).map_err(|_| bad())?;
     let [_, _, _, leaves, _] = h.counts.map(|c| usize::try_from(c.get()).unwrap_or(usize::MAX));
     let [_, _, _, start, _] = h.offsets.map(|c| usize::try_from(c.get()).unwrap_or(usize::MAX));
     let leaf = usize::try_from(h.value_size.get())
@@ -44,8 +82,7 @@ fn cuts(frozen: &[u8]) -> Result<Vec<usize>, CacheError> {
         .ok_or_else(bad)?;
     let chunk = leaf.checked_mul(CHUNK_LEAVES).ok_or_else(bad)?;
     let end = leaves.checked_mul(leaf).and_then(|n| n.checked_add(start)).ok_or_else(bad)?;
-    let total = frozen.len() / BLOCK;
-    if end > total {
+    if end > total || chunk == 0 {
         return Err(bad());
     }
     let mut marks = vec![0];
@@ -54,52 +91,105 @@ fn cuts(frozen: &[u8]) -> Result<Vec<usize>, CacheError> {
     Ok(marks
         .windows(2)
         .filter_map(|w| match w {
-            [a, b] if b > a => Some(b - a),
+            [a, b] if b > a => Some((b - a, *a >= start && *b <= end)),
             _ => None,
         })
         .collect())
 }
 
-/// A grid as written: its metadata, its chunks' lengths in blocks, and its chunks
-/// compressed.
+/// A grid as written: its metadata, its encoding's code and ranges' bytes, its chunks'
+/// lengths in blocks, and its chunks compressed.
 struct Packed {
     meta: Vec<u8>,
+    encoding: u32,
+    ranges: Vec<u8>,
     raw: Vec<usize>,
     chunks: Vec<Vec<u8>>,
 }
 
-/// A grid's chunks, its frozen buffer cut by `cut`.
-fn pack(e: &CacheEntry, cut: Cut) -> Result<Packed, CacheError> {
+/// How grid `index`, of `pieces`, is quantised by `encoding`, if it is.
+fn plan(
+    index: usize,
+    e: &CacheEntry,
+    encoding: Encoding,
+    pieces: &[(&[u8], bool)],
+) -> Result<Option<(Kind, Quantised)>, CacheError> {
+    let eight = match encoding {
+        Encoding::Exact => return Ok(None),
+        Encoding::Binary16 => false,
+        Encoding::EightBit => true,
+    };
+    let kind = Kind::of(e.value_type)
+        .ok_or(CacheError::NotQuantised { index, value_type: e.value_type })?;
+    let q = if eight {
+        let leaves = pieces.iter().filter(|(_, leaf)| *leaf).map(|(p, _)| *p);
+        Quantised::EightBit(
+            quantise::ranges(kind, leaves).ok_or(CacheError::Unrepresentable(index))?,
+        )
+    } else {
+        Quantised::Binary16
+    };
+    Ok(Some((kind, q)))
+}
+
+/// Grid `index`'s chunks, its frozen buffer cut by `cut` and its leaf values encoded by
+/// `encoding`.
+fn pack(index: usize, e: &CacheEntry, encoding: Encoding, cut: Cut) -> Result<Packed, CacheError> {
     let bytes = e.frozen.as_bytes();
     let raw = cut(bytes)?;
     let mut pieces = Vec::new();
     let mut rest = bytes;
-    for r in &raw {
+    for (r, leaf) in &raw {
         let (piece, after) =
             rest.split_at_checked(r * BLOCK).ok_or(CacheError::Inconsistent("grid"))?;
-        pieces.push(piece);
+        pieces.push((piece, *leaf));
         rest = after;
     }
-    // Compressed in parallel, collected in order: the same bytes whatever the threads.
-    let chunks = pieces.par_iter().map(|p| lz4_flex::block::compress(p)).collect();
-    Ok(Packed { meta: encode_meta(&e.meta, e.bounds)?, raw, chunks })
+    let values = plan(index, e, encoding, &pieces)?;
+    // Encoded and compressed in parallel, collected in order: the same bytes whatever the
+    // threads.
+    let chunks = pieces
+        .par_iter()
+        .map(|(p, leaf)| match &values {
+            Some((kind, q)) if *leaf => {
+                quantise::encode(q, *kind, p).map(|b| lz4_flex::block::compress(&b))
+            }
+            Some(_) | None => Some(lz4_flex::block::compress(p)),
+        })
+        .collect::<Option<Vec<_>>>()
+        .ok_or(CacheError::Unrepresentable(index))?;
+    let ranges = match &values {
+        Some((_, Quantised::EightBit(r))) => quantise::range_bytes(r),
+        Some((_, Quantised::Binary16)) | None => Vec::new(),
+    };
+    let meta = encode_meta(&e.meta, e.bounds)?;
+    let raw = raw.into_iter().map(|(r, _)| r).collect();
+    Ok(Packed { meta, encoding: encoding.code(), ranges, raw, chunks })
 }
 
 /// How a frozen buffer is cut into chunks: `cuts`, but for a test of the reader.
-type Cut = fn(&[u8]) -> Result<Vec<usize>, CacheError>;
+type Cut = fn(&[u8]) -> Result<Vec<Piece>, CacheError>;
 
-/// Writes the archive holding `entries` to `out`, part by part, each frozen buffer cut by
+/// Writes the archive holding `grids` to `out`, part by part, each frozen buffer cut by
 /// `cut`.
-fn emit(entries: &[CacheEntry], cut: Cut, out: &mut impl std::io::Write) -> Result<(), CacheError> {
-    let packed = entries.iter().map(|e| pack(e, cut)).collect::<Result<Vec<_>, _>>()?;
+fn emit(
+    grids: &[(&CacheEntry, Encoding)],
+    cut: Cut,
+    out: &mut impl std::io::Write,
+) -> Result<(), CacheError> {
+    let packed = grids
+        .iter()
+        .enumerate()
+        .map(|(i, (e, encoding))| pack(i, e, *encoding, cut))
+        .collect::<Result<Vec<_>, _>>()?;
     let mut top = Vec::new();
-    for x in [MAGIC, VERSION, u32_of(entries.len())?, CODEC, u32_of(CHUNK_LEAVES)?, 0, 0, 0] {
+    for x in [MAGIC, VERSION, u32_of(grids.len())?, CODEC, u32_of(CHUNK_LEAVES)?, 0, 0, 0] {
         put_u32(&mut top, x);
     }
-    let mut at = 1 + entries.len();
-    for (e, p) in entries.iter().zip(&packed) {
+    let mut at = 1 + grids.len();
+    for ((e, _), p) in grids.iter().zip(&packed) {
         let table_at = at + p.meta.len().div_ceil(BLOCK);
-        let first = table_at + (p.chunks.len() * ENTRY).div_ceil(BLOCK);
+        let first = table_at + (p.chunks.len() * ENTRY + p.ranges.len()).div_ceil(BLOCK);
         at = first + p.chunks.iter().map(|c| c.len().div_ceil(BLOCK)).sum::<usize>();
         let grid_blocks = e.frozen.as_bytes().len() / BLOCK;
         for x in [
@@ -109,7 +199,7 @@ fn emit(entries: &[CacheEntry], cut: Cut, out: &mut impl std::io::Write) -> Resu
             u32_of(p.chunks.len())?,
             u32_of(grid_blocks)?,
             e.value_type,
-            0,
+            p.encoding,
             0,
         ] {
             put_u32(&mut top, x);
@@ -124,6 +214,7 @@ fn emit(entries: &[CacheEntry], cut: Cut, out: &mut impl std::io::Write) -> Resu
             put_u32(&mut table, u32_of(*r)?);
             put_u32(&mut table, u32_of(c.len())?);
         }
+        table.extend_from_slice(&p.ranges);
         for part in std::iter::once(&p.meta).chain([&table]).chain(&p.chunks) {
             out.write_all(part)?;
             written += part.len();
@@ -133,24 +224,46 @@ fn emit(entries: &[CacheEntry], cut: Cut, out: &mut impl std::io::Write) -> Resu
     Ok(())
 }
 
-/// The bytes of an archive holding `entries`, in order.
+/// Every grid of `entries`, exact.
+fn exact(entries: &[CacheEntry]) -> Vec<(&CacheEntry, Encoding)> {
+    entries.iter().map(|e| (e, Encoding::Exact)).collect()
+}
+
+/// The bytes of an archive holding `entries`, in order, their values exact.
 pub fn to_bytes(entries: &[CacheEntry]) -> Result<Vec<u8>, CacheError> {
+    to_bytes_with(&exact(entries))
+}
+
+/// The bytes of an archive holding `grids`, in order, each grid's leaf values stored by its
+/// encoding. A grid quantised but not of a floating value type is refused, `NotQuantised`,
+/// and one holding a value its encoding cannot hold, `Unrepresentable`, both naming its
+/// place in `grids`.
+pub fn to_bytes_with(grids: &[(&CacheEntry, Encoding)]) -> Result<Vec<u8>, CacheError> {
     let mut out = Vec::new();
-    emit(entries, cuts, &mut out)?;
+    emit(grids, cuts, &mut out)?;
     Ok(out)
 }
 
-/// Writes an archive holding `entries`, replacing `path` whole as `cache::write` does.
+/// Writes an archive holding `entries`, their values exact, replacing `path` whole as
+/// `cache::write` does.
 pub fn write(path: &Path, entries: &[CacheEntry]) -> Result<(), CacheError> {
-    crate::cache::replace(path, |out| emit(entries, cuts, out))
+    write_with(path, &exact(entries))
+}
+
+/// Writes an archive holding `grids`, each by its encoding, as `to_bytes_with` makes it,
+/// replacing `path` whole as `cache::write` does.
+pub fn write_with(path: &Path, grids: &[(&CacheEntry, Encoding)]) -> Result<(), CacheError> {
+    crate::cache::replace(path, |out| emit(grids, cuts, out))
 }
 
 /// A grid as read: where its metadata is, its frozen buffer's length in blocks, its value
-/// type, and its chunks with their lengths in blocks.
+/// type, how its leaf values are quantised, if they are, and its chunks with their lengths
+/// in blocks.
 struct Found<'a> {
     meta: &'a [u8],
     grid_blocks: usize,
     value_type: u32,
+    values: Option<(Kind, Quantised)>,
     chunks: Vec<(&'a [u8], usize)>,
 }
 
@@ -209,21 +322,39 @@ fn grid<'a>(
     c: &mut Cursor<'_>,
     after: usize,
 ) -> Result<(Found<'a>, usize), CacheError> {
-    let [meta_at, meta_len, table_at, chunk_count, grid_blocks, value_type, r0, r1] =
+    let [meta_at, meta_len, table_at, chunk_count, grid_blocks, value_type, encoding, unused] =
         [(); 8].map(|()| c.u32());
-    if [r0?, r1?] != [0; 2] {
+    if unused? != 0 {
         return Err(CacheError::Inconsistent("directory"));
     }
+    let value_type = value_type?;
+    let (kind, components) = encoding_of(value_type, encoding?)?;
     let meta = range(meta_at?, size(meta_len?)?, after, all.len(), "metadata")?;
-    let table_len = size(chunk_count?)?.checked_mul(ENTRY).ok_or(CacheError::TooLarge)?;
+    let entries = size(chunk_count?)?.checked_mul(ENTRY).ok_or(CacheError::TooLarge)?;
+    let table_len =
+        entries.checked_add(components * quantise::RANGE).ok_or(CacheError::TooLarge)?;
     let table_start = meta.end.next_multiple_of(BLOCK);
     let table = range(table_at?, table_len, table_start, all.len(), "chunk table")?;
-    let mut parts = vec![meta.clone(), table.clone()];
-    let chunks = chunks(all, table, &mut parts)?;
+    let what = "chunk table";
+    let (listed, tail) = all
+        .get(table.clone())
+        .and_then(|t| t.split_at_checked(entries))
+        .ok_or(CacheError::Truncated(what))?;
+    let values = match kind {
+        Some(k) if components > 0 => {
+            let r =
+                quantise::read_ranges(tail, components).ok_or(CacheError::Inconsistent(what))?;
+            Some((k, Quantised::EightBit(r)))
+        }
+        Some(k) => Some((k, Quantised::Binary16)),
+        None => None,
+    };
+    let mut parts = vec![meta.clone(), table];
+    let chunks = chunks(all, listed, &mut parts)?;
     let grid_blocks = size(grid_blocks?)?;
     let sum = chunks.iter().try_fold(0_usize, |s, (_, raw)| s.checked_add(*raw));
     if sum != Some(grid_blocks) {
-        return Err(CacheError::Inconsistent("chunk table"));
+        return Err(CacheError::Inconsistent(what));
     }
     let end = parts.last().map_or(after, |p| p.end).next_multiple_of(BLOCK);
     parts.push(end..end);
@@ -235,19 +366,30 @@ fn grid<'a>(
         }
     }
     let meta = all.get(meta).ok_or(CacheError::Truncated("metadata"))?;
-    let found = Found { meta, grid_blocks, value_type: value_type?, chunks };
-    Ok((found, end))
+    Ok((Found { meta, grid_blocks, value_type, values, chunks }, end))
 }
 
-/// The chunks a grid's table at `table` lists, each with its length in blocks, none zero,
-/// each at the block after the part before it; their places are added to `parts`.
+/// A grid's value encoding `code`, checked against its value type: the kind of a
+/// quantised grid's values, and the ranges its table holds, a component's for 8 bits.
+fn encoding_of(value_type: u32, code: u32) -> Result<(Option<Kind>, usize), CacheError> {
+    let quantised = || Kind::of(value_type).ok_or(CacheError::Inconsistent("directory"));
+    match code {
+        0 => Ok((None, 0)),
+        1 => Ok((Some(quantised()?), 0)),
+        2 => quantised().map(|k| (Some(k), k.components())),
+        code => Err(CacheError::UnknownEncoding(code)),
+    }
+}
+
+/// The chunks a grid's table entries `listed` list, each with its length in blocks, none
+/// zero, each at the block after the part before it; their places are added to `parts`.
 fn chunks<'a>(
     all: &'a [u8],
-    table: std::ops::Range<usize>,
+    listed: &[u8],
     parts: &mut Vec<std::ops::Range<usize>>,
 ) -> Result<Vec<(&'a [u8], usize)>, CacheError> {
     let what = "chunk table";
-    let mut t = Cursor { rest: all.get(table).ok_or(CacheError::Truncated(what))?, what };
+    let mut t = Cursor { rest: listed, what };
     let mut chunks = Vec::new();
     while !t.rest.is_empty() {
         let (raw, len) = (size(t.u32()?)?, size(t.u32()?)?);
@@ -291,51 +433,92 @@ pub fn from_bytes(bytes: &[u8], limit: u64) -> Result<CacheFile, CacheError> {
     }
     let out = unpack(&found, &top, blocks)?;
     let grids = index(out.as_bytes())?;
-    for (index, (g, e)) in found.iter().zip(&grids).enumerate() {
-        let frozen = out.as_bytes().get(e.grid.clone()).ok_or(CacheError::Truncated("grid"))?;
-        if cuts(frozen)?.into_iter().ne(g.chunks.iter().map(|(_, raw)| *raw)) {
-            return Err(CacheError::Chunks(index));
-        }
-    }
     Ok(CacheFile { storage: Storage::Copied(out), grids })
 }
 
+/// A chunk to decompress: its grid's place and its own, its bytes, the room it fills, and
+/// whether it holds leaf values.
+struct Work<'a, 'b> {
+    grid: usize,
+    chunk: usize,
+    bytes: &'a [u8],
+    room: &'b mut [u8],
+    leaf: bool,
+}
+
 /// The cache file of `blocks` blocks that `found` decompresses into, below its header and
-/// directory `top`: each grid's metadata, then its chunks decompressed in parallel.
+/// directory `top`: each grid's metadata, then its chunks. Every grid's first chunk is
+/// decompressed first, in parallel, for the frozen header that tells how the grid is cut
+/// (docs/formats.md §8.4, rule 6); then the others, in parallel, leaf values restored.
 fn unpack(found: &[Found<'_>], top: &[u8], blocks: usize) -> Result<Vec<Block>, CacheError> {
     let mut out = vec![Block::new_zeroed(); blocks];
-    let mut rest = out.as_mut_bytes();
-    let (lead, after) = rest.split_at_mut_checked(top.len()).ok_or(CacheError::TooLarge)?;
-    lead.copy_from_slice(top);
-    rest = after;
-    // Each grid's metadata, then the room its chunks decompress into, in order.
-    let mut work = Vec::new();
+    let mut work = rooms(found, top, out.as_mut_bytes())?;
+    run(found, work.iter_mut().filter(|w| w.chunk == 0).collect())?;
     for (i, g) in found.iter().enumerate() {
+        let head = work.iter().find(|w| w.grid == i).map_or(&[][..], |w| &*w.room);
+        let pieces = cut(head, g.grid_blocks)?;
+        let first_leaf = pieces.first().is_some_and(|(_, leaf)| *leaf);
+        if first_leaf || pieces.iter().map(|(r, _)| *r).ne(g.chunks.iter().map(|(_, raw)| *raw)) {
+            return Err(CacheError::Chunks(i));
+        }
+        for (w, (_, leaf)) in work.iter_mut().filter(|w| w.grid == i).zip(pieces) {
+            w.leaf = leaf;
+        }
+    }
+    run(found, work.iter_mut().filter(|w| w.chunk != 0).collect())?;
+    Ok(out)
+}
+
+/// `out` split into the header and directory `top`, copied in, then each grid's metadata,
+/// copied in, and the room each of its chunks fills, in order.
+fn rooms<'a, 'b>(
+    found: &[Found<'a>],
+    top: &[u8],
+    out: &'b mut [u8],
+) -> Result<Vec<Work<'a, 'b>>, CacheError> {
+    let (lead, mut rest) = out.split_at_mut_checked(top.len()).ok_or(CacheError::TooLarge)?;
+    lead.copy_from_slice(top);
+    let mut work = Vec::new();
+    for (grid, g) in found.iter().enumerate() {
         let (meta, after) = rest.split_at_mut_checked(g.meta.len()).ok_or(CacheError::TooLarge)?;
         meta.copy_from_slice(g.meta);
         let pad = g.meta.len().next_multiple_of(BLOCK) - g.meta.len();
         let (_, mut after) = after.split_at_mut_checked(pad).ok_or(CacheError::TooLarge)?;
-        for (k, (chunk, raw)) in g.chunks.iter().enumerate() {
+        for (chunk, (bytes, raw)) in g.chunks.iter().enumerate() {
             let (room, next) =
                 after.split_at_mut_checked(raw * BLOCK).ok_or(CacheError::TooLarge)?;
-            work.push(((i, k), *chunk, room));
+            work.push(Work { grid, chunk, bytes, room, leaf: false });
             after = next;
         }
         rest = after;
     }
-    // Decompressed in parallel; the first chunk in order that fails is named, whatever the
-    // threads.
+    Ok(work)
+}
+
+/// Decompresses `work` in parallel, a leaf chunk of a quantised grid through a scratch
+/// buffer and restored; the first chunk in order that fails is named, whatever the threads.
+fn run(found: &[Found<'_>], mut work: Vec<&mut Work<'_, '_>>) -> Result<(), CacheError> {
     let failed: Vec<_> = work
         .par_iter_mut()
-        .map(|((i, k), chunk, room)| {
-            let filled = lz4_flex::block::decompress_into(chunk, room).ok();
-            (filled != Some(room.len())).then_some((*i, *k))
+        .map_init(Vec::new, |scratch, w| {
+            let values = found.get(w.grid).and_then(|g| g.values.as_ref()).filter(|_| w.leaf);
+            let done = match values {
+                Some((kind, q)) => q.encoded_len(*kind, w.room.len()).is_some_and(|n| {
+                    scratch.resize(n, 0);
+                    let filled = lz4_flex::block::decompress_into(w.bytes, scratch).ok();
+                    filled == Some(n) && quantise::restore(q, *kind, scratch, w.room)
+                }),
+                None => {
+                    lz4_flex::block::decompress_into(w.bytes, w.room).ok() == Some(w.room.len())
+                }
+            };
+            (!done).then_some((w.grid, w.chunk))
         })
         .collect();
-    if let Some((index, chunk)) = failed.into_iter().flatten().next() {
-        return Err(CacheError::Decompress { index, chunk });
+    match failed.into_iter().flatten().next() {
+        Some((index, chunk)) => Err(CacheError::Decompress { index, chunk }),
+        None => Ok(()),
     }
-    Ok(out)
 }
 
 /// Reads and checks an archive of at most `limit` bytes, decompressed into a cache file of
@@ -389,10 +572,12 @@ mod tests {
         let file = from_bytes(&to_bytes(&e).unwrap(), u64::MAX).unwrap();
         assert!(file.storage.bytes() == crate::cache::to_bytes(&e).unwrap().as_slice());
         let leaves = 16 * 4 * 1100;
-        let starts: Vec<_> = e.iter().map(|g| cuts(g.frozen.as_bytes()).unwrap()).collect();
+        let starts: Vec<Vec<_>> = e.iter().map(|g| cuts(g.frozen.as_bytes()).unwrap()).collect();
         assert_eq!(starts[0].len(), 5, "the nodes, three chunks of leaves and the tiles");
-        assert_eq!(starts[0][1..4].iter().sum::<usize>(), leaves);
-        assert_eq!(starts[1][1..4].iter().sum::<usize>(), leaves * 6);
+        let flags: Vec<_> = starts[0].iter().map(|(_, leaf)| *leaf).collect();
+        assert_eq!(flags, [false, true, true, true, false]);
+        assert_eq!(starts[0][1..4].iter().map(|(r, _)| r).sum::<usize>(), leaves);
+        assert_eq!(starts[1][1..4].iter().map(|(r, _)| r).sum::<usize>(), leaves * 6);
     }
 
     /// A grid cut otherwise than docs/formats.md §8.3 cuts it is refused (§8.4, rule 6),
@@ -401,7 +586,7 @@ mod tests {
     fn a_grid_cut_otherwise_is_refused() {
         let e = entries();
         let mut bytes = Vec::new();
-        emit(&e, |b| Ok(vec![b.len() / BLOCK]), &mut bytes).unwrap();
+        emit(&exact(&e), |b| Ok(vec![(b.len() / BLOCK, false)]), &mut bytes).unwrap();
         assert!(matches!(from_bytes(&bytes, u64::MAX), Err(CacheError::Chunks(0))));
     }
 }

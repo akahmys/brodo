@@ -302,7 +302,8 @@ version still reads the one before it and can write it on request; a version old
 that is refused, naming it (ADR-0038). Every format is at version 1, the first.
 
 Within a version only two changes are made, each recorded in CHANGELOG.md: a value type
-code added (§1.1), which a reader that does not know it refuses; and a reader's rule added
+code (§1.1) or an archive's value encoding code (§8.5) added, which a reader that does not
+know it refuses; and a reader's rule added
 that refuses only what brodo's writer never wrote, so that every file brodo wrote at that
 version is still read. Any other change to the bytes or to what a reader takes raises the
 version. A cache file of version 1 holds frozen buffers of version 1 (§3.4), so raising the
@@ -321,6 +322,7 @@ The golden files in `crates/brodo/tests/data/`, written by brodo's Format-tier t
 | `frozen_v1_f64x3.bin` | a bare frozen buffer of three `f64`, the same tree |
 | `cache_v1.bin` | a cache file of two grids, `f32` and three `f32`, with bounds and a free pair |
 | `archive_v1.bin` | an archive of the same two grids as `cache_v1.bin` |
+| `archive_v1_quantised.bin` | an archive of the same two grids, the first in binary16, the second in 8 bits |
 | `hermite_v1.bin` | a cache file holding one Hermite set, `golden`, on one leaf, with two named groups |
 
 ## 8. The archive profile, format version 1
@@ -328,15 +330,15 @@ The golden files in `crates/brodo/tests/data/`, written by brodo's Format-tier t
 Grids with their metadata in one file, each frozen buffer cut into chunks compressed apart
 (ARCHITECTURE.md §4.7). Media type `application/vnd.brodo.archive; version=1`, stated and not
 registered (ADR-0041). It is read back as the cache file (§3) of the same grids: a reader
-decompresses each grid's chunks, in order, into its frozen buffer, and checks the cache
-file so made as §3.4 does. Every part's place follows from those before it, with no gap.
+decompresses each grid's chunks, in order, into its frozen buffer, restoring leaf values
+stored quantised (§8.5), and checks the cache file so made as §3.4 does. Every part's place follows from those before it, with no gap.
 
 | Part | At | Size |
 | :--- | :--- | :--- |
 | header | block 0 | 1 block |
 | directory | block 1 | 1 block per grid |
 | per grid, in directory order: metadata, §3.3 | the block after the previous part | its length, zero-padded to a block |
-| then its chunk table | the block after its metadata | 8 bytes a chunk, zero-padded to a block |
+| then its chunk table, and its ranges for encoding 2 (§8.5) | the block after its metadata | 8 bytes a chunk, then 16 bytes a component for encoding 2, zero-padded to a block |
 | then each chunk, in order | the block after the previous part | its compressed length, zero-padded to a block |
 
 ### 8.1 Header, one block
@@ -360,18 +362,21 @@ file so made as §3.4 does. Every part's place follows from those before it, wit
 | 12 | chunk count, `u32` |
 | 16 | frozen buffer length, `u32` blocks |
 | 20 | value type, `u32` code, §1.1 |
-| 24 | unused, 8 bytes, zero |
+| 24 | value encoding, `u32` code, §8.5 |
+| 28 | unused, 4 bytes, zero |
 
 ### 8.3 Chunks
 
-A chunk table entry is the chunk's length before compression, `u32` blocks, then its
-length compressed, `u32` bytes. A grid's frozen buffer (§2) is cut at its leaf values
+A chunk table entry is the length of the frozen buffer's bytes the chunk holds, `u32`
+blocks, then its length compressed, `u32` bytes. A grid's frozen buffer (§2) is cut at its leaf values
 section's start, every 512 leaves within it (512 × 512 × value size bytes), and at that
 section's end, 512 × value size bytes a leaf on from its start; a piece of no bytes is
 left out, so the first chunk holds the header, the root table and the nodes, and the last
 the tile values, if there are any. Each chunk is one LZ4 block, as the LZ4 project's
-`lz4_Block_format.md` describes it: no frame, no checksum, no stated length, the length
-before compression taken from the table.
+`lz4_Block_format.md` describes it: no frame, no checksum, no stated length. Before
+compression a chunk is its bytes of the frozen buffer, or, for a leaf chunk (one within
+the leaf values section) of an encoding other than 0, those bytes encoded as §8.5 says;
+its length before compression follows from the table's.
 
 ### 8.4 What a reader checks
 
@@ -379,16 +384,50 @@ A reader refuses a file, before answering anything, unless:
 
 1. its length is a multiple of 32;
 2. the magic and version 1, codec 1, 512 leaves a chunk, and the header's unused bytes zero;
-3. for each grid: the directory's unused words zero; its metadata at the block right after
+3. for each grid: the directory's unused word zero; its value encoding 0, or 1 or 2 with a
+   value type of code 1, 2, 5 or 6; for encoding 2, each range's ends finite, the least at
+   or below the greatest, and their difference finite; its metadata at the block right after
    the previous part, (count + 1) × 32 for the first, its chunk table at the block right
    after the metadata and each chunk at the block right after the part before it, all
    ending within the file; the bytes between parts zero;
-4. its chunks' lengths before compression, none zero, add up to its frozen buffer's
-   length, and each chunk decompresses to exactly its length;
-5. the cache file so made passes §3.4;
+4. its chunks' lengths, none zero, add up to its frozen buffer's length, and each chunk
+   decompresses to exactly its length before compression, which for a leaf chunk follows
+   from rule 6's cut, read from the frozen header (§2.1) in the first chunk;
+5. the cache file so made, its leaf values restored as §8.5 says, passes §3.4;
 6. each grid's chunks are cut as §8.3 cuts its frozen buffer;
 7. the last grid's last chunk ends, padded, where the file ends, or, with no grid, the
    header does.
 
 That a chunk's compressed bytes are those brodo's compressor gives is not checked: another
-compressor's valid LZ4 block of the same bytes is read (ADR-0016).
+compressor's valid LZ4 block of the same bytes is read (ADR-0016). Nor are a quantised
+chunk's codes: a binary16 code of an infinity or a NaN, which brodo never writes, restores
+as one, and an 8-bit grid's ranges need not be its values' least and greatest.
+
+### 8.5 Value encodings
+
+A grid's value encoding says how its leaf chunks hold its leaf values; its other chunks,
+and so the background and the tiles, are its frozen buffer's bytes. A value's scalars are
+its components, x, y, z, or the value itself for a type of one, and a leaf chunk's scalars
+are taken in order, each value's in turn. A value restored is written as its type writes
+it (§1.1).
+
+| Code | Encoding | Value types | A scalar before compression |
+| :--- | :--- | :--- | :--- |
+| 0 | exact | any | not encoded |
+| 1 | binary16, shuffled | 1, 2, 5, 6 | 2 bytes |
+| 2 | 8 bits over a range | 1, 2, 5, 6 | 1 byte |
+
+**Binary16.** Each scalar x is stored as the IEEE 754 binary16 nearest it, ties to the one
+of even significand, as a `u16` code; a leaf chunk before compression is the low bytes of
+its codes, in order, then their high bytes. A scalar restores as its code's value, which
+`f32` and `f64` hold exactly. The writer refuses a NaN, or x beyond ±65504; the value
+restored, x', is within 2⁻¹¹ × |x| + 2⁻²⁵ of x.
+
+**8 bits.** The grid's ranges, after its chunk table entries, are for each component, in
+order, two `f64`: lo and hi, the least and the greatest of that component over the grid's
+leaf values, or 0 and 0 with no leaf. Each scalar x is stored as one byte, q = (x − lo) /
+(hi − lo) × 255 rounded to the nearest integer, half away from zero, or 0 where hi = lo,
+each step in `f64`; a leaf chunk before compression is its bytes, in order. A scalar
+restores as lo + q × ((hi − lo) / 255), in `f64`, rounded to the nearest of its type. The
+writer refuses a NaN, an infinity, or hi − lo beyond `f64`'s range; x' is within
+(hi − lo) / 510 of x, to the rounding of `f64` and of x's type.

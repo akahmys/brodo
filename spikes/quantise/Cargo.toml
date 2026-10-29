@@ -1,0 +1,21 @@
+# Throwaway spike for value quantisation in the archive (ROADMAP.md P6). Never imported by
+# `crates/` (PLANNING.md §3); its own workspace, so cargo does not look for it in the one
+# above.
+[package]
+name = "quantise-spike"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+brodo = { path = "../../crates/brodo", default-features = false }
+colino = { path = "../../crates/colino", default-features = false }
+rayon = "=1.12.0"
+lz4_flex = { version = "=0.14.0", default-features = false, features = ["std", "safe-encode", "safe-decode", "checked-decode"] }
+zerocopy = { version = "=0.8.63", features = ["derive"] }
+
+[profile.release]
+debug = false
+
+[workspace]
+members = ["."]

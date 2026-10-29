@@ -22,6 +22,8 @@ const GOLDEN: &[&str] = &[
     "hermite_v1.bin",
     #[cfg(feature = "archive")]
     "archive_v1.bin",
+    #[cfg(feature = "archive")]
+    "archive_v1_quantised.bin",
 ];
 
 /// A cache file as the crates read the bytes: a cache file's, or an archive's decompressed.

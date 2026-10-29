@@ -25,6 +25,8 @@ mod mapping;
 pub mod meta;
 pub mod morphology;
 pub mod parallel;
+#[cfg(feature = "archive")]
+mod quantise;
 #[cfg(feature = "slice-png")]
 pub mod slice;
 pub mod topology;

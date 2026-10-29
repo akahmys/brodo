@@ -12,6 +12,11 @@ are recorded here when they change (V6).
   `CacheFile` of the same grids, checked whole first, as docs/formats.md §8.4 states
   (ADR-0016). Archive format version 1. `CacheError` gains `Decompress` and `Chunks`;
   `BadMagic` and `UnsupportedVersion` now name no profile in their messages.
+- Quantised values in the archive: `archive::write_with` and `to_bytes_with` take each
+  grid's `archive::Encoding`, exact, binary16 byte-shuffled, or 8 bits over its range, for
+  floating value types, its leaf values read back within docs/formats.md §8.5's bounds
+  (ADR-0016). Archive format version 1 gains the value encoding code; exact archives keep
+  their bytes. `CacheError` gains `UnknownEncoding`, `NotQuantised` and `Unrepresentable`.
 
 ## 0.6.0 (2026-10-28)
 

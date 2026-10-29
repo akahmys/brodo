@@ -121,3 +121,38 @@ Before the archive profile was built, the human decided four points:
   of an older `lz4_flex`; docs/formats.md states the gap.
 - It is built under the `archive` feature, opted into (ADR-0036), so that `lz4_flex` reaches
   only a user who asks for it.
+
+## Amendment: quantised values in the archive
+
+- **Date**: 2026-10-29 (third)
+
+ROADMAP.md P6 asked for an archive's values quantised to 16-bit floats and to 8 bits over
+a range, with byte shuffling. `spikes/quantise/` measured five frozen grids (its REPORT.md)
+against criteria the human set: every value within its encoding's error bound, reading at
+most twice `CacheFile::read`'s copy and check, and an encoding adopted only if smaller than
+exact `lz4_flex`. Every encoding met the first and third; byte shuffling shrank binary16 by
+8 to 40 %, and 8 bits over each chunk's range was never smaller than over the grid's. On
+reading, a 10 MB grid exceeded twice the yardstick, binary16 at 2.5 to 2.8, only while its
+bytes stayed in the caches between runs, which sped the copy, not binary16: with the caches
+flushed before each run it was 1.9 to 2.0, and the same shape four times larger 1.7
+either way. The human decided:
+
+- The criterion on reading is measured with the caches flushed before each run, as a file
+  is read.
+- A grid's leaf values may be stored exact, as IEEE 754 binary16 rounded to nearest, ties
+  to even, byte-shuffled, or as 8 bits over each component's range across the grid's leaf
+  values, the writer choosing per grid. Only floating value types are quantised; the
+  background and the tiles stay exact. The writer refuses, naming the grid, a value
+  binary16 cannot hold (NaN, or beyond ±65504) and one 8 bits cannot (NaN, infinite, or a
+  range wider than an `f64` holds).
+- The encoding is a code in the directory entry's first unused word, 0 for exact, and a
+  reader that does not know a code refuses it, as with a value type code: archive format
+  version 1 is extended, not raised, its exact files' bytes unchanged. The human weighed
+  raising the version, or redrawing version 1, unreleased, and found that a design drawn
+  anew places the code and the ranges where these do.
+- An 8-bit grid's ranges, two `f64` a component, follow its chunk table, within its part.
+  A chunk table still states each chunk's length in the frozen buffer; a quantised chunk
+  decompresses to its encoded length, which follows from that.
+- A reader restores the values and checks the cache file so made as before; it checks an
+  encoding's code against the value type, and the ranges as finite and ordered, but not
+  that the codes are ones the writer gives.

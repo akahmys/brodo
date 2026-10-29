@@ -5,7 +5,7 @@
 
 #![cfg(feature = "archive")]
 
-use brodo::archive::{from_bytes, read, to_bytes, write};
+use brodo::archive::{Encoding, from_bytes, read, to_bytes, to_bytes_with, write, write_with};
 use brodo::cache::{self, CacheEntry, CacheFile};
 use brodo::error::{CacheError, FormatError};
 use brodo::field::{Field, Value};
@@ -65,6 +65,12 @@ fn golden_entries() -> Vec<CacheEntry> {
 }
 
 const GOLDEN: &[u8] = include_bytes!("data/archive_v1.bin");
+const QUANTISED: &[u8] = include_bytes!("data/archive_v1_quantised.bin");
+
+/// The golden grids, the first in binary16 and the second in 8 bits.
+fn quantised(e: &[CacheEntry]) -> Vec<(&CacheEntry, Encoding)> {
+    e.iter().zip([Encoding::Binary16, Encoding::EightBit]).collect()
+}
 
 /// Grids of `leaves` leaves in a row, several chunks of them for more than 512.
 fn row(leaves: i32) -> Vec<CacheEntry> {
@@ -204,8 +210,17 @@ fn each_check_refuses_its_damage() {
     assert!(matches!(read(&g[..g.len() - 32]), Err(CacheError::Truncated(_))));
     assert!(matches!(read(&g[..g.len() - 1]), Err(CacheError::Inconsistent("length"))));
     // Directory of grid 0 is words 8..16: metadata at, length, table at, chunks, blocks,
-    // type, then two unused.
-    assert!(matches!(read(&with_word(&g, 14, 1)), Err(CacheError::Inconsistent("directory"))));
+    // type, encoding, then one unused.
+    assert!(matches!(read(&with_word(&g, 15, 1)), Err(CacheError::Inconsistent("directory"))));
+    assert!(matches!(read(&with_word(&g, 14, 3)), Err(CacheError::UnknownEncoding(3))));
+    // Exact chunks said to be binary16: the first leaf chunk does not decompress to half
+    // its length.
+    assert!(matches!(
+        read(&with_word(&g, 14, 1)),
+        Err(CacheError::Decompress { index: 0, chunk: 1 })
+    ));
+    // Eight bits want ranges after the table, which then holds what is not one.
+    assert!(read(&with_word(&g, 14, 2)).is_err());
     assert!(matches!(read(&with_word(&g, 8, 4)), Err(CacheError::Inconsistent("metadata"))));
     assert!(matches!(
         read(&with_word(&g, 10, word(&g, 10) + 1)),
@@ -238,15 +253,16 @@ fn each_check_refuses_its_damage() {
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(512))]
 
-    /// Damaged archives: changed words, or a cut. Either refused, or every read answers
-    /// without a panic.
+    /// Damaged archives, exact or quantised: changed words, or a cut. Either refused, or
+    /// every read answers without a panic.
     #[test]
     fn damaged_files_are_refused_or_read_safely(
         changes in prop::collection::vec((any::<prop::sample::Index>(), any::<u32>()), 1..6),
         cut in prop::option::of(any::<prop::sample::Index>()),
         early in any::<bool>(),
+        quantised in any::<bool>(),
     ) {
-        let mut bytes = GOLDEN.to_vec();
+        let mut bytes = if quantised { QUANTISED } else { GOLDEN }.to_vec();
         let words = if early { 64 } else { bytes.len() / 4 };
         for (i, x) in changes {
             let w = i.index(words);
@@ -264,4 +280,135 @@ proptest! {
             }
         }
     }
+}
+
+/// Quantised grids keep their bytes (TESTING.md V6), and read back within their bounds
+/// (docs/formats.md §8.5): binary16 within 2⁻¹¹ × |x| + 2⁻²⁵, 8 bits within a 510th of
+/// the range; the background and the tiles exact.
+#[test]
+fn quantised_values_keep_their_bytes_and_read_back_within_their_bounds() {
+    let e = golden_entries();
+    let bytes = to_bytes_with(&quantised(&e)).unwrap();
+    assert!(bytes == QUANTISED, "the bytes of a quantised archive changed (TESTING.md V6)");
+    assert!(bytes.len() < GOLDEN.len(), "quantised is smaller");
+    let path = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("archive_v1_q.brda");
+    write_with(&path, &quantised(&e)).unwrap();
+    assert_eq!(std::fs::read(&path).unwrap(), bytes);
+    let file = read(&path, u64::MAX).unwrap();
+    let exact = CacheFile::from_bytes(&cache::to_bytes(&e).unwrap()).unwrap();
+    let t = build(
+        &[[-1, 0, 0], [4096, 7, 9]],
+        &[(TileLevel::Lower, [8, 8, 8]), (TileLevel::Root, [0, 8192, 0])],
+    );
+    let (a, x) = (file.view::<f32>(0).unwrap(), exact.view::<f32>(0).unwrap());
+    let (b, y) = (file.view::<[f32; 3]>(1).unwrap(), exact.view::<[f32; 3]>(1).unwrap());
+    let step = 1023.0 / 255.0;
+    for n in t.leaf_numbers() {
+        let o = t.leaf_origin(n).unwrap();
+        for i in 0..512 {
+            let v = [o[0] + i % 8, o[1] + i / 8 % 8, o[2] + i / 64];
+            let (got, want) = (a.get(v).unwrap(), x.get(v).unwrap());
+            assert!(
+                (got - want).abs() <= want.abs() / 2048.0 + 2.0_f32.powi(-25),
+                "{want} as {got}"
+            );
+            let (got, want) = (b.get(v).unwrap(), y.get(v).unwrap());
+            for (g, w) in got.iter().zip(want) {
+                assert!((g - w).abs() <= step / 2.0 * 1.000_001, "{w} as {g}");
+            }
+        }
+    }
+    // Outside the leaves: a tile and the background, exact.
+    for v in [[8, 8, 8], [0, 8192, 0], [-4096, 0, 0]] {
+        assert_eq!(a.get(v).unwrap().to_bits(), x.get(v).unwrap().to_bits());
+        assert_eq!(b.get(v).unwrap().map(f32::to_bits), y.get(v).unwrap().map(f32::to_bits));
+    }
+}
+
+/// A grid quantised but not of a floating type, and a value its encoding cannot hold, are
+/// refused at write, naming the grid.
+#[test]
+fn a_value_its_encoding_cannot_hold_is_refused() {
+    let t = build(&[[0, 0, 0]], &[]);
+    let m = meta("g", &[]);
+    let bytes = CacheEntry::new(&m, &t, &Field::new(&t, 3_u8)).unwrap();
+    let exact = CacheEntry::new(&m, &t, &Field::new(&t, 1.0_f32)).unwrap();
+    for encoding in [Encoding::Binary16, Encoding::EightBit] {
+        assert!(matches!(
+            to_bytes_with(&[(&exact, encoding), (&bytes, encoding)]),
+            Err(CacheError::NotQuantised { index: 1, value_type: 3 })
+        ));
+    }
+    let with = |x: f64| {
+        let mut f = Field::new(&t, [0.0_f64; 3]);
+        f.leaf_mut(&t, t.leaf_numbers().next().unwrap()).unwrap()[7] = [0.0, x, 0.0];
+        CacheEntry::new(&m, &t, &f).unwrap()
+    };
+    for (x, encoding) in [
+        (65504.5, Encoding::Binary16),
+        (-1.0e6, Encoding::Binary16),
+        (f64::NAN, Encoding::Binary16),
+        (f64::NAN, Encoding::EightBit),
+        (f64::INFINITY, Encoding::EightBit),
+    ] {
+        let g = with(x);
+        assert!(
+            matches!(
+                to_bytes_with(&[(&exact, Encoding::Exact), (&g, encoding)]),
+                Err(CacheError::Unrepresentable(1))
+            ),
+            "{x} in {encoding:?}"
+        );
+    }
+    // Wider than an f64 holds: the range from -f64::MAX to f64::MAX.
+    let mut f = Field::new(&t, [0.0_f64; 3]);
+    let leaf = f.leaf_mut(&t, t.leaf_numbers().next().unwrap()).unwrap();
+    leaf[0] = [f64::MAX; 3];
+    leaf[1] = [-f64::MAX; 3];
+    let g = CacheEntry::new(&m, &t, &f).unwrap();
+    assert!(matches!(
+        to_bytes_with(&[(&g, Encoding::EightBit)]),
+        Err(CacheError::Unrepresentable(0))
+    ));
+    assert!(to_bytes_with(&[(&with(65504.0), Encoding::Binary16)]).is_ok());
+}
+
+/// Quantised chunks are encoded in parallel, and the bytes are the same on one thread or
+/// many; binary16 read back and written again gives the same bytes.
+#[test]
+fn quantised_grids_give_the_same_bytes_whatever_the_threads() {
+    let e = row(1300);
+    let grids = quantised(&e);
+    let on = |n: usize| {
+        let pool = rayon::ThreadPoolBuilder::new().num_threads(n).build().unwrap();
+        pool.install(|| to_bytes_with(&grids).unwrap())
+    };
+    let one = on(1);
+    assert_eq!(on(8), one);
+    let back = from_bytes(&one, u64::MAX).unwrap();
+    let (t, f) = back.view::<f32>(0).unwrap().thaw().unwrap();
+    let again = CacheEntry::new(back.meta(0).unwrap(), &t, &f).unwrap();
+    let first = to_bytes_with(&[(&e[0], Encoding::Binary16)]).unwrap();
+    assert_eq!(to_bytes_with(&[(&again, Encoding::Binary16)]).unwrap(), first);
+}
+
+/// An 8-bit grid's ranges are checked: finite, the least at or below the greatest.
+#[test]
+fn an_eight_bit_grids_ranges_are_checked() {
+    let q = QUANTISED.to_vec();
+    let read = |b: &[u8]| from_bytes(b, u64::MAX).map(|_| ());
+    assert!(read(&q).is_ok());
+    // Grid 1's directory is words 16..24; its ranges follow its table's entries.
+    let ranges = word(&q, 18) as usize * 8 + word(&q, 19) as usize * 2;
+    let lo = f64::from_le_bytes(q[ranges * 4..ranges * 4 + 8].try_into().unwrap());
+    let hi = f64::from_le_bytes(q[ranges * 4 + 8..ranges * 4 + 16].try_into().unwrap());
+    assert!(lo < hi, "the x component spans {lo}..{hi}");
+    for bad in [f64::NAN, f64::INFINITY, hi + 1.0] {
+        let mut b = q.clone();
+        b[ranges * 4..ranges * 4 + 8].copy_from_slice(&bad.to_le_bytes());
+        assert!(matches!(read(&b), Err(CacheError::Inconsistent("chunk table"))), "lo {bad}");
+    }
+    // Ranges said to be binary16's: the table is then shorter than its part, the padding
+    // not zero.
+    assert!(matches!(read(&with_word(&q, 22, 1)), Err(CacheError::Inconsistent("padding"))));
 }

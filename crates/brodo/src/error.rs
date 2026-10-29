@@ -240,6 +240,22 @@ pub enum CacheError {
     /// An archive's grid is not cut into chunks as its writer cuts it (docs/formats.md §8.3).
     #[error("grid {0} is not cut into chunks as the format cuts it")]
     Chunks(usize),
+    /// An archive's value encoding this build does not know (docs/formats.md §8.5).
+    #[error("value encoding {0} is not read by this build")]
+    UnknownEncoding(u32),
+    /// A grid asked to be quantised holds values of a type that is not: only floating ones
+    /// are (docs/formats.md §8.5).
+    #[error("grid {index}'s values, of type {value_type}, are not quantised")]
+    NotQuantised {
+        /// The grid's place in what was written.
+        index: usize,
+        /// Its value type's code.
+        value_type: u32,
+    },
+    /// A grid's leaf value is one its encoding cannot hold: a NaN, a value beyond ±65504 in
+    /// binary16, an infinity or a range wider than an `f64` holds in 8 bits.
+    #[error("grid {0} holds a leaf value its encoding cannot hold")]
+    Unrepresentable(usize),
     /// The metadata holds a key beginning `hermite.`, which `CacheEntry::new` leaves to
     /// Hermite data.
     #[error("the metadata holds the key {0:?}, which Hermite data reserves")]

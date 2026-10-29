@@ -321,13 +321,48 @@ def lz4(src, n):
     return bytes(out)
 
 
-def cuts(g):
-    """§8.3: a frozen buffer's chunks' lengths, in blocks."""
-    size, leaves, start, total = u32(g, 12), u32(g, 28), u32(g, 48), len(g) // BLOCK
+def cuts(head, total):
+    """§8.3: the chunks of a frozen buffer of `total` blocks, its header at `head`'s start:
+    each its length in blocks and whether it holds leaf values."""
+    size, leaves, start = u32(head, 12), u32(head, 28), u32(head, 48)
     leaf = 512 * size // BLOCK
     end = start + leaves * leaf
+    need(leaf > 0 and end <= total, "grid")
     marks = [0] + list(range(start, end, 512 * leaf)) + [end, total]
-    return [b - a for a, b in zip(marks, marks[1:]) if b > a]
+    return [(b - a, a >= start and b <= end) for a, b in zip(marks, marks[1:]) if b > a]
+
+
+# §8.5: value type code -> (scalar format, scalar size, components), for the floating ones.
+FLOATING = {1: ("<f", 4, 1), 2: ("<d", 8, 1), 5: ("<f", 4, 3), 6: ("<d", 8, 3)}
+
+
+def scalar(fmt, x):
+    """`x` written as a scalar of `fmt`, rounded to the nearest; beyond `f32`, an infinity."""
+    try:
+        return struct.pack(fmt, x)
+    except OverflowError:
+        return struct.pack(fmt, x * float("inf"))
+
+
+def restore(encoding, code, ranges, codes):
+    """§8.5: a leaf chunk's values from its codes."""
+    fmt, _, comps = FLOATING[code]
+    if encoding == 1:
+        n = len(codes) // 2
+        values = (struct.unpack("<e", bytes([codes[i], codes[n + i]]))[0] for i in range(n))
+    else:
+        values = (ranges[i % comps][0] + q * ((ranges[i % comps][1] - ranges[i % comps][0]) / 255)
+                  for i, q in enumerate(codes))
+    return b"".join(scalar(fmt, x) for x in values)
+
+
+def ranges_of(t, comps):
+    """§8.5: an 8-bit grid's ranges, checked as §8.4 rule 3 says."""
+    r = [struct.unpack("<2d", t[16 * c : 16 * c + 16]) for c in range(comps)]
+    finite = lambda x: x == x and abs(x) != float("inf")
+    for lo, hi in r:
+        need(finite(lo) and finite(hi) and lo <= hi and finite(hi - lo), "ranges")
+    return r
 
 
 def archive(b):
@@ -341,13 +376,17 @@ def archive(b):
     need(after <= len(b), "directory")
     for i in range(count):
         d = 32 * (1 + i)
-        meta_at, meta_len, table_at, chunks, grid_blocks, code = (u32(b, d + 4 * k) for k in range(6))
-        need(b[d + 24 : d + 32] == b"\0" * 8, "directory")
+        meta_at, meta_len, table_at, chunks, grid_blocks, code, encoding = (u32(b, d + 4 * k) for k in range(7))
+        need(b[d + 28 : d + 32] == b"\0" * 4, "directory")
+        need(encoding in (0, 1, 2), "encoding")
+        need(encoding == 0 or code in FLOATING, "directory")
+        comps = FLOATING[code][2] if encoding == 2 else 0
         parts = [(meta_at * BLOCK, meta_at * BLOCK + meta_len)]
         need(parts[0][0] == after and parts[0][1] <= len(b), "metadata place")
-        table = table_at * BLOCK
-        need(table == -(-parts[0][1] // BLOCK) * BLOCK and table + 8 * chunks <= len(b), "table place")
-        parts.append((table, table + 8 * chunks))
+        table, table_len = table_at * BLOCK, 8 * chunks + 16 * comps
+        need(table == -(-parts[0][1] // BLOCK) * BLOCK and table + table_len <= len(b), "table place")
+        parts.append((table, table + table_len))
+        ranges = ranges_of(b[table + 8 * chunks : table + table_len], comps) if comps else []
         listed = []
         for k in range(chunks):
             raw, n = u32(b, table + 8 * k), u32(b, table + 8 * k + 4)
@@ -360,21 +399,28 @@ def archive(b):
         for (_, a), (z, _) in zip(parts, parts[1:] + [(end, end)]):
             need(b[a:z] == b"\0" * (z - a), "padding")
         meta = b[parts[0][0] : parts[0][1]]
-        grids.append((meta, grid_blocks, code, listed))
+        grids.append((meta, grid_blocks, code, encoding, ranges, listed))
         after = end
     need(after == len(b), "end")
-    # The cache file of the same grids, §3, its frozen buffers decompressed.
+    # The cache file of the same grids, §3, its frozen buffers decompressed: each first
+    # chunk, its header telling how the grid is cut, then the others, leaf values restored.
     head, body, at = [b"BRDC", struct.pack("<II", 1, count), b"\0" * 20], [], 1 + count
-    for meta, grid_blocks, code, listed in grids:
+    for meta, grid_blocks, code, encoding, ranges, listed in grids:
         grid_at = at + -(-len(meta) // BLOCK)
         head.append(struct.pack("<5I", at, len(meta), grid_at, grid_blocks, code) + b"\0" * 12)
         body.append(meta + b"\0" * (-len(meta) % BLOCK))
-        body.extend(lz4(c, raw * BLOCK) for raw, c in listed)
+        first = lz4(listed[0][1], listed[0][0] * BLOCK) if listed else b""
+        pieces = cuts(first, grid_blocks)
+        need([r for r, _ in pieces] == [r for r, _ in listed] and not pieces[0][1], "chunks")
+        body.append(first)
+        for (raw, c), (_, leaf) in list(zip(listed, pieces))[1:]:
+            if leaf and encoding:
+                size = FLOATING[code][1]
+                body.append(restore(encoding, code, ranges, lz4(c, raw * BLOCK // size * {1: 2, 2: 1}[encoding])))
+            else:
+                body.append(lz4(c, raw * BLOCK))
         at = grid_at + grid_blocks
-    out = cache(b"".join(head + body))
-    for (_, g), (_, _, _, listed) in zip(out, grids):
-        need(cuts(g.b) == [r for r, _ in listed], "chunks")
-    return out
+    return cache(b"".join(head + body))
 
 
 def group_table(pairs):

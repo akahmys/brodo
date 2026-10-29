@@ -258,8 +258,12 @@ fastest. A neighbour beyond the `i32` coordinate range is the background.
   checks how each grid is cut into chunks, but not that a chunk's compressed bytes are
   brodo's compressor's. It carries no checksum (ADR-0016). It is written whole, as a
   cache file is.
-- (P6, not built.) The archive can decompress only the chunks a region needs, and can quantise values
-  (16-bit float, 8-bit range), byte-shuffled before compression.
+- An archive's grid of a floating value type may store its leaf values quantised, the
+  writer choosing per grid (`archive::Encoding`): as IEEE 754 binary16, byte-shuffled, or
+  as 8 bits over each component's range across its leaf values, each read back within the
+  bound docs/formats.md §8.5 states; the background and the tiles stay exact. A value the
+  encoding cannot hold is refused at write (ADR-0016).
+- (P6, not built.) The archive can decompress only the chunks a region needs.
 - (P7, not built.) OpenVDB files (`.vdb`) are read through the `vdb-rs` crate into brodo's tree and written
   by brodo, for level sets and scalar density first.
 
