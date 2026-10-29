@@ -18,7 +18,7 @@ papers, public documentation and permissively licensed code (S1, S2) may appear 
 | :--- | :--- | :--- |
 | `crates/brodo/src/accessor.rs` | ARCHITECTURE.md §4.4, ADR-0015 only | value accessors: reads and leaf-only writes from a cached path |
 | `crates/brodo/src/analysis.rs` | ARCHITECTURE.md §4.5, ADR-0013 only; union-find and breadth-first search as textbook material | connected-component labelling and flood fill on the sparse tree |
-| `crates/brodo/src/archive.rs` | ARCHITECTURE.md §4.7, ADR-0016; the LZ4 project's `lz4_Block_format.md`, for the block format docs/formats.md §8.3 names; `lz4_flex` 0.14's API only | the archive profile: writing grids in compressed chunks and reading them back as a cache file |
+| `crates/brodo/src/archive.rs` | ARCHITECTURE.md §4.7, ADR-0016; the LZ4 project's `lz4_Block_format.md`, for the block format docs/formats.md §8.3 names; `lz4_flex` 0.14's API only | the archive profile: writing grids in compressed chunks and reading them back as a cache file, or one grid's region of them |
 | `crates/brodo/src/quantise.rs` | docs/formats.md §8.5, ADR-0016; IEEE 754-2019 §3.6, for binary16's format and §4.3.3, for rounding to nearest, ties to even | an archive's quantised leaf values: binary16, byte-shuffled, and 8 bits over a range |
 | `crates/brodo/src/cache.rs` | ARCHITECTURE.md §4.7, ADR-0016 only | the cache profile: writing and checking a file of grids with their metadata |
 | `crates/brodo/src/error.rs` | none | the crate's error types |
@@ -35,7 +35,7 @@ papers, public documentation and permissively licensed code (S1, S2) may appear 
 | `crates/brodo/src/morphology.rs` | ARCHITECTURE.md §4.5, ADR-0025 only; dilation and erosion by a structuring element as textbook material | dilation and erosion of a topology on whole leaves, and of values by a max or min filter |
 | `crates/brodo/src/parallel.rs` | ARCHITECTURE.md §4.4, ADR-0015 only | the leaf-parallel update and the fixed-order reduction |
 | `crates/brodo/src/topology.rs` | ARCHITECTURE.md §4.2, ADR-0014 only; Morton order as bit interleaving | topologies: stamps, Morton numbering, the editor, `Remap` |
-| `crates/brodo/src/view.rs` | ARCHITECTURE.md §4.6, ADR-0016, ADR-0032 only; `zerocopy`'s public API documentation (0.8.63) | `GridView`: checking a frozen grid whole, reading it in place, and walking its leaves and tiles |
+| `crates/brodo/src/view.rs` | ARCHITECTURE.md §4.6, ADR-0016, ADR-0032 only; `zerocopy`'s public API documentation (0.8.63) | `GridView`: checking a frozen grid whole, or its nodes without its leaf values, reading it in place, and walking its leaves and tiles |
 | `crates/brodo/src/slice.rs` | ARCHITECTURE.md §6.1, ADR-0018 only; `png`'s public API documentation (0.18.1) | a slice of a scalar field drawn and encoded as PNG |
 | `crates/brodo/src/vtk.rs` | ARCHITECTURE.md §6.1, ADR-0018 only; VTK's published XML file-format documentation, its `NumberOfComponents` and `Vectors` included; VTK_VOXEL's number from VTK's public Python API | a field, scalar or of three components, written as one ASCII `.vtu` of voxel cells |
 | `crates/brodo/src/tree.rs` | ARCHITECTURE.md §4.1, ADR-0013; Museth 2013, for a shallow, wide tree of fixed levels with tiles | the sparse tree: levels, masks, arenas, activation, tiles, their split and merge, iteration, compaction |

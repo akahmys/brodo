@@ -431,3 +431,23 @@ each step in `f64`; a leaf chunk before compression is its bytes, in order. A sc
 restores as lo + q × ((hi − lo) / 255), in `f64`, rounded to the nearest of its type. The
 writer refuses a NaN, an infinity, or hi − lo beyond `f64`'s range; x' is within
 (hi − lo) / 510 of x, to the rounding of `f64` and of x's type.
+
+### 8.6 Reading a region
+
+A reader of one grid's region, a box of voxels, decompresses that grid's first chunk, its
+last if it holds the tile values, and each leaf chunk holding a leaf whose 8 × 8 × 8 voxels
+meet the box (ADR-0016). It refuses a file, before answering anything, unless:
+
+1. rules 1 to 3 and 7 of §8.4 hold, and, for every grid, its chunks' lengths add up to its
+   frozen buffer's length;
+2. the grid's metadata passes §3.4, rule 4;
+3. each chunk it decompresses does so to exactly its length before compression, its first
+   before any other;
+4. the grid's chunks are cut as §8.3 cuts its frozen buffer, read from the frozen header in
+   its first chunk;
+5. its frozen buffer passes §2.5's rules 2 to 6, the leaf values section's bytes aside,
+   with the directory's value type.
+
+A chunk it does not decompress is not checked to decompress, nor are its values: a file
+that a whole read (§8.4) refuses may answer a region. It answers a voxel within the box as
+the frozen buffer does, and refuses any other, though the chunks it holds may cover it.

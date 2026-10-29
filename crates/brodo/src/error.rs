@@ -156,6 +156,10 @@ pub enum FormatError {
     /// A topology asked to hold a view's values does not hold the view's leaves and tiles.
     #[error("the topology does not hold the view's leaves and tiles")]
     OtherTopology,
+    /// A region's view was asked for a voxel outside its box, or a leaf that does not meet
+    /// it (docs/formats.md §8.6).
+    #[error("the voxel or leaf lies outside the region read")]
+    OutsideRegion,
 }
 
 /// Why a grid's metadata was refused.

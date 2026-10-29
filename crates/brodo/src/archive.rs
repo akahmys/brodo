@@ -4,7 +4,8 @@
 //! listed in `UNTRUSTED_INPUT`, indexes nothing (CODING.md Rule 3), checks the whole file
 //! before it answers, and is fuzzed (TESTING.md T6).
 //!
-//! Format version 1's bytes are in `docs/formats.md` §8, which this code follows.
+//! Format version 1's bytes are in `docs/formats.md` §8, which this code follows. A region's
+//! read (§8.6) checks the archive's structure and only the chunks it decompresses.
 
 use std::io::Read;
 use std::path::Path;
@@ -13,12 +14,16 @@ use rayon::prelude::*;
 use zerocopy::{FromBytes, FromZeros, IntoBytes};
 
 use crate::cache::{
-    CacheEntry, CacheFile, Cursor, Part, Storage, encode_meta, head, index, pad_to, put_u32, range,
-    u32_of, zero,
+    CacheEntry, CacheFile, Cursor, Part, Storage, decode_meta, encode_meta, head, index, pad_to,
+    put_u32, range, u32_of, zero,
 };
-use crate::error::CacheError;
-use crate::frozen::{BLOCK, Block, Header};
+use crate::error::{CacheError, FormatError};
+use crate::field::{LEAF_VOXELS, Stored};
+use crate::frozen::{BLOCK, Block, Header, local};
+use crate::meta::{Bounds, GridMeta};
 use crate::quantise::{self, Kind, Quantised};
+use crate::tree::Coord;
+use crate::view::{GridView, ViewLocation};
 
 /// "BRDA", read as a little-endian `u32`.
 const MAGIC: u32 = u32::from_le_bytes(*b"BRDA");
@@ -526,6 +531,12 @@ fn run(found: &[Found<'_>], mut work: Vec<&mut Work<'_, '_>>) -> Result<(), Cach
 /// or by the bytes read where its length says less than it holds, and a larger cache file
 /// by the lengths the archive states, before it is made (ADR-0036).
 pub fn read(path: &Path, limit: u64) -> Result<CacheFile, CacheError> {
+    from_bytes(&load(path, limit)?, limit)
+}
+
+/// An archive's bytes, of at most `limit`, refused by its length before any of it is read,
+/// or by the bytes read where its length says less than it holds.
+fn load(path: &Path, limit: u64) -> Result<Vec<u8>, CacheError> {
     let file = std::fs::File::open(path)?;
     let length = file.metadata()?.len();
     if length > limit {
@@ -537,7 +548,271 @@ pub fn read(path: &Path, limit: u64) -> Result<CacheFile, CacheError> {
     if read > limit {
         return Err(CacheError::FileTooLarge { length: read, limit });
     }
-    from_bytes(&bytes, limit)
+    Ok(bytes)
+}
+
+/// One grid's region of an archive, a box of voxels, read without the leaf chunks it does
+/// not need (docs/formats.md §8.6, ADR-0016): the grid's first chunk, its tile chunk, and
+/// each leaf chunk holding a leaf that meets the box, each decompressed into a buffer of
+/// its own. Its view answers within the box (`Region::view`).
+#[derive(Debug)]
+pub struct Region {
+    index: usize,
+    meta: GridMeta,
+    bounds: Bounds,
+    value_type: u32,
+    extent: Bounds,
+    /// The frozen buffer's length in bytes.
+    len: usize,
+    head: Vec<Block>,
+    tail: Vec<Block>,
+    /// Each leaf chunk held, by its place among the grid's leaf chunks.
+    chunks: Vec<(usize, Vec<Block>)>,
+    /// The number and origin of each leaf meeting the box, in number order.
+    leaves: Vec<(u32, Coord)>,
+}
+
+/// Reads grid `index`'s region `extent` from an archive of at most `limit` bytes, holding at
+/// most `limit` bytes decompressed, both refused before they are read or made, as `read`
+/// refuses them (ADR-0036). The file is read whole; a chunk not decompressed is not checked
+/// (docs/formats.md §8.6).
+pub fn read_region(
+    path: &Path,
+    limit: u64,
+    index: usize,
+    extent: Bounds,
+) -> Result<Region, CacheError> {
+    region_from_bytes(&load(path, limit)?, limit, index, extent)
+}
+
+/// Checks an archive's bytes as docs/formats.md §8.6 states and reads grid `index`'s region
+/// `extent`, holding at most `limit` bytes decompressed: more is refused by the lengths the
+/// archive states, before it is made. Of several broken rules, which is named is not
+/// promised.
+pub fn region_from_bytes(
+    bytes: &[u8],
+    limit: u64,
+    index: usize,
+    extent: Bounds,
+) -> Result<Region, CacheError> {
+    let found = find(bytes)?;
+    let g = found.get(index).ok_or(CacheError::NoGrid(index))?;
+    let (meta, bounds) = decode_meta(g.meta)?;
+    let chunk = |k: usize| g.chunks.get(k).copied().ok_or(CacheError::Chunks(index));
+    let (first, raw) = chunk(0)?;
+    within(raw, limit)?;
+    let head = decompress(&found, index, 0, first, raw, false)?;
+    let pieces = cut(head.as_bytes(), g.grid_blocks)?;
+    let first_leaf = pieces.first().is_some_and(|(_, leaf)| *leaf);
+    if first_leaf || pieces.iter().map(|(r, _)| *r).ne(g.chunks.iter().map(|(_, raw)| *raw)) {
+        return Err(CacheError::Chunks(index));
+    }
+    let last = pieces.len().checked_sub(1).filter(|k| *k > 0);
+    let tail = match last.filter(|k| pieces.get(*k).is_some_and(|(_, leaf)| !leaf)) {
+        Some(k) => {
+            let (bytes, raw) = chunk(k)?;
+            within(head.len().saturating_add(raw), limit)?;
+            decompress(&found, index, k, bytes, raw, false)?
+        }
+        None => Vec::new(),
+    };
+    let len = g.grid_blocks.checked_mul(BLOCK).ok_or(CacheError::TooLarge)?;
+    let leaves = meeting(g.value_type, head.as_bytes(), tail.as_bytes(), len, extent)
+        .map_err(|error| CacheError::Grid { index, error })?;
+    let mut wanted: Vec<usize> = leaves.iter().map(|(n, _)| *n as usize / CHUNK_LEAVES).collect();
+    wanted.dedup();
+    let mut chunks = Vec::new();
+    let mut held = head.len().saturating_add(tail.len());
+    for k in wanted {
+        let (_, raw) = chunk(k.checked_add(1).ok_or(CacheError::TooLarge)?)?;
+        held = held.saturating_add(raw);
+        chunks.push((k, vec![Block::new_zeroed(); raw]));
+    }
+    within(held, limit)?;
+    let mut work = Vec::new();
+    for (k, room) in &mut chunks {
+        let (bytes, _) = chunk(*k + 1)?;
+        work.push(Work {
+            grid: index,
+            chunk: *k + 1,
+            bytes,
+            room: room.as_mut_bytes(),
+            leaf: true,
+        });
+    }
+    run(&found, work.iter_mut().collect())?;
+    let value_type = g.value_type;
+    Ok(Region { index, meta, bounds, value_type, extent, len, head, tail, chunks, leaves })
+}
+
+/// Refuses `blocks` blocks held beyond `limit` bytes.
+fn within(blocks: usize, limit: u64) -> Result<(), CacheError> {
+    let length = u64::try_from(blocks)
+        .ok()
+        .and_then(|b| b.checked_mul(BLOCK as u64))
+        .ok_or(CacheError::TooLarge)?;
+    if length > limit {
+        return Err(CacheError::FileTooLarge { length, limit });
+    }
+    Ok(())
+}
+
+/// Chunk `chunk` of grid `grid`, `raw` blocks, decompressed alone into a buffer of its own.
+fn decompress(
+    found: &[Found<'_>],
+    grid: usize,
+    chunk: usize,
+    bytes: &[u8],
+    raw: usize,
+    leaf: bool,
+) -> Result<Vec<Block>, CacheError> {
+    let mut out = vec![Block::new_zeroed(); raw];
+    let mut w = Work { grid, chunk, bytes, room: out.as_mut_bytes(), leaf };
+    run(found, vec![&mut w])?;
+    Ok(out)
+}
+
+/// Checks a frozen buffer of `len` bytes held as `head` and `tail`, its leaf values left
+/// out, as a view of the type `value_type` names: the leaves meeting `extent`.
+fn meeting(
+    value_type: u32,
+    head: &[u8],
+    tail: &[u8],
+    len: usize,
+    extent: Bounds,
+) -> Result<Vec<(u32, Coord)>, FormatError> {
+    fn walk<T: Stored>(
+        head: &[u8],
+        tail: &[u8],
+        len: usize,
+        extent: Bounds,
+    ) -> Result<Vec<(u32, Coord)>, FormatError> {
+        let view = GridView::<T>::nodes(head, tail, len)?;
+        match extent {
+            Bounds::Empty => Ok(Vec::new()),
+            Bounds::Box { min, max } => view.leaves_meeting(min, max),
+        }
+    }
+    match value_type {
+        t if t == f32::TYPE_CODE => walk::<f32>(head, tail, len, extent),
+        t if t == f64::TYPE_CODE => walk::<f64>(head, tail, len, extent),
+        t if t == u8::TYPE_CODE => walk::<u8>(head, tail, len, extent),
+        t if t == u32::TYPE_CODE => walk::<u32>(head, tail, len, extent),
+        t if t == <[f32; 3]>::TYPE_CODE => walk::<[f32; 3]>(head, tail, len, extent),
+        t if t == <[f64; 3]>::TYPE_CODE => walk::<[f64; 3]>(head, tail, len, extent),
+        found => Err(FormatError::UnknownValueType(found)),
+    }
+}
+
+impl Region {
+    /// The grid's metadata.
+    pub fn meta(&self) -> &GridMeta {
+        &self.meta
+    }
+
+    /// The bounds the archive states for the grid, not checked against it, as
+    /// `CacheFile::bounds` gives them.
+    pub fn bounds(&self) -> Bounds {
+        self.bounds
+    }
+
+    /// The type code of the grid's values (`Stored::TYPE_CODE`).
+    pub fn value_type(&self) -> u32 {
+        self.value_type
+    }
+
+    /// The box read.
+    pub fn extent(&self) -> Bounds {
+        self.extent
+    }
+
+    /// A view of the region's values of type `T`; another type is refused as
+    /// `CacheError::Grid` with `FormatError::WrongValueType`.
+    pub fn view<T: Stored>(&self) -> Result<RegionView<'_, T>, CacheError> {
+        let grid = |error| CacheError::Grid { index: self.index, error };
+        let nodes = GridView::<T>::nodes(self.head.as_bytes(), self.tail.as_bytes(), self.len)
+            .map_err(grid)?;
+        let mut chunks = Vec::new();
+        for (k, blocks) in &self.chunks {
+            let leaves = <[[T; LEAF_VOXELS]]>::ref_from_bytes(blocks.as_bytes())
+                .map_err(|_| grid(FormatError::Inconsistent("leaf value")))?;
+            chunks.push((*k, leaves));
+        }
+        Ok(RegionView { nodes, chunks, leaves: &self.leaves, extent: self.extent })
+    }
+}
+
+/// A region's values read in place (`Region::view`): every voxel within its box answered as
+/// the grid's frozen buffer answers it, and every other refused as
+/// `FormatError::OutsideRegion`, whatever the chunks held cover (docs/formats.md §8.6).
+#[derive(Debug, Clone)]
+pub struct RegionView<'a, T> {
+    nodes: GridView<'a, T>,
+    chunks: Vec<(usize, &'a [[T; LEAF_VOXELS]])>,
+    leaves: &'a [(u32, Coord)],
+    extent: Bounds,
+}
+
+impl<'a, T: Stored> RegionView<'a, T> {
+    /// The box read.
+    pub fn extent(&self) -> Bounds {
+        self.extent
+    }
+
+    /// The value outside the tree.
+    pub fn background(&self) -> T {
+        self.nodes.background()
+    }
+
+    /// The number and origin of every leaf whose voxels meet the box, in number order.
+    pub fn leaves(&self) -> impl Iterator<Item = (u32, Coord)> + '_ {
+        self.leaves.iter().copied()
+    }
+
+    /// What holds a voxel within the box.
+    pub fn locate(&self, v: Coord) -> Result<ViewLocation, FormatError> {
+        let inside = match self.extent {
+            Bounds::Empty => false,
+            Bounds::Box { min, max } => (0..3).all(|k| {
+                v.get(k)
+                    .zip(min.get(k))
+                    .zip(max.get(k))
+                    .is_some_and(|((c, lo), hi)| lo <= c && c <= hi)
+            }),
+        };
+        if !inside {
+            return Err(FormatError::OutsideRegion);
+        }
+        self.nodes.locate(v)
+    }
+
+    /// The value at a voxel within the box: its leaf's, its tile's, or the background.
+    pub fn get(&self, v: Coord) -> Result<T, FormatError> {
+        match self.locate(v)? {
+            ViewLocation::Leaf(n) => {
+                let [x, y, z] = local(v, 0, 3).map(|c| c as usize);
+                self.leaf(n)?
+                    .get(x + 8 * y + 64 * z)
+                    .copied()
+                    .ok_or(FormatError::Inconsistent("leaf value"))
+            }
+            ViewLocation::Tile(t, _) => self.nodes.tile_value(t),
+            ViewLocation::Background => Ok(self.nodes.background()),
+        }
+    }
+
+    /// A leaf's 512 values, x fastest, for a leaf meeting the box; another is refused as
+    /// `FormatError::OutsideRegion`.
+    pub fn leaf(&self, n: u32) -> Result<&'a [T; LEAF_VOXELS], FormatError> {
+        self.leaves
+            .binary_search_by_key(&n, |(m, _)| *m)
+            .map_err(|_| FormatError::OutsideRegion)?;
+        let n = n as usize;
+        let lost = FormatError::Inconsistent("leaf value");
+        let i =
+            self.chunks.binary_search_by_key(&(n / CHUNK_LEAVES), |(k, _)| *k).map_err(|_| lost)?;
+        self.chunks.get(i).and_then(|(_, l)| l.get(n % CHUNK_LEAVES)).ok_or(lost)
+    }
 }
 
 #[cfg(test)]

@@ -17,6 +17,11 @@ are recorded here when they change (V6).
   floating value types, its leaf values read back within docs/formats.md §8.5's bounds
   (ADR-0016). Archive format version 1 gains the value encoding code; exact archives keep
   their bytes. `CacheError` gains `UnknownEncoding`, `NotQuantised` and `Unrepresentable`.
+- Reading a region of an archive: `archive::read_region` and `region_from_bytes` read one
+  grid's box of voxels, decompressing only its first chunk, its tile chunk and the leaf
+  chunks the box needs, as an `archive::Region` whose `RegionView` answers within the box;
+  a chunk not decompressed is not checked (docs/formats.md §8.6, ADR-0016). `FormatError`
+  gains `OutsideRegion`.
 
 ## 0.6.0 (2026-10-28)
 

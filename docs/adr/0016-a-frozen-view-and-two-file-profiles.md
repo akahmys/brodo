@@ -156,3 +156,31 @@ either way. The human decided:
 - A reader restores the values and checks the cache file so made as before; it checks an
   encoding's code against the value type, and the ranges as finite and ordered, but not
   that the codes are ones the writer gives.
+
+## Amendment: reading a region of an archive
+
+- **Date**: 2026-10-29 (fourth)
+
+The human added to ROADMAP.md P6 a reader of one grid's region that decompresses only the
+chunks a box of voxels needs, and chose a view that answers within what it read, holding
+those chunks each in a buffer of its own, with none the size of the grid, over one that
+decompresses into a grid-sized buffer, which the zeroing of that buffer alone held to 1.2
+to 4 times faster than a whole read. `spikes/region/` measured four grids, 64, 128 and
+512 leaves a chunk (its REPORT.md): a region's read follows the bytes it holds, 0.02 of a
+whole read for a box a tenth of a 537 MB grid's side at 512 leaves, and smaller chunks
+saved at most 0.35 ms a read while costing up to 9 % (128) and 28 % (64) in size for 8
+bits. The human decided:
+
+- Chunks stay 512 leaves: the header's value is unchanged.
+- A region is read as an owned `archive::Region` of one grid and a box of voxels, holding
+  the grid's first chunk, its tile chunk and the leaf chunks holding a leaf that meets the
+  box, each decompressed and restored as a whole read does; its `RegionView` answers every
+  voxel within the box, and refuses one outside it as `OutsideRegion`, even where the
+  chunks it holds cover it, so that what it answers does not follow from how the grid is
+  cut.
+- A region's read checks the archive's structure as a whole read does, its first chunk's
+  frozen header and nodes as a `GridView` does, and the chunks it decompresses; a chunk it
+  does not decompress is not checked to decompress, nor its values. docs/formats.md states
+  the gap; a whole read checks everything.
+- The file is read whole, as a whole read reads it; reading only the bytes of the chunks
+  needed is left to later.

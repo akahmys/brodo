@@ -263,7 +263,13 @@ fastest. A neighbour beyond the `i32` coordinate range is the background.
   as 8 bits over each component's range across its leaf values, each read back within the
   bound docs/formats.md §8.5 states; the background and the tiles stay exact. A value the
   encoding cannot hold is refused at write (ADR-0016).
-- (P6, not built.) The archive can decompress only the chunks a region needs.
+- One grid's region, a box of voxels, is read from an archive without its other leaf
+  chunks (`archive::read_region`): the grid's first and tile chunks and the leaf chunks
+  holding a leaf that meets the box are decompressed, each into a buffer of its own, and
+  checked as docs/formats.md §8.6 states; a chunk not decompressed is not checked. Its
+  `RegionView` answers every voxel within the box and refuses one outside it, whatever
+  the chunks held cover, so that what it answers does not follow from how the grid is cut
+  (ADR-0016).
 - (P7, not built.) OpenVDB files (`.vdb`) are read through the `vdb-rs` crate into brodo's tree and written
   by brodo, for level sets and scalar density first.
 

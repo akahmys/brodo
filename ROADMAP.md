@@ -16,7 +16,8 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   recorded again, a sync's cost and a change of code placement (ADR-0019).
 - **Next**: P6 (§2), brodo's archives and quantisation, 0.7.0, each step a spike and an
   ADR before it is built; B-005 answered, `lz4_flex`, the archive profile and its quantised
-  values built (ADR-0016); P6's closing checks next. OpenVDB files follow as
+  values built (ADR-0016), and reading a region (added by the human); P6's closing
+  checks next. OpenVDB files follow as
   P7 (split by the human, 2026-10-28).
 - **Unresolved problems**: `cache_map_x256` runs 8 to 10 % behind its baseline of
   2026-10-17 at v0.3.0 and now alike, run in turn (2026-10-23); a first run straight after
@@ -327,6 +328,9 @@ spike and an ADR before it is built.
       (2026-10-29)
 - [x] Value quantisation in the archive, 16-bit float and 8-bit range, with byte shuffling
       (ADR-0016, 2026-10-29)
+- [x] Reading a region: only the chunks a box of voxels needs decompressed, each into a
+      buffer of its own, read as a view that answers within the box and refuses the rest
+      (the human, 2026-10-29; spikes/region/, ADR-0016)
 - [ ] Retrospective and refactoring; fuzz round, the new reader included; Miri run;
       benchmarks, the archive's with baselines; mutation run (ADR-0023), as the human
       chooses (ADR-0033)
@@ -346,6 +350,9 @@ built.
 ### After P7
 
 STEP is not read (ADR-0031). `piatto` is held (§2, B-021).
+
+- [ ] Reading a region of an archive from only the bytes of the chunks it needs, the file
+      not read whole (left to later by the human, 2026-10-29; ADR-0016)
 
 ## 3. Open questions and spikes
 

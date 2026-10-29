@@ -17,8 +17,9 @@ on its tree.
   `GridView`; the cache profile stores several grids with their metadata, read by copy or
   by memory mapping (feature `mmap`, on by default), checked whole first, as
   docs/formats.md §3.4 states; the archive profile compresses them, each grid's leaf
-  values exact or quantised to 16 or 8 bits, and is read back as the same cache file
-  (feature `archive`, opted into).
+  values exact or quantised to 16 or 8 bits, and is read back as the same cache file, or
+  as one grid's region, decompressing only the chunks a box of voxels needs (feature
+  `archive`, opted into).
 - **Hermite data**: signs on a grid's voxel corners and, on each edge whose ends differ,
   where a surface crosses it, its normal and its group, as a format any producer writes
   and any reader checks.

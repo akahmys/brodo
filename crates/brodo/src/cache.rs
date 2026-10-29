@@ -265,7 +265,7 @@ impl<'a> Cursor<'a> {
     }
 }
 
-fn decode_meta(bytes: &[u8]) -> Result<(GridMeta, Bounds), CacheError> {
+pub(crate) fn decode_meta(bytes: &[u8]) -> Result<(GridMeta, Bounds), CacheError> {
     let mut c = Cursor { rest: bytes, what: "metadata" };
     let (name, unit) = (c.string()?, c.string()?);
     let mut floats = [0.0; 15];

@@ -79,6 +79,7 @@ fn format_error(e: &FormatError) -> &'static str {
         FormatError::Inconsistent(..) => "Inconsistent",
         FormatError::Shared => "Shared",
         FormatError::OtherTopology => "OtherTopology",
+        FormatError::OutsideRegion => "OutsideRegion",
         _ => "later",
     }
 }

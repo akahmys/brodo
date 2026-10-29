@@ -32,6 +32,9 @@ pub struct GridView<'a, T> {
     uppers: &'a [UpperNode],
     lowers: &'a [LowerNode],
     leaves: &'a [[T; LEAF_VOXELS]],
+    /// The header's leaf count: `leaves`' length, or, in a view of nodes alone
+    /// (`GridView::nodes`), the leaves its nodes link to.
+    leaf_count: usize,
     tiles: &'a [T],
     background: T,
 }
@@ -98,8 +101,12 @@ fn check_header<T: Stored>(h: &Header, len: usize) -> Result<(), FormatError> {
     Ok(())
 }
 
-/// The sections' bytes, each where the header says, in order, none overlapping.
-fn sections<'a, T>(h: &Header, bytes: &'a [u8]) -> Result<[&'a [u8]; 5], FormatError> {
+/// The sections' bytes, each where the header says, in order, none overlapping, each
+/// found by `find` from its place among them and its byte range.
+fn sections<'a, T>(
+    h: &Header,
+    find: impl Fn(usize, std::ops::Range<usize>, &'static str) -> Result<&'a [u8], FormatError>,
+) -> Result<[&'a [u8]; 5], FormatError> {
     let sizes = [
         size_of::<RootEntry>(),
         size_of::<UpperNode>(),
@@ -109,8 +116,8 @@ fn sections<'a, T>(h: &Header, bytes: &'a [u8]) -> Result<[&'a [u8]; 5], FormatE
     ];
     let mut at = size_of::<Header>();
     let mut out: [&[u8]; 5] = [&[]; 5];
-    for ((((slot, size), count), offset), name) in
-        out.iter_mut().zip(sizes).zip(h.counts).zip(h.offsets).zip(NAMES)
+    for (i, ((((slot, size), count), offset), name)) in
+        out.iter_mut().zip(sizes).zip(h.counts).zip(h.offsets).zip(NAMES).enumerate()
     {
         let start = usize::try_from(offset.get())
             .ok()
@@ -124,7 +131,7 @@ fn sections<'a, T>(h: &Header, bytes: &'a [u8]) -> Result<[&'a [u8]; 5], FormatE
         if start < at {
             return Err(lost(name));
         }
-        *slot = bytes.get(start..end).ok_or(FormatError::Truncated(name))?;
+        *slot = find(i, start..end, name)?;
         at = end;
     }
     Ok(out)
@@ -141,12 +148,51 @@ impl<'a, T: Stored> GridView<'a, T> {
         let (h, _) =
             Header::ref_from_prefix(bytes).map_err(|_| FormatError::Truncated("header"))?;
         check_header::<T>(h, bytes.len())?;
-        let [r, u, l, leaf, tile] = sections::<T>(h, bytes)?;
+        let found =
+            sections::<T>(h, |_, r, name| bytes.get(r).ok_or(FormatError::Truncated(name)))?;
+        Self::from_sections(h, found)
+    }
+
+    /// Checks a frozen buffer of `len` bytes of `T` values whose leaf values section is
+    /// left out: `head`, its bytes before that section, and `tail`, its bytes after it, each
+    /// starting on a 32-byte boundary. The view checks as `new` does, the leaf values aside,
+    /// and holds no leaf values (docs/formats.md §8.6).
+    #[cfg(feature = "archive")]
+    pub(crate) fn nodes(head: &'a [u8], tail: &'a [u8], len: usize) -> Result<Self, FormatError> {
+        let tail_at = len.checked_sub(tail.len()).ok_or(lost("header"))?;
+        let aligned = |b: &[u8]| b.as_ptr().align_offset(BLOCK) == 0;
+        if !(aligned(head) && aligned(tail)) || !head.len().is_multiple_of(BLOCK) {
+            return Err(FormatError::Misaligned);
+        }
+        let (h, _) = Header::ref_from_prefix(head).map_err(|_| FormatError::Truncated("header"))?;
+        check_header::<T>(h, len)?;
+        let found = sections::<T>(h, |i, r, name| {
+            if i == 3 {
+                // The leaf values: exactly what lies between the two, held as no bytes at
+                // the end of `head`, which is aligned as they would be.
+                let between = r == (head.len()..tail_at);
+                return head.get(head.len()..).filter(|_| between).ok_or(lost(name));
+            }
+            let held = if r.end <= head.len() {
+                head.get(r)
+            } else {
+                let start = r.start.checked_sub(tail_at);
+                start.zip(r.end.checked_sub(tail_at)).and_then(|(s, e)| tail.get(s..e))
+            };
+            held.ok_or(FormatError::Truncated(name))
+        })?;
+        Self::from_sections(h, found)
+    }
+
+    /// The view of the sections `found` holds, its links checked.
+    fn from_sections(h: &Header, found: [&'a [u8]; 5]) -> Result<Self, FormatError> {
+        let [r, u, l, leaf, tile] = found;
         let view = Self {
             roots: <[RootEntry]>::ref_from_bytes(r).map_err(|_| lost("root"))?,
             uppers: <[UpperNode]>::ref_from_bytes(u).map_err(|_| lost("upper node"))?,
             lowers: <[LowerNode]>::ref_from_bytes(l).map_err(|_| lost("lower node"))?,
             leaves: <[[T; LEAF_VOXELS]]>::ref_from_bytes(leaf).map_err(|_| lost("leaf value"))?,
+            leaf_count: usize::try_from(h.counts[3].get()).map_err(|_| lost("leaf value"))?,
             tiles: <[T]>::ref_from_bytes(tile).map_err(|_| lost("tile value"))?,
             background: T::read_from_prefix(h.background.as_bytes()).map_err(|_| lost("header"))?.0,
         };
@@ -176,7 +222,7 @@ impl<'a, T: Stored> GridView<'a, T> {
         {
             return Err(lost("upper node"));
         }
-        let n = [self.leaves.len(), self.tiles.len()];
+        let n = [self.leaf_count, self.tiles.len()];
         if !self
             .lowers
             .iter()
@@ -189,7 +235,7 @@ impl<'a, T: Stored> GridView<'a, T> {
 
     /// The number of leaves.
     pub fn leaf_count(&self) -> usize {
-        self.leaves.len()
+        self.leaf_count
     }
 
     /// The number of tiles.
@@ -333,7 +379,7 @@ impl<'a, T: Stored> GridView<'a, T> {
     /// tiles, so that neither holds values its nodes do not reach (ADR-0038). Two views of
     /// one tree thaw into one topology.
     pub fn same_topology<U: Stored>(&self, other: &GridView<'_, U>) -> bool {
-        self.leaves.len() == other.leaves.len()
+        self.leaf_count == other.leaf_count
             && self.tiles.len() == other.tiles.len()
             && self.roots.as_bytes() == other.roots.as_bytes()
             && self.uppers.as_bytes() == other.uppers.as_bytes()
@@ -346,7 +392,7 @@ impl<'a, T: Stored> GridView<'a, T> {
     /// buffer holds, and a leaf never reached as `Inconsistent` (docs/formats.md §4.2,
     /// rule 11).
     pub(crate) fn regions(&self) -> Result<Regions, FormatError> {
-        let mut leaves = vec![None; self.leaves.len()];
+        let mut leaves = vec![None; self.leaf_count];
         let mut tiles = Vec::with_capacity(self.tiles.len());
         let mut seen = Seen::new(self.uppers.len(), self.lowers.len(), self.tiles.len());
         for e in self.roots {
@@ -394,6 +440,60 @@ impl<'a, T: Stored> GridView<'a, T> {
         }
         let leaves = leaves.into_iter().collect::<Option<Vec<_>>>().ok_or(lost("leaf value"))?;
         Ok(Regions { leaves, tiles })
+    }
+}
+
+#[cfg(feature = "archive")]
+impl<T: Stored> GridView<'_, T> {
+    /// The number and origin of every leaf whose voxels meet the box from `min` to `max`,
+    /// inclusive, in leaf number order, found by walking only the nodes that meet it.
+    pub(crate) fn leaves_meeting(
+        &self,
+        min: Coord,
+        max: Coord,
+    ) -> Result<Vec<(u32, Coord)>, FormatError> {
+        let meets = |o: Coord, level: TileLevel| {
+            let far = i64::from(level.edge()) - 1;
+            (0..3).all(|k| {
+                let (o, lo, hi) = (o.get(k), min.get(k), max.get(k));
+                o.zip(lo).zip(hi).is_some_and(|((o, lo), hi)| {
+                    i64::from(*o) <= i64::from(*hi) && i64::from(*o) + far >= i64::from(*lo)
+                })
+            })
+        };
+        let mut out = Vec::new();
+        for e in self.roots {
+            let key = e.key.map(|k| k.get());
+            if e.kind.get() == ROOT_TILE || !meets(key, TileLevel::Root) {
+                continue;
+            }
+            let u = self.uppers.get(e.index.get() as usize).ok_or(lost("root"))?;
+            let mut child = Next::from(u.first_child);
+            for p in 0..UPPER_PLACES {
+                if !is_set(&u.children, p) {
+                    continue;
+                }
+                let n = child.take("upper node")?;
+                let at = offset(key, unplace(p, 5), TileLevel::Upper.edge_log2());
+                if !meets(at, TileLevel::Upper) {
+                    continue;
+                }
+                let l = self.lowers.get(n as usize).ok_or(lost("upper node"))?;
+                let mut leaf = Next::from(l.first_child);
+                for q in 0..LOWER_PLACES {
+                    if is_set(&l.children, q) {
+                        let i = leaf.take("lower node")?;
+                        let o = offset(at, unplace(q, 4), TileLevel::Lower.edge_log2());
+                        if meets(o, TileLevel::Lower) {
+                            out.push((i, o));
+                        }
+                    }
+                }
+            }
+        }
+        out.sort_unstable();
+        out.dedup();
+        Ok(out)
     }
 }
 
