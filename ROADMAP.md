@@ -17,17 +17,9 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
 - **Next**: P6 (§2), brodo's archives and quantisation, 0.7.0, each step a spike and an
   ADR before it is built; B-005 answered, `lz4_flex`, the archive profile and its quantised
   values built (ADR-0016), and reading a region (added by the human); P6's closing
-  checks next. OpenVDB files follow as
-  P7 (split by the human, 2026-10-28).
+  checks done but the mutation run, next. OpenVDB files follow as P7 (split by the human,
+  2026-10-28).
 - **Unresolved problems**, each with when it is taken up (the human, 2026-10-30):
-  - `cache_map_x256` runs 8 to 10 % behind its baseline of 2026-10-17 at v0.3.0 and now
-    alike, run in turn (2026-10-23); a first run straight after the fuzz round and Miri
-    failed at +13 %. Machine drift is the likely cause, not shown. At P6's closing
-    benchmarks.
-  - `cache_write_x8` ran 169 to 214 % slow in the first child of a pair, the second within
-    1 %, twice (2026-10-25, 2026-10-26); the first file write of a run is the likely cause,
-    not shown. Such a pair is now refused (ADR-0019, 2026-10-30). At P6's closing
-    benchmarks.
   - The leaf-parallel update's benchmark disagrees within a pair by up to 17 % (ADR-0019),
     as colino's `convert_slab_320` does by up to 24 % at rest (B-024). Allocating
     and dropping its output field takes about a third of that item (1.04 of 3.3 ms,
@@ -325,11 +317,16 @@ spike and an ADR before it is built.
 - [x] Reading a region: only the chunks a box of voxels needs decompressed, each into a
       buffer of its own, read as a view that answers within the box and refuses the rest
       (the human, 2026-10-29; spikes/region/, ADR-0016)
-- [ ] Retrospective and refactoring; fuzz round, the new reader included; Miri run, which
-      states whether Miri still warns of integer-to-pointer casts in `crossbeam-epoch`
-      under Tree Borrows (ADR-0015); benchmarks, the archive's with baselines,
-      `cache_map_x256` and `cache_write_x8` looked into (§1); mutation run (ADR-0023), as
-      the human chooses (ADR-0033)
+- [x] Retrospective and refactoring (ADR-0001, ADR-0019, 2026-10-30)
+- [x] Fuzz round, the new reader included: seven targets, 900 s each, no finding
+      (2026-10-30)
+- [x] Miri run: every `miri_*` test passes; Miri's nightly of 2026-07-21 still warns of
+      integer-to-pointer casts in `crossbeam-epoch` 0.9.21 under Tree Borrows (ADR-0015,
+      2026-10-30)
+- [x] Benchmarks, every feature, the archive's with baselines, `cache_map_x256` and
+      `cache_write_x8` looked into (ADR-0019, 2026-10-30); the whole read's buffer kept
+      written (ADR-0016)
+- [ ] Mutation run over the workspace (ADR-0023), as the human chose (ADR-0033)
 - [ ] **Accepted when** archives round-trip within their stated error
 
 ### Between P6 and P7

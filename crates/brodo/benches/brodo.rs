@@ -1,11 +1,12 @@
 //! Benchmark tier (TESTING.md §1) for brodo, on the shared harness (`harness/mod.rs`,
-//! ADR-0019): `cargo bench -p brodo --bench brodo`, `--record` to record a baseline,
-//! `--record NAME` one item's.
+//! ADR-0019): `cargo bench -p brodo --bench brodo --all-features`, `--record` to record a
+//! baseline, `--record NAME` one item's.
 //!
 //! The workload is a narrow-band sphere SDF of radius 80, the textbook |p| − r clamped to a
 //! band of ±3: a leaf where the band passes, an inside tile where all of a leaf's region
 //! lies below it. The file items read and write through the operating system's page cache,
-//! which the harness's eviction buffer does not empty.
+//! which the harness's eviction buffer does not empty. The archive's items need its
+//! feature, so the benchmark runs with every feature (TESTING.md T10).
 
 #![expect(
     unsafe_code,
@@ -15,10 +16,14 @@
 use std::path::PathBuf;
 
 use brodo::accessor::ValueAccessor;
+#[cfg(feature = "archive")]
+use brodo::archive::{self, Encoding};
 use brodo::cache::{self, CacheEntry, CacheFile};
 use brodo::field::Field;
 use brodo::frozen::freeze;
 use brodo::gather::{GATHER_VOXELS, GhostWidth, gather, gather_wide};
+#[cfg(feature = "archive")]
+use brodo::meta::Bounds;
 use brodo::meta::GridMeta;
 use brodo::parallel::par_update;
 use brodo::topology::Topology;
@@ -32,6 +37,10 @@ const RADIUS: i32 = 80;
 const BAND: f32 = 3.0;
 /// Voxels read by the random-access items.
 const LOOKUPS: usize = 100_000;
+/// The box the region item reads: a fifth of the sphere's leaf bounds along each axis,
+/// across the band where it crosses the positive x axis.
+#[cfg(feature = "archive")]
+const REGION: Bounds = Bounds::Box { min: [61, -19, -19], max: [99, 19, 19] };
 
 fn out_dir() -> PathBuf {
     std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../out/bench/brodo")
@@ -117,6 +126,9 @@ struct Data {
     voxels: Vec<Coord>,
     entry: CacheEntry,
     file: PathBuf,
+    /// The archive, exact and in 8 bits.
+    #[cfg(feature = "archive")]
+    archives: [PathBuf; 2],
 }
 
 impl Data {
@@ -127,7 +139,34 @@ impl Data {
         let entry = CacheEntry::new(&GridMeta::new("sdf", [1.0; 3], "voxel")?, &t, &f)?;
         let file = out_dir().join("sphere.cache");
         cache::write(&file, std::slice::from_ref(&entry))?;
-        Ok(Self { leaves, tiles, t, f, voxels: random_voxels(), entry, file })
+        #[cfg(feature = "archive")]
+        let archives = Self::archives(&entry)?;
+        Ok(Self {
+            leaves,
+            tiles,
+            t,
+            f,
+            voxels: random_voxels(),
+            entry,
+            file,
+            #[cfg(feature = "archive")]
+            archives,
+        })
+    }
+
+    /// Writes the archives, and refuses to time a region that holds no leaf (PLANNING.md §3).
+    #[cfg(feature = "archive")]
+    fn archives(entry: &CacheEntry) -> Result<[PathBuf; 2], Failure> {
+        let paths = [out_dir().join("sphere.archive"), out_dir().join("sphere-8bit.archive")];
+        archive::write(&paths[0], std::slice::from_ref(entry))?;
+        archive::write_with(&paths[1], &[(entry, Encoding::EightBit)])?;
+        let region = archive::read_region(&paths[0], u64::MAX, 0, REGION)?;
+        if region.view::<f32>()?.leaves().next().is_none() {
+            return Err(Failure::from(std::io::Error::other(
+                "the region item's box holds no leaf",
+            )));
+        }
+        Ok(paths)
     }
 
     /// The items of the Benchmark tier (TESTING.md §1).
@@ -167,7 +206,10 @@ impl Data {
                 }),
             ),
         ];
-        items.into_iter().chain(self.gather_items()).chain(self.file_items()).collect()
+        let items = items.into_iter().chain(self.gather_items()).chain(self.file_items());
+        #[cfg(feature = "archive")]
+        let items = items.chain(self.archive_items());
+        items.collect()
     }
 
     /// The gathers: one ghost layer into an array, and three into a `Vec` (ADR-0015).
@@ -233,6 +275,40 @@ impl Data {
                         unsafe { CacheFile::map(&self.file) }
                     }?
                     .grid_count() as f64)
+                }),
+            ),
+        ]
+    }
+
+    /// The archive profile's file I/O (ADR-0016).
+    #[cfg(feature = "archive")]
+    fn archive_items(&self) -> Vec<Item<'_>> {
+        let [exact, eight] = &self.archives;
+        vec![
+            repeated(
+                "archive_write",
+                1,
+                Box::new(move || {
+                    archive::write(exact, std::slice::from_ref(&self.entry))?;
+                    Ok(0.0)
+                }),
+            ),
+            repeated(
+                "archive_read",
+                8,
+                Box::new(move || Ok(archive::read(exact, u64::MAX)?.grid_count() as f64)),
+            ),
+            repeated(
+                "archive_read_8bit",
+                8,
+                Box::new(move || Ok(archive::read(eight, u64::MAX)?.grid_count() as f64)),
+            ),
+            repeated(
+                "archive_region",
+                8,
+                Box::new(move || {
+                    let region = archive::read_region(exact, u64::MAX, 0, REGION)?;
+                    Ok(region.view::<f32>()?.leaves().count() as f64)
                 }),
             ),
         ]

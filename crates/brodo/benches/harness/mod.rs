@@ -2,18 +2,18 @@
 //! §1): std only, built to T5. A member's benchmark includes this file and calls `run`
 //! with the data its items read and the items.
 //!
-//! `cargo bench -p <crate> --bench <crate>` runs two child processes, each a fresh process.
-//! Each child runs every item once per round, in turn, starting from a different item each
-//! round, for `ROUNDS` rounds, writing over an `EVICT_BYTES` buffer before each run, and
-//! keeps each item's fastest time. The parent writes both children's times, how far they
-//! agree, and the change from the baseline of this hardware model to
+//! `cargo bench -p <crate> --bench <crate> --all-features` runs two child processes, each a
+//! fresh process. Each child runs every item once per round, in turn, starting from a
+//! different item each round, for `ROUNDS` rounds, writing over an `EVICT_BYTES` buffer
+//! before each run, and keeps each item's fastest time. The parent writes both children's
+//! times, how far they agree, and the change from the baseline of this hardware model to
 //! `out/bench/<crate>/report.tsv`, and fails when an item is more than `TOLERANCE` slower
 //! than its baseline in both. It refuses, comparing or recording, a pair whose children
 //! disagree on an item by more than `SPREAD`, a run disturbed by other work that the load
 //! averages cannot show. With `--record` it instead replaces this model's rows of the
-//! member's `benches/baseline.tsv` with the faster of the two times, dated; with
-//! `--record NAME`, only that item's row, the others kept with their dates, so that an item
-//! added later gains a baseline without the rest losing theirs.
+//! member's `benches/baseline.tsv` with the faster of the two times, dated; with `--record
+//! NAME`, only that item's row, the others kept with their dates, so that an item added
+//! later gains a baseline without the rest losing theirs.
 //!
 //! Run and record on a machine doing nothing else; a run waits, then refuses, while the
 //! one-minute or the five-minute load average says otherwise. With other work running,

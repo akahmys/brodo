@@ -184,3 +184,14 @@ bits. The human decided:
   the gap; a whole read checks everything.
 - The file is read whole, as a whole read reads it; reading only the bytes of the chunks
   needed is left to later.
+
+## Amendment: the whole read's buffer
+
+- **Date**: 2026-10-30
+
+Reading a region left to P6's benchmarks whether a whole read makes its grid-sized buffer
+with `zerocopy`'s `new_vec_zeroed`, the allocator's zeroed memory, rather than writing
+zeros over it. `spikes/region/` had timed both on its 537 MB grid (`parts-b.tsv`): 4.09 ms
+zeroed, 4.32 ms written, 0.2 ms of a whole read's 18 to 19 ms. The owner decided that the
+buffer stays written: the saving is about 1 %, and `new_vec_zeroed` would need `zerocopy`'s
+`alloc` feature and a failure of its own to handle.

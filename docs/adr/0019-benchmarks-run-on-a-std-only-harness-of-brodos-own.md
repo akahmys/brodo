@@ -200,3 +200,36 @@ step held all of it, 156.8 to 179.5 ms, the serial steps within 0.6 ms; no other
 used 5 % of a processor for more than one 2-s sample in a child. The owner decided that the
 limit stays at 10 %, a refused pair run again, and the item's variation is an open question
 (ROADMAP.md B-024).
+
+## Amendment: every feature
+
+- **Date**: 2026-10-30
+
+P6's closing checks found no benchmark item for the archive, whose feature is not a
+default one, so that an item behind it would be left out, unseen, by T10's command. The
+owner decided that brodo's benchmark gains `archive_write`, `archive_read`,
+`archive_read_8bit` and `archive_region`, the last refused before it is timed if its box
+holds no leaf (PLANNING.md §3), and that every benchmark runs with every feature, as the
+gate's tests do: `cargo bench -p <crate> --bench <crate> --all-features` (TESTING.md T10).
+
+P6's closing benchmarks, at rest, at one-minute loads of 1.81 to 2.03: two pairs were
+refused, `leaf_parallel_update_x32` at 12.5 and 10.3 % (ROADMAP.md B-024's question), and
+the third put every item within its baseline. Children of `6013b72`, before P6's
+refactoring, and of `644fe47`, after it, run in turn three times each:
+
+| Item | `6013b72` | `644fe47` | Baseline |
+| :--- | ---: | ---: | ---: |
+| `cache_read_x16` | 2.76 to 2.89 ms | 2.78 to 2.86 ms | 3.98 ms, 2026-10-17 |
+| `cache_map_x256` | 4.35 to 4.53 ms | 3.97 to 4.09 ms | 3.86 ms, 2026-10-17 |
+| `gather` | 3.46 to 3.54 ms | 3.02 to 3.09 ms | 3.47 ms, 2026-10-28 |
+
+`cache_read_x16` had grown faster before the refactoring, its baseline left 28 % slow;
+`gather`, whose code the refactoring did not touch, moved by 13 % between the two builds,
+as code placement moved it at P5's close; `cache_map_x256`, whose path the refactoring
+touched, by 9 %, its cause not told apart. `cache_write_x8`'s slow first child did not
+recur in four pairs, within 2.6 %. The owner decided that the archive's four items and
+`cache_read_x16` are recorded, one `--record NAME` each, at one-minute loads of 1.39 to
+1.97: `archive_write` 5 140 417, `archive_read_x8` 3 948 083, `archive_read_8bit_x8`
+3 167 167, `archive_region_x8` 3 471 458 and `cache_read_x16` 2 850 416 ns; that
+`gather` and `cache_map_x256` keep theirs, which a build's placement moves both ways; and
+that the two cache items leave ROADMAP.md's unresolved problems with these figures.

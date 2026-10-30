@@ -1,6 +1,6 @@
 //! Benchmark tier (TESTING.md §1) for colino, on brodo's harness (`harness/mod.rs`,
-//! ADR-0019): `cargo bench -p colino --bench colino`, `--record` to record a baseline,
-//! `--record NAME` one item's.
+//! ADR-0019): `cargo bench -p colino --bench colino --all-features`, `--record` to record a
+//! baseline, `--record NAME` one item's.
 //!
 //! The workload is a sphere of radius 50 voxels, the octahedron split five times (8192
 //! triangles, edges near 2.5 voxels), converted with a band of 3 and labelled. At a

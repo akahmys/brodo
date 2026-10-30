@@ -1,7 +1,11 @@
 name	fastest_ns	date	model
 activation	1613500	2026-10-25	Apple M5
+archive_read_8bit_x8	3167167	2026-10-30	Apple M5
+archive_read_x8	3948083	2026-10-30	Apple M5
+archive_region_x8	3471458	2026-10-30	Apple M5
+archive_write	5140417	2026-10-30	Apple M5
 cache_map_x256	3857959	2026-10-17	Apple M5
-cache_read_x16	3981458	2026-10-17	Apple M5
+cache_read_x16	2850416	2026-10-30	Apple M5
 cache_write_x8	43486750	2026-10-28	Apple M5
 freeze_x8	1666250	2026-10-25	Apple M5
 gather	3468083	2026-10-28	Apple M5
