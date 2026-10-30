@@ -328,6 +328,91 @@ mod tests {
         }
     }
 
+    /// Binary16 codes read as their values: the infinities, a NaN, and negatives by the
+    /// sign bit, zero too.
+    #[test]
+    fn binary16_codes_read_as_their_values() {
+        assert_eq!(from_binary16(0x7c00).to_bits(), f32::INFINITY.to_bits());
+        assert_eq!(from_binary16(0xfc00).to_bits(), f32::NEG_INFINITY.to_bits());
+        assert!(from_binary16(0x7e00).is_nan());
+        assert!(from_binary16(0x7c01).is_nan());
+        assert_eq!(from_binary16(0xc000).to_bits(), (-2.0_f32).to_bits());
+        assert_eq!(from_binary16(0x8000).to_bits(), (-0.0_f32).to_bits());
+    }
+
+    /// The four floating value types have a kind, of their scalar and components; no other
+    /// type has one.
+    #[test]
+    fn the_floating_types_alone_have_a_kind() {
+        for (code, size, components) in [
+            (f32::TYPE_CODE, 4, 1),
+            (f64::TYPE_CODE, 8, 1),
+            (<[f32; 3]>::TYPE_CODE, 4, 3),
+            (<[f64; 3]>::TYPE_CODE, 8, 3),
+        ] {
+            let k = Kind::of(code).unwrap();
+            assert_eq!((k.scalar_size(), k.components()), (size, components), "type {code}");
+        }
+        assert!(Kind::of(u8::TYPE_CODE).is_none());
+    }
+
+    fn scalars(xs: &[f64]) -> Vec<u8> {
+        xs.iter().flat_map(|x| x.to_le_bytes()).collect()
+    }
+
+    /// A range keeps the first least and greatest in order, so that +0 after -0 leaves it
+    /// at -0 and -0 after +0 at +0; a NaN, an infinity and a piece of other than whole
+    /// scalars are refused.
+    #[test]
+    fn a_range_keeps_the_first_extremes_and_refuses_what_is_not_finite() {
+        let kind = Kind { scalar: Scalar::F64, components: 1 };
+        let bits = |bytes: &[u8]| {
+            ranges(kind, [bytes].into_iter())
+                .map(|r| r.iter().map(|c| [c.lo.to_bits(), c.hi.to_bits()]).collect::<Vec<_>>())
+        };
+        let zero = |x: f64| Some(vec![[x.to_bits(); 2]]);
+        assert_eq!(bits(&scalars(&[-0.0, 0.0])), zero(-0.0));
+        assert_eq!(bits(&scalars(&[0.0, -0.0])), zero(0.0));
+        assert_eq!(bits(&scalars(&[1.0, f64::NAN, 2.0])), None);
+        assert_eq!(bits(&scalars(&[1.0, f64::INFINITY])), None);
+        assert_eq!(bits(&scalars(&[1.0, 2.0])[..9]), None);
+    }
+
+    /// Ranges read are of a finite width: from -f64::MAX to f64::MAX is refused, and a
+    /// range of one value at f64::MAX is not.
+    #[test]
+    fn ranges_read_are_of_a_finite_width() {
+        assert!(read_ranges(&scalars(&[-f64::MAX, f64::MAX]), 1).is_none());
+        assert!(read_ranges(&scalars(&[f64::MAX, f64::MAX]), 1).is_some());
+        assert!(read_ranges(&scalars(&[-1.0, 2.0]), 1).is_some());
+    }
+
+    /// Eight bits refuse a scalar that is not finite and a piece of other than whole
+    /// scalars.
+    #[test]
+    fn eight_bits_refuse_what_they_cannot_hold() {
+        let kind = Kind { scalar: Scalar::F64, components: 1 };
+        let q = Quantised::EightBit(vec![Range { lo: -1.0, hi: 1.0 }]);
+        assert!(encode(&q, kind, &scalars(&[0.5, 1.0])).is_some());
+        assert!(encode(&q, kind, &scalars(&[0.5, f64::NAN])).is_none());
+        assert!(encode(&q, kind, &scalars(&[f64::INFINITY])).is_none());
+        assert!(encode(&q, kind, &scalars(&[0.5, 1.0])[..9]).is_none());
+    }
+
+    /// A chunk restores only into room for exactly its scalars.
+    #[test]
+    fn a_chunk_restores_only_into_room_for_its_scalars() {
+        for (scalar, size) in [(Scalar::F32, 4), (Scalar::F64, 8)] {
+            let kind = Kind { scalar, components: 1 };
+            for q in [Quantised::Binary16, Quantised::EightBit(vec![Range { lo: 0.0, hi: 1.0 }])] {
+                let codes = encode(&q, kind, &vec![0; 2 * size]).unwrap();
+                assert!(restore(&q, kind, &codes, &mut vec![0; 2 * size]), "{q:?}");
+                assert!(!restore(&q, kind, &codes, &mut vec![0; 3 * size]), "{q:?}");
+                assert!(!restore(&q, kind, &codes, &mut vec![0; size]), "{q:?}");
+            }
+        }
+    }
+
     /// Eight bits restore within a 510th of the range, the ends exactly.
     #[test]
     fn eight_bits_restore_within_half_a_step() {

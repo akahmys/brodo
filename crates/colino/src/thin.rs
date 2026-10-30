@@ -412,6 +412,32 @@ mod tests {
         }
     }
 
+    /// A ray finds the distance to the nearest triangle along it within its reach, and
+    /// nothing beyond the reach or behind it: a mutant that measures every ray as thin
+    /// fails here, before the tests that would only wait for the places it makes.
+    #[test]
+    fn a_ray_measures_the_nearest_triangle_within_its_reach() {
+        let vertices = vec![
+            [0.0, 0.0, 0.0],
+            [1.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0],
+            [0.0, 0.0, 1.0],
+            [1.0, 0.0, 1.0],
+            [0.0, 1.0, 1.0],
+            [0.0, 0.0, 3.0],
+            [1.0, 0.0, 3.0],
+            [0.0, 1.0, 3.0],
+        ];
+        let triangles = vec![[0, 1, 2], [3, 4, 5], [6, 7, 8]];
+        let bvh =
+            Bvh::new(&crate::mesh::Mesh { vertices, triangles, ..Default::default() }).unwrap();
+        let x = [0.25, 0.25, 0.0];
+        let up = ray(&bvh, x, [0.0, 0.0, 1.0], 4.0).unwrap();
+        assert!((up - 1.0).abs() < 1e-9, "{up}");
+        assert_eq!(ray(&bvh, x, [0.0, 0.0, 1.0], 0.5), None);
+        assert_eq!(ray(&bvh, x, [0.0, 0.0, -1.0], 4.0), None);
+    }
+
     /// Joining points into places ends: a mutant that makes finding a root loop for ever
     /// fails here within a minute, in the first test binary, before the tests that would
     /// only wait for it (TESTING.md T11). Three points in a row are one place

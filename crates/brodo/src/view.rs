@@ -687,6 +687,26 @@ mod tests {
         assert!(frozen.view::<u8>().unwrap().regions().is_ok());
     }
 
+    /// A view of the nodes alone refuses a part off a 32-byte boundary, the other aligned,
+    /// and a head not of whole blocks.
+    #[cfg(feature = "archive")]
+    #[test]
+    fn a_view_of_the_nodes_refuses_parts_off_their_blocks() {
+        let t = mixed();
+        let frozen = freeze(&t, &Field::new(&t, 0_u8)).unwrap();
+        let b = frozen.as_bytes();
+        let len = b.len();
+        for (head, tail) in [(&b[..64], &b[len - 31..]), (&b[..33], &b[len - 32..])] {
+            assert_eq!(
+                GridView::<u8>::nodes(head, tail, len).err(),
+                Some(FormatError::Misaligned),
+                "a head of {} bytes, a tail of {}",
+                head.len(),
+                tail.len()
+            );
+        }
+    }
+
     #[test]
     fn views_of_one_topology_share_it_whatever_their_type() {
         let t = mixed();

@@ -226,3 +226,15 @@ decided how a test and an exclusion are held to the contract (ADR-0043), and tha
 
 Shown to fire: a comment's kind removed failed the check for its pattern and those `As
 above.` after it, and a kind naming no document or item failed it.
+
+## Amendment: P6's missed mutants
+
+- **Date**: 2026-10-31
+
+The run on `b179b2a` (2026-10-30, GitHub Actions) reported all 3949 mutants and missed 30,
+in the archive, its quantisation and the region's walk, and one, a ray measured as always
+thin, still timed out after the patient run's 1800 s. 29 are now killed by tests written
+for them, each shown to fail with its mutant applied by hand behind `rss_guard.py`; one
+test wrote a file a run before had left, so that a write doing nothing passed, and now
+removes it first. The human decided that the two left, which no test can tell from the
+original, are excluded, each with its reason.

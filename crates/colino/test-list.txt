@@ -21,6 +21,7 @@ lib colino surface::tests::counting_a_tetrahedron_ends_in_time
 lib colino thin::tests::a_box_beyond_i64_at_h_over_2_has_no_count
 lib colino thin::tests::a_box_holds_its_voxels_alone
 lib colino thin::tests::a_places_box_is_bounded_and_checked_up_to_its_limit
+lib colino thin::tests::a_ray_measures_the_nearest_triangle_within_its_reach
 lib colino thin::tests::a_triangle_is_sampled_by_sections_of_its_longest_edge
 lib colino thin::tests::a_voxel_at_h_over_2_is_sampled_at_its_centre
 lib colino thin::tests::joining_three_points_ends_in_time

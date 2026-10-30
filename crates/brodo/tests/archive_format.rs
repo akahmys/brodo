@@ -146,6 +146,8 @@ fn format_version_1_keeps_its_bytes_and_a_file_round_trips() {
         "the bytes of archive format version 1 changed; raise the version (TESTING.md V6)"
     );
     let path = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("archive_v1.brda");
+    // A file an earlier run left must not stand in for this one's.
+    let _absent = std::fs::remove_file(&path);
     write(&path, &golden_entries()).unwrap();
     let cached = CacheFile::from_bytes(&cache::to_bytes(&golden_entries()).unwrap()).unwrap();
     let t = build(
@@ -200,6 +202,11 @@ fn the_limit_bounds_the_file_and_what_it_decompresses_into() {
         read(&path, g.len() as u64 - 1),
         Err(CacheError::FileTooLarge { length, .. }) if length == g.len() as u64
     ));
+    // A file of exactly the limit is read, and refused only for the cache file it makes.
+    assert!(matches!(
+        read(&path, g.len() as u64),
+        Err(CacheError::FileTooLarge { length, .. }) if length == made
+    ));
 }
 
 #[test]
@@ -245,8 +252,9 @@ fn each_check_refuses_its_damage() {
     let (first, second, chunks) = (word(&g, table), word(&g, table + 2), word(&g, 11) as usize);
     let moved = with_word(&with_word(&g, table, first + 1), table + 2, second - 1);
     assert!(matches!(read(&moved), Err(CacheError::Decompress { index: 0, chunk: 0 })));
-    // A chunk of no blocks.
-    assert!(matches!(read(&with_word(&g, table, 0)), Err(CacheError::Inconsistent("chunk table"))));
+    // A chunk of no blocks, the next holding its blocks, so that they still add up.
+    let none = with_word(&with_word(&g, table, 0), table + 2, first + second);
+    assert!(matches!(read(&none), Err(CacheError::Inconsistent("chunk table"))));
     // The padding after the chunk table is zero.
     let pad = table * 4 + chunks * 8;
     assert!(!pad.is_multiple_of(32), "the table needs padding");
@@ -307,6 +315,7 @@ fn quantised_values_keep_their_bytes_and_read_back_within_their_bounds() {
     assert!(bytes == QUANTISED, "the bytes of a quantised archive changed (TESTING.md V6)");
     assert!(bytes.len() < GOLDEN.len(), "quantised is smaller");
     let path = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("archive_v1_q.brda");
+    let _absent = std::fs::remove_file(&path);
     write_with(&path, &quantised(&e)).unwrap();
     assert_eq!(std::fs::read(&path).unwrap(), bytes);
     let file = read(&path, u64::MAX).unwrap();
@@ -453,6 +462,8 @@ fn a_region_answers_within_its_box_as_the_whole_grid_does() {
         ([0, 4100, 5], [3, 4200, 9]),
         ([-50, 0, 0], [-10, 9, 9]),
         ([9, 1, 9], [9, 1, 9]),
+        // Just past leaf 0 along x, and below leaf 1 along z: no leaf.
+        ([8, 0, 0], [15, 7, 7]),
     ];
     for encoding in [Encoding::Exact, Encoding::Binary16, Encoding::EightBit] {
         let bytes = to_bytes_with(&[(&e[0], encoding), (&e[1], Encoding::Exact)]).unwrap();
@@ -463,6 +474,7 @@ fn a_region_answers_within_its_box_as_the_whole_grid_does() {
         let region =
             region_from_bytes(&bytes, u64::MAX, 1, Bounds::Box { min: [0; 3], max: [9; 3] });
         let v = region.unwrap();
+        assert_eq!(v.value_type(), whole.value_type(1).unwrap());
         let (r, w) = (v.view::<[f64; 3]>().unwrap(), whole.view::<[f64; 3]>(1).unwrap());
         assert_eq!(
             r.get([8, 0, 8]).unwrap().map(f64::to_bits),
@@ -470,6 +482,7 @@ fn a_region_answers_within_its_box_as_the_whole_grid_does() {
         );
     }
     let path = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("archive_region.brda");
+    let _absent = std::fs::remove_file(&path);
     write(&path, &e).unwrap();
     let extent = Bounds::Box { min: [0; 3], max: [7; 3] };
     let r = read_region(&path, u64::MAX, 0, extent).unwrap();
@@ -485,6 +498,7 @@ fn same_within(bytes: &[u8], whole: &CacheFile, t: &Topology, min: Coord, max: C
     assert_eq!(region.meta(), whole.meta(0).unwrap());
     assert_eq!(region.bounds(), whole.bounds(0).unwrap());
     assert_eq!(region.extent(), Bounds::Box { min, max });
+    assert_eq!(region.value_type(), whole.value_type(0).unwrap());
     let r = region.view::<f32>().unwrap();
     let want: Vec<(u32, Coord)> = t
         .leaf_numbers()
@@ -600,4 +614,69 @@ fn a_region_checks_the_archives_structure() {
     );
     assert!(matches!(r.locate([8, 8, 8]).unwrap(), ViewLocation::Tile(..)));
     assert_eq!(r.background().to_bits(), (-1.0_f32).to_bits());
+}
+
+/// A region about a root tile, and one about every leaf and tile, answer as the whole grid
+/// does: a root tile holds no node to walk.
+#[test]
+fn a_region_about_a_root_tile_answers_as_the_whole_grid_does() {
+    let t = build(
+        &[[-1, 0, 0], [4096, 7, 9]],
+        &[(TileLevel::Lower, [8, 8, 8]), (TileLevel::Root, [0, 8192, 0])],
+    );
+    let whole = from_bytes(GOLDEN, u64::MAX).unwrap();
+    same_within(GOLDEN, &whole, &t, [0, 8192, 0], [4095, 12287, 4095]);
+    same_within(GOLDEN, &whole, &t, [-5000; 3], [5000, 13000, 5000]);
+}
+
+/// A grid of one chunk, its nodes, is read as a region holding that chunk alone: the limit
+/// bounds it alone.
+#[test]
+fn a_region_of_a_grid_of_one_chunk_holds_that_chunk_alone() {
+    let t = build(&[], &[]);
+    let e = CacheEntry::new(&meta("g", &[]), &t, &Field::new(&t, 2.0_f32)).unwrap();
+    let bytes = to_bytes(std::slice::from_ref(&e)).unwrap();
+    assert_eq!(word(&bytes, 11), 1, "one chunk");
+    let held = u64::from(word(&bytes, word(&bytes, 10) as usize * 8)) * 32;
+    let extent = Bounds::Box { min: [0; 3], max: [9; 3] };
+    let r = region_from_bytes(&bytes, held, 0, extent).unwrap();
+    assert_eq!(r.view::<f32>().unwrap().get([1, 2, 3]).unwrap().to_bits(), 2.0_f32.to_bits());
+    assert!(matches!(
+        region_from_bytes(&bytes, held - 1, 0, extent),
+        Err(CacheError::FileTooLarge { length, .. }) if length == held
+    ));
+}
+
+/// Each grid's leaf chunks are restored by its own cut: a quantised grid next to a grid cut
+/// otherwise reads back as it does alone.
+#[test]
+fn each_grid_is_restored_by_its_own_cut() {
+    let (g, r) = (golden_entries(), row(1300));
+    let (tg, tr) = (
+        build(
+            &[[-1, 0, 0], [4096, 7, 9]],
+            &[(TileLevel::Lower, [8, 8, 8]), (TileLevel::Root, [0, 8192, 0])],
+        ),
+        row_topology(1300),
+    );
+    let bits = |file: &CacheFile, i: usize, t: &Topology| -> Vec<u32> {
+        let v = file.view::<f32>(i).unwrap();
+        t.leaf_numbers().flat_map(|n| v.leaf(n.get()).unwrap().map(f32::to_bits)).collect()
+    };
+    for encoding in [Encoding::Binary16, Encoding::EightBit] {
+        let alone = |e: &CacheEntry| {
+            from_bytes(&to_bytes_with(&[(e, encoding)]).unwrap(), u64::MAX).unwrap()
+        };
+        let (ga, ra) = (alone(&g[0]), alone(&r[0]));
+        for (first, second) in
+            [((&g[0], &tg, &ga), (&r[0], &tr, &ra)), ((&r[0], &tr, &ra), (&g[0], &tg, &ga))]
+        {
+            let both = to_bytes_with(&[(first.0, encoding), (second.0, Encoding::Exact)]).unwrap();
+            let file = from_bytes(&both, u64::MAX).unwrap();
+            assert_eq!(bits(&file, 0, first.1), bits(first.2, 0, first.1), "{encoding:?}");
+            let exact =
+                from_bytes(&to_bytes(std::slice::from_ref(second.0)).unwrap(), u64::MAX).unwrap();
+            assert_eq!(bits(&file, 1, second.1), bits(&exact, 0, second.1), "{encoding:?}");
+        }
+    }
 }
