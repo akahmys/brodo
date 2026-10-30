@@ -18,7 +18,7 @@ use crate::cache::{
     put_u32, range, u32_of, zero,
 };
 use crate::error::{CacheError, FormatError};
-use crate::field::{LEAF_VOXELS, Stored};
+use crate::field::{ForType, LEAF_VOXELS, Stored, with_type};
 use crate::frozen::{BLOCK, Block, Header, local};
 use crate::meta::{Bounds, GridMeta};
 use crate::quantise::{self, Kind, Quantised};
@@ -461,17 +461,24 @@ fn unpack(found: &[Found<'_>], top: &[u8], blocks: usize) -> Result<Vec<Block>, 
     run(found, work.iter_mut().filter(|w| w.chunk == 0).collect())?;
     for (i, g) in found.iter().enumerate() {
         let head = work.iter().find(|w| w.grid == i).map_or(&[][..], |w| &*w.room);
-        let pieces = cut(head, g.grid_blocks)?;
-        let first_leaf = pieces.first().is_some_and(|(_, leaf)| *leaf);
-        if first_leaf || pieces.iter().map(|(r, _)| *r).ne(g.chunks.iter().map(|(_, raw)| *raw)) {
-            return Err(CacheError::Chunks(i));
-        }
+        let pieces = pieces(i, g, head)?;
         for (w, (_, leaf)) in work.iter_mut().filter(|w| w.grid == i).zip(pieces) {
             w.leaf = leaf;
         }
     }
     run(found, work.iter_mut().filter(|w| w.chunk != 0).collect())?;
     Ok(out)
+}
+
+/// Grid `index`'s chunks as §8.3 cuts its frozen buffer, read from the frozen header in
+/// `head`, its first chunk decompressed; a table that lists others is refused (§8.4, rule 6).
+fn pieces(index: usize, g: &Found<'_>, head: &[u8]) -> Result<Vec<Piece>, CacheError> {
+    let pieces = cut(head, g.grid_blocks)?;
+    let first_leaf = pieces.first().is_some_and(|(_, leaf)| *leaf);
+    if first_leaf || pieces.iter().map(|(r, _)| *r).ne(g.chunks.iter().map(|(_, raw)| *raw)) {
+        return Err(CacheError::Chunks(index));
+    }
+    Ok(pieces)
 }
 
 /// `out` split into the header and directory `top`, copied in, then each grid's metadata,
@@ -602,11 +609,7 @@ pub fn region_from_bytes(
     let (first, raw) = chunk(0)?;
     within(raw, limit)?;
     let head = decompress(&found, index, 0, first, raw, false)?;
-    let pieces = cut(head.as_bytes(), g.grid_blocks)?;
-    let first_leaf = pieces.first().is_some_and(|(_, leaf)| *leaf);
-    if first_leaf || pieces.iter().map(|(r, _)| *r).ne(g.chunks.iter().map(|(_, raw)| *raw)) {
-        return Err(CacheError::Chunks(index));
-    }
+    let pieces = pieces(index, g, head.as_bytes())?;
     let last = pieces.len().checked_sub(1).filter(|k| *k > 0);
     let tail = match last.filter(|k| pieces.get(*k).is_some_and(|(_, leaf)| !leaf)) {
         Some(k) => {
@@ -681,27 +684,24 @@ fn meeting(
     len: usize,
     extent: Bounds,
 ) -> Result<Vec<(u32, Coord)>, FormatError> {
-    fn walk<T: Stored>(
-        head: &[u8],
-        tail: &[u8],
+    struct Walk<'a> {
+        head: &'a [u8],
+        tail: &'a [u8],
         len: usize,
         extent: Bounds,
-    ) -> Result<Vec<(u32, Coord)>, FormatError> {
-        let view = GridView::<T>::nodes(head, tail, len)?;
-        match extent {
-            Bounds::Empty => Ok(Vec::new()),
-            Bounds::Box { min, max } => view.leaves_meeting(min, max),
+    }
+    impl ForType for Walk<'_> {
+        type Out = Result<Vec<(u32, Coord)>, FormatError>;
+        fn run<T: Stored>(self) -> Self::Out {
+            let view = GridView::<T>::nodes(self.head, self.tail, self.len)?;
+            match self.extent {
+                Bounds::Empty => Ok(Vec::new()),
+                Bounds::Box { min, max } => view.leaves_meeting(min, max),
+            }
         }
     }
-    match value_type {
-        t if t == f32::TYPE_CODE => walk::<f32>(head, tail, len, extent),
-        t if t == f64::TYPE_CODE => walk::<f64>(head, tail, len, extent),
-        t if t == u8::TYPE_CODE => walk::<u8>(head, tail, len, extent),
-        t if t == u32::TYPE_CODE => walk::<u32>(head, tail, len, extent),
-        t if t == <[f32; 3]>::TYPE_CODE => walk::<[f32; 3]>(head, tail, len, extent),
-        t if t == <[f64; 3]>::TYPE_CODE => walk::<[f64; 3]>(head, tail, len, extent),
-        found => Err(FormatError::UnknownValueType(found)),
-    }
+    with_type(value_type, Walk { head, tail, len, extent })
+        .unwrap_or_else(|found| Err(FormatError::UnknownValueType(found)))
 }
 
 impl Region {

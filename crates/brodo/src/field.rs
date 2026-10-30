@@ -118,6 +118,26 @@ impl Stored for [f64; 3] {
     const TYPE_CODE: u32 = 6;
 }
 
+/// Work done for one stored type, chosen at run time by its type code (`with_type`).
+pub(crate) trait ForType {
+    type Out;
+    fn run<T: Stored>(self) -> Self::Out;
+}
+
+/// `work` run for the stored type whose code is `code`; a code no stored type has is given
+/// back.
+pub(crate) fn with_type<W: ForType>(code: u32, work: W) -> Result<W::Out, u32> {
+    match code {
+        t if t == f32::TYPE_CODE => Ok(work.run::<f32>()),
+        t if t == f64::TYPE_CODE => Ok(work.run::<f64>()),
+        t if t == u8::TYPE_CODE => Ok(work.run::<u8>()),
+        t if t == u32::TYPE_CODE => Ok(work.run::<u32>()),
+        t if t == <[f32; 3]>::TYPE_CODE => Ok(work.run::<[f32; 3]>()),
+        t if t == <[f64; 3]>::TYPE_CODE => Ok(work.run::<[f64; 3]>()),
+        found => Err(found),
+    }
+}
+
 /// How a merged tile's value comes from the values it covers, each with the number of
 /// voxels holding it (ADR-0014); `None` refuses the merge.
 pub type MergeRule<T> = dyn Fn(&[(T, u32)]) -> Option<T> + Send + Sync;

@@ -11,7 +11,7 @@ use std::path::Path;
 use zerocopy::{FromZeros, IntoBytes};
 
 use crate::error::{CacheError, FormatError};
-use crate::field::{Field, Stored};
+use crate::field::{Field, ForType, Stored, with_type};
 use crate::frozen::{BLOCK, Block, FrozenGrid, aligned, freeze};
 use crate::meta::{Bounds, GridMeta};
 use crate::topology::Topology;
@@ -350,18 +350,15 @@ impl Storage {
 
 /// Checks a grid's frozen buffer with the type its directory names.
 fn check_grid(bytes: &[u8], value_type: u32) -> Result<(), FormatError> {
-    fn view<T: Stored>(b: &[u8]) -> Result<(), FormatError> {
-        GridView::<T>::new(b).map(|_| ())
+    struct Check<'a>(&'a [u8]);
+    impl ForType for Check<'_> {
+        type Out = Result<(), FormatError>;
+        fn run<T: Stored>(self) -> Self::Out {
+            GridView::<T>::new(self.0).map(|_| ())
+        }
     }
-    match value_type {
-        t if t == f32::TYPE_CODE => view::<f32>(bytes),
-        t if t == f64::TYPE_CODE => view::<f64>(bytes),
-        t if t == u8::TYPE_CODE => view::<u8>(bytes),
-        t if t == u32::TYPE_CODE => view::<u32>(bytes),
-        t if t == <[f32; 3]>::TYPE_CODE => view::<[f32; 3]>(bytes),
-        t if t == <[f64; 3]>::TYPE_CODE => view::<[f64; 3]>(bytes),
-        found => Err(FormatError::UnknownValueType(found)),
-    }
+    with_type(value_type, Check(bytes))
+        .unwrap_or_else(|found| Err(FormatError::UnknownValueType(found)))
 }
 
 /// A range of `len` bytes from block `at`, which must be byte `expected`, where the writer
