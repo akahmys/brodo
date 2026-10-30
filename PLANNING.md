@@ -32,7 +32,8 @@ implementing goes back to the human as an amendment before the work lands. A cla
 holds for every input is measured on each kind of input the design accepts, such as a
 badly oriented, holed or degenerate mesh (ADR-0026), not only on well-made ones. A number
 an ADR sets, a distance, a threshold or a bound, is tried on the case at its edge before
-it is proposed. Held by review alone (ADR-0001).
+it is proposed. An ADR states as the human's decision only a point the human answered in
+the session, each put to the human before it is written. Held by review alone (ADR-0001).
 
 ## 3. Spikes
 
@@ -40,7 +41,9 @@ A spike is a throwaway prototype that answers an open question by measurement. I
 only when the human asks, lives in `spikes/`, and is never imported by `crates/`. Its
 deliverables are a measurement report and the ADR built on it. A report that weighs a
 method's cost measures it at the size and on the shapes the method will meet: for a mesh,
-one of about 10⁵ triangles and one of slivers. Held by review alone (ADR-0001).
+one of about 10⁵ triangles and one of slivers. Before it times a case, a spike asserts that
+the case holds what its report says is measured, such as the chunks a region reads, so
+that a timing of nothing stops the run. Held by review alone (ADR-0001).
 
 ## 4. Keeping it small
 

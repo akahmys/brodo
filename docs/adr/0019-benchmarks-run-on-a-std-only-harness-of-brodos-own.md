@@ -173,3 +173,30 @@ cache_write_x8` and `--record gather`, at loads of 1.44 and 1.41: 43 486 750 and
 3 468 083 ns. A run then put every item within its baseline, the two at +0.8 and −2.0 %,
 and −0.6 and −0.2 %. Code placement alone moves an item by as much as 15 %, which the
 10 % tolerance cannot tell from a change in the code; it is read by disassembling, as here.
+
+## Amendment: a pair that disagrees is refused
+
+- **Date**: 2026-10-30
+
+P6's retrospective found a spike's run that started at rest, at a one-minute load below
+2.5 and a five-minute below 4.0, and read 1.3 to 2.5 times slower than two later runs,
+which agreed within 15 % (spikes/region/REPORT.md). A load read at the start cannot see
+work that begins during a run, and one read at the end cannot tell it from the run's own:
+ten busy threads, as many as the machine's processors, took the one-minute load from 2.40
+to 9.02 in 90 s, above `BUSY_LOAD` with nothing else running. The owner decided that the
+harness refuses a pair whose two children disagree on an item by more than 10 %,
+`SPREAD`, comparing or recording, and judges and records nothing from it, the report still
+written: at rest pairs agreed within 7.8 % (P5's close) and 4.2 % at most in the last
+reports of 2026-10-28, and a pair disturbed by other work disagreed by 16.9 %. The
+refusal is checked by the harness; a spike's timings, which do not run on it, are held by
+review alone. Shown to fire: with `SPREAD` at 0, colino's run at loads of 1.82 and 1.50
+was refused, naming every item.
+
+At 10 %, at rest, colino's `convert_slab_320` alone was refused, at 17.2 % and 20.5 % in
+two runs of three, while its other items agreed within 3.8 %. Ten children run one after
+another put its fastest time at 154 to 191 ms, a different one each process, the other
+items within 6 %; on 4 threads at 227 to 232 ms. Timed by step, the leaf-parallel values
+step held all of it, 156.8 to 179.5 ms, the serial steps within 0.6 ms; no other process
+used 5 % of a processor for more than one 2-s sample in a child. The owner decided that the
+limit stays at 10 %, a refused pair run again, and the item's variation is an open question
+(ROADMAP.md B-024).

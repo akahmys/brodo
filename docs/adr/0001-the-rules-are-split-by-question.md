@@ -114,3 +114,15 @@ thick into two places. The human decided that a spike weighing a method's cost m
 it at the size and on the shapes the method will meet, for a mesh about 10⁵ triangles and
 slivers (PLANNING.md §3), and that a number an ADR sets is tried on the case at its edge
 before it is proposed (PLANNING.md §2). Held by review alone.
+
+## Amendment
+
+- **Date**: 2026-10-29
+
+P6's retrospective found a spike that timed a box at a sphere's centre, which met no leaf,
+so that its first timing measured a read of nothing; and an ADR amendment that stated as
+the human's decision a point, reading the archive whole for a region, not yet put to the
+human, who agreed to it only afterwards. The human decided that a spike asserts, before it
+times a case, that the case holds what its report says is measured (PLANNING.md §3), and
+that an ADR states as the human's decision only a point the human answered in the session,
+each put to the human before it is written (PLANNING.md §2). Held by review alone.

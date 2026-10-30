@@ -19,26 +19,20 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   values built (ADR-0016), and reading a region (added by the human); P6's closing
   checks next. OpenVDB files follow as
   P7 (split by the human, 2026-10-28).
-- **Unresolved problems**: `cache_map_x256` runs 8 to 10 % behind its baseline of
-  2026-10-17 at v0.3.0 and now alike, run in turn (2026-10-23); a first run straight after
-  the fuzz round and Miri failed at +13 %. Machine drift is the likely cause, not shown. Miri's Stacked Borrows reports undefined behaviour in
-  `crossbeam-epoch` under rayon; Tree Borrows does not (ADR-0015), but Miri's nightly of
-  2026-07-21 warns there of integer-to-pointer casts in `crossbeam-epoch` 0.9.21, which
-  Tree Borrows does not support, so it may miss a bug past them (2026-10-20). The leaf-parallel
-  update's benchmark disagrees within a pair by up to 17 %; whether a load average of 3.0
-  catches other work is unknown (ADR-0019); readings: other work in another project
-  raised it to 14.76 (2026-10-19); a program using more than one core let the run start
-  and failed the leaf-parallel update at +16 % (2026-10-20); the Claude app's own drawing
-  held the load average near 3 during runs (2026-10-20). Allocating and dropping its
-  output field takes about a third of that item (1.04 of 3.3 ms, 2026-10-18, load 3.3),
-  but the update alone varied as much, so it is not shown to cause the spread.
-  `cache_write_x8` ran 169 to 214 % slow in the first child of a pair, the second within
-  1 %, twice (2026-10-25, 2026-10-26); the first file write of a run is the likely cause,
-  not shown.
-  Labelling held about 161 MB for the 33 million leaf voxels of a sphere of radius 400,
-  near 5 bytes a voxel, and took 2.42 s on one thread (2026-10-26); it has a benchmark
-  item. The gate's debug tests grew: `morphology_reference` takes 27 s at a
-  load of 5 (2026-10-19).
+- **Unresolved problems**, each with when it is taken up (the human, 2026-10-30):
+  - `cache_map_x256` runs 8 to 10 % behind its baseline of 2026-10-17 at v0.3.0 and now
+    alike, run in turn (2026-10-23); a first run straight after the fuzz round and Miri
+    failed at +13 %. Machine drift is the likely cause, not shown. At P6's closing
+    benchmarks.
+  - `cache_write_x8` ran 169 to 214 % slow in the first child of a pair, the second within
+    1 %, twice (2026-10-25, 2026-10-26); the first file write of a run is the likely cause,
+    not shown. Such a pair is now refused (ADR-0019, 2026-10-30). At P6's closing
+    benchmarks.
+  - The leaf-parallel update's benchmark disagrees within a pair by up to 17 % (ADR-0019),
+    as colino's `convert_slab_320` does by up to 24 % at rest (B-024). Allocating
+    and dropping its output field takes about a third of that item (1.04 of 3.3 ms,
+    2026-10-18), but the update alone varied as much. By one spike with B-024, after P6
+    and before P7.
 
 ## 2. Milestones
 
@@ -331,10 +325,18 @@ spike and an ADR before it is built.
 - [x] Reading a region: only the chunks a box of voxels needs decompressed, each into a
       buffer of its own, read as a view that answers within the box and refuses the rest
       (the human, 2026-10-29; spikes/region/, ADR-0016)
-- [ ] Retrospective and refactoring; fuzz round, the new reader included; Miri run;
-      benchmarks, the archive's with baselines; mutation run (ADR-0023), as the human
-      chooses (ADR-0033)
+- [ ] Retrospective and refactoring; fuzz round, the new reader included; Miri run, which
+      states whether Miri still warns of integer-to-pointer casts in `crossbeam-epoch`
+      under Tree Borrows (ADR-0015); benchmarks, the archive's with baselines,
+      `cache_map_x256` and `cache_write_x8` looked into (§1); mutation run (ADR-0023), as
+      the human chooses (ADR-0033)
 - [ ] **Accepted when** archives round-trip within their stated error
+
+### Between P6 and P7
+
+- [ ] A spike on why parallel benchmark items vary from one process to the next: the
+      leaf-parallel update and colino's `convert_slab_320`, each thread's leaves and time
+      in a slow and a fast process (§1, B-024; the human, 2026-10-30)
 
 ### P7 — brodo: OpenVDB files
 
@@ -361,6 +363,7 @@ implementation (PLANNING.md §2).
 
 | # | Question | Proposal so far |
 | :--- | :--- | :--- |
+| B-024 | Why does colino's `convert_slab_320` vary by up to 24 % from one benchmark process to the next, at rest, so that ADR-0019's 10 % refuses one pair in several? | Not yet: found by P6's retrospective (ADR-0019, 2026-10-30). The variation is all in the leaf-parallel values step; the serial steps vary by 0.6 ms at most, other items within 6 %, and on 4 threads it is 2.0 %. No state is shared between the threads, and no other process ran through a slow child. Next, each thread's leaves and time in a slow and a fast process. Until then, a refused pair is run again |
 | B-023 | Does Hermite data hold its crossings sparsely, only on the edges that hold one, rather than nine dense fields over every leaf? | Not yet: found by P5's review (M2): the fields take about 61 bytes a voxel and writing them about three times as much, so that a sphere of radius 1500 voxels does not fit in 32 GB, read against a measurement of 613 MB at radius 200 (2026-10-26). It changes the Hermite format, so it waits for a spike and a version raised (ADR-0038); the owner set it aside for P5 (2026-10-27) |
 | B-022 | Does a later version of the frozen layout and the cache profile check what version 1's readers leave unchecked: padding and the background's bytes beyond its size, the order of nodes, whether every node and leaf is reached, and a cache file's bounds against its grid (docs/formats.md §2.5, §3.4)? | Not yet: found writing the format document (ADR-0037); each check a reader adds refuses files version 1 accepts, so it waits for a version raised for another reason (ADR-0038). Now for `GridView::new` and the cache reader alone: the Hermite reader and thawing refuse nodes reached twice and leaves never reached at version 1 (ADR-0038's amendment of 2026-10-27, ADR-0042). For the links, one pass would do: each node's `first_child` and `first_tile`, where it has children or tiles, the end of the previous such node's, the last end the count, so that no child is shared or unreached |
 | B-019 | Does `colino` move to a repository of its own? | Not now (owner, 2026-10-23; ADR-0012 keeps two crates in one repository): changes span both, as P3's Hermite format and producer did, and before 1.0 a split would turn each into two releases, duplicate the rules and their audit, and take colino's tests out of brodo's gate. Revisited when brodo's API and formats settle (1.0), both are on crates.io, colino needs what brodo's rules forbid, or others maintain it. Publishing does not split them: both crates are published from this repository (owner, 2026-10-29). A split waits for colino needing what brodo's rules forbid, or for others maintaining it, and is then a milestone of its own that gives colino its own rules, audit and CI (owner, 2026-10-29) |

@@ -8,7 +8,9 @@
 //! keeps each item's fastest time. The parent writes both children's times, how far they
 //! agree, and the change from the baseline of this hardware model to
 //! `out/bench/<crate>/report.tsv`, and fails when an item is more than `TOLERANCE` slower
-//! than its baseline in both. With `--record` it instead replaces this model's rows of the
+//! than its baseline in both. It refuses, comparing or recording, a pair whose children
+//! disagree on an item by more than `SPREAD`, a run disturbed by other work that the load
+//! averages cannot show. With `--record` it instead replaces this model's rows of the
 //! member's `benches/baseline.tsv` with the faster of the two times, dated; with
 //! `--record NAME`, only that item's row, the others kept with their dates, so that an item
 //! added later gains a baseline without the rest losing theirs.
@@ -38,6 +40,12 @@ const EVICT_BYTES: usize = 256 << 20;
 /// How much slower than its baseline an item may be, in both children, before it fails
 /// (ADR-0019).
 const TOLERANCE: f64 = 0.10;
+/// How far the two children of a pair may disagree on an item before the pair is refused:
+/// at rest they agreed within 7.8 %, and with other work running they disagreed by up to
+/// 16.9 %. The load averages cannot tell the two apart once a run starts, since the
+/// benchmark's own threads raise them: ten busy threads took the one-minute load from 2.4
+/// to 9.0 in 90 s (ADR-0019).
+const SPREAD: f64 = 0.10;
 /// The one-minute load average above which the machine is taken to be busy: at rest an
 /// Apple M5 read 1.53 to 2.13, and 3.86 just after a build and the tests (ADR-0019).
 const BUSY_LOAD: f64 = 3.0;
@@ -105,11 +113,46 @@ pub fn run<D>(
     let load = wait_for_rest()?;
     let runs = [run_child(&places, 0)?, run_child(&places, 1)?];
     let model = hardware_model()?;
+    let spreads = spreads(&runs)?;
     if at.is_some() {
+        refuse_spread(&spreads, None)?;
         record_baseline(&places, &runs, &model, only.as_deref())
     } else {
-        compare(&places, &runs, &model, load)
+        // The report is written either way; a refused pair's verdicts are not returned.
+        let judged = compare(&places, &runs, &model, load);
+        refuse_spread(&spreads, Some(&places.out.join("report.tsv")))?;
+        judged
     }
+}
+
+/// Each item's spread between the two children, in percent of the faster.
+fn spreads(runs: &[BTreeMap<String, u128>; 2]) -> Result<BTreeMap<String, f64>, Failure> {
+    runs[0]
+        .iter()
+        .map(|(name, a)| {
+            let b = *runs[1].get(name).ok_or(Failure(format!("{name} missing from run 2")))?;
+            Ok((name.clone(), change((*a).max(b), (*a).min(b))))
+        })
+        .collect()
+}
+
+/// Refuses the pair if an item's spread is more than `SPREAD`, naming each such item and
+/// the report that holds the times, if one was written.
+fn refuse_spread(spreads: &BTreeMap<String, f64>, report: Option<&Path>) -> Result<(), Failure> {
+    let limit = SPREAD * 100.0;
+    let apart: Vec<String> = spreads
+        .iter()
+        .filter(|(_, s)| **s > limit)
+        .map(|(name, s)| format!("{name}: {s:.1} %"))
+        .collect();
+    if apart.is_empty() {
+        return Ok(());
+    }
+    let held = report.map(|r| format!(" ({})", r.display())).unwrap_or_default();
+    Err(Failure(format!(
+        "the two runs disagree by more than {limit} %{held}, so other work disturbed them; nothing is judged or recorded; stop other work and run again:\n{}",
+        apart.join("\n")
+    )))
 }
 
 /// The one-minute and five-minute load averages: `vm.loadavg` on macOS, `/proc/loadavg`
