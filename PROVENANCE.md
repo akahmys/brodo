@@ -22,6 +22,7 @@ docs/formats.md.
 | :--- | :--- | :--- | :--- |
 | `v12.0.0` | `269300808a4651daa65836214fc20f78e1c0eb7f` | `LICENSE`, `README.md`, `RE-LICENSE_NOTE.txt` | The licence (ADR-0044) |
 | `v14.0.0` | `ecae2bda85744412b0cd47e1b8e1e4e76beb7b88` | `LICENSE`, `README.md`, `RE-LICENSE_NOTE.txt` | The licence (ADR-0044) |
+| `v14.0.0` | `ecae2bda85744412b0cd47e1b8e1e4e76beb7b88` | Under `openvdb/openvdb/`: `COPYRIGHT`; `io/` `File.cc`, `Archive.h`, `Archive.cc`, `GridDescriptor.cc`, `Compression.h`, `Compression.cc`, `Codec.h`, `Codec.cc`, `io.h`; `codecs/` `ScalarCodec.h`, `TopologyCodec.h`, `impl/ScalarLeafCodec.h`; `Grid.cc`, `MetaMap.cc`, `Metadata.h`, `Metadata.cc`, `version.h.in`; `math/` `Maps.h`, `Maps.cc`, `Transform.cc` in part; `util/NodeMasks.h` in part; `tree/` `Tree.h`, `RootNode.h`, `InternalNode.h`, `LeafNode.h` in part | The layout a writer emits for float and double grids at file version 225 (`spikes/vdb/`, ADR-0045) |
 
 ## Files
 

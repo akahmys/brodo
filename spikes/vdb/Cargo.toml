@@ -1,0 +1,14 @@
+# Throwaway spike for P7's writing step (ADR-0045): which bytes of a `.vdb` file OpenVDB
+# 14.0.0 reads back as brodo's grid. Never imported by `crates/` (PLANNING.md §3); its own
+# workspace. `oracle/` is a C++ checker built by hand against the owner's OpenVDB.
+[package]
+name = "vdb-spike"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+brodo = { path = "../../crates/brodo" }
+
+[workspace]
+members = ["."]

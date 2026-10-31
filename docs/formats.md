@@ -451,3 +451,80 @@ meet the box (ADR-0016). It refuses a file, before answering anything, unless:
 A chunk it does not decompress is not checked to decompress, nor are its values: a file
 that a whole read (§8.4) refuses may answer a region. It answers a voxel within the box as
 the frozen buffer does, and refuses any other, though the chunks it holds may cover it.
+
+## 9. OpenVDB files as brodo writes them (P7, not built)
+
+A grid of `f32` or `f64` written as OpenVDB's `.vdb` file at file version 225, as OpenVDB
+14.0.0 reads and writes it (ADR-0046); the layout was learnt from OpenVDB at `v14.0.0`
+(PROVENANCE.md). Unlike §1, a string here is a `u32` byte length and its bytes, with no
+padding, and nothing is aligned to blocks. Every number is little-endian.
+
+### 9.1 Header
+
+| Field | Bytes |
+| :--- | :--- |
+| magic, `0x56444220` as an `i64` | 8 |
+| file version, 225, `u32` | 4 |
+| library version, 14 and 0, two `u32` | 8 |
+| grid offsets follow: 1, `u8` | 1 |
+| UUID: `00000000-0000-0000-0000-000000000000`, ASCII, no length | 36 |
+| file metadata: a count of 0, `u32` | 4 |
+| grid count, `i32` | 4 |
+
+Then each grid: its descriptor (§9.2) and its body (§9.3), the next grid's descriptor at
+the body's end.
+
+### 9.2 Grid descriptor
+
+The grid's name, a string; its type, `Tree_float_5_4_3` or `Tree_double_5_4_3`; an empty
+string, the grid not being an instance; then three `i64`, each a byte offset from the start
+of the file: the body's start, the start of its leaf buffers (§9.6), and the body's end.
+
+### 9.3 Grid body
+
+1. Compression flags, `u32`: 2, active-mask.
+2. Metadata: a `u32` count, then each entry sorted by name: its name, its type name, a
+   `u32` byte count, and the value. Seven entries:
+
+   | Name | Type | Value |
+   | :--- | :--- | :--- |
+   | `class` | `string` | `level set` for a grid holding `sdf.version` (§5), else `unknown` |
+   | `file_bbox_max` | `vec3i` | the greatest voxel of a leaf or tile, three `i32` |
+   | `file_bbox_min` | `vec3i` | the least such voxel |
+   | `file_compression` | `string` | `active values` |
+   | `file_mem_bytes` | `int64` | 0 |
+   | `file_voxel_count` | `int64` | the voxels of every leaf and tile |
+   | `name` | `string` | the grid's name |
+
+3. The transform: the string `AffineMap`, then sixteen `f64`, a 4×4 matrix row by row, M,
+   by which OpenVDB maps a row vector (x, y, z, 1) to world coordinates. From brodo's 3×4
+   map A, whose last column is the translation t: M's upper 3×3 is A's transposed, its last
+   column (0, 0, 0, 1), and its fourth row t + A·(½, ½, ½), so that OpenVDB's index v is
+   brodo's voxel centre.
+4. The topology (§9.4), then the leaf buffers (§9.6).
+
+### 9.4 Topology
+
+An `i32` 1; the background, one value; the root's tile count and its upper-node count, two
+`u32`. Then each root tile in ascending origin, x first: its origin, its value, and 1, a
+`u8`, active. Then each upper node in ascending origin, x first: its origin, then its masks
+and values (§9.5), then each of its lower nodes, and in each lower node its masks and
+values and then 512 set bits per leaf, a leaf's value mask, all in ascending place.
+
+A node's **place** for a voxel v: with c the log₂ of its child's edge and n of its side,
+lx = (vx >> c) mod 2ⁿ and likewise ly, lz; place = lx·2²ⁿ + ly·2ⁿ + lz, z fastest. An
+upper node has c = 7, n = 5; a lower node c = 3, n = 4; a leaf c = 0, n = 3.
+
+### 9.5 A node's masks and values
+
+A **mask** is its node's places as `u64` words, place p at bit p mod 64 of word p div 64:
+4096 bytes for an upper node, 512 for a lower node, 64 for a leaf. An upper or lower node
+writes its child mask (a lower node or a leaf at the place), then its value mask (a tile at
+the place), then its values: a `u8` 0, then each tile's value in ascending place, the other
+places holding the background or a child.
+
+### 9.6 Leaf buffers
+
+Each leaf in the topology's order: its value mask again, 512 set bits; a `u8` 0; then its
+512 values in place order, z fastest, which is brodo's leaf order (§1.2) with x and z
+exchanged.
