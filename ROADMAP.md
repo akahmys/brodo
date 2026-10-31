@@ -21,7 +21,9 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   threads as the machine has performance cores (ADR-0019).
 - **Done**: P7's first unit, OpenVDB from its Apache-2.0 release 12.0.0 read for the
   `.vdb` format and never copied (ADR-0044; the owner, 2026-10-31).
-- **Next**: B-006 asked again on that ground, then the rest of P7, OpenVDB files.
+- **Done**: B-006 answered, `.vdb` read and written by brodo itself, writing in P7
+  (ADR-0045; the owner, 2026-10-31).
+- **Next**: P7's writing step: its spike and ADR.
 
 ## 2. Milestones
 
@@ -339,13 +341,18 @@ spike and an ADR before it is built.
 ### P7 — brodo: OpenVDB files
 
 Split from P6 by the human on 2026-10-28. Each step is a spike and an ADR before it is
-built.
+built. brodo reads and writes `.vdb` itself, the format learnt from OpenVDB at `v14.0.0`
+(ADR-0044, ADR-0045; the owner, 2026-10-31).
 
-- [ ] `.vdb`: B-006 for reading through `vdb-rs`; writing only if the format can be learnt
-      within AGENTS.md S1, as the human decides
+- [x] OpenVDB from its Apache-2.0 release 12.0 read for the format (ADR-0044)
+- [x] B-006: `vdb-rs` not used (ADR-0045)
+- [ ] Writing: float and double grids on brodo's tree, checked by OpenVDB's own tools
+- [ ] Reading: the files brodo writes, and those OpenVDB 12 to 14 writes for the same grid
+      types by default
 - [ ] Retrospective and refactoring; fuzz round, the new readers included; Miri run;
       benchmarks; mutation run (ADR-0023), as the human chooses (ADR-0033)
-- [ ] **Accepted when** `.vdb` files are read as B-006 decides
+- [ ] **Accepted when** brodo's float and double grids are written to `.vdb` files that
+      OpenVDB's tools read back the same, and such files are read back into brodo
 
 ### After P7
 
@@ -368,10 +375,9 @@ implementation (PLANNING.md §2).
 | B-018 | Does model checking with Kani join the closing checks? | Not now (owner, 2026-10-23): it fits only integer bit work and `view.rs`'s small helpers, already fuzzed and mutation-tested, and cannot reach rayon or the memory mapping; this milestone's defects were numeric and in design claims. Revisited by a spike if Miri-unreachable unsafe code grows, an integer coordinate bug escapes the tests, or before 1.0 |
 | B-003 | Do level-set operations (CSG, redistancing) belong in brodo? | No, until shown to be general |
 | B-004 | Does a shared IR schema crate live in this repository? | Undecided; for brodo's users to agree, not for brodo to anticipate |
-| B-006 | Does `vdb-rs` pass Rules 12 and 13 (no C, permissive licence) on every target, or does brodo read and write `.vdb` itself, learning the format from OpenVDB at a tag from `v12.0.0` on (ADR-0044)? | Asked again under ADR-0044 (2026-10-31): `vdb-rs` 0.6.0, MIT, reads only and needs `blosc-src`, which compiles C (Rule 12), and states that it follows OpenVDB's implementation; no public document specifies the format's bytes |
 | B-013 | Which crates handle `piatto`'s window, input and GUI parts? | `winit` and `egui`, to be measured against Rules 12 and 13 (ADR-0018) |
 
-`spikes/sign/` answered B-016 (ADR-0027); `spikes/thin/` and `spikes/recheck/` B-020 (ADR-0028); `spikes/value/` B-017 (ADR-0029); `spikes/archive/` B-005, `lz4_flex` (ADR-0016). `spikes/parvar/` B-024, a benchmark on the performance cores (ADR-0019). No spike is running. `spikes/remap/` answered B-001 and B-008, and `spikes/merge/` B-010
+`spikes/sign/` answered B-016 (ADR-0027); `spikes/thin/` and `spikes/recheck/` B-020 (ADR-0028); `spikes/value/` B-017 (ADR-0029); `spikes/archive/` B-005, `lz4_flex` (ADR-0016). ADR-0045 B-006, with no spike, by measurement of `vdb-rs`'s dependencies; `spikes/parvar/` B-024, a benchmark on the performance cores (ADR-0019). No spike is running. `spikes/remap/` answered B-001 and B-008, and `spikes/merge/` B-010
 (ADR-0014); `spikes/vtk/` answered B-012 (ADR-0018); `spikes/bench/` B-007 (ADR-0019); `spikes/threads/` B-014, rayon kept (ADR-0015); `spikes/dilate/` B-011, no mask (ADR-0025); `spikes/ghost/` B-002, one to three layers (ADR-0015); `spikes/mutants/` the audit review's proposal C (ADR-0023).
 
 ## 4. Administrative items still open

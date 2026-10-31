@@ -270,8 +270,9 @@ fastest. A neighbour beyond the `i32` coordinate range is the background.
   `RegionView` answers every voxel within the box and refuses one outside it, whatever
   the chunks held cover, so that what it answers does not follow from how the grid is cut
   (ADR-0016).
-- (P7, not built.) OpenVDB files (`.vdb`) are read through the `vdb-rs` crate into brodo's tree and written
-  by brodo, for level sets and scalar density first.
+- (P7, not built.) OpenVDB files (`.vdb`) are written and read by brodo itself, float and
+  double grids on its tree first, the format learnt from OpenVDB at `v14.0.0` (ADR-0044,
+  ADR-0045).
 
 ### 4.8 Value types
 

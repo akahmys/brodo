@@ -72,3 +72,4 @@ A record is `Proposed` until the human accepts it.
 | [0042](0042-a-frozen-view-thaws-into-a-topology-and-a-field.md) | A frozen view thaws into a topology and a field |
 | [0043](0043-a-test-holds-the-code-to-its-promises-not-to-its-implementation.md) | A test holds the code to its promises, not to its implementation |
 | [0044](0044-openvdb-from-12-0-is-read-for-its-file-format.md) | OpenVDB from 12.0 on is read for its file format, and never copied |
+| [0045](0045-brodo-reads-and-writes-vdb-files-itself.md) | brodo reads and writes `.vdb` files itself, not through `vdb-rs` |
