@@ -8,17 +8,14 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: P5 accepted by the human and closed as 0.6.0 (2026-10-28): a sign without
-  orientation, `Sign::Parity` (ADR-0027); the report's third layer, thin walls and narrow
-  gaps (ADR-0028); the costs a review found, measured and kept where they helped; a frozen
-  view thawed (ADR-0042); and the promises given three homes, tests and excluded mutants
-  held to them (ADR-0043). Its mutation run missed none of 3557; two baselines were
-  recorded again, a sync's cost and a change of code placement (ADR-0019).
-- **Next**: P6 (§2), brodo's archives and quantisation, 0.7.0, each step a spike and an
-  ADR before it is built; B-005 answered, `lz4_flex`, the archive profile and its quantised
-  values built (ADR-0016), and reading a region (added by the human); P6's closing
-  checks done, its acceptance next. OpenVDB files follow as P7 (split by the human,
-  2026-10-28).
+- **Done**: P6 accepted by the human and closed as 0.7.0 (2026-10-31): the archive
+  profile, compressed by `lz4_flex` (B-005), its values exact, in binary16 or in 8 bits,
+  and one grid's region read alone (ADR-0016). A benchmark pair whose runs disagree by
+  more than 10 % is refused, and every benchmark runs with every feature (ADR-0019). Its
+  mutation run reported all 3949; the 31 missed or timed out are killed or excluded, and
+  the files changed ran again with none missed (ADR-0023).
+- **Next**: the spike between P6 and P7 (§2) on why parallel benchmark items vary from
+  one process to the next (B-024); then P7, OpenVDB files.
 - **Unresolved problems**, each with when it is taken up (the human, 2026-10-30):
   - The leaf-parallel update's benchmark disagrees within a pair by up to 17 % (ADR-0019),
     as colino's `convert_slab_320` does by up to 24 % at rest (B-024). Allocating
@@ -329,7 +326,9 @@ spike and an ADR before it is built.
 - [x] Mutation run over the workspace (ADR-0023), as the human chose (ADR-0033): of 3949,
       31 missed or timed out, 29 now killed and 2 excluded as equivalent; the four files
       changed run again, 721 mutants, none missed (2026-10-31)
-- [ ] **Accepted when** archives round-trip within their stated error
+- [x] **Accepted when** archives round-trip within their stated error:
+      `archive_format.rs`, exact to the bit, quantised within docs/formats.md §8.5's
+      bounds, a region as the whole grid within its box; accepted 2026-10-31
 
 ### Between P6 and P7
 

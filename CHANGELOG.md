@@ -6,6 +6,12 @@ are recorded here when they change (V6).
 
 ## Unreleased
 
+## 0.7.0 (2026-10-31)
+
+Closes P6: brodo's archive profile, its grids compressed by `lz4_flex` in chunks of 512
+leaves, their floating values exact, in binary16 or in 8 bits, read back within their
+stated bounds, whole or one grid's region at a time.
+
 - The archive profile, under the new feature `archive`: `archive::write` and `to_bytes`
   store grids with their metadata, each frozen buffer in chunks of 512 leaves compressed
   by `lz4_flex`'s block format, and `archive::read` and `from_bytes` read one back as the
