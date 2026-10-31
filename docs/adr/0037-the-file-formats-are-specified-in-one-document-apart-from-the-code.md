@@ -71,3 +71,17 @@ the references to `docs/formats.md §N` went unchecked; it now reads the heading
 fire: a reference to a section the document lacks failed the check with the name in
 backquotes, after a link, and bare.
 
+
+## Amendment: OpenVDB files
+
+- **Date**: 2026-11-01
+
+docs/formats.md §9 gained a test vector when brodo began writing `.vdb` files (ADR-0046):
+`crates/brodo/tests/data/vdb_v225.bin`, a float level set, a double grid and an empty
+grid. The owner had the reader cover it, as recommended: `scripts/audit/formats.py` reads
+an OpenVDB file from §9 alone, and `crates/brodo/tests/vdb_format.rs` holds every grid's
+metadata, transform, background, leaves and tiles it prints to the grids brodo wrote.
+brodo does not read `.vdb` yet, so no damaged copy is compared; that waits for the reading
+step. Shown to fire: with a leaf's values taken y fastest by the reader, the test failed.
+OpenVDB 14.0.0 read the same file back with every voxel and tile the same, and wrote it
+again the same but for `file_mem_bytes`, by hand with `spikes/vdb/`'s oracle.

@@ -452,12 +452,14 @@ A chunk it does not decompress is not checked to decompress, nor are its values:
 that a whole read (§8.4) refuses may answer a region. It answers a voxel within the box as
 the frozen buffer does, and refuses any other, though the chunks it holds may cover it.
 
-## 9. OpenVDB files as brodo writes them (P7, not built)
+## 9. OpenVDB files as brodo writes them
 
 A grid of `f32` or `f64` written as OpenVDB's `.vdb` file at file version 225, as OpenVDB
 14.0.0 reads and writes it (ADR-0046); the layout was learnt from OpenVDB at `v14.0.0`
 (PROVENANCE.md). Unlike §1, a string here is a `u32` byte length and its bytes, with no
-padding, and nothing is aligned to blocks. Every number is little-endian.
+padding, and nothing is aligned to blocks. Every number is little-endian. Its test vector
+is `crates/brodo/tests/data/vdb_v225.bin`: a float level set and a double grid on one
+topology of five leaves and a tile at each level, and an empty float grid.
 
 ### 9.1 Header
 
@@ -489,8 +491,8 @@ of the file: the body's start, the start of its leaf buffers (§9.6), and the bo
    | Name | Type | Value |
    | :--- | :--- | :--- |
    | `class` | `string` | `level set` for a grid holding `sdf.version` (§5), else `unknown` |
-   | `file_bbox_max` | `vec3i` | the greatest voxel of a leaf or tile, three `i32` |
-   | `file_bbox_min` | `vec3i` | the least such voxel |
+   | `file_bbox_max` | `vec3i` | the greatest voxel of a leaf or tile, three `i32`; with none, `i32::MIN` thrice |
+   | `file_bbox_min` | `vec3i` | the least such voxel; with none, `i32::MAX` thrice |
    | `file_compression` | `string` | `active values` |
    | `file_mem_bytes` | `int64` | 0 |
    | `file_voxel_count` | `int64` | the voxels of every leaf and tile |

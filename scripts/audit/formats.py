@@ -7,7 +7,8 @@
 For each file it prints `file PATH`, then either `refused REASON` or what it read: the
 grids, each with its metadata, background, leaves, some of their voxels found as §2.4
 says, and tiles, then each Hermite set's
-verdict, and `end`. With `--brief`, a read file prints `accepted` in place of its grids.
+verdict, and `end`; for an OpenVDB file, §9, each grid's metadata, transform, background,
+leaves, their values in brodo's order, and tiles. With `--brief`, a read file prints `accepted` in place of its grids.
 With `--patch`, each line of standard input, a byte offset and a `u32` in hexadecimal,
 gives a copy of FILE with that word replaced, read as `--brief` reads, named
 `FILE@OFFSET=VALUE`.
@@ -423,6 +424,128 @@ def archive(b):
     return cache(b"".join(head + body))
 
 
+# §9: the value types of an OpenVDB file brodo writes, by tree type.
+VDB_TYPES = {b"Tree_float_5_4_3": "<f", b"Tree_double_5_4_3": "<d"}
+VDB_META = [b"class", b"file_bbox_max", b"file_bbox_min", b"file_compression",
+            b"file_mem_bytes", b"file_voxel_count", b"name"]
+
+
+class Bytes(Cursor):
+    """§9: little-endian numbers and strings of a `u32` length, no padding."""
+
+    def num(self, fmt):
+        return struct.unpack(fmt, self.take(struct.calcsize(fmt)))[0]
+
+    def string(self):
+        return self.take(self.num("<I"))
+
+    def mask(self, places):
+        """§9.5: the places set, ascending."""
+        words = struct.unpack(f"<{places // 64}Q", self.take(places // 8))
+        return [p for p in range(places) if (words[p // 64] >> (p % 64)) & 1]
+
+
+def vdb_place(p, n):
+    """§9.4: a place's local coordinates, z fastest."""
+    m = (1 << n) - 1
+    return [p >> (2 * n), (p >> n) & m, p & m]
+
+
+def vdb_values(c, fmt, places):
+    """§9.5: a node's values block, one value for each of `places`."""
+    need(c.take(1) == b"\0", "vdb values")
+    return [c.take(struct.calcsize(fmt)) for _ in places]
+
+
+def vdb_topology(c, fmt):
+    """§9.4: the background, the leaves' origins and the tiles, (level, origin, value)."""
+    size = struct.calcsize(fmt)
+    need(c.num("<i") == 1, "vdb topology")
+    background = c.take(size)
+    ntiles, nuppers = c.num("<I"), c.num("<I")
+    leaves, tiles = [], []
+    for _ in range(ntiles):
+        o = [c.num("<i") for _ in range(3)]
+        tiles.append(("root", o, c.take(size)))
+        need(c.take(1) == b"\1", "vdb root tile")
+    for _ in range(nuppers):
+        uo = [c.num("<i") for _ in range(3)]
+        lowers, utiles = c.mask(1 << 15), c.mask(1 << 15)
+        for p, v in zip(utiles, vdb_values(c, fmt, utiles)):
+            tiles.append(("upper", [uo[k] + 128 * x for k, x in enumerate(vdb_place(p, 5))], v))
+        for p in lowers:
+            lo = [uo[k] + 128 * x for k, x in enumerate(vdb_place(p, 5))]
+            lch, ltiles = c.mask(1 << 12), c.mask(1 << 12)
+            for q, v in zip(ltiles, vdb_values(c, fmt, ltiles)):
+                tiles.append(("lower", [lo[k] + 8 * x for k, x in enumerate(vdb_place(q, 4))], v))
+            for q in lch:
+                need(c.mask(512) == list(range(512)), "vdb leaf mask")
+                leaves.append([lo[k] + 8 * x for k, x in enumerate(vdb_place(q, 4))])
+    return background, leaves, tiles
+
+
+def vdb_grid(b, at, end, fmt):
+    """§9.3: a grid's body, from `at` to `end`; its leaf buffers' start is checked by the
+    caller. Returns the grid and where its buffers start."""
+    c = Bytes(b[:end])
+    c.at = at
+    need(c.num("<I") == 2, "vdb compression")
+    meta = []
+    for _ in range(c.num("<I")):
+        name, kind = c.string(), c.string()
+        meta.append((name, kind, c.take(c.num("<I"))))
+    need([m[0] for m in meta] == VDB_META, "vdb metadata")
+    need(c.string() == b"AffineMap", "vdb transform")
+    transform = [c.take(8) for _ in range(16)]
+    background, leaves, tiles = vdb_topology(c, fmt)
+    buffers, size = c.at, struct.calcsize(fmt)
+    values = []
+    for _ in leaves:
+        need(c.mask(512) == list(range(512)), "vdb leaf mask")
+        need(c.take(1) == b"\0", "vdb leaf values")
+        z_fastest = [c.take(size) for _ in range(512)]
+        # §9.6: brodo's order, x fastest, from place x·64 + y·8 + z.
+        values.append(b"".join(z_fastest[64 * (i % 8) + 8 * (i // 8 % 8) + i // 64] for i in range(512)))
+    need(c.at == end, "vdb grid end")
+    grid = {"meta": meta, "transform": transform, "background": background,
+            "leaves": list(zip(leaves, values)), "tiles": tiles}
+    return grid, buffers
+
+
+def vdb(b):
+    """§9: the grids of an OpenVDB file as brodo writes it, (name, type, grid)."""
+    c = Bytes(b)
+    need(c.num("<q") == 0x56444220, "magic")
+    need([c.num("<I") for _ in range(3)] == [225, 14, 0], "vdb version")
+    need(c.take(1) == b"\1", "vdb header")
+    need(c.take(36) == b"00000000-0000-0000-0000-000000000000", "vdb uuid")
+    need(c.num("<I") == 0, "vdb file metadata")
+    out = []
+    for _ in range(c.num("<i")):
+        name, kind = c.string(), c.string()
+        need(kind in VDB_TYPES and c.string() == b"", "vdb grid type")
+        body, buffers, end = (c.num("<q") for _ in range(3))
+        need(body == c.at and body <= buffers <= end <= len(b), "vdb offsets")
+        grid, at = vdb_grid(b, body, end, VDB_TYPES[kind])
+        need(at == buffers, "vdb buffers")
+        out.append((name, kind, grid))
+        c.at = end
+    need(c.at == len(b), "end")
+    return out
+
+
+def dump_vdb(name, kind, g):
+    print("vdb", name.hex() or "-", kind.decode())
+    for k, t, v in g["meta"]:
+        print("meta", k.decode(), t.decode(), v.hex() or "-")
+    print("transform", *(x.hex() for x in g["transform"]))
+    print("background", g["background"].hex())
+    for o, v in g["leaves"]:
+        print("leaf", *o, v.hex())
+    for level, o, v in g["tiles"]:
+        print("tile", level, *o, v.hex())
+
+
 def group_table(pairs):
     """§4.1: the names by id, group 0 first; [] when there is no group key."""
     by_id = {}
@@ -515,6 +638,16 @@ def read(path, brief, b=None):
     if b is None:
         b = open(path, "rb").read()
     print("file", path)
+    if b[0:8] == struct.pack("<q", 0x56444220):
+        try:
+            grids = vdb(b)
+        except (Refused, struct.error, IndexError) as e:
+            print("refused", e)
+            return
+        for name, kind, g in grids:
+            dump_vdb(name, kind, g)
+        print("end")
+        return
     try:
         if b[0:4] == b"BRDG":
             grids, sets = [(None, Grid(b))], []

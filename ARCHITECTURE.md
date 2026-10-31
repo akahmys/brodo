@@ -34,7 +34,7 @@ a discretisation, its user's.
 
 | Crate | Contents |
 | :--- | :--- |
-| `brodo` | The sparse tree, `Topology`, `Field<T>`, `Grid<T>`, topology editing and `Remap`, `LeafManifest`, `ValueAccessor`, leaf-parallel updates and gather, topology analysis, `GridView`, the file profiles, the Hermite data format, OpenVDB files (P7, not built), checking output (slice PNG, VTK) |
+| `brodo` | The sparse tree, `Topology`, `Field<T>`, `Grid<T>`, topology editing and `Remap`, `LeafManifest`, `ValueAccessor`, leaf-parallel updates and gather, topology analysis, `GridView`, the file profiles, the Hermite data format, OpenVDB files, checking output (slice PNG, VTK) |
 | `colino` | Meshes to narrow-band SDFs on brodo's tree, and the topology report |
 | `piatto` | A viewer of cache-profile files, as a library and a thin windowed program; built only when needed (ADR-0018) |
 
@@ -270,9 +270,11 @@ fastest. A neighbour beyond the `i32` coordinate range is the background.
   `RegionView` answers every voxel within the box and refuses one outside it, whatever
   the chunks held cover, so that what it answers does not follow from how the grid is cut
   (ADR-0016).
-- (P7, not built.) OpenVDB files (`.vdb`) are written and read by brodo itself, float and
-  double grids on its tree first, the format learnt from OpenVDB at `v14.0.0` (ADR-0044,
-  ADR-0045).
+- OpenVDB files (`.vdb`), under the feature `vdb`, are written by brodo itself, float and
+  double grids on its tree, as one file OpenVDB 14 reads with brodo's values where brodo
+  samples them (docs/formats.md §9, ADR-0045, ADR-0046); every leaf voxel and tile is
+  written active, the unit, voxel size and free pairs but `sdf.version` are not, and two
+  grids of one name are refused. Reading them is not built (P7).
 
 ### 4.8 Value types
 

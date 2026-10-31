@@ -26,7 +26,11 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
 - **Done**: P7's writing step decided: `spikes/vdb/` wrote float and double grids that
   OpenVDB 14.0.0 read back with every value the same; active-mask compression, half a
   voxel's shift, every voxel active (ADR-0046; the owner, 2026-10-31).
-- **Next**: building the writer to docs/formats.md §9; then the reading step's spike.
+- **Done**: the writer, `brodo::vdb` under the feature `vdb`, to docs/formats.md §9; OpenVDB
+  14.0.0 read its golden file back with every value the same and wrote it again the same
+  but for `file_mem_bytes` (2026-11-01).
+- **Next**: the reading step's spike: which compressions OpenVDB 12 to 14 write by default,
+  and whether OpenVDB 12 and 13 read file version 225.
 
 ## 2. Milestones
 
@@ -349,7 +353,8 @@ built. brodo reads and writes `.vdb` itself, the format learnt from OpenVDB at `
 
 - [x] OpenVDB from its Apache-2.0 release 12.0 read for the format (ADR-0044)
 - [x] B-006: `vdb-rs` not used (ADR-0045)
-- [ ] Writing: float and double grids on brodo's tree, checked by OpenVDB's own tools
+- [x] Writing: float and double grids on brodo's tree, checked by OpenVDB's own tools
+      (ADR-0046)
 - [ ] Reading: the files brodo writes, and those OpenVDB 12 to 14 writes for the same grid
       types by default
 - [ ] Retrospective and refactoring; fuzz round, the new readers included; Miri run;

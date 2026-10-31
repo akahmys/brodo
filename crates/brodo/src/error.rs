@@ -370,6 +370,30 @@ pub enum SliceError {
     Encode(#[from] png::EncodingError),
 }
 
+/// Why grids could not be written as an OpenVDB file (ARCHITECTURE.md §4.7, ADR-0046).
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum VdbError {
+    /// Writing the file failed.
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+    /// A grid's metadata was refused.
+    #[error(transparent)]
+    Meta(#[from] MetaError),
+    /// The field does not belong to the topology.
+    #[error(transparent)]
+    Field(#[from] FieldError),
+    /// The topology refused a lookup by number.
+    #[error(transparent)]
+    Tree(#[from] TreeError),
+    /// Two grids share a name, by which OpenVDB tells a file's grids apart.
+    #[error("two grids are named {0:?}")]
+    DuplicateName(String),
+    /// A count, length or offset does not fit the format's field for it.
+    #[error("the {0} does not fit the file format")]
+    TooLarge(&'static str),
+}
+
 /// Why a field could not be written as `.vtu` (ARCHITECTURE.md §6.1).
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]

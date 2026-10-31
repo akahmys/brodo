@@ -31,6 +31,8 @@ mod quantise;
 pub mod slice;
 pub mod topology;
 pub mod tree;
+#[cfg(feature = "vdb")]
+pub mod vdb;
 pub mod view;
 #[cfg(feature = "vtk")]
 pub mod vtk;

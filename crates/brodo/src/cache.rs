@@ -197,10 +197,10 @@ pub fn write(path: &Path, entries: &[CacheEntry]) -> Result<(), CacheError> {
 
 /// Writes the bytes `emit` gives to a hidden file beside `path` and renames it over
 /// `path`, as `write` states.
-pub(crate) fn replace(
+pub(crate) fn replace<E: From<std::io::Error>>(
     path: &Path,
-    emit: impl FnOnce(&mut std::io::BufWriter<std::fs::File>) -> Result<(), CacheError>,
-) -> Result<(), CacheError> {
+    emit: impl FnOnce(&mut std::io::BufWriter<std::fs::File>) -> Result<(), E>,
+) -> Result<(), E> {
     use std::io::Write;
     let name = path.file_name().ok_or_else(|| {
         std::io::Error::new(std::io::ErrorKind::InvalidInput, "the path names no file")
@@ -210,7 +210,7 @@ pub(crate) fn replace(
     let n = WRITES.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     hidden.push(format!(".{}.{n}.tmp", std::process::id()));
     let temp = path.with_file_name(hidden);
-    let written = (|| -> Result<(), CacheError> {
+    let written = (|| -> Result<(), E> {
         let made = std::fs::OpenOptions::new().write(true).create_new(true).open(&temp)?;
         let mut file = std::io::BufWriter::new(made);
         emit(&mut file)?;

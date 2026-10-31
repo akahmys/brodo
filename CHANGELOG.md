@@ -6,6 +6,11 @@ are recorded here when they change (V6).
 
 ## Unreleased
 
+- OpenVDB files, under the new feature `vdb`: `vdb::VdbEntry::new` takes an `f32` or `f64`
+  grid with its metadata, and `vdb::to_bytes` and `vdb::write` give one `.vdb` file at file
+  version 225, which OpenVDB 14.0.0 reads back with every value the same, as
+  docs/formats.md §9 states (ADR-0046). The new `VdbError` refuses two grids of one name.
+
 ## 0.7.0 (2026-10-31)
 
 Closes P6: brodo's archive profile, its grids compressed by `lz4_flex` in chunks of 512
