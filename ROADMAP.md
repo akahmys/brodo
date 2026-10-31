@@ -17,7 +17,7 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
 - **Next**: P6 (§2), brodo's archives and quantisation, 0.7.0, each step a spike and an
   ADR before it is built; B-005 answered, `lz4_flex`, the archive profile and its quantised
   values built (ADR-0016), and reading a region (added by the human); P6's closing
-  checks done but the mutation run, next. OpenVDB files follow as P7 (split by the human,
+  checks done, its acceptance next. OpenVDB files follow as P7 (split by the human,
   2026-10-28).
 - **Unresolved problems**, each with when it is taken up (the human, 2026-10-30):
   - The leaf-parallel update's benchmark disagrees within a pair by up to 17 % (ADR-0019),
@@ -326,7 +326,9 @@ spike and an ADR before it is built.
 - [x] Benchmarks, every feature, the archive's with baselines, `cache_map_x256` and
       `cache_write_x8` looked into (ADR-0019, 2026-10-30); the whole read's buffer kept
       written (ADR-0016)
-- [ ] Mutation run over the workspace (ADR-0023), as the human chose (ADR-0033)
+- [x] Mutation run over the workspace (ADR-0023), as the human chose (ADR-0033): of 3949,
+      31 missed or timed out, 29 now killed and 2 excluded as equivalent; the four files
+      changed run again, 721 mutants, none missed (2026-10-31)
 - [ ] **Accepted when** archives round-trip within their stated error
 
 ### Between P6 and P7
