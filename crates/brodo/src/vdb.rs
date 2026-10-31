@@ -1,5 +1,6 @@
-//! OpenVDB files (ARCHITECTURE.md §4.7, ADR-0045, ADR-0046): grids of `f32` or `f64` written
-//! as one `.vdb` file at file version 225, as OpenVDB 14 reads it.
+//! OpenVDB files (ARCHITECTURE.md §4.7, ADR-0045, ADR-0046, ADR-0047): grids of `f32` or
+//! `f64` written as one `.vdb` file at file version 225, as OpenVDB 14 reads it, and read
+//! from the files brodo and OpenVDB 12 to 14 write (`from_bytes`, `read`).
 //!
 //! The bytes are in `docs/formats.md` §9, which this code follows. brodo's tree has
 //! OpenVDB's shape, so each of brodo's nodes is one of OpenVDB's; what differs is order.
@@ -16,6 +17,7 @@ use crate::field::{Field, Stored};
 use crate::meta::{Bounds, GridMeta, SDF_KEY};
 use crate::topology::{LeafNumber, TileNumber, Topology};
 use crate::tree::{Coord, TileLevel};
+pub use crate::vdb_read::{VdbField, VdbFile, VdbGrid, from_bytes, read};
 
 /// The file's magic number, written as an `i64`.
 const MAGIC: i64 = 0x5644_4220;

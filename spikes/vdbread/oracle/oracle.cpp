@@ -11,6 +11,9 @@
 //   oracle dump FILE      every grid's name, type, class, background, transform, then each
 //                         leaf's origin and its 512 values with their active bits, and each
 //                         tile with its value and active bit, sorted
+//   oracle small FILE default|zip|mask   brodo's test grids (`small` below)
+//   oracle small FILE none   the grid of inactive values alone, uncompressed
+//   oracle expect FILE    what brodo's reader is to give for each grid (ADR-0047)
 
 #include <openvdb/openvdb.h>
 #include <openvdb/io/File.h>
@@ -19,6 +22,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstring>
 #include <string>
 #include <vector>
 
@@ -27,11 +31,11 @@ namespace {
 // The textbook |p - c| - r clamped to a band of 3 voxels, the band alone active, and the
 // inside then flood-filled with -band, inactive, as a level set holds it.
 template <typename GridT>
-typename GridT::Ptr sphere(const std::string& name)
+typename GridT::Ptr sphere(const std::string& name, typename GridT::ValueType r = 20,
+    typename GridT::ValueType band = 3, bool positive = false)
 {
     using V = typename GridT::ValueType;
-    const V r = 20, band = 3;
-    const V c[3] = {3, -5, 7};
+    const V c[3] = {V(positive ? 13 : 3), V(positive ? 11 : -5), V(positive ? 12 : 7)};
     typename GridT::Ptr grid = GridT::create(band);
     auto acc = grid->getAccessor();
     for (int z = -24; z < 34; ++z) for (int y = -30; y < 20; ++y) for (int x = -22; x < 28; ++x) {
@@ -89,6 +93,145 @@ openvdb::DoubleGrid::Ptr tiles()
         grid->tree().addTile(2, openvdb::Coord(128 * x, 128 * y, 128 * z), 0.5 * k, true);
     grid->setName("tiles");
     return grid;
+}
+
+// brodo's test files (crates/brodo/tests/vdb_read.rs): the cases of `default` made small,
+// each grid within one upper node, and the three kinds of grid brodo skips. A float and a
+// double level set of radius 4 about (13, 11, 12); a
+// double fog of 16³ voxels as eight active lower tiles, five distinct voxels and an active
+// root tile, under a uniform scale and translation; the four leaves of inactive values, an
+// inactive lower tile of another value, one of the background, an active upper tile and an
+// inactive root tile of another value, under a non-uniform scale; a vector grid, a float
+// grid saved as half floats, and an instance of the float level set.
+openvdb::GridPtrVec small()
+{
+    openvdb::FloatGrid::Ptr sdf = sphere<openvdb::FloatGrid>("sdf", 4, 2, true);
+    openvdb::DoubleGrid::Ptr dsdf = sphere<openvdb::DoubleGrid>("dsdf", 4, 2, true);
+    openvdb::DoubleGrid::Ptr f = openvdb::DoubleGrid::create(0.0);
+    f->fill(openvdb::CoordBBox(openvdb::Coord(0, 0, 0), openvdb::Coord(15, 15, 15)), 1.0, true);
+    auto acc = f->getAccessor();
+    for (int k = 0; k < 5; ++k) acc.setValue(openvdb::Coord(40 + k, 2 * k, -k), 0.25 * k + 1e-12 * (k % 7));
+    f->tree().addTile(3, openvdb::Coord(4096, 0, 0), 0.5, true);
+    f->setName("fog");
+    f->setGridClass(openvdb::GRID_FOG_VOLUME);
+    openvdb::math::Transform::Ptr t = openvdb::math::Transform::createLinearTransform(0.5);
+    t->postTranslate(openvdb::Vec3d(1.0, -2.0, 3.5));
+    f->setTransform(t);
+    openvdb::FloatGrid::Ptr in = inactive();
+    in->tree().addTile(1, openvdb::Coord(64, 0, 0), 5.0f, false);
+    in->tree().addTile(1, openvdb::Coord(72, 0, 0), 2.0f, false);
+    in->tree().addTile(2, openvdb::Coord(128, 0, 0), -4.0f, true);
+    in->tree().addTile(3, openvdb::Coord(0, 4096, 0), 9.0f, false);
+    openvdb::Vec3SGrid::Ptr vec = openvdb::Vec3SGrid::create();
+    vec->tree().setValue(openvdb::Coord(1, 2, 3), openvdb::Vec3s(1, 2, 3));
+    vec->setName("vec");
+    openvdb::FloatGrid::Ptr half = openvdb::FloatGrid::create(0.0f);
+    half->tree().setValue(openvdb::Coord(1, 2, 3), 1.5f);
+    half->setName("half");
+    half->setSaveFloatAsHalf(true);
+    openvdb::GridBase::Ptr copy = sdf->copyGrid();
+    copy->setName("sdf_instance");
+    return openvdb::GridPtrVec{sdf, dsdf, f, in, vec, half, copy};
+}
+
+int writeSmall(const std::string& path, const std::string& compression)
+{
+    openvdb::io::File file(path);
+    if (compression == "zip") file.setCompression(openvdb::io::COMPRESS_ZIP | openvdb::io::COMPRESS_ACTIVE_MASK);
+    else if (compression == "mask") file.setCompression(openvdb::io::COMPRESS_ACTIVE_MASK);
+    else if (compression == "none") {
+        // Uncompressed, each upper node's values are written whole: the four leaves alone.
+        file.setCompression(openvdb::io::COMPRESS_NONE);
+        openvdb::FloatGrid::Ptr in = inactive();
+        in->tree().addTile(1, openvdb::Coord(64, 0, 0), 5.0f, false);
+        file.write(openvdb::GridPtrVec{in});
+        file.close();
+        return 0;
+    }
+    else if (compression != "default") { std::fprintf(stderr, "compression: default, zip, mask or none\n"); return 2; }
+    file.write(small());
+    file.close();
+    return 0;
+}
+
+std::string hex(const void* p, size_t n)
+{
+    static const char* digits = "0123456789abcdef";
+    std::string out;
+    for (size_t i = 0; i < n; ++i) {
+        const unsigned b = static_cast<const unsigned char*>(p)[i];
+        out += digits[b >> 4];
+        out += digits[b & 15];
+    }
+    return out;
+}
+
+// What brodo's reader is to give (ADR-0047), from OpenVDB's reading: each leaf's values in
+// brodo's order, x fastest; each active tile, and each inactive one not holding the
+// background, by bits; the transform as brodo's 3×4 map, its index v at v + ½ undone; the
+// voxel size as the length of each of its columns.
+template <typename GridT>
+void expectTree(const GridT& grid)
+{
+    using V = typename GridT::ValueType;
+    const V bg = grid.background();
+    std::printf("background %s\n", hex(&bg, sizeof bg).c_str());
+    std::vector<std::string> rows;
+    for (auto it = grid.tree().cbeginLeaf(); it; ++it) {
+        const openvdb::Coord o = it->origin();
+        std::vector<V> values;
+        for (int z = 0; z < 8; ++z) for (int y = 0; y < 8; ++y) for (int x = 0; x < 8; ++x)
+            values.push_back(it->getValue(openvdb::Coord(o.x() + x, o.y() + y, o.z() + z)));
+        char line[96];
+        std::snprintf(line, sizeof line, "leaf %d %d %d ", o.x(), o.y(), o.z());
+        rows.push_back(line + hex(values.data(), values.size() * sizeof(V)) + "\n");
+    }
+    for (auto it = grid.tree().cbeginValueAll(); it; ++it) {
+        if (it.isVoxelValue()) continue;
+        const V v = *it;
+        if (!it.isValueOn() && std::memcmp(&v, &bg, sizeof v) == 0) continue;
+        const openvdb::CoordBBox box = it.getBoundingBox();
+        const int edge = box.dim().x();
+        const char* level = edge == 4096 ? "root" : edge == 128 ? "upper" : "lower";
+        char line[96];
+        std::snprintf(line, sizeof line, "tile %s %d %d %d ", level, box.min().x(), box.min().y(), box.min().z());
+        rows.push_back(line + hex(&v, sizeof v) + "\n");
+    }
+    std::sort(rows.begin(), rows.end());
+    for (const auto& r : rows) std::fputs(r.c_str(), stdout);
+}
+
+int expect(const std::string& path)
+{
+    openvdb::io::File file(path);
+    file.open();
+    openvdb::GridPtrVecPtr grids = file.getGrids();
+    file.close();
+    for (const auto& base : *grids) {
+        const bool half = base->saveFloatAsHalf();
+        const bool kind = base->isType<openvdb::FloatGrid>() || base->isType<openvdb::DoubleGrid>();
+        const bool shared = std::count_if(grids->begin(), grids->end(), [&](const openvdb::GridBase::Ptr& g) {
+            return g->baseTreePtr() == base->baseTreePtr(); }) > 1 && base->getName() != "sdf";
+        if (half || !kind || shared) { std::printf("skipped %s\n", base->getName().c_str()); continue; }
+        std::printf("grid %s %s\n", base->getName().c_str(), base->type().c_str());
+        for (auto m = base->beginMeta(); m != base->endMeta(); ++m) {
+            const std::string key = m->first;
+            if (m->second->typeName() != "string" || key == "name" || key.rfind("file_", 0) == 0) continue;
+            std::printf("meta %s %s\n", key.c_str(), hex(m->second->str().data(), m->second->str().size()).c_str());
+        }
+        const openvdb::math::Mat4d M = base->transform().baseMap()->getAffineMap()->getMat4();
+        double a[3][4];
+        for (int r = 0; r < 3; ++r) {
+            for (int c = 0; c < 3; ++c) a[r][c] = M(c, r);
+            a[r][3] = M(3, r) - 0.5 * (a[r][0] + a[r][1] + a[r][2]);
+        }
+        double size[3];
+        for (int c = 0; c < 3; ++c) size[c] = std::sqrt(a[0][c] * a[0][c] + a[1][c] * a[1][c] + a[2][c] * a[2][c]);
+        std::printf("voxel_size %s\ntransform %s\n", hex(size, sizeof size).c_str(), hex(a, sizeof a).c_str());
+        if (auto g = openvdb::gridPtrCast<openvdb::FloatGrid>(base)) expectTree(*g);
+        else if (auto g = openvdb::gridPtrCast<openvdb::DoubleGrid>(base)) expectTree(*g);
+    }
+    return 0;
 }
 
 int info()
@@ -179,10 +322,12 @@ int main(int argc, char** argv)
         if (mode == "default" && argc == 3) return writeDefault(argv[2], "default");
         if (mode == "default" && argc == 4) return writeDefault(argv[2], argv[3]);
         if (mode == "dump" && argc == 3) return dump(argv[2]);
+        if (mode == "small" && argc == 4) return writeSmall(argv[2], argv[3]);
+        if (mode == "expect" && argc == 3) return expect(argv[2]);
     } catch (const std::exception& e) {
         std::fprintf(stderr, "error: %s\n", e.what());
         return 1;
     }
-    std::fprintf(stderr, "usage: oracle info | oracle default FILE [zip|none] | oracle dump FILE\n");
+    std::fprintf(stderr, "usage: oracle info | oracle default FILE [zip|none] | oracle dump FILE | oracle small FILE default|zip|mask|none | oracle expect FILE\n");
     return 2;
 }

@@ -33,6 +33,8 @@ pub mod topology;
 pub mod tree;
 #[cfg(feature = "vdb")]
 pub mod vdb;
+#[cfg(feature = "vdb")]
+mod vdb_read;
 pub mod view;
 #[cfg(feature = "vtk")]
 pub mod vtk;

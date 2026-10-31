@@ -274,7 +274,13 @@ fastest. A neighbour beyond the `i32` coordinate range is the background.
   double grids on its tree, as one file OpenVDB 14 reads with brodo's values where brodo
   samples them (docs/formats.md §9, ADR-0045, ADR-0046); every leaf voxel and tile is
   written active, the unit, voxel size and free pairs but `sdf.version` are not, and two
-  grids of one name are refused. Reading them is not built (P7).
+  grids of one name are refused. They are read back, with those OpenVDB 12 to 14 writes by
+  default, at file version 224 or 225, uncompressed, with active-mask or with Blosc's LZ4
+  (docs/formats.md §9.7, ADR-0047): each float and double grid with its name, transform,
+  voxel size, string metadata and a unit the caller gives; every leaf voxel's value,
+  active or not, and each tile active or not holding the background. Grids of other
+  types, saved as half floats or instanced are skipped by name; zip, other maps and other
+  Blosc codecs are refused.
 
 ### 4.8 Value types
 

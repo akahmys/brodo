@@ -9,6 +9,8 @@ use brodo::analysis::AnalysisError;
 #[cfg(feature = "archive")]
 use brodo::archive::Encoding;
 use brodo::cache::CacheFile;
+#[cfg(feature = "vdb")]
+use brodo::error::VdbError;
 use brodo::error::{
     CacheError, FieldError, FormatError, FreezeError, HermiteError, MetaError, Rule, SliceError,
     TreeError, VtkError,
@@ -18,6 +20,8 @@ use brodo::grid::GridError;
 use brodo::meta::GridMeta;
 #[cfg(feature = "slice-png")]
 use brodo::slice::{Axis, ColorMap, Image, Slice};
+#[cfg(feature = "vdb")]
+use brodo::vdb::VdbField;
 
 fn analysis_error(e: &AnalysisError) -> &'static str {
     match e {
@@ -204,6 +208,33 @@ fn encoding(e: Encoding) -> &'static str {
     }
 }
 
+#[cfg(feature = "vdb")]
+fn vdb_error(e: &VdbError) -> &'static str {
+    match e {
+        VdbError::Io(..) => "Io",
+        VdbError::Meta(..) => "Meta",
+        VdbError::Field(..) => "Field",
+        VdbError::Tree(..) => "Tree",
+        VdbError::DuplicateName(..) => "DuplicateName",
+        VdbError::TooLarge(..) => "TooLarge",
+        VdbError::Version(..) => "Version",
+        VdbError::Unsupported(..) => "Unsupported",
+        VdbError::Map(..) => "Map",
+        VdbError::Malformed(..) => "Malformed",
+        VdbError::FileTooLarge { .. } => "FileTooLarge",
+        _ => "later",
+    }
+}
+
+#[cfg(feature = "vdb")]
+fn vdb_field(e: &VdbField) -> &'static str {
+    match e {
+        VdbField::F32(..) => "F32",
+        VdbField::F64(..) => "F64",
+        _ => "later",
+    }
+}
+
 #[cfg(feature = "slice-png")]
 fn color_map(e: &ColorMap) -> &'static str {
     match e {
@@ -234,6 +265,13 @@ fn every_enum_that_may_grow_is_matched_with_a_wildcard() {
     assert_eq!(color_map(&ColorMap::Diverging { limit: 1.0 }), "Diverging");
     #[cfg(feature = "archive")]
     assert_eq!(encoding(Encoding::default()), "Exact");
+    #[cfg(feature = "vdb")]
+    assert_eq!(vdb_error(&VdbError::Version(1)), "Version");
+    #[cfg(feature = "vdb")]
+    {
+        let t = brodo::topology::Topology::new();
+        assert_eq!(vdb_field(&VdbField::F32(brodo::field::Field::new(&t, 0.0))), "F32");
+    }
 }
 
 #[test]

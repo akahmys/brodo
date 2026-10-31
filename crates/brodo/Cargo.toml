@@ -27,8 +27,9 @@ mmap = ["dep:memmap2"]
 # The checking output's slices as PNG (ARCHITECTURE.md §6.1, ADR-0018); opted into
 # (ADR-0036), the gate covering it with every feature.
 slice-png = ["dep:png"]
-# Writing OpenVDB's .vdb files (ARCHITECTURE.md §4.7, ADR-0045); opted into (ADR-0036).
-vdb = []
+# Writing and reading OpenVDB's .vdb files (ARCHITECTURE.md §4.7, ADR-0045, ADR-0047);
+# opted into (ADR-0036). Reading decodes Blosc's LZ4 with `lz4_flex`.
+vdb = ["dep:lz4_flex"]
 # The checking output's field as one ASCII .vtu (ARCHITECTURE.md §6.1, ADR-0018); opted
 # into (ADR-0036).
 vtk = []
@@ -58,6 +59,10 @@ required-features = ["vtk"]
 
 [[test]]
 name = "vdb_format"
+required-features = ["vdb"]
+
+[[test]]
+name = "vdb_read"
 required-features = ["vdb"]
 
 [[test]]

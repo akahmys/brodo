@@ -19,8 +19,8 @@ on its tree.
   docs/formats.md §3.4 states; the archive profile compresses them, each grid's leaf
   values exact or quantised to 16 or 8 bits, and is read back as the same cache file, or
   as one grid's region, decompressing only the chunks a box of voxels needs (feature
-  `archive`, opted into); float and double grids are written as OpenVDB's `.vdb` files
-  (feature `vdb`, opted into).
+  `archive`, opted into); float and double grids are written as OpenVDB's `.vdb` files,
+  and read from those brodo and OpenVDB 12 to 14 write (feature `vdb`, opted into).
 - **Hermite data**: signs on a grid's voxel corners and, on each edge whose ends differ,
   where a surface crosses it, its normal and its group, as a format any producer writes
   and any reader checks.

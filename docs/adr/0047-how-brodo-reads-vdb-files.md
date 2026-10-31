@@ -57,3 +57,17 @@ loses on reading what it cannot hold: which voxels were active. A file written a
 brodo holds every voxel active (ADR-0046). Files with zip, other Blosc codecs, half floats
 or other maps are refused or skipped until a user asks and a spike measures them. OpenVDB's
 tools stay the check, by hand, not in the gate.
+
+## Amendment: the reader built
+
+- **Date**: 2026-11-01
+
+The reader was built as decided, in `crates/brodo/src/vdb_read.rs`, a module of its own so
+that the writer is not held to CODING.md Rule 3; it was listed in `UNTRUSTED_INPUT`
+(`scripts/audit/project.py`) and given the fuzz target `fuzz/fuzz_targets/vdb.rs`, as the
+decision had it. Two facts the spike had not met were taken from OpenVDB's output while
+building its test files: OpenVDB writes a grid saved as half floats with `_HalfFloat`
+appended to its type name, so that it is skipped as a type brodo does not read, and an
+instanced grid with its leaf buffers' offset 0. docs/formats.md §9.7 and §9.8 state the
+bytes; `crates/brodo/tests/vdb_read.rs` holds the reader to OpenVDB's own reading of files
+OpenVDB 12.0.0 and 14.0.0 wrote.

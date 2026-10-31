@@ -10,6 +10,14 @@ are recorded here when they change (V6).
   grid with its metadata, and `vdb::to_bytes` and `vdb::write` give one `.vdb` file at file
   version 225, which OpenVDB 14.0.0 reads back with every value the same, as
   docs/formats.md §9 states (ADR-0046). The new `VdbError` refuses two grids of one name.
+- Reading OpenVDB files: `vdb::from_bytes` and `vdb::read` read the float and double grids
+  of a `.vdb` file at file version 224 or 225, uncompressed, with active-mask or with Blosc's
+  LZ4, as brodo and OpenVDB 12 to 14 write them by default, into a `VdbFile` of `VdbGrid`s,
+  each with its `GridMeta`, `Topology` and a `VdbField` of `f32` or `f64`, and the names of
+  the grids skipped: of another type, saved as half floats, or instanced. Inactive leaf
+  voxels keep their values; inactive tiles holding the background are left out. Zip, other
+  maps and other Blosc codecs are refused, as docs/formats.md §9.7 states (ADR-0047). The
+  feature `vdb` now depends on `lz4_flex`.
 
 ## 0.7.0 (2026-10-31)
 

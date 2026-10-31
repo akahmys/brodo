@@ -374,7 +374,7 @@ pub enum SliceError {
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum VdbError {
-    /// Writing the file failed.
+    /// Reading or writing the file failed.
     #[error(transparent)]
     Io(#[from] std::io::Error),
     /// A grid's metadata was refused.
@@ -392,6 +392,26 @@ pub enum VdbError {
     /// A count, length or offset does not fit the format's field for it.
     #[error("the {0} does not fit the file format")]
     TooLarge(&'static str),
+    /// The file's version is neither 224 nor 225 (docs/formats.md §9.7).
+    #[error("file version {0} is not read; 224 and 225 are")]
+    Version(u32),
+    /// The file holds what brodo does not read, named (docs/formats.md §9.7, ADR-0047).
+    #[error("{0} is not read")]
+    Unsupported(&'static str),
+    /// A grid's transform is a map brodo does not read, named.
+    #[error("the map {0:?} is not read")]
+    Map(String),
+    /// The file breaks docs/formats.md §9.7 or §9.8 at the part named.
+    #[error("the file is malformed at its {0}")]
+    Malformed(&'static str),
+    /// The file is longer than the limit it was read under.
+    #[error("the file is {length} bytes, above the limit of {limit}")]
+    FileTooLarge {
+        /// The file's length, or the bytes read past the limit.
+        length: u64,
+        /// The limit.
+        limit: u64,
+    },
 }
 
 /// Why a field could not be written as `.vtu` (ARCHITECTURE.md §6.1).

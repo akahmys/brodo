@@ -26,6 +26,7 @@ UNTRUSTED_INPUT = [
     "crates/brodo/src/cache.rs",
     "crates/brodo/src/hermite.rs",
     "crates/brodo/src/view.rs",
+    "crates/brodo/src/vdb_read.rs",
     "crates/colino/src/obj.rs",
     "crates/colino/src/stl.rs",
     "crates/colino/src/threemf.rs",

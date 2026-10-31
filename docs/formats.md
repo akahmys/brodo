@@ -452,13 +452,15 @@ A chunk it does not decompress is not checked to decompress, nor are its values:
 that a whole read (§8.4) refuses may answer a region. It answers a voxel within the box as
 the frozen buffer does, and refuses any other, though the chunks it holds may cover it.
 
-## 9. OpenVDB files as brodo writes them
+## 9. OpenVDB files
 
 A grid of `f32` or `f64` written as OpenVDB's `.vdb` file at file version 225, as OpenVDB
-14.0.0 reads and writes it (ADR-0046); the layout was learnt from OpenVDB at `v14.0.0`
-(PROVENANCE.md). Unlike §1, a string here is a `u32` byte length and its bytes, with no
-padding, and nothing is aligned to blocks. Every number is little-endian. Its test vector
-is `crates/brodo/tests/data/vdb_v225.bin`: a float level set and a double grid on one
+14.0.0 reads and writes it (ADR-0046), §9.1 to §9.6, and the files of OpenVDB 12 to 14
+that brodo reads (ADR-0047), §9.7; the layout was learnt from OpenVDB at `v14.0.0` and
+from OpenVDB's output (PROVENANCE.md, `spikes/vdbread/`). Unlike §1, a string here is a
+`u32` byte length and its bytes, with no padding, and nothing is aligned to blocks. Every
+number is little-endian. The test vector of what brodo writes is
+`crates/brodo/tests/data/vdb_v225.bin`: a float level set and a double grid on one
 topology of five leaves and a tile at each level, and an empty float grid.
 
 ### 9.1 Header
@@ -530,3 +532,78 @@ places holding the background or a child.
 Each leaf in the topology's order: its value mask again, 512 set bits; a `u8` 0; then its
 512 values in place order, z fastest, which is brodo's leaf order (§1.2) with x and z
 exchanged.
+
+### 9.7 Reading
+
+A reader takes what §9.1 to §9.6 state with these differences, and refuses a file that
+breaks them; of several broken rules, which is named is not promised.
+
+1. **Header.** File version 224 or 225; any library version and UUID; grid offsets, 1;
+   the file's metadata entries skipped by their byte counts. A grid's body starts at its
+   descriptor's end and ends within the file, where the next descriptor starts, and the
+   last grid's where the file ends; a grid read has its leaf buffers' offset from its
+   start to its end.
+2. **Grids read and skipped.** A grid whose type is neither `Tree_float_5_4_3` nor
+   `Tree_double_5_4_3`, among them one saved as half floats, whose type OpenVDB writes
+   with `_HalfFloat` appended, or whose instance string is not empty, an instanced grid
+   with a leaf buffers' offset of 0, is skipped whole, by its offsets, and its name
+   returned.
+3. **Compression flags**: 0, 2, 4 or 6. Zip (1) and any other bit are refused.
+4. **Metadata.** Every entry's bytes are skipped by its count. Of entries of type
+   `string`, `name` and those whose name begins `file_` are dropped, and the others kept,
+   as UTF-8, among the grid's free pairs.
+5. **Transform**, one of four maps by its name, each read into OpenVDB's 4×4 matrix M of
+   §9.3: `AffineMap`, sixteen `f64`, M itself, whose last column is (0, 0, 0, 1);
+   `ScaleMap` and `UniformScaleMap`, fifteen `f64`, a scale s, then twelve derived values
+   not read, M = diag(s, 1); `UniformScaleTranslateMap`, eighteen `f64`, a translation t,
+   then the fifteen of a scale map, M = diag(s, 1) with t as its fourth row. Any other map
+   is refused. brodo's map A has M's upper 3×3 transposed and translation M's fourth row
+   less A·(½, ½, ½), so that a round trip through §9.3 may differ by rounding; the voxel
+   size is the length of each of A's first three columns.
+6. **Topology.** As §9.4, with the root's tiles of any active byte, 0 or 1, and in any
+   order of distinct origins, each a multiple of 4096, as the upper nodes'. Every node's
+   values are read as §9.8 states, with the node's value mask as its active places, of
+   32 768, 4096 or 512 places.
+7. **Leaf buffers.** A leaf's value mask is the one its topology states, then its values
+   as §9.8 states. The last leaf's values end at the body's end.
+8. **What brodo makes of it.** brodo holds no activity (ADR-0047): each leaf, with all its
+   512 values, active or not; each tile, at the root or in a node, that is active or
+   whose value's bits differ from the background's, as brodo's tile of its level and
+   value; nothing for the other places.
+
+### 9.8 A node's values, as OpenVDB writes them
+
+A `u8` **indicator**, at every compression; then, by indicator, one or two **inactive
+values** and a **selection mask** of the node's places (§9.5); then the values stored:
+every place's at indicator 6, or without active-mask (flags 0 or 4), else the active
+places' alone, in place order. An inactive place holds:
+
+| Indicator | Inactive values | Selection mask | An inactive place holds |
+| ---: | ---: | :--- | :--- |
+| 0 | 0 | no | the background |
+| 1 | 0 | no | minus the background |
+| 2 | 1 | no | the value stored |
+| 3 | 0 | yes | the background where its bit is set, else minus the background |
+| 4 | 1 | yes | the background where its bit is set, else the value stored |
+| 5 | 2 | yes | the second value where its bit is set, else the first |
+| 6 | 0 | no | its own value, every place stored |
+
+With Blosc (flag 4), the values stored are preceded by an `i64` n: n > 0, a Blosc chunk of
+n bytes; n ≤ 0, −n bytes of the values as they are. Without it, they follow as they are. A
+Blosc chunk (c-blosc's `README_CHUNK_FORMAT.rst`) has a 16-byte header: format version 2,
+a codec version not read, flags, a type size, then `u32`s the values' byte count, which is
+the count stored times the value's size, a block size, and the chunk's own byte count, n.
+With flag bit 1, the values follow as they are. Otherwise its codec, bits 5 to 7, is LZ4
+(1), bit 2 (bit shuffle) clear, and its values, of one byte or more, fit one block: an
+`i32`, the block's offset from the chunk's start, then the block, split into type-size streams unless bit 4 is set or the block is shorter than the
+block size; each stream an `i32` length and that many bytes, LZ4's block format, or, of the
+stream's own length, as it is. With bit 0, the block is byte-shuffled: of its m whole
+values of the type size, byte b of value j is at b × m + j, a remainder past them left in
+place. Any other
+chunk is refused.
+
+Test vectors of reading, written by OpenVDB, are in `crates/brodo/tests/data/`:
+`vdb_by12_v224.bin` and `vdb_by14_v225.bin`, the same seven grids with Blosc, by OpenVDB
+12.0.0 and 14.0.0, and `vdb_by14_none.bin`, one of them uncompressed; what brodo makes of
+each, as OpenVDB's own reading gives it, is in `vdb_read_expect.txt` and
+`vdb_read_none_expect.txt` (`spikes/vdbread/oracle/`, `oracle expect`).

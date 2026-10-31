@@ -33,7 +33,11 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   Blosc with active-mask by default, at file version 224 or 225, and each reading brodo's
   files; a reader from the document read them all as OpenVDB does. Blosc read with
   `lz4_flex`, zip refused, inactive values kept (ADR-0047; the owner, 2026-11-01).
-- **Next**: the reader, `brodo::vdb`, to docs/formats.md §9 extended for reading.
+- **Done**: the reader, `vdb::from_bytes` and `vdb::read`, to docs/formats.md §9.7 and §9.8,
+  in `UNTRUSTED_INPUT` and fuzzed; files OpenVDB 12.0.0 and 14.0.0 wrote read as OpenVDB
+  reads them (2026-11-01).
+- **Next**: P7's close: retrospective and refactoring, the fuzz round with the new reader,
+  the Miri run, and the checks the milestone's list names.
 
 ## 2. Milestones
 
@@ -358,8 +362,8 @@ built. brodo reads and writes `.vdb` itself, the format learnt from OpenVDB at `
 - [x] B-006: `vdb-rs` not used (ADR-0045)
 - [x] Writing: float and double grids on brodo's tree, checked by OpenVDB's own tools
       (ADR-0046)
-- [ ] Reading: the files brodo writes, and those OpenVDB 12 to 14 writes for the same grid
-      types by default
+- [x] Reading: the files brodo writes, and those OpenVDB 12 to 14 writes for the same grid
+      types by default (ADR-0047, 2026-11-01)
 - [ ] Retrospective and refactoring; fuzz round, the new readers included; Miri run;
       benchmarks; mutation run (ADR-0023), as the human chooses (ADR-0033)
 - [ ] **Accepted when** brodo's float and double grids are written to `.vdb` files that
