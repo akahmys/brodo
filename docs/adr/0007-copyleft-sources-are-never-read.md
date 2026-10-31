@@ -105,3 +105,14 @@ that the question is asked again when the form of distribution changes, such as
 registration on crates.io or an implementation in hardware, or when the pending
 application is granted with claims beyond hardware.
 
+
+## Amendment: OpenVDB's Apache-2.0 releases
+
+- **Date**: 2026-10-31
+
+OpenVDB was relicensed from MPL-2.0 to Apache-2.0 with its release 12.0.0 of 2024-10-31,
+checked in its release notes, `LICENSE` and `RE-LICENSE_NOTE.txt`; the amendment of
+2026-10-24 held for releases before 12.0 only. The owner decided that OpenVDB from
+`v12.0.0` on is read to learn the `.vdb` format, never copied or translated, and that the
+guard lets it through at such a tag (ADR-0044). OpenFOAM and the owner's local list are
+unchanged.

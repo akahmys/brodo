@@ -19,7 +19,9 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   `convert_slab_320` lost instructions per cycle on both core types; on four, the
   performance cores, both agreed within 1.3 %. A benchmark's children now run on as many
   threads as the machine has performance cores (ADR-0019).
-- **Next**: P7, OpenVDB files.
+- **Done**: P7's first unit, OpenVDB from its Apache-2.0 release 12.0.0 read for the
+  `.vdb` format and never copied (ADR-0044; the owner, 2026-10-31).
+- **Next**: B-006 asked again on that ground, then the rest of P7, OpenVDB files.
 
 ## 2. Milestones
 
@@ -366,7 +368,7 @@ implementation (PLANNING.md §2).
 | B-018 | Does model checking with Kani join the closing checks? | Not now (owner, 2026-10-23): it fits only integer bit work and `view.rs`'s small helpers, already fuzzed and mutation-tested, and cannot reach rayon or the memory mapping; this milestone's defects were numeric and in design claims. Revisited by a spike if Miri-unreachable unsafe code grows, an integer coordinate bug escapes the tests, or before 1.0 |
 | B-003 | Do level-set operations (CSG, redistancing) belong in brodo? | No, until shown to be general |
 | B-004 | Does a shared IR schema crate live in this repository? | Undecided; for brodo's users to agree, not for brodo to anticipate |
-| B-006 | Does `vdb-rs` pass Rules 12 and 13 (no C, permissive licence) on every target, and is it written apart from OpenVDB's source rather than translated from it, which would carry MPL-2.0 (ADR-0007)? | To be checked before it is added |
+| B-006 | Does `vdb-rs` pass Rules 12 and 13 (no C, permissive licence) on every target, or does brodo read and write `.vdb` itself, learning the format from OpenVDB at a tag from `v12.0.0` on (ADR-0044)? | Asked again under ADR-0044 (2026-10-31): `vdb-rs` 0.6.0, MIT, reads only and needs `blosc-src`, which compiles C (Rule 12), and states that it follows OpenVDB's implementation; no public document specifies the format's bytes |
 | B-013 | Which crates handle `piatto`'s window, input and GUI parts? | `winit` and `egui`, to be measured against Rules 12 and 13 (ADR-0018) |
 
 `spikes/sign/` answered B-016 (ADR-0027); `spikes/thin/` and `spikes/recheck/` B-020 (ADR-0028); `spikes/value/` B-017 (ADR-0029); `spikes/archive/` B-005, `lz4_flex` (ADR-0016). `spikes/parvar/` B-024, a benchmark on the performance cores (ADR-0019). No spike is running. `spikes/remap/` answered B-001 and B-008, and `spikes/merge/` B-010

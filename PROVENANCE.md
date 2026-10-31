@@ -12,6 +12,17 @@ papers, public documentation and permissively licensed code (S1, S2) may appear 
 | Jacobson 2013 | A. Jacobson et al., "Robust Inside-Outside Segmentation using Generalized Winding Numbers", ACM Transactions on Graphics, 2013 |
 | Barill 2018 | G. Barill et al., "Fast Winding Numbers for Soups and Clouds", ACM Transactions on Graphics, 2018 |
 
+## OpenVDB, read for the `.vdb` format
+
+What was read of OpenVDB, at a tag from `v12.0.0` on, and for what (AGENTS.md S1,
+ADR-0044). Its code is neither copied nor translated; the format is written in
+docs/formats.md.
+
+| Tag | Commit | File | For |
+| :--- | :--- | :--- | :--- |
+| `v12.0.0` | `269300808a4651daa65836214fc20f78e1c0eb7f` | `LICENSE`, `README.md`, `RE-LICENSE_NOTE.txt` | The licence (ADR-0044) |
+| `v14.0.0` | `ecae2bda85744412b0cd47e1b8e1e4e76beb7b88` | `LICENSE`, `README.md`, `RE-LICENSE_NOTE.txt` | The licence (ADR-0044) |
+
 ## Files
 
 | File | Draws on | For |

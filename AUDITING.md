@@ -85,10 +85,13 @@ the guard; the history scan is the backstop.
 
 **Forbidden sources.** The same file runs `scripts/hooks/provenance_guard.py` before every
 read, search, fetch and shell command, which blocks a path or URL naming a source AGENTS.md
-S1 forbids: OpenVDB, OpenFOAM, and the names in the owner's local list, kept outside the
-repository so that it names no other project of the owner's. It matches names only, so no
-directory on any machine is written into the repository. Nothing backs it up: what was
-read leaves no trace in the tree.
+S1 forbids: OpenVDB before its tag `v12.0.0`, OpenFOAM, and the names in the owner's local
+list, kept outside the repository so that it names no other project of the owner's. It
+matches names only, so no directory on any machine is written into the repository.
+OpenVDB passes where a path or URL names a tag from `v12.0.0` on, a segment `vX.Y.Z` among
+the two after its name or a directory `openvdb-vX.Y.Z`, the repository's own directories
+under it included; a path that climbs with `..` is judged segment by segment (ADR-0044).
+Nothing backs it up: what was read leaves no trace in the tree.
 
 Install the hooks once per clone:
 
