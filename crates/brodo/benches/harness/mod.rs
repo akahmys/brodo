@@ -3,7 +3,8 @@
 //! with the data its items read and the items.
 //!
 //! `cargo bench -p <crate> --bench <crate> --all-features` runs two child processes, each a
-//! fresh process. Each child runs every item once per round, in turn, starting from a
+//! fresh process. Each child runs on as many rayon threads as the machine has performance
+//! cores (`threads`), and runs every item once per round, in turn, starting from a
 //! different item each round, for `ROUNDS` rounds, writing over an `EVICT_BYTES` buffer
 //! before each run, and keeps each item's fastest time. The parent writes both children's
 //! times, how far they agree, and the change from the baseline of this hardware model to
@@ -58,6 +59,22 @@ const SETTLED_LOAD: f64 = 4.0;
 /// so that a build just before the run can settle: ten minutes in all.
 const LOAD_WAIT: Duration = Duration::from_secs(10);
 const LOAD_RETRIES: u32 = 60;
+/// The threads a child runs its items on: the performance cores, `hw.perflevel0.logicalcpu`
+/// on macOS, or every processor where the system names no core types. On ten threads, as
+/// many as an Apple M5's processors, colino's `convert_slab_320` took 158 to 212 ms in
+/// twelve children at rest and pairs disagreed by up to 32 %; on four, its performance
+/// cores, 229 to 233 ms, every pair within 1.3 % (ADR-0019).
+fn threads() -> Result<usize, Failure> {
+    if let Ok(out) = Command::new("sysctl").args(["-n", "hw.perflevel0.logicalcpu"]).output()
+        && out.status.success()
+        && let Ok(n) = String::from_utf8_lossy(&out.stdout).trim().parse::<usize>()
+        && n > 0
+    {
+        return Ok(n);
+    }
+    Ok(std::thread::available_parallelism()?.get())
+}
+
 /// A failure, shown by `main`'s return as its message alone.
 pub struct Failure(String);
 
@@ -103,6 +120,8 @@ pub fn run<D>(
     if let [mode, path, ..] = args.as_slice()
         && mode == "child"
     {
+        // Before `data`, whose building may start rayon's global pool at its default size.
+        rayon::ThreadPoolBuilder::new().num_threads(threads()?).build_global()?;
         let data = data()?;
         return child(&items(&data), Path::new(path));
     }
@@ -294,8 +313,8 @@ fn change(ns: u128, base: u128) -> f64 {
     (ns as f64 / base as f64 - 1.0) * 100.0
 }
 
-/// Writes the report, its header naming the hardware, the date and the one-minute and
-/// five-minute load averages the run started at, and fails on every item more than
+/// Writes the report, its header naming the hardware, the date, the children's threads and
+/// the one-minute and five-minute load averages the run started at, and fails on every item more than
 /// `TOLERANCE` slower in both runs.
 fn compare(
     places: &Places,
@@ -305,8 +324,9 @@ fn compare(
 ) -> Result<(), Failure> {
     let baseline = read_baseline(places)?;
     let mut text = format!(
-        "name\trun1_ns\trun2_ns\tpair_spread_pct\tbaseline_ns\tbaseline_date\tchange1_pct\tchange2_pct\tverdict\t{model}\t{}\tload {} {}\n",
+        "name\trun1_ns\trun2_ns\tpair_spread_pct\tbaseline_ns\tbaseline_date\tchange1_pct\tchange2_pct\tverdict\t{model}\t{}\tthreads {}\tload {} {}\n",
         today()?,
+        threads()?,
         load.0,
         load.1
     );

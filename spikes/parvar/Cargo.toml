@@ -1,0 +1,15 @@
+# Throwaway spike for B-024 (ROADMAP.md §3): why parallel benchmark items vary from one
+# process to the next. Never imported by `crates/` (PLANNING.md §3); its own workspace.
+[package]
+name = "parvar-spike"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+brodo = { path = "../../crates/brodo" }
+colino = { path = "../../crates/colino" }
+rayon = "=1.12.0"
+
+[workspace]
+members = ["."]

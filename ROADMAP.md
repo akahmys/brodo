@@ -14,14 +14,12 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   more than 10 % is refused, and every benchmark runs with every feature (ADR-0019). Its
   mutation run reported all 3949; the 31 missed or timed out are killed or excluded, and
   the files changed ran again with none missed (ADR-0023).
-- **Next**: the spike between P6 and P7 (§2) on why parallel benchmark items vary from
-  one process to the next (B-024); then P7, OpenVDB files.
-- **Unresolved problems**, each with when it is taken up (the human, 2026-10-30):
-  - The leaf-parallel update's benchmark disagrees within a pair by up to 17 % (ADR-0019),
-    as colino's `convert_slab_320` does by up to 24 % at rest (B-024). Allocating
-    and dropping its output field takes about a third of that item (1.04 of 3.3 ms,
-    2026-10-18), but the update alone varied as much. By one spike with B-024, after P6
-    and before P7.
+- **Done**: the spike between P6 and P7 answered B-024 (2026-10-31): on ten threads the
+  leaf-parallel update waited for workers other processes displaced, and colino's
+  `convert_slab_320` lost instructions per cycle on both core types; on four, the
+  performance cores, both agreed within 1.3 %. A benchmark's children now run on as many
+  threads as the machine has performance cores (ADR-0019).
+- **Next**: P7, OpenVDB files.
 
 ## 2. Milestones
 
@@ -332,7 +330,7 @@ spike and an ADR before it is built.
 
 ### Between P6 and P7
 
-- [ ] A spike on why parallel benchmark items vary from one process to the next: the
+- [x] A spike on why parallel benchmark items vary from one process to the next: the
       leaf-parallel update and colino's `convert_slab_320`, each thread's leaves and time
       in a slow and a fast process (§1, B-024; the human, 2026-10-30)
 
@@ -361,7 +359,6 @@ implementation (PLANNING.md §2).
 
 | # | Question | Proposal so far |
 | :--- | :--- | :--- |
-| B-024 | Why does colino's `convert_slab_320` vary by up to 24 % from one benchmark process to the next, at rest, so that ADR-0019's 10 % refuses one pair in several? | Not yet: found by P6's retrospective (ADR-0019, 2026-10-30). The variation is all in the leaf-parallel values step; the serial steps vary by 0.6 ms at most, other items within 6 %, and on 4 threads it is 2.0 %. No state is shared between the threads, and no other process ran through a slow child. Next, each thread's leaves and time in a slow and a fast process. Until then, a refused pair is run again |
 | B-023 | Does Hermite data hold its crossings sparsely, only on the edges that hold one, rather than nine dense fields over every leaf? | Not yet: found by P5's review (M2): the fields take about 61 bytes a voxel and writing them about three times as much, so that a sphere of radius 1500 voxels does not fit in 32 GB, read against a measurement of 613 MB at radius 200 (2026-10-26). It changes the Hermite format, so it waits for a spike and a version raised (ADR-0038); the owner set it aside for P5 (2026-10-27) |
 | B-022 | Does a later version of the frozen layout and the cache profile check what version 1's readers leave unchecked: padding and the background's bytes beyond its size, the order of nodes, whether every node and leaf is reached, and a cache file's bounds against its grid (docs/formats.md §2.5, §3.4)? | Not yet: found writing the format document (ADR-0037); each check a reader adds refuses files version 1 accepts, so it waits for a version raised for another reason (ADR-0038). Now for `GridView::new` and the cache reader alone: the Hermite reader and thawing refuse nodes reached twice and leaves never reached at version 1 (ADR-0038's amendment of 2026-10-27, ADR-0042). For the links, one pass would do: each node's `first_child` and `first_tile`, where it has children or tiles, the end of the previous such node's, the last end the count, so that no child is shared or unreached |
 | B-019 | Does `colino` move to a repository of its own? | Not now (owner, 2026-10-23; ADR-0012 keeps two crates in one repository): changes span both, as P3's Hermite format and producer did, and before 1.0 a split would turn each into two releases, duplicate the rules and their audit, and take colino's tests out of brodo's gate. Revisited when brodo's API and formats settle (1.0), both are on crates.io, colino needs what brodo's rules forbid, or others maintain it. Publishing does not split them: both crates are published from this repository (owner, 2026-10-29). A split waits for colino needing what brodo's rules forbid, or for others maintaining it, and is then a milestone of its own that gives colino its own rules, audit and CI (owner, 2026-10-29) |
@@ -372,7 +369,7 @@ implementation (PLANNING.md §2).
 | B-006 | Does `vdb-rs` pass Rules 12 and 13 (no C, permissive licence) on every target, and is it written apart from OpenVDB's source rather than translated from it, which would carry MPL-2.0 (ADR-0007)? | To be checked before it is added |
 | B-013 | Which crates handle `piatto`'s window, input and GUI parts? | `winit` and `egui`, to be measured against Rules 12 and 13 (ADR-0018) |
 
-`spikes/sign/` answered B-016 (ADR-0027); `spikes/thin/` and `spikes/recheck/` B-020 (ADR-0028); `spikes/value/` B-017 (ADR-0029); `spikes/archive/` B-005, `lz4_flex` (ADR-0016). No spike is running. `spikes/remap/` answered B-001 and B-008, and `spikes/merge/` B-010
+`spikes/sign/` answered B-016 (ADR-0027); `spikes/thin/` and `spikes/recheck/` B-020 (ADR-0028); `spikes/value/` B-017 (ADR-0029); `spikes/archive/` B-005, `lz4_flex` (ADR-0016). `spikes/parvar/` B-024, a benchmark on the performance cores (ADR-0019). No spike is running. `spikes/remap/` answered B-001 and B-008, and `spikes/merge/` B-010
 (ADR-0014); `spikes/vtk/` answered B-012 (ADR-0018); `spikes/bench/` B-007 (ADR-0019); `spikes/threads/` B-014, rayon kept (ADR-0015); `spikes/dilate/` B-011, no mask (ADR-0025); `spikes/ghost/` B-002, one to three layers (ADR-0015); `spikes/mutants/` the audit review's proposal C (ADR-0023).
 
 ## 4. Administrative items still open

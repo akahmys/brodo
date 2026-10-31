@@ -233,3 +233,45 @@ recur in four pairs, within 2.6 %. The owner decided that the archive's four ite
 3 167 167, `archive_region_x8` 3 471 458 and `cache_read_x16` 2 850 416 ns; that
 `gather` and `cache_map_x256` keep theirs, which a build's placement moves both ways; and
 that the two cache items leave ROADMAP.md's unresolved problems with these figures.
+
+## Amendment: the threads a benchmark runs on
+
+- **Date**: 2026-10-31
+
+The spike `spikes/parvar/` answered B-024 on an Apple M5, ten processors of which four are
+performance cores, at rest (`spikes/parvar/REPORT.md`). On ten threads the leaf-parallel
+update varied with the CPU time other processes took: in 20 children at one-minute loads
+of 2.3 to 2.5, the fastest time went with the time its threads were ready but had no
+processor (correlation +0.96) and with fewer threads taking a leaf (−0.95), a call of under
+100 µs waiting for any worker displaced; at loads of 1.3 to 2.4 its pairs agreed within
+3.7 %. `convert_slab_320` varied with its value step's instructions per cycle, both core
+types losing them together when its threads ran on both, the instructions and the clocks
+the same in every run: 158 to 212 ms in twelve children at rest, pairs apart by up to
+32 %. Neither waiting for a processor, idle spinning, power (controls that touch no memory
+kept their instructions per cycle at every thread count) nor the code's layout (children
+with address randomisation off and on agreed) explained it; what in the chip takes the
+cycles is not seen by the counters the spike read. On four threads, the performance
+cores, both items' pairs agreed within 1.3 % over twelve children, the slab at 229 to
+233 ms.
+
+The owner decided that a benchmark's children run on as many rayon threads as the machine
+has performance cores, `hw.perflevel0.logicalcpu` on macOS and every processor where the
+system names no core types (TESTING.md T5); the harness builds rayon's global pool so
+before an item's data, a dependency both crates already have. A benchmark no longer
+measures a parallel item on every processor; a spike that compares thread counts does.
+Shown to fire: with the pool built after the data, the child failed, "The global thread
+pool has already been initialized".
+
+The first run on four threads, at one-minute loads of 1.83 and 1.85, refused no pair, the
+widest `convert_slab_320` at 7.1 %; the items that run on rayon were slower than their
+baselines on ten threads, `leaf_parallel_update_x32` by 23 %, `archive_read_x8` by 12 to
+14 %, colino's conversions and Hermite items by 26 to 47 %, and the others within 8 % or
+faster. The nine items whose paths run on rayon were recorded again, one `--record NAME` each, the
+others keeping theirs: `leaf_parallel_update_x32` 3 080 250, `archive_write` 5 533 709,
+`archive_read_x8` 4 630 167, `archive_read_8bit_x8` 3 330 833, `archive_region_x8`
+3 326 000, `convert_slab_320` 231 949 875, `convert_sphere_r50` 418 750 334,
+`hermite_sphere_r50` 406 291 542 and `hermite_holed_r50` 407 224 750 ns. One record of
+`convert_slab_320` was refused, every colino item apart by 16 to 17 %, and run again.
+`leaf_parallel_update_x32` read 3.69 ms in the first run and 3.08 ms in its record, 20 %
+apart between runs a few minutes apart, the first pair within 0.3 % and the record's
+within 10 %: drift between processes on four threads, its cause not measured.
