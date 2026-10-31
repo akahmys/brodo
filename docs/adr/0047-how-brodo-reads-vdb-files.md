@@ -1,0 +1,59 @@
+# ADR-0047: How brodo reads `.vdb` files
+
+- **Status**: Accepted
+- **Date**: 2026-11-01
+
+## Context
+
+ADR-0045 had brodo read the files it writes and those OpenVDB 12 to 14 writes for float
+and double grids by default, after writing (ADR-0046). The spike `spikes/vdbread/`
+(2026-11-01, `spikes/vdbread/REPORT.md`) built OpenVDB 12.0.0 and 13.0.0 from their
+Apache-2.0 tags beside Homebrew's 14.0.0 (PROVENANCE.md) and had each write five float and
+double grids by default, with zip and with none:
+
+- All three write Blosc with active-mask by default; 12.0.0 at file version 224, 13.0.0 and
+  14.0.0 at 225, laid out the same for these grids.
+- Each library read every file, brodo's golden file included, with the same values. 12.0.0
+  warned on version 225 and read it the same; stamped 224, brodo's bytes read without a
+  warning in all three.
+- A reader written from docs/formats.md §9, the public LZ4 and Blosc chunk formats and
+  OpenVDB's output read all ten files line for line as OpenVDB 14.0.0 lists them.
+- OpenVDB's files hold the seven per-node indicators of inactive values; Blosc chunks of
+  LZ4 with byte shuffle, or stored, always one block; maps other than `AffineMap`, its
+  default `UniformScaleMap`; metadata of types brodo does not know; and inactive voxels and
+  tiles, some holding a value other than the background. Zip was never written by default,
+  nor on a level set or fog volume.
+
+## Decision
+
+The owner decided, on 2026-11-01, as proposed:
+
+- **Versions**: file versions 224 and 225 are read; any other is refused. brodo goes on
+  writing 225 (ADR-0046).
+- **Compression**: none, active-mask, and Blosc of LZ4 with byte shuffle or stored, in
+  one block, decoded with `lz4_flex` (ADR-0016), so that reading adds no dependency. Zip,
+  and any other Blosc chunk, is refused until a user asks (ADR-0036).
+- **Activity**: brodo holds none (ADR-0025). A leaf's inactive voxels keep their values;
+  an active tile, and an inactive tile holding other than the background, become brodo's
+  tile of that value; an inactive tile holding the background is left out.
+- **Transform**: `AffineMap`, `ScaleMap`, `UniformScaleMap` and `UniformScaleTranslateMap`,
+  the maps whose bytes were measured, are read into brodo's 3×4 map with the half voxel
+  ADR-0046 adds taken away; any other map is refused until measured.
+- **Metadata**: a grid's name and transform are taken, its voxel size as the length of
+  each of the map's columns. OpenVDB states no unit, so the caller gives one when reading.
+  String entries are kept in `extra`; OpenVDB's own `file_*` entries, and entries of other
+  types, are dropped. `sdf.version` is not set, since OpenVDB's level sets are not known to
+  follow brodo's convention (docs/formats.md §5).
+- **Other grids**: a grid of another type, saved as half floats, or instanced, is skipped,
+  and its name returned, so that none is lost unnoticed.
+- **Untrusted input**: the reader joins `UNTRUSTED_INPUT` and the closing fuzz round.
+
+The bytes read are specified in docs/formats.md §9.
+
+## Consequences
+
+brodo reads the files OpenVDB 12 to 14 writes by default without a new dependency, and
+loses on reading what it cannot hold: which voxels were active. A file written again by
+brodo holds every voxel active (ADR-0046). Files with zip, other Blosc codecs, half floats
+or other maps are refused or skipped until a user asks and a spike measures them. OpenVDB's
+tools stay the check, by hand, not in the gate.

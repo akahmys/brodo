@@ -74,3 +74,4 @@ A record is `Proposed` until the human accepts it.
 | [0044](0044-openvdb-from-12-0-is-read-for-its-file-format.md) | OpenVDB from 12.0 on is read for its file format, and never copied |
 | [0045](0045-brodo-reads-and-writes-vdb-files-itself.md) | brodo reads and writes `.vdb` files itself, not through `vdb-rs` |
 | [0046](0046-how-brodo-writes-vdb-files.md) | How brodo writes `.vdb` files |
+| [0047](0047-how-brodo-reads-vdb-files.md) | How brodo reads `.vdb` files |

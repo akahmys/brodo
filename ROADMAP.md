@@ -29,8 +29,11 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
 - **Done**: the writer, `brodo::vdb` under the feature `vdb`, to docs/formats.md §9; OpenVDB
   14.0.0 read its golden file back with every value the same and wrote it again the same
   but for `file_mem_bytes` (2026-11-01).
-- **Next**: the reading step's spike: which compressions OpenVDB 12 to 14 write by default,
-  and whether OpenVDB 12 and 13 read file version 225.
+- **Done**: P7's reading step decided: `spikes/vdbread/` found OpenVDB 12 to 14 writing
+  Blosc with active-mask by default, at file version 224 or 225, and each reading brodo's
+  files; a reader from the document read them all as OpenVDB does. Blosc read with
+  `lz4_flex`, zip refused, inactive values kept (ADR-0047; the owner, 2026-11-01).
+- **Next**: the reader, `brodo::vdb`, to docs/formats.md §9 extended for reading.
 
 ## 2. Milestones
 
@@ -385,7 +388,7 @@ implementation (PLANNING.md §2).
 | B-004 | Does a shared IR schema crate live in this repository? | Undecided; for brodo's users to agree, not for brodo to anticipate |
 | B-013 | Which crates handle `piatto`'s window, input and GUI parts? | `winit` and `egui`, to be measured against Rules 12 and 13 (ADR-0018) |
 
-`spikes/sign/` answered B-016 (ADR-0027); `spikes/thin/` and `spikes/recheck/` B-020 (ADR-0028); `spikes/value/` B-017 (ADR-0029); `spikes/archive/` B-005, `lz4_flex` (ADR-0016). `spikes/vdb/` the writing step (ADR-0046); ADR-0045 B-006, with no spike, by measurement of `vdb-rs`'s dependencies; `spikes/parvar/` B-024, a benchmark on the performance cores (ADR-0019). No spike is running. `spikes/remap/` answered B-001 and B-008, and `spikes/merge/` B-010
+`spikes/sign/` answered B-016 (ADR-0027); `spikes/thin/` and `spikes/recheck/` B-020 (ADR-0028); `spikes/value/` B-017 (ADR-0029); `spikes/archive/` B-005, `lz4_flex` (ADR-0016). `spikes/vdb/` the writing step (ADR-0046); `spikes/vdbread/` the reading step (ADR-0047); ADR-0045 B-006, with no spike, by measurement of `vdb-rs`'s dependencies; `spikes/parvar/` B-024, a benchmark on the performance cores (ADR-0019). No spike is running. `spikes/remap/` answered B-001 and B-008, and `spikes/merge/` B-010
 (ADR-0014); `spikes/vtk/` answered B-012 (ADR-0018); `spikes/bench/` B-007 (ADR-0019); `spikes/threads/` B-014, rayon kept (ADR-0015); `spikes/dilate/` B-011, no mask (ADR-0025); `spikes/ghost/` B-002, one to three layers (ADR-0015); `spikes/mutants/` the audit review's proposal C (ADR-0023).
 
 ## 4. Administrative items still open

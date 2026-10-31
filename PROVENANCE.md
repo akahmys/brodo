@@ -21,6 +21,8 @@ docs/formats.md.
 | Tag | Commit | File | For |
 | :--- | :--- | :--- | :--- |
 | `v12.0.0` | `269300808a4651daa65836214fc20f78e1c0eb7f` | `LICENSE`, `README.md`, `RE-LICENSE_NOTE.txt` | The licence (ADR-0044) |
+| `v12.0.0` | `269300808a4651daa65836214fc20f78e1c0eb7f` | The archive built, not read; `openvdb/openvdb/version.h`'s line stating file version 224, shown by the compiler | OpenVDB 12.0.0 as a reader and writer in `spikes/vdbread/` |
+| `v13.0.0` | `7c03e1f084873cd1b3422c7ff7aec6ee681b3b38` | The archive built, not read; `LICENSE` and `RE-LICENSE_NOTE.txt` compared by hash; `openvdb/openvdb/io/Archive.cc`, `Archive::setGridCompression` | OpenVDB 13.0.0 as a reader and writer in `spikes/vdbread/`; why zip is dropped on level sets and fog volumes |
 | `v14.0.0` | `ecae2bda85744412b0cd47e1b8e1e4e76beb7b88` | `LICENSE`, `README.md`, `RE-LICENSE_NOTE.txt` | The licence (ADR-0044) |
 | `v14.0.0` | `ecae2bda85744412b0cd47e1b8e1e4e76beb7b88` | Under `openvdb/openvdb/`: `COPYRIGHT`; `io/` `File.cc`, `Archive.h`, `Archive.cc`, `GridDescriptor.cc`, `Compression.h`, `Compression.cc`, `Codec.h`, `Codec.cc`, `io.h`; `codecs/` `ScalarCodec.h`, `TopologyCodec.h`, `impl/ScalarLeafCodec.h`; `Grid.cc`, `MetaMap.cc`, `Metadata.h`, `Metadata.cc`, `version.h.in`; `math/` `Maps.h`, `Maps.cc`, `Transform.cc` in part; `util/NodeMasks.h` in part; `tree/` `Tree.h`, `RootNode.h`, `InternalNode.h`, `LeafNode.h` in part | The layout a writer emits for float and double grids at file version 225 (`spikes/vdb/`, ADR-0045) |
 
