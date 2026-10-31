@@ -30,3 +30,13 @@ The owner chose, on 2026-10-25, the recommended option of each point:
 A user depending through another crate asks that crate to move to the same tag; the README
 says why. Registration on crates.io, where versions resolve without tags, stays a later
 decision (ROADMAP.md §4).
+
+## Amendment: a GitHub release for each tag
+
+- **Date**: 2026-10-31
+
+No version up to 0.6.0 had a GitHub release; a tag and its CHANGELOG.md section were the
+release. The human decided that 0.7.0 gets one, the versions before it none, and every
+version after it one too: made once its tag is pushed, titled with the version, its notes
+the version's CHANGELOG.md section as it stands, as proposed. TESTING.md V4 says so. The
+gate runs before the tag is pushed, so nothing checks that the release is made.
