@@ -593,14 +593,14 @@ n bytes; n ≤ 0, −n bytes of the values as they are. Without it, they follow 
 Blosc chunk (c-blosc's `README_CHUNK_FORMAT.rst`) has a 16-byte header: format version 2,
 a codec version not read, flags, a type size, then `u32`s the values' byte count, which is
 the count stored times the value's size, a block size, and the chunk's own byte count, n.
-With flag bit 1, the values follow as they are. Otherwise its codec, bits 5 to 7, is LZ4
-(1), bit 2 (bit shuffle) clear, and its values, of one byte or more, fit one block: an
-`i32`, the block's offset from the chunk's start, then the block, split into type-size streams unless bit 4 is set or the block is shorter than the
-block size; each stream an `i32` length and that many bytes, LZ4's block format, or, of the
-stream's own length, as it is. With bit 0, the block is byte-shuffled: of its m whole
-values of the type size, byte b of value j is at b × m + j, a remainder past them left in
-place. Any other
-chunk is refused.
+With flag bit 1, the values follow as they are, to the chunk's end. Otherwise its codec,
+bits 5 to 7, is LZ4 (1), bit 2 (bit shuffle) clear, and its values, of one byte or more, fit
+one block: an `i32`, the block's offset from the chunk's start, 20, then the block, to the
+chunk's end, split into type-size streams unless bit 4 is set or the block is shorter
+than the block size; each stream an `i32` length and that many bytes, LZ4's block format,
+or, of the stream's own length, as it is. With bit 0, the block is byte-shuffled: of its m
+whole values of the type size, byte b of value j is at b × m + j, a remainder past them
+left in place. Any other chunk is refused.
 
 Test vectors of reading, written by OpenVDB, are in `crates/brodo/tests/data/`:
 `vdb_by12_v224.bin` and `vdb_by14_v225.bin`, the same seven grids with Blosc, by OpenVDB

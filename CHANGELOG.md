@@ -6,6 +6,10 @@ are recorded here when they change (V6).
 
 ## Unreleased
 
+- `vdb::from_bytes` and `vdb::read` refuse a Blosc chunk whose block does not start where
+  its header ends, or with bytes after its values, as docs/formats.md §9.8 states; 0.8.0
+  read past them.
+
 ## 0.8.0 (2026-11-02)
 
 Closes P7: OpenVDB's `.vdb` files, brodo's float and double grids written as OpenVDB reads

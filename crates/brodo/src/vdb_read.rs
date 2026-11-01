@@ -623,7 +623,11 @@ fn blosc(chunk: &[u8], raw: usize) -> Result<Vec<u8>, VdbError> {
     }
     if flags & BLOSC_MEMCPY != 0 {
         let out = c.take(nbytes, "Blosc chunk")?;
-        return Ok(out.to_vec());
+        return if c.at == chunk.len() {
+            Ok(out.to_vec())
+        } else {
+            Err(VdbError::Malformed("Blosc chunk"))
+        };
     }
     if flags >> 5 != BLOSC_LZ4 || flags & BLOSC_BITSHUFFLE != 0 {
         return Err(VdbError::Unsupported("a Blosc codec other than LZ4 with byte shuffle"));
@@ -631,15 +635,25 @@ fn blosc(chunk: &[u8], raw: usize) -> Result<Vec<u8>, VdbError> {
     if nbytes == 0 || nbytes > block {
         return Err(VdbError::Unsupported("a Blosc chunk of more than one block"));
     }
-    let start = usize::try_from(c.i32("Blosc block start")?)
-        .map_err(|_| VdbError::Malformed("Blosc chunk"))?;
-    c.at = start;
+    let start = c.i32("Blosc block start")?;
+    if usize::try_from(start).ok() != Some(c.at) {
+        return Err(VdbError::Malformed("Blosc chunk"));
+    }
     let splits = if flags & BLOSC_NO_SPLIT == 0 && nbytes == block { usize::from(size) } else { 1 };
     if splits == 0 || nbytes % splits != 0 {
         return Err(VdbError::Malformed("Blosc chunk"));
     }
-    let part = nbytes / splits;
-    let mut out = Vec::with_capacity(nbytes);
+    let out = streams(&mut c, splits, nbytes / splits)?;
+    if c.at != chunk.len() {
+        return Err(VdbError::Malformed("Blosc chunk"));
+    }
+    Ok(if flags & BLOSC_SHUFFLE != 0 { unshuffle(&out, usize::from(size)) } else { out })
+}
+
+/// A block's `splits` streams of `part` bytes each, each an `i32` length and that many
+/// bytes, LZ4's block format or, of the stream's own length, as it is.
+fn streams(c: &mut Cursor<'_>, splits: usize, part: usize) -> Result<Vec<u8>, VdbError> {
+    let mut out = Vec::with_capacity(splits.saturating_mul(part));
     for _ in 0..splits {
         let len = usize::try_from(c.i32("Blosc split")?)
             .map_err(|_| VdbError::Malformed("Blosc split"))?;
@@ -654,7 +668,7 @@ fn blosc(chunk: &[u8], raw: usize) -> Result<Vec<u8>, VdbError> {
             out.extend(buf);
         }
     }
-    Ok(if flags & BLOSC_SHUFFLE != 0 { unshuffle(&out, usize::from(size)) } else { out })
+    Ok(out)
 }
 
 /// A block byte-shuffled by `size` restored: of its m whole values, byte b of value j is

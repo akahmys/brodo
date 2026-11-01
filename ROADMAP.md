@@ -367,8 +367,8 @@ STEP is not read (ADR-0031). `piatto` is held (§2, B-021).
 order (the owner, 2026-11-01). No public item changes; a change one would want is recorded
 as a proposal for a unit of its own.
 
-- [ ] `target/mutants-tmp`, left by a stopped run, removed
-- [ ] `vdb_read`'s Blosc chunk refused when its block does not start where its header
+- [x] `target/mutants-tmp`, left by a stopped run, removed
+- [x] `vdb_read`'s Blosc chunk refused when its block does not start where its header
       ends or bytes are left after its block, as docs/formats.md §9.8 says, a test failing
       first (found by an outside review, 2026-11-01; the owner set it after 0.8.0)
 - [ ] The memory `vdb::read` makes, measured on the file that makes the most per byte, then

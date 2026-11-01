@@ -527,3 +527,29 @@ fn blosc_chunks_beyond_section_9_8_are_refused() {
     );
     assert_eq!(malformed(&stored_as(p, n, &counted(&chunk(&raw, LZ4, 0, len)))), "Blosc chunk");
 }
+
+/// `c` with `with` put at `at` and its own byte count kept true.
+fn chunk_with(c: &[u8], at: usize, with: &[u8]) -> Vec<u8> {
+    let mut out = c.to_vec();
+    out.splice(at..at, with.iter().copied());
+    let n = u32::try_from(out.len()).unwrap();
+    out[12..16].copy_from_slice(&n.to_le_bytes());
+    out
+}
+
+#[test]
+fn a_blosc_block_off_its_place_or_with_bytes_after_it_is_refused() {
+    let (p, raw) = a_chunk();
+    let (n, len) = (16 + raw.len(), raw.len());
+    let refused = |c: &[u8]| malformed(&stored_as(p, n, &counted(c)));
+    let lz4 = chunk(&raw, LZ4 | NO_SPLIT, 4, len);
+    let mut later = chunk_with(&lz4, 20, &[0; 4]);
+    later[16..20].copy_from_slice(&24_i32.to_le_bytes());
+    assert_eq!(refused(&later), "Blosc chunk");
+    let mut earlier = lz4.clone();
+    earlier[16..20].copy_from_slice(&16_i32.to_le_bytes());
+    assert_eq!(refused(&earlier), "Blosc chunk");
+    assert_eq!(refused(&chunk_with(&lz4, lz4.len(), &[0; 3])), "Blosc chunk");
+    let memcpy = chunk_with(&BY14[p + 8..p + 8 + n], n, &[0]);
+    assert_eq!(refused(&memcpy), "Blosc chunk");
+}
