@@ -273,4 +273,19 @@ exclude_re = [
     # share no bit, so `|` and `^` agree.
     # [same]
     'quantise\.rs:.*: replace \| with \^ in to_binary16$',
+    # Place bits from x, y and z are shifted apart and share none, so `|` and `^` agree.
+    # [same]
+    'vdb\.rs:.*: replace \| with \^ in place$',
+    # Active-mask and Blosc, the two flags read, share no bit, so `|` and `^` agree.
+    # [same]
+    'vdb_read\.rs:.*: replace \| with \^ in grid$',
+    # Indicator 0 stores no inactive value, so the last arm's `first` is the background,
+    # which arm 0 gives.
+    # [same]
+    'vdb_read\.rs:.*: delete match arm 0 in values$',
+    # The arms of indicators 2 and 4 give `first`, as the last arm does.
+    # [same]
+    'vdb_read\.rs:.*: delete match arm 2 in values$',
+    # As above.
+    'vdb_read\.rs:.*: delete match arm 4 in values$',
 ]

@@ -238,3 +238,18 @@ for them, each shown to fail with its mutant applied by hand behind `rss_guard.p
 test wrote a file a run before had left, so that a write doing nothing passed, and now
 removes it first. The human decided that the two left, which no test can tell from the
 original, are excluded, each with its reason.
+
+## Amendment: P7's missed mutants
+
+- **Date**: 2026-11-01
+
+The run on `a7022af` (2026-11-01, GitHub Actions, 4 h 22 min to its last shard) reported
+all 4307 mutants and missed 36, all in P7's `.vdb` reader and writer; the timeouts run again
+were caught. 30 are now killed by tests that make, from OpenVDB's files and brodo's, what
+those files do not hold: descriptors whose offsets disagree, a limit above the file, an
+inactive root tile of another value, a root origin off its edge, a map not affine, an
+instance of a double grid, indicator 1, a node without active-mask not at indicator 6, and
+Blosc chunks stored in ways OpenVDB did not use or beyond docs/formats.md §9.8; all 36 were
+run by hand behind `rss_guard.py` against them, and 30 caught. The human decided that the
+six left, which no test can tell from the original, are excluded, each with its reason:
+three `|` over bits shared by none, and three indicator arms giving what the last arm gives.

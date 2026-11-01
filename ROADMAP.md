@@ -40,7 +40,8 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   the benchmarks, `leaf_parallel_update_x32` recorded again (ADR-0019).
 - **Done**: P7's retrospective, its three proposals decided by the owner (ADR-0001,
   ADR-0002, ADR-0044; 2026-11-01).
-- **Next**: P7's mutation run, then its acceptance and 0.8.0.
+- **Next**: the mutants of `vdb.rs` and `vdb_read.rs` run again, then P7's acceptance and
+  0.8.0.
 
 ## 2. Milestones
 
@@ -377,6 +378,9 @@ built. brodo reads and writes `.vdb` itself, the format learnt from OpenVDB at `
       under Tree Borrows (ADR-0015, 2026-11-01)
 - [x] Benchmarks, every feature, at rest: every item within its baseline but
       `leaf_parallel_update_x32`, as slow before P7, recorded again (ADR-0019, 2026-11-01)
+- [ ] Mutation run (ADR-0023): all 4307 reported on `a7022af`, 36 missed in the `.vdb`
+      reader and writer, 30 killed by tests and six excluded (2026-11-01); then the two
+      files' mutants run again with none missed
 - [ ] **Accepted when** brodo's float and double grids are written to `.vdb` files that
       OpenVDB's tools read back the same, and such files are read back into brodo
 

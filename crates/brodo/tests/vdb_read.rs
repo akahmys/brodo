@@ -226,3 +226,304 @@ fn a_file_above_the_limit_is_refused_before_it_is_read() {
         listing_of(&from_bytes(BY14, "m").unwrap())
     );
 }
+
+// What OpenVDB's files do not hold, made from them or from brodo's (TESTING.md T3): each
+// test below fails on a mutant of the reader that the files above leave alive.
+
+fn u32_at(b: &[u8], at: usize) -> usize {
+    u32::from_le_bytes(b[at..at + 4].try_into().unwrap()) as usize
+}
+
+fn i64_at(b: &[u8], at: usize) -> i64 {
+    i64::from_le_bytes(b[at..at + 8].try_into().unwrap())
+}
+
+fn int(v: usize) -> i64 {
+    i64::try_from(v).unwrap()
+}
+
+fn size(v: i64) -> usize {
+    usize::try_from(v).unwrap()
+}
+
+fn put_i64(b: &mut [u8], at: usize, v: i64) {
+    b[at..at + 8].copy_from_slice(&v.to_le_bytes());
+}
+
+/// Each grid's name and where its three offsets are (docs/formats.md §9.1, §9.2).
+fn descriptors(bytes: &[u8]) -> Vec<(String, usize)> {
+    let mut at = 8 + 4 + 8 + 1 + 36;
+    assert_eq!(u32_at(bytes, at), 0, "this test reads a file without file metadata");
+    let count = u32_at(bytes, at + 4);
+    at += 8;
+    let mut out = Vec::new();
+    for _ in 0..count {
+        let len = u32_at(bytes, at);
+        let name = String::from_utf8(bytes[at + 4..at + 4 + len].to_vec()).unwrap();
+        at += 4 + len;
+        for _ in 0..2 {
+            at += 4 + u32_at(bytes, at);
+        }
+        out.push((name, at));
+        at = size(i64_at(bytes, at + 16));
+    }
+    out
+}
+
+/// Where grid `name`'s offsets are, and the three of them.
+fn offsets(bytes: &[u8], name: &str) -> (usize, [usize; 3]) {
+    let (_, at) = descriptors(bytes).into_iter().find(|(n, _)| n == name).unwrap();
+    (at, [0, 1, 2].map(|k| size(i64_at(bytes, at + 8 * k))))
+}
+
+/// `bytes` with `range` replaced by `with`, every offset at or past its end moved with it.
+fn splice(bytes: &[u8], range: std::ops::Range<usize>, with: &[u8]) -> Vec<u8> {
+    let mut out = bytes.to_vec();
+    let delta = int(with.len()) - int(range.len());
+    for (_, at) in descriptors(bytes) {
+        for k in 0..3 {
+            let o = i64_at(&out, at + 8 * k);
+            if o >= int(range.end) {
+                put_i64(&mut out, at + 8 * k, o + delta);
+            }
+        }
+    }
+    out.splice(range, with.iter().copied());
+    out
+}
+
+fn malformed(bytes: &[u8]) -> &'static str {
+    match from_bytes(bytes, "m") {
+        Err(VdbError::Malformed(what)) => what,
+        other => panic!("not refused as malformed: {:?}", other.map(|f| f.skipped)),
+    }
+}
+
+#[test]
+fn a_grid_whose_offsets_disagree_is_refused() {
+    let (at, [start, _, end]) = offsets(BY14, "sdf");
+    let with = |k: usize, v: usize| {
+        let mut b = BY14.to_vec();
+        put_i64(&mut b, at + 8 * k, int(v));
+        b
+    };
+    assert_eq!(malformed(&with(0, start + 1)), "grid offset");
+    assert_eq!(malformed(&with(2, BY14.len() + 1)), "grid offset");
+    assert_eq!(malformed(&with(1, start - 1)), "grid offset");
+    assert_eq!(malformed(&with(1, start)), "topology's end");
+    assert_eq!(malformed(&with(1, end + 1)), "grid offset");
+    assert_eq!(malformed(&with(1, end)), "topology's end");
+    let (at, [start, _, _]) = offsets(BY14, "sdf_instance");
+    assert_eq!(descriptors(BY14).last().unwrap().0, "sdf_instance", "the last grid is skipped");
+    let mut b = BY14.to_vec();
+    put_i64(&mut b, at + 16, int(start));
+    assert_eq!(malformed(&b), "file's end");
+    put_i64(&mut b, at + 16, int(start) - 1);
+    assert_eq!(malformed(&b), "grid offset");
+}
+
+#[test]
+fn a_file_below_the_limit_is_read() {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/vdb_by14_v225.bin");
+    assert_eq!(
+        listing_of(&read(&path, "m", u64::MAX).unwrap()),
+        listing_of(&from_bytes(BY14, "m").unwrap())
+    );
+}
+
+/// The double grid of `written`, its root tile, and the file brodo writes of it.
+fn written_file() -> (Topology, Field<f64>, Vec<u8>) {
+    let (m, t, f) = written(-1.0_f64, |k| f64::from(k) * 0.25);
+    let bytes = to_bytes(&[VdbEntry::new(&m, &t, &f).unwrap()]).unwrap();
+    (t, f, bytes)
+}
+
+/// Where the root tile's origin is in a file of `written_file`, and its active byte.
+fn root_tile(t: &Topology, f: &Field<f64>, bytes: &[u8]) -> (usize, usize) {
+    let n = t.tile_numbers().find(|&n| t.tile(n).unwrap().0 == TileLevel::Root).unwrap();
+    let mut pattern: Vec<u8> = t.tile(n).unwrap().1.iter().flat_map(|c| c.to_le_bytes()).collect();
+    pattern.extend(f.tile(t, n).unwrap().to_le_bytes());
+    pattern.push(1);
+    let at = bytes.windows(pattern.len()).position(|w| w == pattern).unwrap();
+    (at, at + pattern.len() - 1)
+}
+
+#[test]
+fn an_inactive_root_tile_of_another_value_is_kept() {
+    let (t, f, mut bytes) = written_file();
+    let (_, active) = root_tile(&t, &f, &bytes);
+    bytes[active] = 0;
+    let file = from_bytes(&bytes, "mm").unwrap();
+    let VdbField::F64(g) = &file.grids[0].field else { panic!("not a double grid") };
+    assert_eq!(
+        lines_of(&file.grids[0].meta, &file.grids[0].topology, g),
+        lines_of(&file.grids[0].meta, &t, &f)
+    );
+}
+
+#[test]
+fn a_root_origin_off_its_edge_and_a_map_not_affine_are_refused() {
+    let (t, f, bytes) = written_file();
+    let (origin, _) = root_tile(&t, &f, &bytes);
+    let mut off = bytes.clone();
+    off[origin] = 1;
+    assert_eq!(malformed(&off), "root's origin");
+    let at = bytes.windows(9).position(|w| w == b"AffineMap").unwrap() + 9 + 15 * 8;
+    assert_eq!(
+        f64::from_le_bytes(bytes[at..at + 8].try_into().unwrap()).to_bits(),
+        1.0_f64.to_bits()
+    );
+    let mut map = bytes;
+    map[at..at + 8].copy_from_slice(&2.0_f64.to_le_bytes());
+    assert_eq!(malformed(&map), "AffineMap");
+}
+
+#[test]
+fn an_instance_of_a_double_grid_is_skipped() {
+    let (_, _, bytes) = written_file();
+    let (_, at) = descriptors(&bytes)[0].clone();
+    let mut b = splice(&bytes, at..at, b"x");
+    b[at - 4..at].copy_from_slice(&1_u32.to_le_bytes());
+    let file = from_bytes(&b, "mm").unwrap();
+    assert!(file.grids.is_empty());
+    assert_eq!(file.skipped, ["g"]);
+}
+
+#[test]
+fn indicators_openvdb_does_not_write_here_read_as_section_9_8_says() {
+    // Without active-mask every value is stored, whatever the indicator.
+    let (_, [_, buffers, _]) = offsets(NONE, "inactive");
+    let mut none = NONE.to_vec();
+    assert_eq!(none[buffers + 64], 6);
+    none[buffers + 64] = 0;
+    same_listing(&none, NONE_EXPECT);
+    // Indicator 1: the fog's first leaf, its inactive places minus the background.
+    let (_, [_, buffers, _]) = offsets(BY14, "fog");
+    let mut fog = BY14.to_vec();
+    assert_eq!(fog[buffers + 64], 0);
+    fog[buffers + 64] = 1;
+    let negated = |bytes: &[u8]| {
+        let file = from_bytes(bytes, "m").unwrap();
+        let g = file.grids.iter().find(|g| g.meta.name == "fog").unwrap();
+        let VdbField::F64(f) = &g.field else { panic!("not a double grid") };
+        let t = &g.topology;
+        let bits = (-f.background()).to_bits();
+        t.leaf_numbers().flat_map(|n| f.leaf(t, n).unwrap()).filter(|v| v.to_bits() == bits).count()
+    };
+    assert_eq!(negated(BY14), 0);
+    assert!(negated(&fog) > 0);
+}
+
+const LZ4: u8 = 1 << 5;
+const SHUFFLE: u8 = 1;
+const NO_SPLIT: u8 = 0x10;
+
+/// Each Blosc chunk OpenVDB stored as it is (memcpy) within `within`: where its `i64`
+/// count is, and the bytes of values it holds.
+fn memcpy_chunks(bytes: &[u8], within: std::ops::Range<usize>) -> Vec<(usize, Vec<u8>)> {
+    (within.start..within.end - 24)
+        .filter(|&p| {
+            let n = i64_at(bytes, p);
+            n >= 16
+                && bytes[p + 8] == 2
+                && bytes[p + 10] & 2 != 0
+                && int(u32_at(bytes, p + 20)) == n
+                && int(u32_at(bytes, p + 12)) + 16 == n
+        })
+        .map(|p| (p, bytes[p + 24..p + 8 + size(i64_at(bytes, p))].to_vec()))
+        .collect()
+}
+
+/// A Blosc chunk of `raw`'s bytes in one block of one stream, stored as it is.
+fn chunk(raw: &[u8], flags: u8, size: u8, block: usize) -> Vec<u8> {
+    let mut c = vec![2, 1, flags, size];
+    for w in [raw.len(), block, 16 + 4 + 4 + raw.len()] {
+        c.extend(u32::try_from(w).unwrap().to_le_bytes());
+    }
+    c.extend(20_i32.to_le_bytes());
+    c.extend(i32::try_from(raw.len()).unwrap().to_le_bytes());
+    c.extend(raw);
+    c
+}
+
+/// Byte b of each of `raw`'s whole values of `size` bytes moved to stream b.
+fn shuffle(raw: &[u8], size: usize) -> Vec<u8> {
+    let m = raw.len() / size;
+    let mut out = raw.to_vec();
+    for j in 0..m {
+        for b in 0..size {
+            out[b * m + j] = raw[j * size + b];
+        }
+    }
+    out
+}
+
+/// BY14 with the stored values at `p`, a chunk of their bytes, stored as `with` instead.
+fn stored_as(p: usize, n: usize, with: &[u8]) -> Vec<u8> {
+    splice(BY14, p..p + 8 + n, with)
+}
+
+fn counted(chunk: &[u8]) -> Vec<u8> {
+    let mut out = int(chunk.len()).to_le_bytes().to_vec();
+    out.extend(chunk);
+    out
+}
+
+/// A chunk of the inactive grid's values that a shuffle changes, and where it is.
+fn a_chunk() -> (usize, Vec<u8>) {
+    let (_, [start, _, end]) = offsets(BY14, "inactive");
+    let (p, raw) = memcpy_chunks(BY14, start..end)
+        .into_iter()
+        .find(|(_, raw)| {
+            (8..255).contains(&raw.len()) && shuffle(raw, 4) != *raw && shuffle(raw, 2) != *raw
+        })
+        .unwrap();
+    (p, raw)
+}
+
+#[test]
+fn values_stored_in_other_ways_read_the_same() {
+    let (p, raw) = a_chunk();
+    let n = 16 + raw.len();
+    let mut plain = (-int(raw.len())).to_le_bytes().to_vec();
+    plain.extend(&raw);
+    same_listing(&stored_as(p, n, &plain), EXPECT);
+    let len = raw.len();
+    for c in [
+        chunk(&raw, LZ4 | NO_SPLIT, 4, len),
+        chunk(&raw, LZ4, 4, len + 1),
+        chunk(&shuffle(&raw, 2), LZ4 | SHUFFLE | NO_SPLIT, 2, len),
+        chunk(&raw, LZ4 | SHUFFLE | NO_SPLIT, 255, len),
+    ] {
+        same_listing(&stored_as(p, n, &counted(&c)), EXPECT);
+    }
+    let (q, _) =
+        memcpy_chunks(BY14, 0..BY14.len()).into_iter().find(|(_, r)| r.is_empty()).unwrap();
+    same_listing(&stored_as(q, 16, &0_i64.to_le_bytes()), EXPECT);
+}
+
+#[test]
+fn blosc_chunks_beyond_section_9_8_are_refused() {
+    let (p, raw) = a_chunk();
+    let (n, len) = (16 + raw.len(), raw.len());
+    let mut long = BY14.to_vec();
+    long[p + 20..p + 24].copy_from_slice(&(u32::try_from(n).unwrap() + 1).to_le_bytes());
+    assert_eq!(malformed(&long), "Blosc chunk");
+    let unsupported = |c: Vec<u8>| match from_bytes(&stored_as(p, n, &counted(&c)), "m") {
+        Err(VdbError::Unsupported(what)) => what,
+        other => panic!("not refused as unsupported: {:?}", other.map(|f| f.skipped)),
+    };
+    assert_eq!(
+        unsupported(chunk(&raw, NO_SPLIT, 4, len)),
+        "a Blosc codec other than LZ4 with byte shuffle"
+    );
+    assert_eq!(
+        unsupported(chunk(&raw, LZ4 | NO_SPLIT | 4, 4, len)),
+        "a Blosc codec other than LZ4 with byte shuffle"
+    );
+    assert_eq!(
+        unsupported(chunk(&raw, LZ4 | NO_SPLIT, 4, len - 1)),
+        "a Blosc chunk of more than one block"
+    );
+    assert_eq!(malformed(&stored_as(p, n, &counted(&chunk(&raw, LZ4, 0, len)))), "Blosc chunk");
+}
