@@ -1,6 +1,6 @@
 # ADR-0005: Dependencies are pure Rust, permissively licensed, and declared once
 
-- **Status**: Accepted
+- **Status**: Amended
 - **Date**: 2026-10-16
 
 ## Context
@@ -22,3 +22,15 @@ has chosen one. Dependencies declared per crate drift apart in version and featu
 
 A native library (MPI, a GPU runtime, a system library) needs an exception, by amending
 this record and naming the crate.
+
+## Amendment: a tree cargo cannot give fails
+
+- **Date**: 2026-11-02
+
+The review of the whole repository found the gate's step for the first rule above passing
+where `cargo tree` failed: its errors were dropped and an empty tree read as one without
+`cc`. A manifest naming `cc` and a crate that does not exist passed the step; clippy, run
+earlier, fails on such a manifest, so the gate as a whole did not pass it. The owner
+decided, on 2026-11-02, that the step fails where `cargo tree` fails, naming the member and
+target. Shown to fire: the same manifest failed the step on `cargo tree`, and one naming
+`cc` alone still failed on `cc`.

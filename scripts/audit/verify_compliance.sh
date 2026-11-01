@@ -41,7 +41,7 @@ if [ "${pin%.*}" != "$stated" ]; then fail "rust-version $stated, pin $pin"
 elif [ "$running" != "$pin" ]; then fail "rustc $running runs, $pin is pinned"
 else echo "  PASS ($pin)"; fi
 
-echo "[Rules 4, 11, 19, 20, L1, V1, V3, T6] Workspace members, lint inheritance, layer order, version, fuzzer..."
+echo "[Rules 4, 11, 19, 20, L1, L3, L4, V1, V3, T6] Workspace members, lint inheritance, layer order, version, fuzzer, layout..."
 python3 scripts/audit/workspace.py || ERROR=1
 
 echo "[Rules 1, 4, 6, 7, 9, 10, 16, 17, 18, 19] cargo clippy --workspace --all-targets -D warnings..."
@@ -75,13 +75,14 @@ done
 [ $ERROR -eq 0 ] && echo "  PASS ($feature_sets )"
 [ $ERROR_BEFORE -eq 0 ] || ERROR=1
 
-# Rules 2 and 3 apply to production code only, so they run apart from the clippy step above.
+# Rules 2 and 3 apply to production code only, so they run apart from the clippy step above,
+# with every feature, so that a module behind one is read (ADR-0021).
 # The workspace lints fire here too; lint_filter.py keeps each step to its own lints.
 # Both warn rather than deny their lints and fail if clippy does not finish: a finding
 # that stops the build of one crate would otherwise leave the crates above it unlinted,
 # and the step would pass having checked them not at all (ADR-0002).
 echo "[Rule 2] No panic in production code..."
-if json=$(cargo clippy --workspace --lib --bins --quiet --message-format=json -- \
+if json=$(cargo clippy --workspace --lib --bins --all-features --quiet --message-format=json -- \
         -W clippy::unwrap_used -W clippy::expect_used -W clippy::panic \
         -W clippy::unreachable -W clippy::todo -W clippy::unimplemented 2>/dev/null); then
     python3 scripts/audit/lint_filter.py clippy::unwrap_used clippy::expect_used \
@@ -97,7 +98,7 @@ for module in $UNTRUSTED_INPUT; do
     crate=$(cut -d/ -f2 <<<"$module")
     if [ ! -e "$module" ]; then fail "$module (project.py) does not exist"; continue; fi
     if ! grep -qw "$crate" <<<"$MEMBERS"; then fail "$crate (project.py) is not a member"; continue; fi
-    if json=$(cargo clippy -p "$crate" --lib --bins --quiet --message-format=json -- \
+    if json=$(cargo clippy -p "$crate" --lib --bins --all-features --quiet --message-format=json -- \
             -W clippy::indexing_slicing 2>/dev/null); then
         python3 scripts/audit/lint_filter.py --under "$module" \
             clippy::indexing_slicing <<<"$json" || ERROR=1
@@ -127,20 +128,23 @@ echo "[Rule 10] cargo fmt --all --check..."
 if cargo fmt --all --check >/dev/null 2>&1; then echo "  PASS"
 else cargo fmt --all --check 2>&1 | grep '^Diff in' | sort -u; fail "run 'cargo fmt --all'"; fi
 
-# Rule 12: a crate that compiles C pulls `cc`.
+# Rule 12: a crate that compiles C pulls `cc`. A tree cargo cannot give fails, rather than
+# passing as one without `cc` (ADR-0005).
 echo "[Rule 12] No dependency compiles C ($TARGETS)..."
-c_builders=""
+c_builders=""; ERROR_BEFORE=$ERROR; ERROR=0
 for member in $MEMBERS; do
     for triple in $TARGETS; do
-        if cargo tree -p "$member" --target "$triple" --all-features --edges normal,build --prefix none \
-                2>/dev/null | grep -q '^cc v'; then
+        if ! tree=$(cargo tree -p "$member" --target "$triple" --all-features --edges normal,build \
+                --prefix none 2>&1); then
+            fail "cargo tree -p $member --target $triple"
+        elif grep -q '^cc v' <<<"$tree"; then
             c_builders+=" $member($triple)"
         fi
     done
 done
-if [ -n "$c_builders" ]; then
-    fail "these pull cc:$c_builders (cargo tree -p <crate> --target <triple> -i cc)"
-else echo "  PASS"; fi
+[ -z "$c_builders" ] || fail "these pull cc:$c_builders (cargo tree -p <crate> --target <triple> -i cc)"
+[ $ERROR -eq 0 ] && echo "  PASS"
+[ $ERROR_BEFORE -eq 0 ] || ERROR=1
 
 echo "[T1] Tests: no test file in src/, and #[ignore] only as needing what the repository lacks..."
 stray=$(find $SRC_DIRS \( -name '*_test.rs' -o -name '*_tests.rs' -o -name 'test_*.rs' \

@@ -49,9 +49,10 @@ The dependency order between crates is CODING.md Rule 11, listed in
 ├── PLANNING.md, CODING.md, TESTING.md, AUDITING.md
 ├── PROVENANCE.md, CHANGELOG.md, LICENSE-MIT, LICENSE-APACHE
 ├── Cargo.toml, Cargo.lock, rust-toolchain.toml, clippy.toml, rustfmt.toml,
-│   deny.toml, .betterleaks.toml
+│   deny.toml, .betterleaks.toml, .gitignore, .gitattributes
 ├── .cargo/mutants.toml          # cargo-mutants: the equivalent mutants (TESTING.md T11)
 ├── .claude/settings.json        # Claude Code: the guard hooks
+├── .github/workflows/           # GitHub Actions: the gate and the mutation run (ADR-0034)
 ├── docs/adr/                    # decision records
 ├── scripts/audit/               # the audit, and project.py, its settings
 ├── scripts/hooks/               # git and Claude Code hooks

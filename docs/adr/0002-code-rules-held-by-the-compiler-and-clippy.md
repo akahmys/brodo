@@ -52,3 +52,13 @@ pattern matches `Result<(), String>`, `Result<Vec<u8>, String>` and
 `Result<BTreeMap<u32, Vec<u8>>, String>`, as the old one did, and no longer
 `Result<BTreeMap<String, String>, VdbError>` or `Result<Vec<String>, VdbError>`; a value type
 nested deeper is not matched.
+
+## Amendment: Rule 15 leans on `cargo fmt`
+
+- **Date**: 2026-11-02
+
+The review of the whole repository found `scripts/audit/source.py`'s call graph reading a
+function's body from the line after its signature, so that a recursive function written on
+one line passed. `cargo fmt`, held by Rule 10, never leaves a body on its signature's line,
+and the same function formatted failed. The owner decided, on 2026-11-02, to keep the check
+as it is and state that it leans on `cargo fmt`, in CODING.md Rule 15 and AUDITING.md.

@@ -46,3 +46,16 @@ read every feature (`deny.toml`'s `all-features`). The human decided:
 Each was shown to fire: a failing test behind `serde` failed the gate, and was missing from
 the list until listed; a dependency named `cc` behind a feature failed Rule 12. Each passed
 with the default features only.
+
+## Amendment: Rules 2 and 3 with every feature
+
+- **Date**: 2026-11-02
+
+The review of the whole repository broke each checked rule once (TESTING.md T3) and found
+the steps for Rule 2 and Rule 3, which lint production code apart from the clippy steps
+above, built with the default features only: code behind a feature off by default was never
+read by them. That covered three of the nine modules in `UNTRUSTED_INPUT`, `archive.rs` and
+`quantise.rs` behind `archive` and `vdb_read.rs` behind `vdb`. `x.unwrap()` and `b[0]` added
+to `vdb_read.rs` passed both steps; the code as it was passed them with every feature. The
+owner decided, on 2026-11-02, that both steps run with `--all-features`, as the tests do.
+Shown to fire: the same two breaks each failed its step, by name.

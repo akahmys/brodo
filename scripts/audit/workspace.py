@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Checks on the workspace manifests (CODING.md Rules 4, 11, 19, 20 and L1; TESTING.md V1, V3, T6).
+"""Checks on the workspace manifests and the layout (CODING.md Rules 4, 11, 19, 20, L1, L3 and
+L4; TESTING.md V1, V3, T6).
 
 1. Every member sits in `crates/` or is `xtask`, so `spikes/` never joins the build.
 2. Every member declares `[lints] workspace = true`. Without it a crate escapes every lint
@@ -17,9 +18,13 @@
    exists, is its own workspace, so cargo-fuzz never joins the main one, declares a
    target, and depends on the crate by path. Whether each way in has a target, and whether the targets run, is
    not checked.
+8. Every entry at the root is named in ARCHITECTURE.md §3's tree (L3), and every script, a
+   `.py` or `.sh` file or an executable one, lies under `SCRIPT_HOMES` (L4). The files read
+   are those git tracks or would add, so a new one is checked before it is staged.
 """
 
 import json
+import os
 import re
 import subprocess
 import sys
@@ -37,6 +42,9 @@ DEP_SECTION = re.compile(r"^\[(?:target\.[^\]]+\.)?(?:dev-|build-)?dependencies\
 DEP_SUBTABLE = re.compile(r"^\[(?:target\.[^\]]+\.)?(?:dev-|build-)?dependencies\.([\w-]+)\]\s*$")
 DEP_LINE = re.compile(r"^([\w-]+)(\.workspace)?\s*=\s*(.*)$")
 LINTS = re.compile(r"^\[lints\]\s*\nworkspace\s*=\s*true\s*$", re.MULTILINE)
+LAYOUT_TREE = re.compile(r"^## 3\. Repository layout\n.*?^```\n(.*?)^```", re.DOTALL | re.MULTILINE)
+# Where a script may lie (L4); a spike's own code is the spike's (PLANNING.md §3).
+SCRIPT_HOMES = ("scripts/audit/", "scripts/hooks/", "xtask/", "spikes/")
 
 
 def metadata() -> dict:
@@ -147,8 +155,36 @@ def fuzzer() -> list[str]:
     return out
 
 
+def files() -> list[str]:
+    out = subprocess.run(
+        ["git", "ls-files", "--cached", "--others", "--exclude-standard"],
+        cwd=ROOT, capture_output=True, text=True, check=True,
+    )
+    return [f for f in out.stdout.splitlines() if (ROOT / f).is_file()]
+
+
+def layout() -> list[str]:
+    tree = LAYOUT_TREE.search((ROOT / "ARCHITECTURE.md").read_text())
+    if not tree:
+        return ["  ARCHITECTURE.md §3 has no layout tree (L3)"]
+    named = set()
+    for line in tree.group(1).splitlines():
+        text = re.sub(r"[│├└─]", " ", line.split("#")[0])
+        for token in re.split(r"[,\s]+", text):
+            if token and "(" not in token and ")" not in token:
+                named.add(token.split("/")[0])
+    out = []
+    for root in sorted({f.split("/")[0] for f in files()} - named):
+        out.append(f"  {root} is at the root and not in ARCHITECTURE.md §3 (L3)")
+    for f in files():
+        script = f.endswith((".py", ".sh")) or os.access(ROOT / f, os.X_OK)
+        if script and not f.startswith(SCRIPT_HOMES):
+            out.append(f"  {f} is a script outside {', '.join(SCRIPT_HOMES)} (L4)")
+    return out
+
+
 def main() -> int:
-    failures = release_table() + cargo_config() + fuzzer()
+    failures = release_table() + cargo_config() + fuzzer() + layout()
     for pkg in metadata()["packages"]:
         failures += check_package(pkg)
     if failures:

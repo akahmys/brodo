@@ -8,13 +8,13 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: P7 accepted by the human and closed as 0.8.0 (2026-11-02): brodo reads and
-  writes `.vdb` itself, the format learnt from OpenVDB's Apache-2.0 releases and never
-  copied (ADR-0044, ADR-0045). Float and double grids are written as OpenVDB 14.0.0 reads
-  them back (ADR-0046), and read from the files brodo and OpenVDB 12 to 14 write by default
-  (ADR-0047). Its mutation run reported all 4307; the 36 missed are killed or excluded, and
-  the two files ran again, 354 mutants, none missed (ADR-0023).
-- **Next**: the review of the whole repository (§2, "After P7"), before anything else.
+- **Done**: the review of the whole repository (§2, "After P7"), its first four items: the
+  Blosc chunk refused off its place, the memory `vdb::read` makes stated (ADR-0047), and
+  the rules inventoried, every checked rule broken once: Rules 2 and 3 now read code behind
+  a feature (ADR-0021), Rule 12 fails where `cargo tree` does (ADR-0005), Rule 15's lean on
+  `cargo fmt` is stated (ADR-0002), and L3 and L4 are checked (ADR-0048).
+- **Next**: the review's issues and pull requests, then the documents, among them amended
+  ADRs still marked Accepted and two stale passages in TESTING.md §4 and AUDITING.md.
 
 ## 2. Milestones
 
@@ -374,7 +374,7 @@ as a proposal for a unit of its own.
 - [x] The memory `vdb::read` makes, measured on the file that makes the most per byte, then
       either `limit` bounding it, as `archive::read` does, or its multiple stated, by an
       amendment of ADR-0047 the owner decides (the same review)
-- [ ] Rules: every rule in one table, with what enforces it, whether breaking it once
+- [x] Rules: every rule in one table, with what enforces it, whether breaking it once
       fails the check (TESTING.md T3), what it has caught in the history and what it costs
       the gate; each proposed to be kept, enforced, merged or retired, and the owner's
       decisions landed through the ADR on their topic (AGENTS.md, "Changing the rules")

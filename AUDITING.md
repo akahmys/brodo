@@ -31,16 +31,16 @@ grep -E '^echo "\[' scripts/audit/verify_compliance.sh
 | Step | Rules |
 | :--- | :--- |
 | Toolchain: `rust-version`, `rust-toolchain.toml` and the running `rustc` agree | — |
-| `scripts/audit/workspace.py`: members, lint inheritance, layer order, version and licence inheritance, CHANGELOG.md's version, dependency inheritance, `rustflags`, the fuzzer's reach | 4, 11, 19, 20, L1, V1, V3, T6 |
+| `scripts/audit/workspace.py`: members, lint inheritance, layer order, version and licence inheritance, CHANGELOG.md's version, dependency inheritance, `rustflags`, the fuzzer's reach, the root's entries against ARCHITECTURE.md §3, where scripts lie | 4, 11, 19, 20, L1, L3, L4, V1, V3, T6 |
 | `cargo clippy --workspace --all-targets -- -D warnings`, with the lints in `Cargo.toml` and the bans in `clippy.toml` | 1, 4, 6, 7, 9, 10, 16, 17, 18, 19 |
 | `cargo clippy --all-targets -D warnings` per member with no default features and with each feature alone | 10 |
-| clippy's panic lints over `--lib --bins`, filtered by `scripts/audit/lint_filter.py` | 2 |
-| `scripts/audit/source.py`: asserts and recursion in production code; the lints an exception names, in every target; `unsafe` outside `UNSAFE_MODULES`, in every file, but a call of `CacheFile::map` in `UNSAFE_CALLERS` | 2, 4, 15, 18, 19 |
-| clippy's `indexing_slicing` over the crate of each module in `UNTRUSTED_INPUT`, its findings kept to that module by `scripts/audit/lint_filter.py --under` | 3 |
+| clippy's panic lints over `--lib --bins` with every feature, filtered by `scripts/audit/lint_filter.py` | 2 |
+| `scripts/audit/source.py`: asserts and recursion in production code, a body read from the line after its signature as `cargo fmt` writes it; the lints an exception names, in every target; `unsafe` outside `UNSAFE_MODULES`, in every file, but a call of `CacheFile::map` in `UNSAFE_CALLERS` | 2, 4, 15, 18, 19 |
+| clippy's `indexing_slicing` over the crate of each module in `UNTRUSTED_INPUT`, with every feature, its findings kept to that module by `scripts/audit/lint_filter.py --under` | 3 |
 | grep for `String` as `Result`'s error, its value type nested at most two deep, and for `anyhow` | 8 |
 | grep for `filter_map(Result::ok)` and its forms | 9 |
 | `cargo fmt --all --check` | 10 |
-| `cargo tree --all-features … -i cc` per member and target | 12 |
+| `cargo tree --all-features … -i cc` per member and target, failing where cargo gives no tree | 12 |
 | test files in `src/`, and `#[ignore]` reasons, direct or under `cfg_attr`, in every target | T1 |
 | `scripts/audit/documents.py`, and `cargo doc` with warnings denied | AGENTS.md writing rules 1, 2, 6, S3, no `CLAUDE.md`, and each crate's README read in; Rule 10 |
 | `scripts/audit/mutants.py`: `.cargo/mutants.toml` holds no setting, and each pattern in its `exclude_re` has a comment above it ending in its kind and where, and excludes a mutant | T11 |
