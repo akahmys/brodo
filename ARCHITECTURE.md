@@ -280,7 +280,9 @@ fastest. A neighbour beyond the `i32` coordinate range is the background.
   voxel size, string metadata and a unit the caller gives; every leaf voxel's value,
   active or not, and each tile active or not holding the background. Grids of other
   types, saved as half floats or instanced are skipped by name; zip, other maps and other
-  Blosc codecs are refused.
+  Blosc codecs are refused. The limit `vdb::read` takes bounds the file's length, not what
+  reading makes, which is a multiple of that length but of hundreds for a file of tiles
+  alone (ADR-0047's amendment of 2026-11-02).
 
 ### 4.8 Value types
 

@@ -4,8 +4,9 @@
 //! (CODING.md Rule 3), and is fuzzed (TESTING.md T6).
 //!
 //! The bytes are in `docs/formats.md` §9, which this code follows, §9.7 and §9.8 for what a
-//! reader takes beyond what brodo writes. The memory it takes is bounded by a fixed multiple
-//! of the file's length: every node's values, and every leaf, come from bytes of their own.
+//! reader takes beyond what brodo writes. The memory it makes is a multiple of the file's
+//! length, every node's values and every leaf coming from bytes of their own, but of
+//! hundreds (ARCHITECTURE.md §4.7).
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::io::Read;
@@ -73,7 +74,8 @@ pub struct VdbFile {
 
 /// Reads an OpenVDB file's bytes whole, as docs/formats.md §9.7 states, refusing a file
 /// that breaks it; of several broken rules, which is named is not promised. OpenVDB states
-/// no unit, so `unit` is every grid's.
+/// no unit, so `unit` is every grid's. What it makes in memory is not bounded but by a
+/// multiple of hundreds of the bytes' length (ARCHITECTURE.md §4.7).
 pub fn from_bytes(bytes: &[u8], unit: &str) -> Result<VdbFile, VdbError> {
     let mut c = Cursor { bytes, at: 0 };
     let count = header(&mut c)?;
@@ -105,7 +107,7 @@ pub fn from_bytes(bytes: &[u8], unit: &str) -> Result<VdbFile, VdbError> {
 
 /// Reads an OpenVDB file of at most `limit` bytes, as `from_bytes` does: a longer file is
 /// refused by its length before any of it is read, or by the bytes read where its length
-/// says less than it holds.
+/// says less than it holds. `limit` does not bound what reading makes (ARCHITECTURE.md §4.7).
 pub fn read(path: &Path, unit: &str, limit: u64) -> Result<VdbFile, VdbError> {
     let file = std::fs::File::open(path)?;
     let length = file.metadata()?.len();

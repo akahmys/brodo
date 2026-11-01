@@ -71,3 +71,19 @@ appended to its type name, so that it is skipped as a type brodo does not read, 
 instanced grid with its leaf buffers' offset 0. docs/formats.md §9.7 and §9.8 state the
 bytes; `crates/brodo/tests/vdb_read.rs` holds the reader to OpenVDB's own reading of files
 OpenVDB 12.0.0 and 14.0.0 wrote.
+
+## Amendment: the memory reading makes
+
+- **Date**: 2026-11-02
+
+An outside review (2026-11-01) found that `vdb::read`'s `limit` bounded the file's length
+alone, where `archive::read`'s bounds what reading makes too (ADR-0036). The spike
+`spikes/vdbmemory/` (2026-11-02, `spikes/vdbmemory/REPORT.md`) measured the file that makes
+the most for each byte: upper nodes of inactive tiles alone, a quarter of a byte a tile,
+made about 637 bytes for each byte of an `f64` file and 617 of an `f32` one; leaves holding
+the background, 68.
+
+The owner decided, on 2026-11-02, as proposed: the multiple is stated now, in
+ARCHITECTURE.md §4.7, and `limit` bounding what `vdb::from_bytes` and `vdb::read` make, as
+`archive` does, is a unit of its own after the review of the whole repository, since it
+changes public items (ROADMAP.md §2, "After P7").

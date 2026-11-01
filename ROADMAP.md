@@ -371,7 +371,7 @@ as a proposal for a unit of its own.
 - [x] `vdb_read`'s Blosc chunk refused when its block does not start where its header
       ends or bytes are left after its block, as docs/formats.md §9.8 says, a test failing
       first (found by an outside review, 2026-11-01; the owner set it after 0.8.0)
-- [ ] The memory `vdb::read` makes, measured on the file that makes the most per byte, then
+- [x] The memory `vdb::read` makes, measured on the file that makes the most per byte, then
       either `limit` bounding it, as `archive::read` does, or its multiple stated, by an
       amendment of ADR-0047 the owner decides (the same review)
 - [ ] Rules: every rule in one table, with what enforces it, whether breaking it once
@@ -398,12 +398,16 @@ as a proposal for a unit of its own.
       `distance.rs` has; `archive::load` and `vdb_read::read` reading a file within a limit
       alike; `RegionView` searching twice for a leaf. Public errors that differ in deriving
       `Clone` and `PartialEq` change public items, so they are a proposal, not part of this
+      review
 - [ ] Files no longer needed: one list from the three steps, removed once the owner
       approves it; a test file kept only if removing it fails a test; every spike's
       REPORT.md kept, its code removed only where its ADR's decision was later reversed
 - [ ] A version only if code changed, 0.8.1 by the owner's choice; TESTING.md V2 raises
       PATCH for a fix, so whether a refactoring counts as one is put to the owner then
 
+- [ ] `limit` bounding what `vdb::from_bytes` and `vdb::read` make, as `archive` does, a
+      unit of its own after the review, since it changes public items (the owner,
+      2026-11-02; ADR-0047)
 - [ ] Reading a region of an archive from only the bytes of the chunks it needs, the file
       not read whole (left to later by the human, 2026-10-29; ADR-0016)
 

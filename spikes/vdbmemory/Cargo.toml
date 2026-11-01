@@ -1,0 +1,17 @@
+# Throwaway spike for the memory `vdb::read` makes (ROADMAP.md, "After P7"). Never imported
+# by `crates/` (PLANNING.md §3); its own workspace, so cargo does not look for it in the one
+# above.
+[package]
+name = "vdbmemory-spike"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+brodo = { path = "../../crates/brodo", default-features = false, features = ["vdb"] }
+
+[profile.release]
+debug = false
+
+[workspace]
+members = ["."]
