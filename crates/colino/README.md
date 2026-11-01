@@ -1,29 +1,26 @@
 # colino
 
 Converts triangle meshes into narrow-band signed distance fields on brodo's sparse volumes,
-and reports how the conversion may have changed the shape's topology. It reports; it does not repair a mesh or refine a grid.
+and reports how the conversion may have changed the shape's topology. ARCHITECTURE.md §5
+is the design: what a conversion gives, and what each layer of the report finds.
 
-- **Reading**: binary and ASCII STL, Wavefront OBJ and 3MF, each under the limits the
-  caller sets on triangles, vertices and bytes. Badly oriented, holed and degenerate
-  meshes are read as they are. Each reader is a feature, `stl`, `obj` and `threemf`, all
-  on by default; a user who reads no 3MF can leave out its ZIP and XML parsing.
-- **Converting**: exact distances to the nearest triangle, signed by the generalised winding
-  number (exact, or Barill et al.'s fast approximation), or, for a mesh whose triangles
-  are turned at random, by a parity count along the axes that does not depend on their
-  orientation (`Sign::Parity`), clamped to a band of ±N voxels.
-  Leaves lie only in the band; inside regions become tiles; memory follows the band's
-  volume, not the grid's.
-- **Reporting**: the solid's and its complement's Betti numbers, the Euler characteristic
-  against the input's when the input is a closed 2-manifold, and which named points share a
-  component of the space around the solid, and the places thinner, or gaps narrower, than
-  two voxels, where a conversion may have opened a wall or closed a gap. With the feature
-  `serde`, the report serialises.
+- **Reading**: binary and ASCII STL, Wavefront OBJ and 3MF (`stl`, `obj`, `threemf`), each
+  into a `Mesh` under the `Limits` the caller sets on triangles, vertices and bytes. Each
+  reader is a feature of the same name, all on by default; a user who reads no 3MF can
+  leave out its ZIP and XML parsing. A user working with B-reps triangulates with its own
+  kernel and passes a `Mesh`, whose `groups` and `group_names` carry the faces' names into
+  the Hermite data.
+- **Converting**: `convert` with `Options`: the voxel size, the band's half-width in voxels
+  (`with_band`), and the sign: the generalised winding number by default, approximate or
+  exact (`with_accuracy`), or, for a mesh whose triangles are turned at random, a parity
+  count (`with_sign(Sign::Parity)`).
+- **Reporting**: `report` gives the solid's and its complement's Betti numbers, the Euler
+  characteristic against the input's, the component of each named point, and the places
+  thinner, or gaps narrower, than two voxels. With the feature `serde`, the report
+  serialises.
 - **Hermite data**: on the corners of a conversion's voxels, signs and, on each edge whose
   ends differ, where the mesh crosses it, its normal and its triangle's group, in brodo's
   format (`colino::hermite`).
-
-STEP is not read: a user working with B-reps triangulates with its own kernel and passes a
-`Mesh`, whose `groups` and `group_names` carry the faces' names into the Hermite data.
 
 ```rust
 use colino::convert::{Options, convert};

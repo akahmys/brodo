@@ -14,13 +14,14 @@ on its tree.
 - **Analysis**: connected components and flood fill, the Euler characteristic, and
   dilation and erosion, with 6- or 26-connectivity, tiles included.
 - **Files**: `freeze` packs a grid into one aligned buffer, read in place as a
-  `GridView`; the cache profile stores several grids with their metadata, read by copy or
-  by memory mapping (feature `mmap`, on by default), checked whole first, as
-  docs/formats.md §3.4 states; the archive profile compresses them, each grid's leaf
-  values exact or quantised to 16 or 8 bits, and is read back as the same cache file, or
-  as one grid's region, decompressing only the chunks a box of voxels needs (feature
-  `archive`, opted into); float and double grids are written as OpenVDB's `.vdb` files,
-  and read from those brodo and OpenVDB 12 to 14 write (feature `vdb`, opted into).
+  `GridView`; the cache profile stores several grids with their metadata, checked whole
+  and read by copy or by memory mapping (feature `mmap`, on by default); the archive
+  profile compresses them, a floating grid's leaf values kept exact or quantised, and is
+  read back as the same cache file, or as one grid's region, decompressing only the chunks
+  a box of voxels needs (feature `archive`, opted into); float and double grids are
+  written as OpenVDB's `.vdb` files, and read from those brodo and OpenVDB 12 to 14 write
+  (feature `vdb`, opted into). ARCHITECTURE.md §4.7 says what each profile does, and
+  docs/formats.md their bytes and what a reader checks.
 - **Hermite data**: signs on a grid's voxel corners and, on each edge whose ends differ,
   where a surface crosses it, its normal and its group, as a format any producer writes
   and any reader checks.
@@ -54,7 +55,7 @@ let inside = |x: u8| x == 1;
 assert_eq!(label(&t, &solid, inside, Connectivity::TwentySix)?.count(), 1);
 assert_eq!(euler(&t, &solid, inside, Connectivity::TwentySix)?, 1);
 
-// Written to a cache file and read back in place.
+// Serialised as a cache file's bytes, and read back from a copy of them.
 let meta = GridMeta::new("ball", [0.1; 3], "millimeter")?;
 let bytes = to_bytes(&[CacheEntry::new(&meta, &t, &solid)?])?;
 let file = CacheFile::from_bytes(&bytes)?;

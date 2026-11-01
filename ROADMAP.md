@@ -84,7 +84,7 @@ kinds of user before the rest is built on them.
 
 ### Held — `piatto`
 
-Not built for now (owner, 2026-10-24; ADR-0018, B-021). If it is, then:
+Not built for now (owner, 2026-10-24; ADR-0018; §3, B-021). If it is, then:
 
 - [ ] Its dependencies approved and measured against CODING.md Rules 12 and 13 on every
       target (§4); B-013 answered first
@@ -189,57 +189,38 @@ built.
   - [x] Hermite data's fallback, where no triangle is hit, scans every triangle for each
         such edge (`colino/src/hermite.rs`): a mesh with holes or overlaps costs
         unhit edges × triangles; a nearest-triangle search through the BVH would not.
-        Kept: the BVH's search, its answer the scan's to the bit, took
-        `hermite_holed_r50` from 409 to 274–284 ms, as fast as the closed sphere
-        (2026-10-25)
+        Kept: the BVH's search, its answer the scan's to the bit, as fast as the closed
+        sphere (2026-10-25; measured in commit `6baadc4`)
   - [x] Conversion's candidate cells test every leaf cell of a triangle's box
         (`colino/src/convert.rs`): a large slanted triangle, a CAD mesh's floor or wall,
-        costs its box's volume rather than its area. Not changed: on a slab 6 voxels
-        thick turned about two axes, twelve triangles, finding candidates took 1.8 ms of
-        a 220 ms conversion at 320 voxels a side, 86 ms of 2.59 s at 1280 and 496 ms of
-        10.0 s at 2560 (2.65 GB resident), so that removing it would gain under 10 %
-        below about 5000 voxels a side (2026-10-25)
+        costs its box's volume rather than its area. Not changed: removing it would gain
+        under 10 % below about 5000 voxels a side (2026-10-25; measured in commit
+        `82af279`)
   - [x] `hermite` builds the BVH twice, once itself and once inside `Winding::new`, and
-        conversion a third time. Not changed: on the sphere of radius 50, 8192
-        triangles, the BVH took 2.3 to 3.3 ms and `Winding::new` 4.9 to 8.1 ms beside
-        Hermite data's 340 ms; at radius 400, 131 072 triangles, 28 and 66 ms beside a
-        33 s conversion (2026-10-25). `hermite` uses `Winding`'s tree rather than
-        building its own, chosen by the human (2026-10-26) to remove a duplicate, not for
-        speed; sharing conversion's would widen the API
+        conversion a third time. Not changed for speed, a few milliseconds beside
+        Hermite data's hundreds (2026-10-25; measured in commit `82af279`); `hermite`
+        uses `Winding`'s tree rather than building its own, chosen by the human
+        (2026-10-26) to remove a duplicate; sharing conversion's would widen the API
   - [x] Hermite data's search keeps a `Field<[f64; 3]>` over every leaf for each axis in
         turn, the triangle number carried as the bits of an `f64`, where crossings are
         few. Kept: each leaf's crossings gathered as a list by `par_reduce`, the bytes
-        unchanged, took the peak resident size of converting the sphere of radius 200
-        (8.3 million leaf voxels) and making its Hermite data from 788 to 613 MB, the
-        conversion alone 140 MB (2026-10-25)
-  - [x] `label`'s work buffers allocated per node and per call (9.5 s and 440 MB at
-        r = 400, 2026-10-20), `LeafManifest::build`'s lookups from the root, and `freeze`'s
-        plan rebuilt from sorted coordinates rather than from the tree. Kept for `label`:
-        99 % of its time was walking the tree, 49 million of its 51 million
-        classifications single voxels each found from the root, most of them in 19 million
-        pairs across leaves pushed on the stack one by one; a leaf's voxels are now joined
-        from its number, the labels unchanged, `label_sphere_r50` 165 -> 53 ms and the
-        sphere of radius 200 2.41 -> 0.63 s (2026-10-25). Kept for `LeafManifest::build`:
-        87 to 95 % of `commit`, 26 lookups from the root a leaf; through the accessor's
-        path, which keeps the last lower node, 1.27 -> 0.45 ms for 1037 leaves and 20.4 ->
-        9.0 ms for 16 307, `activation` 3.33 -> 1.59 ms (2026-10-25). Kept for `freeze`'s
-        plan: 70 to 90 % of `freeze`, most of it each tile's number found again from the
-        root and every leaf's and tile's node key sorted; tiles now carry their number and
-        runs of equal keys are dropped before the sort, the bytes unchanged, `freeze_x8`
-        4.00 -> 1.65 ms and the sphere of radius 200 9.0 -> 2.3 ms (2026-10-25). The work
-        buffers themselves were not changed: walking the tree, not allocating, took the
-        time. At r = 400, labelling then took 2.44 s and still about 436 MB (2026-10-25);
-        labels stored as `u32` and written over the union-find's parents, chosen by the
-        human (2026-10-26), took that to 161 MB, the labels unchanged (2026-10-26)
+        unchanged, the peak resident size lower (2026-10-25; measured in commit
+        `82af279`)
+  - [x] `label`'s work buffers allocated per node and per call, `LeafManifest::build`'s
+        lookups from the root, and `freeze`'s plan rebuilt from sorted coordinates rather
+        than from the tree. Kept, each faster with its output unchanged: `label` joining a
+        leaf's voxels from its number (commit `fd3ad14`), `LeafManifest::build` through
+        the accessor's path (commit `cc7aa15`), `freeze`'s plan from the tiles' numbers
+        and runs of keys (commit `ad2bff5`), all 2026-10-25; walking the tree, not
+        allocating, took the time. Labels stored as `u32` over the union-find's parents,
+        chosen by the human, cut labelling's memory (2026-10-26; commit `8504ddb`)
 - [x] B-016: a sign that does not depend on orientation, by a spike on synthetic broken
       meshes (`spikes/sign/`), as an option of conversion and Hermite data: the parity
-      count along the axes, `Sign::Parity` (ADR-0027). On the sphere of radius 50 it
-      converted in 165 to 187 ms and made Hermite data in 207 to 217 ms, beside the winding
-      number's 300 to 382 and 320 to 369 ms, at a load near 6 (2026-10-26)
+      count along the axes, `Sign::Parity` (ADR-0027), faster than the winding number
+      (2026-10-26; measured in commit `3f6e6d0`)
 - [x] colino's layer 3, places thinner or gaps narrower than two voxels (B-020)
-  - [x] Finding them, by rays along each sampled point's normal (ADR-0028): the report of
-        the sphere of radius 50 took 117 ms with it, 84 without; of radius 200, 2.16 s and
-        1.69 s; of radius 400, 9.5 s, at loads near 3 (2026-10-26)
+  - [x] Finding them, by rays along each sampled point's normal (ADR-0028; its cost
+        measured in commit `56d0008`, 2026-10-26)
   - [x] Checking them by a local reconversion at h/2 (ADR-0028): the three invariants of
         each place's box at h and at h/2, a box beyond 2²⁶ voxels at h/2 unchecked
 - [x] Retrospective and refactoring; benchmarks; mutation run (ADR-0023). Chosen by the
@@ -272,12 +253,10 @@ built.
   - [x] Benchmarks again at the close (2026-10-28): colino's within their baselines;
         brodo's `cache_write_x8` and `gather` behind, the sync of review G1 and a change
         of code placement, recorded again by the owner's decision (ADR-0019)
-  - [x] Mutation run, after the review and the refactoring; a run on `9940bd5`
-        (2026-10-26 to 27) showed where tests were weak, each missed mutant since killed by
-        a test or excluded with its reason; the run on `fa72208` (2026-10-27) missed 58,
-        killed or excluded under the contract (ADR-0043); the run on `90342e7`
-        (2026-10-28) missed none of 3557, two timeouts in `thin.rs` since killed by tests,
-        and the 13 mutants of the code changed after it caught (2026-10-28)
+  - [x] Mutation run, after the review and the refactoring: each missed mutant of the
+        runs on `9940bd5` and `fa72208` killed by a test or excluded under the contract
+        (ADR-0023, ADR-0043); the run on `90342e7` missed none, its two lasting timeouts
+        since killed (2026-10-28; commit `fc10a04`)
   - [x] Tests and exclusions held to the contract, not the implementation (ADR-0043),
         chosen by the human after tests written for mutants pinned more than the code
         promises (2026-10-28): T12, a test asserts a promise; T11's exclusions name where
@@ -317,9 +296,9 @@ spike and an ADR before it is built.
 - [x] Benchmarks, every feature, the archive's with baselines, `cache_map_x256` and
       `cache_write_x8` looked into (ADR-0019, 2026-10-30); the whole read's buffer kept
       written (ADR-0016)
-- [x] Mutation run over the workspace (ADR-0023), as the human chose (ADR-0033): of 3949,
-      31 missed or timed out, 29 now killed and 2 excluded as equivalent; the four files
-      changed run again, 721 mutants, none missed (2026-10-31)
+- [x] Mutation run over the workspace (ADR-0023), as the human chose (ADR-0033): each
+      missed mutant killed or excluded as equivalent; the four files changed run again,
+      none missed (2026-10-31)
 - [x] **Accepted when** archives round-trip within their stated error:
       `archive_format.rs`, exact to the bit, quantised within docs/formats.md §8.5's
       bounds, a region as the whole grid within its box; accepted 2026-10-31
@@ -352,9 +331,9 @@ built. brodo reads and writes `.vdb` itself, the format learnt from OpenVDB at `
       under Tree Borrows (ADR-0015, 2026-11-01)
 - [x] Benchmarks, every feature, at rest: every item within its baseline but
       `leaf_parallel_update_x32`, as slow before P7, recorded again (ADR-0019, 2026-11-01)
-- [x] Mutation run (ADR-0023): all 4307 reported on `a7022af`, 36 missed in the `.vdb`
-      reader and writer, 30 killed by tests and six excluded (2026-11-01); the two files
-      run again on `b0a924c`, 354 mutants, none missed (2026-11-01)
+- [x] Mutation run (ADR-0023): each mutant the run on `a7022af` missed in the `.vdb`
+      reader and writer killed by a test or excluded; the two files run again on
+      `b0a924c`, none missed (2026-11-01)
 - [x] **Accepted when** brodo's float and double grids are written to `.vdb` files that
       OpenVDB's tools read back the same, and such files are read back into brodo:
       `vdb_format.rs`'s golden file, read back by OpenVDB 14.0.0 with every value the same,
@@ -406,6 +385,8 @@ as a proposal for a unit of its own.
 - [ ] A version only if code changed, 0.8.1 by the owner's choice; TESTING.md V2 raises
       PATCH for a fix, so whether a refactoring counts as one is put to the owner then
 
+Then, as units of their own after the review:
+
 - [ ] `limit` bounding what `vdb::from_bytes` and `vdb::read` make, as `archive` does, a
       unit of its own after the review, since it changes public items (the owner,
       2026-11-02; ADR-0047)
@@ -422,14 +403,36 @@ implementation (PLANNING.md §2).
 | B-023 | Does Hermite data hold its crossings sparsely, only on the edges that hold one, rather than nine dense fields over every leaf? | Not yet: found by P5's review (M2): the fields take about 61 bytes a voxel and writing them about three times as much, so that a sphere of radius 1500 voxels does not fit in 32 GB, read against a measurement of 613 MB at radius 200 (2026-10-26). It changes the Hermite format, so it waits for a spike and a version raised (ADR-0038); the owner set it aside for P5 (2026-10-27) |
 | B-022 | Does a later version of the frozen layout and the cache profile check what version 1's readers leave unchecked: padding and the background's bytes beyond its size, the order of nodes, whether every node and leaf is reached, and a cache file's bounds against its grid (docs/formats.md §2.5, §3.4)? | Not yet: found writing the format document (ADR-0037); each check a reader adds refuses files version 1 accepts, so it waits for a version raised for another reason (ADR-0038). Now for `GridView::new` and the cache reader alone: the Hermite reader and thawing refuse nodes reached twice and leaves never reached at version 1 (ADR-0038's amendment of 2026-10-27, ADR-0042). For the links, one pass would do: each node's `first_child` and `first_tile`, where it has children or tiles, the end of the previous such node's, the last end the count, so that no child is shared or unreached |
 | B-019 | Does `colino` move to a repository of its own? | Not now (owner, 2026-10-23; ADR-0012 keeps two crates in one repository): changes span both, as P3's Hermite format and producer did, and before 1.0 a split would turn each into two releases, duplicate the rules and their audit, and take colino's tests out of brodo's gate. Revisited when brodo's API and formats settle (1.0), both are on crates.io, colino needs what brodo's rules forbid, or others maintain it. Publishing does not split them: both crates are published from this repository (owner, 2026-10-29). A split waits for colino needing what brodo's rules forbid, or for others maintaining it, and is then a milestone of its own that gives colino its own rules, audit and CI (owner, 2026-10-29) |
-| B-021 | Does brodo build `piatto`? | Not now (owner, 2026-10-24; ADR-0018): no user has asked for a viewer, the slice as PNG and VTK for ParaView serve checking, `.vdb` from P7 would open in common tools, and a GPU, window and GUI stack is costly. Revisited when a user asks for a viewer or for drawing to embed, grids too large for VTK and `.vdb` must be looked at, or P6 finds `.vdb` cannot be written |
+| B-021 | Does brodo build `piatto`? | Not now (owner, 2026-10-24; ADR-0018): no user has asked for a viewer, the slice as PNG and VTK for ParaView serve checking, `.vdb` from P7 would open in common tools, and a GPU, window and GUI stack is costly. Revisited when a user asks for a viewer or for drawing to embed, or grids too large for VTK and `.vdb` must be looked at |
 | B-018 | Does model checking with Kani join the closing checks? | Not now (owner, 2026-10-23): it fits only integer bit work and `view.rs`'s small helpers, already fuzzed and mutation-tested, and cannot reach rayon or the memory mapping; this milestone's defects were numeric and in design claims. Revisited by a spike if Miri-unreachable unsafe code grows, an integer coordinate bug escapes the tests, or before 1.0 |
 | B-003 | Do level-set operations (CSG, redistancing) belong in brodo? | No, until shown to be general |
 | B-004 | Does a shared IR schema crate live in this repository? | Undecided; for brodo's users to agree, not for brodo to anticipate |
 | B-013 | Which crates handle `piatto`'s window, input and GUI parts? | `winit` and `egui`, to be measured against Rules 12 and 13 (ADR-0018) |
 
-`spikes/sign/` answered B-016 (ADR-0027); `spikes/thin/` and `spikes/recheck/` B-020 (ADR-0028); `spikes/value/` B-017 (ADR-0029); `spikes/archive/` B-005, `lz4_flex` (ADR-0016). `spikes/vdb/` the writing step (ADR-0046); `spikes/vdbread/` the reading step (ADR-0047); ADR-0045 B-006, with no spike, by measurement of `vdb-rs`'s dependencies; `spikes/parvar/` B-024, a benchmark on the performance cores (ADR-0019). No spike is running. `spikes/remap/` answered B-001 and B-008, and `spikes/merge/` B-010
-(ADR-0014); `spikes/vtk/` answered B-012 (ADR-0018); `spikes/bench/` B-007 (ADR-0019); `spikes/threads/` B-014, rayon kept (ADR-0015); `spikes/dilate/` B-011, no mask (ADR-0025); `spikes/ghost/` B-002, one to three layers (ADR-0015); `spikes/mutants/` the audit review's proposal C (ADR-0023).
+Questions answered, each by its spike and ADR:
+
+- `spikes/remap/`: B-001 and B-008 (ADR-0014)
+- `spikes/merge/`: B-010 (ADR-0014)
+- `spikes/ghost/`: B-002, one to three layers (ADR-0015)
+- `spikes/threads/`: B-014, rayon kept (ADR-0015)
+- `spikes/archive/`: B-005, `lz4_flex` (ADR-0016)
+- `spikes/quantise/`: value quantisation in the archive (ADR-0016's amendment on quantised
+  values)
+- `spikes/region/`: reading a region of an archive (ADR-0016's amendment on a region)
+- `spikes/vtk/`: B-012 (ADR-0018)
+- `spikes/bench/`: B-007 (ADR-0019)
+- `spikes/parvar/`: B-024, a benchmark on the performance cores (ADR-0019)
+- `spikes/mutants/`: the audit review's proposal C (ADR-0023)
+- `spikes/dilate/`: B-011, no mask (ADR-0025)
+- `spikes/sign/`: B-016 (ADR-0027)
+- `spikes/thin/` and `spikes/recheck/`: B-020 (ADR-0028)
+- `spikes/value/`: B-017 (ADR-0029)
+- No spike: B-006, by measurement of `vdb-rs`'s dependencies (ADR-0045)
+- `spikes/vdb/`: the writing step (ADR-0046)
+- `spikes/vdbread/`: the reading step (ADR-0047)
+- `spikes/vdbmemory/`: the memory `vdb::read` makes (ADR-0047's amendment of 2026-11-02)
+
+No spike is running.
 
 ## 4. Administrative items still open
 
@@ -448,7 +451,7 @@ implementation (PLANNING.md §2).
   2. Licences: the terms confirmed for this form of distribution (ADR-0007); `cargo deny`
      already holds every dependency to the allow-list.
   3. History: the two names of the owner's local list of forbidden sources that the first
-     commits carried, removed at `3928db9` (2026-10-20), rewritten out of every commit
+     commits carried, removed on 2026-10-20, rewritten out of every commit
      before it. `git filter-repo`, approved first, runs in a fresh clone with
      `--replace-text` and its table kept outside the repository; a search of every
      commit for the two names then finds none; the gate passes; the tags `v0.1.0` and

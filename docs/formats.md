@@ -3,12 +3,15 @@
 The bytes of brodo's files, for a reader or writer in any language (ADR-0037). Where this
 document and the code differ, this document is right and the code is corrected; a
 difference found is a defect of the format's version. The design behind the formats is in
-ARCHITECTURE.md §4.6, §4.7 and §4.9.
+ARCHITECTURE.md §4.6, §4.7, §4.9 and §5.1.
 
 `scripts/audit/formats.py` is a reader written from this document alone. The gate runs it on
-the golden files and on damaged copies of them, through
-`crates/brodo/tests/format_document.rs`, and fails where it reads a value other than the
-crates read, or accepts what they refuse, or refuses what they accept.
+the golden files of §7 and on damaged copies of them, through
+`crates/brodo/tests/format_document.rs`, and on `vdb_v225.bin` (§9) through
+`crates/brodo/tests/vdb_format.rs`, and fails where it reads a value other than the crates
+read, or accepts what they refuse, or refuses what they accept. What §9.7 and §9.8 state
+of OpenVDB's files is held by `crates/brodo/tests/vdb_read.rs`, against OpenVDB's own
+reading of its test vectors (§9.8), not by that reader.
 
 ## 1. Conventions
 
@@ -297,9 +300,8 @@ samples shifted by −h/2.
 
 Each format carries its own version: the frozen layout in its header, the cache profile in
 its header, the archive profile in its header, Hermite data and the SDF convention in free
-pairs. A release that raises a
-version still reads the one before it and can write it on request; a version older than
-that is refused, naming it (ADR-0038). Every format is at version 1, the first.
+pairs; which older versions a release reads is TESTING.md V6's (ADR-0038). Every format is
+at version 1, the first.
 
 Within a version only two changes are made, each recorded in CHANGELOG.md: a value type
 code (§1.1) or an archive's value encoding code (§8.5) added, which a reader that does not
@@ -314,7 +316,7 @@ carry versions of their own.
 ## 7. Test vectors
 
 The golden files in `crates/brodo/tests/data/`, written by brodo's Format-tier tests
-(TESTING.md T1), each fixing its format's bytes:
+(TESTING.md §1), each fixing its format's bytes; the vectors of OpenVDB files are in §9:
 
 | File | Holds |
 | :--- | :--- |
@@ -456,12 +458,12 @@ the frozen buffer does, and refuses any other, though the chunks it holds may co
 
 A grid of `f32` or `f64` written as OpenVDB's `.vdb` file at file version 225, as OpenVDB
 14.0.0 reads and writes it (ADR-0046), §9.1 to §9.6, and the files of OpenVDB 12 to 14
-that brodo reads (ADR-0047), §9.7; the layout was learnt from OpenVDB at `v14.0.0` and
-from OpenVDB's output (PROVENANCE.md, `spikes/vdbread/`). Unlike §1, a string here is a
-`u32` byte length and its bytes, with no padding, and nothing is aligned to blocks. Every
-number is little-endian. The test vector of what brodo writes is
-`crates/brodo/tests/data/vdb_v225.bin`: a float level set and a double grid on one
-topology of five leaves and a tile at each level, and an empty float grid.
+that brodo reads (ADR-0047), §9.7; where the layout was learnt is in
+[PROVENANCE.md](../PROVENANCE.md). Unlike §1, a string here is a `u32` byte length and its
+bytes, with no padding, and nothing is aligned to blocks. Every number is little-endian.
+The test vector of what brodo writes is `crates/brodo/tests/data/vdb_v225.bin`: a float
+level set and a double grid on one topology of five leaves and a tile at each level, and
+an empty float grid.
 
 ### 9.1 Header
 
@@ -566,10 +568,7 @@ breaks them; of several broken rules, which is named is not promised.
    32 768, 4096 or 512 places.
 7. **Leaf buffers.** A leaf's value mask is the one its topology states, then its values
    as §9.8 states. The last leaf's values end at the body's end.
-8. **What brodo makes of it.** brodo holds no activity (ADR-0047): each leaf, with all its
-   512 values, active or not; each tile, at the root or in a node, that is active or
-   whose value's bits differ from the background's, as brodo's tile of its level and
-   value; nothing for the other places.
+8. **What brodo makes of it** is ARCHITECTURE.md §4.7's (ADR-0047).
 
 ### 9.8 A node's values, as OpenVDB writes them
 

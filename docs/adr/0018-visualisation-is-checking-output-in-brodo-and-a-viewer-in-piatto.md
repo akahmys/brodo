@@ -107,3 +107,11 @@ perhaps `unsafe`, and `f64` values a GPU seldom reads. The human decided:
 - `piatto` is not built for now. It is built when a user asks for a viewer or for drawing to embed, grids too large for VTK and `.vdb` must be looked at, or P5 finds `.vdb` cannot be written.
 - Its design in ARCHITECTURE.md §6.2 is kept as the one it would follow; B-013 waits with it.
 
+## Amendment: a condition P7 settled
+
+- **Date**: 2026-11-02
+
+The review of the whole repository found the condition that `piatto` is built if `.vdb`
+cannot be written named as P5's in this record, P6's in ROADMAP.md and P7's in
+ARCHITECTURE.md §6.2. P7 wrote `.vdb` (ADR-0046), so the condition can no longer be met; it
+was dropped from ARCHITECTURE.md §6.2 and ROADMAP.md's B-021, and the two others stand.

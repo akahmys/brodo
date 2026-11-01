@@ -26,7 +26,7 @@ them back, and read from the files brodo and OpenVDB 12 to 14 write by default.
   the grids skipped: of another type, saved as half floats, or instanced. Inactive leaf
   voxels keep their values; inactive tiles holding the background are left out. Zip, other
   maps and other Blosc codecs are refused, as docs/formats.md §9.7 states (ADR-0047). The
-  feature `vdb` now depends on `lz4_flex`.
+  feature `vdb` depends on `lz4_flex`.
 
 ## 0.7.0 (2026-10-31)
 
@@ -73,7 +73,9 @@ and held by tests to it, not to the code.
   gaps narrower, than two voxels, each a `Thin` with its kind (`ThinKind::Wall` or `Gap`),
   box, least thickness or width and count of points, found from the mesh along its
   triangles' normals, and checked by its box's `Invariants` at h and at h/2 (`Thin::check`,
-  a `Check`: `Same`, `Changed` or `Unchecked`) (ADR-0028). `Report::located` is now true.
+  a `Check`: `Same`, `Changed` or `Unchecked`) (ADR-0028). A mesh lying farther than 2³¹
+  voxels from the world's origin is refused, the new `ReportError::TooFar`.
+  `Report::located` is now true.
   colino depends on `rayon` outside its tests, for the layer's points.
 - colino converts, and gives Hermite data, by a sign that does not depend on the
   triangles' orientation as an option: `Options::with_sign(Sign::Parity)`, a parity count
@@ -345,6 +347,10 @@ a frozen view and cache files read in place, topology analysis, and checking out
 - Merging: `Tree::merge` and `TopologyEditor::merge` into lower- and upper-level tiles,
   `TileSource::Merged` with `Remap::parts`, `brodo::field::Value`, `MergeRule` and
   `uniform`; `Grid::with_rule`. Commits rebuild the tree's arenas.
+- `Field::remap` takes the merge rule its merged tiles' values come from, such as
+  `uniform`.
+- Field values are bounded by `brodo::field::Value`, which requires `Copy + Send + Sync`
+  and `zerocopy`'s `FromBytes`, `IntoBytes`, `Immutable` and `KnownLayout`.
 
 - `brodo::accessor`: `ValueAccessor` and `ValueAccessorMut`, reading and writing by voxel
   from the regions last visited; writes go to leaves only (`FieldError::NotALeaf`).
@@ -371,12 +377,6 @@ a frozen view and cache files read in place, topology analysis, and checking out
 - `brodo::vtk` (feature `vtk`, on by default): `write_vtu` writes a scalar field as one
   ASCII VTK UnstructuredGrid of voxel cells, for ParaView; infinities and names needing
   XML escapes are refused (`VtkError`).
-
-### Breaking
-
-- `Field::remap` takes a merge rule: `remap(&remap, &uniform)` keeps the earlier behaviour.
-- Field values are bounded by `brodo::field::Value` instead of `Copy + Send + Sync`; `Value`
-  now requires `zerocopy`'s `FromBytes`, `IntoBytes`, `Immutable` and `KnownLayout`.
 
 ## 0.1.0 (2026-10-16)
 

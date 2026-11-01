@@ -54,6 +54,7 @@ The dependency order between crates is CODING.md Rule 11, listed in
 ├── .claude/settings.json        # Claude Code: the guard hooks
 ├── .github/workflows/           # GitHub Actions: the gate and the mutation run (ADR-0034)
 ├── docs/adr/                    # decision records
+├── docs/formats.md              # the bytes of each file brodo writes
 ├── scripts/audit/               # the audit, and project.py, its settings
 ├── scripts/hooks/               # git and Claude Code hooks
 ├── crates/brodo/, crates/colino/, crates/piatto/ (if built)
@@ -105,9 +106,10 @@ pub struct Field<T> {
   fails, the grid is unchanged. Its field is written through the grid (`par_update_leaves`,
   `leaf_mut`, `set_tile`), never handed out to be replaced, so that it is always the
   topology's (ADR-0014).
-- Topology changes (activation, removing a leaf, dilation, splitting and merging tiles)
+- Topology changes (activation, removing a leaf, adding, splitting and merging tiles)
   go through an editor (`TopologyEditor`) and take effect at `commit`, which
-  returns a new topology and a `Remap` to it, and leaves the old topology usable. Every
+  returns a new topology and a `Remap` to it, and leaves the old topology usable; dilation
+  and erosion (§4.5) are `morphology` functions returning such a pair. Every
   field on the old topology is remapped by it. Removing a leaf removes the nodes it leaves
   empty; in a tile it is refused (ADR-0025). Pruning is merging: `merge` turns the child
   holding a voxel into one tile, its values merged by the remap's rule; there is no
@@ -148,10 +150,11 @@ fastest. A neighbour beyond the `i32` coordinate range is the background.
 
 ### 4.4 Access and parallel work (ADR-0015)
 
-- `ValueAccessor` borrows `&Topology` and `&Field<T>` (or `&mut`), caches the last node
-  path for nearby access, and is held one per thread. It serves reads beyond the
-  neighbour table. Its field's stamp is checked once, when it is made. It writes only
-  voxels of leaves; a write to a tile's or the background's voxel is a typed error naming
+- `ValueAccessor` borrows `&Topology` and `&Field<T>`, and `ValueAccessorMut` `&Topology`
+  and `&mut Field<T>`; each caches the last node path for nearby access, and is held one
+  per thread. They serve reads beyond the neighbour table. Their field's stamp is checked
+  once, when one is made. Only `ValueAccessorMut` writes (`set`), and only voxels of
+  leaves; a write to a tile's or the background's voxel is a typed error naming
   what holds it, since values change while the topology is read-only (§4.2).
 - Leaf-parallel work runs on `rayon`, in the caller's pool: the global one, or the one a
   caller's `ThreadPool::install` or `RAYON_NUM_THREADS` sets, so that it shares its threads
@@ -224,7 +227,7 @@ fastest. A neighbour beyond the `i32` coordinate range is the background.
 | Profile | For | Content | Read by |
 | :--- | :--- | :--- | :--- |
 | **cache** | passing between processes, replaying frame caches | the `GridView` buffer, uncompressed | memory mapping, no copy |
-| **archive** | storing, shipping | metadata, topology and value blocks in chunks of 512 leaves by default, each compressed by `lz4_flex`'s block format (ADR-0016) | decompressing chunks, in parallel, into a `GridView` (one copy) |
+| **archive** | storing, shipping | metadata, topology and value blocks in chunks of 512 leaves, each compressed by `lz4_flex`'s block format (ADR-0016) | decompressing chunks, in parallel, into a `GridView` (one copy) |
 
 - A cache file holds a header (magic number, format version, grid count) and, per grid, its
   name, value type, voxel size and unit, affine transform, bounding box and free
@@ -239,26 +242,25 @@ fastest. A neighbour beyond the `i32` coordinate range is the background.
 - The cache profile, format version 1: a header, a directory, then each grid's metadata
   and frozen buffer (§4.6) on block boundaries; its bytes are in
   [docs/formats.md](docs/formats.md) §3. A reader checks the whole file, every grid's
-  buffer included, before it answers: no gap between the parts, zero padding and unused
-  words in the header, the directory and the metadata, nothing after the last grid, and
-  each buffer as docs/formats.md §2.5 checks it, which leaves some of its writer's rules
-  unchecked (ADR-0016, ADR-0038).
+  buffer included, before it answers, as docs/formats.md §3.4 states; a buffer is checked
+  as §2.5 states, which leaves some of its writer's rules unchecked (ADR-0016, ADR-0038).
 - A cache file is written whole: to a hidden file beside it, flushed and renamed over it,
   so that a reader, a mapping process among them, sees the old file or the new one; the
   directory must be writable, and a process killed while writing may leave the hidden
   file behind.
 - A cache file is read by copying it into an aligned buffer (`CacheFile::read`) or by
-  mapping it into memory without a copy (`CacheFile::map`); both go through one parser.
-  Mapping is brodo's only unsafe code, in one module (ADR-0008); while a file is mapped,
-  the caller keeps it unchanged.
+  mapping it into memory without a copy (`CacheFile::map`, under the default feature
+  `mmap`); both go through one parser. Mapping is brodo's only unsafe code, in one module
+  (ADR-0008); `CacheFile::map` is an `unsafe fn`, its caller promising that the file stays
+  unchanged while it is mapped.
 - The archive profile, format version 1, under the feature `archive`, opted into: a
   header, a directory, then each grid's metadata, its chunk table and its chunks on block
   boundaries; its bytes are in [docs/formats.md](docs/formats.md) §8. A reader
   decompresses the chunks in parallel into the cache file of the same grids and checks it
   as a cache file, so that an archive is read as a `CacheFile` (`archive::read`); it also
-  checks how each grid is cut into chunks, but not that a chunk's compressed bytes are
-  brodo's compressor's. It carries no checksum (ADR-0016). It is written whole, as a
-  cache file is.
+  checks the rest docs/formats.md §8.4 states, how each grid is cut into chunks among it,
+  but not that a chunk's compressed bytes are brodo's compressor's. It carries no checksum
+  (ADR-0016). It is written whole, as a cache file is.
 - An archive's grid of a floating value type may store its leaf values quantised, the
   writer choosing per grid (`archive::Encoding`): as IEEE 754 binary16, byte-shuffled, or
   as 8 bits over each component's range across its leaf values, each read back within the
@@ -276,14 +278,13 @@ fastest. A neighbour beyond the `i32` coordinate range is the background.
   samples them (docs/formats.md §9, ADR-0045, ADR-0046); every leaf voxel and tile is
   written active, the unit, voxel size and free pairs but `sdf.version` are not, and two
   grids of one name are refused. They are read back, with those OpenVDB 12 to 14 writes by
-  default, at file version 224 or 225, uncompressed, with active-mask or with Blosc's LZ4
-  (docs/formats.md §9.7, ADR-0047): each float and double grid with its name, transform,
-  voxel size, string metadata and a unit the caller gives; every leaf voxel's value,
-  active or not, and each tile active or not holding the background. Grids of other
-  types, saved as half floats or instanced are skipped by name; zip, other maps and other
-  Blosc codecs are refused. The limit `vdb::read` takes bounds the file's length, not what
-  reading makes, which is a multiple of that length but of hundreds for a file of tiles
-  alone (ADR-0047's amendment of 2026-11-02).
+  default, as docs/formats.md §9.7 states (ADR-0047): each float and double grid with its
+  name, transform, voxel size, string metadata and a unit the caller gives; every leaf
+  voxel's value, active or not, and each tile that is active or whose value's bits differ
+  from the background's. Other grids, half-float and instanced ones among them, are
+  skipped and their names returned; a file §9.7 does not take is refused. The limit `vdb::read` takes bounds
+  the file's length, not what reading makes, which is a multiple of that length but of
+  hundreds for a file of tiles alone (ADR-0047's amendment of 2026-11-02).
 
 ### 4.8 Value types
 
@@ -292,7 +293,7 @@ a comparison by bits for merge rules, and `zerocopy`'s traits, so that its value
 bytes. `Value` is open: a field, its parallel update, gathers, accessors and analyses take
 a type of a user's own. Frozen grids and cache files hold only `Stored` types, a sealed
 trait over `Value` that brodo implements for `f32`, `f64`, `u8`, `u32`, `[f32; 3]` and
-`[f64; 3]`, each named by a type code brodo assigns, 1 to 6 in that order (ADR-0029).
+`[f64; 3]`, each named by a type code brodo assigns (docs/formats.md §1.1, ADR-0029).
 
 ### 4.9 Hermite data (ADR-0032)
 
@@ -329,7 +330,8 @@ are in ADR-0030.
 
 ### 5.1 Conversion
 
-- Input: STL (binary and ASCII), OBJ, 3MF, in that order, each read into a `Mesh` of `f64`
+- Input: STL (binary and ASCII), OBJ, 3MF, in that order, each under a default feature a
+  user may leave out (`stl`, `obj`, `threemf`; ADR-0036) and read into a `Mesh` of `f64`
   vertices, `u32` triangles, a group per triangle (ADR-0030) and the file's unit, if any,
   under limits its caller sets (ADR-0026). Badly oriented, holed and degenerate meshes are
   accepted as they are; `Mesh::welded` joins vertices at equal positions, never within a
@@ -363,8 +365,7 @@ are in ADR-0030.
   the band of an open mesh, where the inside is not defined, the boundary the signs give
   across a hole follows the regions, as coarse as the tiles there. The same mesh and
   options give the same topology and the same field bytes whatever the thread count. No
-  dense grid: memory follows
-  the band's volume, at 3000³ resolution as well. These are brodo's SDF convention, version
+  dense grid: memory follows the band's volume. These are brodo's SDF convention, version
   1, which the grid's `extra` names under the key `sdf.version` (`brodo::meta::SDF_KEY`,
   ADR-0039) so that any producer can claim it.
 - Hermite data: a set in brodo's format (§4.9) on the conversion's topology, its signs
@@ -424,7 +425,8 @@ In `brodo`, each behind a cargo feature:
   written to `out/slices/` for a look by
   `cargo test -p brodo --test slice_images -- --ignored`.
 - **A field for ParaView** (`brodo::vtk`, feature `vtk`, opted into, ADR-0036), written from the
-  published file-format documentation only, as one ASCII UnstructuredGrid (`.vtu`): a
+  published file-format documentation and, for VTK_VOXEL's cell type, VTK's public Python
+  API, never from VTK's source, as one ASCII UnstructuredGrid (`.vtu`): a
   VTK_VOXEL cell per leaf voxel, a tile one cell of its region's size, in index space,
   points shared and `Float64`, values as cell data (ADR-0018, B-012): a scalar field as
   `Scalars`, a field of `[f32; 3]` or `[f64; 3]` as three-component `Vectors`, one field
@@ -437,7 +439,7 @@ In `brodo`, each behind a cargo feature:
 
 ### 6.2 `piatto`
 
-Not built until a user asks for a viewer or for drawing to embed, grids too large for VTK and `.vdb` must be looked at, or P7 finds `.vdb` cannot be written (ADR-0018); the slice as PNG and VTK serve meanwhile. The design
+Not built until a user asks for a viewer or for drawing to embed, or grids too large for VTK and `.vdb` must be looked at (ADR-0018); the slice as PNG and VTK serve meanwhile. The design
 it would follow:
 
 - Reads a cache-profile file (§4.7) by memory mapping.

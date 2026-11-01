@@ -1,12 +1,13 @@
 //! OpenVDB files (ARCHITECTURE.md §4.7, ADR-0045, ADR-0046, ADR-0047): grids of `f32` or
 //! `f64` written as one `.vdb` file at file version 225, as OpenVDB 14 reads it, and read
-//! from the files brodo and OpenVDB 12 to 14 write (`from_bytes`, `read`).
+//! from the files brodo and OpenVDB 12 to 14 write by `from_bytes` and `read`, which this
+//! module re-exports from the private module `vdb_read`, where reading lives.
 //!
-//! The bytes are in `docs/formats.md` §9, which this code follows. brodo's tree has
-//! OpenVDB's shape, so each of brodo's nodes is one of OpenVDB's; what differs is order.
-//! OpenVDB numbers a node's places z fastest and lists nodes by origin and place, where
-//! brodo numbers a leaf's voxels x fastest and its leaves and tiles in Morton order; the
-//! nodes are gathered by place first, in `BTreeMap`s, so the same grid always gives the
+//! The bytes are in `docs/formats.md` §9, which this module's writing follows. brodo's tree
+//! has OpenVDB's shape, so each of brodo's nodes is one of OpenVDB's; what differs is
+//! order. OpenVDB numbers a node's places z fastest and lists nodes by origin and place,
+//! where brodo numbers a leaf's voxels x fastest and its leaves and tiles in Morton order;
+//! the nodes are gathered by place first, in `BTreeMap`s, so the same grid always gives the
 //! same bytes.
 
 use std::collections::{BTreeMap, BTreeSet};
