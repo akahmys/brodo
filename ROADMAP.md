@@ -8,40 +8,13 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: P6 accepted by the human and closed as 0.7.0 (2026-10-31): the archive
-  profile, compressed by `lz4_flex` (B-005), its values exact, in binary16 or in 8 bits,
-  and one grid's region read alone (ADR-0016). A benchmark pair whose runs disagree by
-  more than 10 % is refused, and every benchmark runs with every feature (ADR-0019). Its
-  mutation run reported all 3949; the 31 missed or timed out are killed or excluded, and
-  the files changed ran again with none missed (ADR-0023).
-- **Done**: the spike between P6 and P7 answered B-024 (2026-10-31): on ten threads the
-  leaf-parallel update waited for workers other processes displaced, and colino's
-  `convert_slab_320` lost instructions per cycle on both core types; on four, the
-  performance cores, both agreed within 1.3 %. A benchmark's children now run on as many
-  threads as the machine has performance cores (ADR-0019).
-- **Done**: P7's first unit, OpenVDB from its Apache-2.0 release 12.0.0 read for the
-  `.vdb` format and never copied (ADR-0044; the owner, 2026-10-31).
-- **Done**: B-006 answered, `.vdb` read and written by brodo itself, writing in P7
-  (ADR-0045; the owner, 2026-10-31).
-- **Done**: P7's writing step decided: `spikes/vdb/` wrote float and double grids that
-  OpenVDB 14.0.0 read back with every value the same; active-mask compression, half a
-  voxel's shift, every voxel active (ADR-0046; the owner, 2026-10-31).
-- **Done**: the writer, `brodo::vdb` under the feature `vdb`, to docs/formats.md §9; OpenVDB
-  14.0.0 read its golden file back with every value the same and wrote it again the same
-  but for `file_mem_bytes` (2026-11-01).
-- **Done**: P7's reading step decided: `spikes/vdbread/` found OpenVDB 12 to 14 writing
-  Blosc with active-mask by default, at file version 224 or 225, and each reading brodo's
-  files; a reader from the document read them all as OpenVDB does. Blosc read with
-  `lz4_flex`, zip refused, inactive values kept (ADR-0047; the owner, 2026-11-01).
-- **Done**: the reader, `vdb::from_bytes` and `vdb::read`, to docs/formats.md §9.7 and §9.8,
-  in `UNTRUSTED_INPUT` and fuzzed; files OpenVDB 12.0.0 and 14.0.0 wrote read as OpenVDB
-  reads them (2026-11-01).
-- **Done**: P7's closing runs the owner chose (2026-11-01): the fuzz round, the Miri run and
-  the benchmarks, `leaf_parallel_update_x32` recorded again (ADR-0019).
-- **Done**: P7's retrospective, its three proposals decided by the owner (ADR-0001,
-  ADR-0002, ADR-0044; 2026-11-01).
-- **Next**: the mutants of `vdb.rs` and `vdb_read.rs` run again, then P7's acceptance and
-  0.8.0.
+- **Done**: P7 accepted by the human and closed as 0.8.0 (2026-11-02): brodo reads and
+  writes `.vdb` itself, the format learnt from OpenVDB's Apache-2.0 releases and never
+  copied (ADR-0044, ADR-0045). Float and double grids are written as OpenVDB 14.0.0 reads
+  them back (ADR-0046), and read from the files brodo and OpenVDB 12 to 14 write by default
+  (ADR-0047). Its mutation run reported all 4307; the 36 missed are killed or excluded, and
+  the two files ran again, 354 mutants, none missed (ADR-0023).
+- **Next**: the review of the whole repository (§2, "After P7"), before anything else.
 
 ## 2. Milestones
 
@@ -378,11 +351,13 @@ built. brodo reads and writes `.vdb` itself, the format learnt from OpenVDB at `
       under Tree Borrows (ADR-0015, 2026-11-01)
 - [x] Benchmarks, every feature, at rest: every item within its baseline but
       `leaf_parallel_update_x32`, as slow before P7, recorded again (ADR-0019, 2026-11-01)
-- [ ] Mutation run (ADR-0023): all 4307 reported on `a7022af`, 36 missed in the `.vdb`
-      reader and writer, 30 killed by tests and six excluded (2026-11-01); then the two
-      files' mutants run again with none missed
-- [ ] **Accepted when** brodo's float and double grids are written to `.vdb` files that
-      OpenVDB's tools read back the same, and such files are read back into brodo
+- [x] Mutation run (ADR-0023): all 4307 reported on `a7022af`, 36 missed in the `.vdb`
+      reader and writer, 30 killed by tests and six excluded (2026-11-01); the two files
+      run again on `b0a924c`, 354 mutants, none missed (2026-11-01)
+- [x] **Accepted when** brodo's float and double grids are written to `.vdb` files that
+      OpenVDB's tools read back the same, and such files are read back into brodo:
+      `vdb_format.rs`'s golden file, read back by OpenVDB 14.0.0 with every value the same,
+      and `vdb_read.rs`, brodo's files read back the same; accepted 2026-11-02
 
 ### After P7
 

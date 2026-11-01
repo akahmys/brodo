@@ -6,6 +6,11 @@ are recorded here when they change (V6).
 
 ## Unreleased
 
+## 0.8.0 (2026-11-02)
+
+Closes P7: OpenVDB's `.vdb` files, brodo's float and double grids written as OpenVDB reads
+them back, and read from the files brodo and OpenVDB 12 to 14 write by default.
+
 - OpenVDB files, under the new feature `vdb`: `vdb::VdbEntry::new` takes an `f32` or `f64`
   grid with its metadata, and `vdb::to_bytes` and `vdb::write` give one `.vdb` file at file
   version 225, which OpenVDB 14.0.0 reads back with every value the same, as
