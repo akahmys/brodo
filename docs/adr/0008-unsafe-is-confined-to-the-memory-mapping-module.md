@@ -126,3 +126,9 @@ fire: a call of `map` in another test file failed Rules 4 and 19; another `unsaf
 listed file failed Rule 4; the listed file without its `#![expect]` failed rustc's
 `unsafe_code`.
 
+## Amendment: which checks a milestone closes with
+
+- **Date**: 2026-11-02
+
+From P5 on, the human chooses which of the closing checks this record holds a milestone
+to, by its content, and the milestone's checklist lists them (ADR-0033).

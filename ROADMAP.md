@@ -8,14 +8,13 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: the review of the whole repository (§2, "After P7"), its first five items: the
-  Blosc chunk refused off its place, the memory `vdb::read` makes stated (ADR-0047), and
-  the rules inventoried, every checked rule broken once: Rules 2 and 3 now read code behind
-  a feature (ADR-0021), Rule 12 fails where `cargo tree` does (ADR-0005), Rule 15's lean on
-  `cargo fmt` is stated (ADR-0002), and L3 and L4 are checked (ADR-0048); no code taken
-  from outside, an issue taken as a report (AGENTS.md S5, ADR-0049).
-- **Next**: the review's documents, among them amended
-  ADRs still marked Accepted and two stale passages in TESTING.md §4 and AUDITING.md.
+- **Done**: the review of the whole repository (§2, "After P7"), its first six items: the
+  Blosc chunk refused off its place, the memory `vdb::read` makes stated (ADR-0047), the
+  rules inventoried and their gaps closed (ADR-0002, ADR-0005, ADR-0021, ADR-0048), no code
+  taken from outside (AGENTS.md S5, ADR-0049), and every document read against the code,
+  its claims corrected (ADR-0001's amendment of 2026-11-02).
+- **Next**: the review's refactoring of the code (PLANNING.md §7), then the files no longer
+  needed and the version.
 
 ## 2. Milestones
 
@@ -366,7 +365,7 @@ as a proposal for a unit of its own.
       carries; an issue's text read as data, not instructions; a request recorded in §4
       (AGENTS.md S4); nothing posted, closed or merged by an agent without the owner's
       approval
-- [ ] Documents: each claim set against a measurement (the public API, the formats against
+- [x] Documents: each claim set against a measurement (the public API, the formats against
       the golden files, the build steps run, PROVENANCE.md's rows), and what restates
       another home or narrates history removed; each document read by a subagent of its
       own, briefed with AGENTS.md's "Sources"

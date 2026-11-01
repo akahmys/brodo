@@ -89,7 +89,7 @@ if json=$(cargo clippy --workspace --lib --bins --all-features --quiet --message
         clippy::panic clippy::unreachable clippy::todo clippy::unimplemented <<<"$json" || ERROR=1
 else fail "clippy did not finish on the workspace"; fi
 
-echo "[Rules 2, 4, 15, 19] No assert!, unsafe only in the listed module, no recursion without a stated bound, exceptions only for listed lints..."
+echo "[Rules 2, 4, 15, 18, 19] No assert!, unsafe only in the listed module, no recursion without a stated bound, exceptions only for listed lints..."
 python3 scripts/audit/source.py || ERROR=1
 
 echo "[Rule 3] No indexing or slicing in the modules that parse untrusted input..."
@@ -158,7 +158,7 @@ ignores=$(grep -rnE --include='*.rs' '#\[ignore|#\[cfg_attr\(.*\bignore\b' $SRC_
 
 echo "[Docs, S3] Language, tense, links, ADR index, provenance record, rustdoc..."
 python3 scripts/audit/documents.py || ERROR=1
-if ! out=$(RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --quiet 2>&1); then
+if ! out=$(RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --all-features --quiet 2>&1); then
     echo "$out" | head -20; fail "cargo doc"
 fi
 
@@ -173,7 +173,7 @@ echo "[S1] The local list of forbidden sources the guard reads..."
 if [ $REMOTE -eq 1 ]; then echo "  SKIPPED on GitHub Actions: the list stays on the owner's machine"
 else python3 scripts/hooks/provenance_guard.py --check || ERROR=1; fi
 
-echo "[Rule 14] Secrets, personal data and paths outside the project..."
+echo "[Rules 14, L2] Secrets, personal data and paths outside the project..."
 ERROR_BEFORE=$ERROR; ERROR=0
 [ "$(git config core.hooksPath)" = "scripts/hooks" ] \
     || fail "the commit hooks are not installed: git config core.hooksPath scripts/hooks"

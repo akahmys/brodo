@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-"""Checks on code that clippy has no lint for (CODING.md Rules 2, 4, 15 and 19).
+"""Checks on code that clippy has no lint for (CODING.md Rules 2, 4, 15, 18 and 19).
 
-Production code is each `src/` file up to its `#[cfg(test)]` module, which clippy's
-`items_after_test_module` keeps at the end of the file.
+Production code is each `src/` file up to its test module, an unindented `#[cfg(test)]`
+followed by `mod`, which clippy's `items_after_test_module` keeps at the end of the file.
+An item gated by `#[cfg(test)]` before it, such as a helper the tests call, is read as
+production code.
 
 1. Rule 2: no `assert!`, `assert_eq!` or `assert_ne!`. `debug_assert!` is allowed.
 2. Rule 15: no recursion. A cycle in a crate's call graph fails unless one function in it
@@ -58,7 +60,7 @@ CALL = re.compile(r"(?:(?<![\w.:])|(?<=self\.)|(?<=Self::))(\w+)\s*\(")
 def production(path: Path) -> list[str]:
     lines = path.read_text().split("\n")
     for i, line in enumerate(lines):
-        if line.strip() == "#[cfg(test)]":
+        if line == "#[cfg(test)]" and lines[i + 1 : i + 2] and lines[i + 1].startswith("mod "):
             return lines[:i]
     return lines
 

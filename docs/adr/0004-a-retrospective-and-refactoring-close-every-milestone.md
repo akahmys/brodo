@@ -1,6 +1,6 @@
 # ADR-0004: A retrospective and refactoring close every milestone
 
-- **Status**: Accepted
+- **Status**: Amended
 - **Date**: 2026-10-16
 
 ## Context
@@ -22,3 +22,10 @@ procedures redone. Duplication also builds up across units of work.
 
 Each milestone's checklist in ROADMAP.md carries the item; nothing else enforces it.
 Lessons that are not decided into a rule or a check leave no record beyond git.
+
+## Amendment: which checks a milestone closes with
+
+- **Date**: 2026-11-02
+
+From P5 on, the human chooses which of the closing checks this record holds a milestone
+to, by its content, and the milestone's checklist lists them (ADR-0033).

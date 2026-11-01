@@ -1,6 +1,6 @@
 # ADR-0047: How brodo reads `.vdb` files
 
-- **Status**: Accepted
+- **Status**: Amended
 - **Date**: 2026-11-01
 
 ## Context

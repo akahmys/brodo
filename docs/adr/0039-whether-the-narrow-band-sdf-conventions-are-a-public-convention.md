@@ -1,4 +1,4 @@
-# ADR-0039: Whether the narrow-band SDF's conventions are a public convention
+# ADR-0039: The narrow-band SDF's conventions are a public convention
 
 - **Status**: Accepted
 - **Date**: 2026-10-25

@@ -60,3 +60,10 @@ cache file is. The human decided that it starts from seeds too: two packages com
 under `crates/colino/tests/data/`, a mesh placed by components and by build items, its
 model part stored in one and deflated in the other, which a Format-tier test holds to
 the packages they are made from and reads.
+
+## Amendment: which checks a milestone closes with
+
+- **Date**: 2026-11-02
+
+From P5 on, the human chooses which of the closing checks this record holds a milestone
+to, by its content, and the milestone's checklist lists them (ADR-0033).

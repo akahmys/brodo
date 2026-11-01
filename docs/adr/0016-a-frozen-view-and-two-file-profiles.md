@@ -195,3 +195,11 @@ zeros over it. `spikes/region/` had timed both on its 537 MB grid (`parts-b.tsv`
 zeroed, 4.32 ms written, 0.2 ms of a whole read's 18 to 19 ms. The owner decided that the
 buffer stays written: the saving is about 1 %, and `new_vec_zeroed` would need `zerocopy`'s
 `alloc` feature and a failure of its own to handle.
+
+## Amendment: `.vdb` files are not read through `vdb-rs`
+
+- **Date**: 2026-11-02
+
+The decision's bullet that OpenVDB files are read through the `vdb-rs` crate was reversed
+by ADR-0045, which found `vdb-rs` pulling C through `blosc-src`: brodo reads and writes
+`.vdb` itself (ADR-0046, ADR-0047).

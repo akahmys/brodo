@@ -12,7 +12,7 @@
 | **Reference** | Property tests against a dense reference implementation written in the test itself: random activation and writes give the same values; topology edits keep every field's values through `Remap`; every leaf's 26 neighbours match those computed from coordinates | `crates/*/tests/` | exact |
 | **Format** | `freeze` and each file profile: a write then a read gives the same bits, and the same input gives the same bytes at any thread count | `crates/*/tests/` | exact, by bits |
 | **Image** | The checking output (ARCHITECTURE.md §6.1): slices of a sphere's SDF, a torus's SDF and a field with tiles, compared with committed golden images as decoded pixels, so that a change of encoder does not fail them; the same input gives the same PNG bytes | `crates/brodo/tests/` | exact, by pixel |
-| **GPU** | `piatto` (§6.2): a `GridView` buffer copied to the GPU as it is, values at known voxels read back by a shader and compared; `#[ignore = "needs a GPU"]` where none is | `crates/piatto/tests/` | exact, by bits |
+| **GPU** | `piatto`, if built (ARCHITECTURE.md §6.2): a `GridView` buffer copied to the GPU as it is, values at known voxels read back by a shader and compared; `#[ignore = "needs a GPU"]` where none is | `crates/piatto/tests/` | exact, by bits |
 | **Benchmark** | Activation, random access, the leaf-parallel update, gather, `freeze`, file I/O; their baselines are kept with the benchmarks, dated, with the hardware model they ran on (never a host name) | `crates/*/benches/` | T5 |
 
 The shapes colino is checked on (sphere, torus, double torus, holed meshes, walls thinner
@@ -43,7 +43,7 @@ checklist in ROADMAP.md lists them (ADR-0033).
 
 ```bash
 cargo test --workspace --all-features                       # the tests alone, as the gate runs them
-cargo test --workspace --all-features -- --include-ignored  # also what needs local files
+cargo test --workspace --all-features -- --include-ignored  # also what needs a look, or VTK
 ```
 
 The fuzzer (T6) needs a nightly toolchain and `cargo install cargo-fuzz`. Its manifest,
@@ -102,8 +102,9 @@ cargo +nightly miri test -p colino --test miri_paths -- miri_
 Mutation testing (T11) needs `cargo install --locked cargo-mutants@27.1.0`, which the
 audit also needs. The run's settings (jobs, timeout, guard, output) are in
 `scripts/audit/mutants.py`, the equivalent mutants in `.cargo/mutants.toml`. The run
-takes hours: about 5 for brodo's 1099 mutants at one job, from 16.5 s a mutant measured
-on 2026-10-18 (ADR-0023). Run it at rest, with nothing else running:
+takes hours: about 9 for the workspace's 4307 mutants (`cargo mutants --workspace
+--all-features --list | wc -l`, 2026-11-02) at the two jobs `mutants.py` runs, from 13 to
+16 s a caught mutant (ADR-0023). Run it at rest, with nothing else running:
 
 ```bash
 python3 scripts/audit/mutants.py --run                                  # the milestone's run
@@ -117,7 +118,7 @@ python3 scripts/audit/mutants.py --run --patient --from shards/* -- --shard 3/20
 ```
 
 A mutant applied by hand, to show that a test fails on it (T3), runs behind the same
-guard, as cargo's runner, since such a mutant can grow without bound as a run's can; held
+guard, as cargo's runner for the host's target (on macOS, as below), since such a mutant can grow without bound as a run's can; held
 by nothing (ADR-0023):
 
 ```bash
@@ -136,15 +137,16 @@ listed (ADR-0034).
 | `./scripts/audit/verify_compliance.sh` | ends `=== AUDIT PASSED ===`. It runs the tests as its last step. Run it with no edit in flight |
 | ROADMAP.md §1 | updated (PLANNING.md §1) |
 
-There is no hosted CI; this gate, run locally, is the CI.
+The gate also runs on GitHub Actions after each push to `main` (ADR-0034); the run on the
+owner's machine before the push is the one a change lands on.
 
 ## 5. Versions
 
 | Rule | Requirement | Enforced by |
 | :--- | :--- | :--- |
-| **V1** | The version is `0.MINOR.PATCH`, written once, in the workspace `Cargo.toml`; every crate takes `version.workspace = true` | `scripts/audit/workspace.py` |
+| **V1** | The version is `0.MINOR.PATCH`, written once, in the workspace `Cargo.toml`; every crate takes `version.workspace = true` | `scripts/audit/workspace.py`, for the inheritance; the form, **nothing** |
 | **V2** | Closing a milestone (ROADMAP.md §2) raises MINOR: P0 gives 0.1.0, P1 0.2.0. A change that only fixes the last version raises PATCH. Between milestones, a small release raising MINOR is cut when a user needs a change before its milestone closes, the gate its only check (ADR-0040). Until 1.0 a MINOR may break the API | nothing |
 | **V3** | CHANGELOG.md has a section per version, newest first, headed `## <version> (<date>)`, with the milestones it closed and every change that breaks a user; its newest is the version `Cargo.toml` states (0.0.0 while there is none). A breaking change is added under `## Unreleased` in the commit that makes it | `scripts/audit/workspace.py` for the version; the entries, **nothing** |
 | **V4** | The commit that sets a version passes the gate (§4) and carries the local tag `v` + the version. Once the tag is pushed, a GitHub release of it is made, titled with the version, its notes the version's CHANGELOG.md section (ADR-0040) | nothing |
 | **V5** | 1.0 is the human's decision, recorded in an ADR | nothing |
-| **V6** | The `GridView` byte layout and each file profile carry a format version of their own, independent of the crate version, raised by any change to the bytes and recorded in CHANGELOG.md with which older versions still read. A release that raises one still reads the version before it, and can write it on request; older ones are refused, the error naming them (ADR-0038) | a Format-tier test comparing written bytes with a committed file, once the format exists (ROADMAP.md, P1) |
+| **V6** | The `GridView` byte layout and each file profile carry a format version of their own, independent of the crate version, raised by any change to the bytes and recorded in CHANGELOG.md with which older versions still read. A release that raises one still reads the version before it, and can write it on request; older ones are refused, the error naming them (ADR-0038) | the Format-tier tests comparing written bytes with the committed files of docs/formats.md §7 |

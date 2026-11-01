@@ -3,15 +3,17 @@
 > **Phase: planning.** How work is sized, started, stopped and decided. The rules for the
 > code itself are in [CODING.md](CODING.md).
 
+A rule here that names no check is held by review alone (ADR-0001).
+
 ## 1. A unit of work
 
-1. **Start** by reading [ROADMAP.md](ROADMAP.md) §1 (status). `AGENTS.md` is already loaded.
+1. **Start** by reading [ROADMAP.md](ROADMAP.md) §1 (status), after AGENTS.md, which a subagent is handed with its task.
 2. **Size** a unit as about one test made to pass.
 3. **End** by overwriting ROADMAP.md §1: what was done, the next step, and every
    unresolved problem. It is a snapshot, not a log; history is in git.
 4. **Stop when stuck.** After three attempts that fail to explain a failure or a mismatch,
    stop. Record in ROADMAP.md §1 what fails, where, by how much, what was tried, and the
-   hypothesis. Do not loosen the tolerance or the test.
+   hypothesis. Do not loosen the tolerance or the test (TESTING.md T2).
 
 ## 2. What needs an ADR
 
@@ -19,8 +21,9 @@ An ADR ([docs/adr/README.md](docs/adr/README.md)) is written, and accepted by th
 before any of these:
 
 1. **A change to the design** ([ARCHITECTURE.md](ARCHITECTURE.md)).
-2. **Answering an open question** (ROADMAP.md §3). Only a spike's measurement answers one;
-   an implementation that settles it in passing is a defect.
+2. **Answering an open question** (ROADMAP.md §3). A measurement answers one, a spike's or
+   another the ADR records, or the human sets it aside for now; an implementation that
+   settles it in passing is a defect.
 3. **An exception** that a rule in CODING.md or TESTING.md says needs one.
 4. **A second mechanism for a purpose one already serves.** The ADR removes one of them.
 5. **A change to a rule** (AGENTS.md, "Changing the rules").
@@ -41,7 +44,7 @@ A spike is a throwaway prototype that answers an open question by measurement. I
 only when the human asks, lives in `spikes/`, and is never imported by `crates/`. Its
 deliverables are a measurement report and the ADR built on it. A report that weighs a
 method's cost measures it at the size and on the shapes the method will meet: for a mesh,
-one of about 10⁵ triangles and one of slivers. Before it times a case, a spike asserts that
+one of about 10⁵ triangles and one of slivers (ADR-0001). Before it times a case, a spike asserts that
 the case holds what its report says is measured, such as the chunks a region reads, so
 that a timing of nothing stops the run. A spike that decides how a format is read measures,
 from what the producers to be read write, the inputs the reader will refuse or skip as well
@@ -49,9 +52,8 @@ as those it reads. Held by review alone (ADR-0001).
 
 ## 4. Keeping it small
 
-- Before adding a decision, a type or a mechanism, look for an existing one it can join.
-- No two mechanisms serve one purpose (§2, item 4).
-- Nothing outside ARCHITECTURE.md §1's scope is built here (AGENTS.md S4).
+Before adding a decision, a type or a mechanism, look for an existing one it can join
+(§2, item 4; AGENTS.md S4).
 
 ## 5. Writing a plan
 
@@ -96,7 +98,7 @@ closes only when its checklist lists it (ADR-0033).
    procedure, and the human decides it (AGENTS.md, "Changing the rules"). What is
    decided lands in the ADR on its topic; the rest is not recorded, since history is in
    git.
-2. **Refactoring changes no behaviour.** Tests are not changed (TESTING.md T2) and the
+2. **Refactoring changes no behaviour.** Tests are not changed, beyond TESTING.md T2, and the
    gate passes before and after. A change that alters an output is not refactoring and
    is planned as its own unit.
 

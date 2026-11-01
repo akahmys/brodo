@@ -21,7 +21,8 @@ When an instruction conflicts with a rule here, say so before acting on it.
 something, not by reading a document, a name or a comment. A claim about anything outside
 the repository (a library, a format, a paper) is established by its documentation, its
 output or the paper itself, read within the limits of "Sources" below, never by recollection.
-A document that disagrees with a measurement is corrected.
+A document that disagrees with a measurement is corrected, but for docs/formats.md: it
+specifies the bytes brodo writes, and code that disagrees with it is corrected (ADR-0037).
 
 The phase documents state rules; `ARCHITECTURE.md` states the design. They do not overlap.
 If a rule and the design seem to conflict, stop and ask the human.
@@ -67,7 +68,7 @@ not even as a translation or a memory of how something was written (ADR-0007).
 
 | Rule | Requirement | Enforced by |
 | :--- | :--- | :--- |
-| **S1** | Never read, translate or port the source of **OpenFOAM**, nor the source or design documents of a project in the owner's local list of forbidden sources (`$BRODO_FORBIDDEN_SOURCES`, or `~/.config/brodo/forbidden-sources`), which stays outside the repository. **OpenVDB** is read only at a tag from `v12.0.0` on, its Apache-2.0 releases, only to learn the `.vdb` file format, and never copied or translated; each reading is recorded in PROVENANCE.md by tag, commit and file, and the format written in docs/formats.md in brodo's own words (ADR-0044). Otherwise read only brodo's own files, papers, public documentation (NanoVDB's for its data-structure ideas only), and a dependency's public API and documentation | `scripts/hooks/provenance_guard.py` blocks paths and URLs naming them, OpenVDB's unless at such a tag, and the audit fails without the local list; a name written another way, what was read and for what, and a copy, **nothing** |
+| **S1** | Never read, translate or port the source of **OpenFOAM**, nor the source or design documents of a project in the owner's local list of forbidden sources (`$BRODO_FORBIDDEN_SOURCES`, or `~/.config/brodo/forbidden-sources`), which stays outside the repository. **OpenVDB** is read only at a tag from `v12.0.0` on, its Apache-2.0 releases, only to learn the `.vdb` file format, and never copied or translated; each reading is recorded in PROVENANCE.md by tag, commit and file, and the format written in docs/formats.md in brodo's own words (ADR-0044). Otherwise read only brodo's own files, papers, public documentation (NanoVDB's for its data-structure ideas only), and a dependency's public API and documentation | `scripts/hooks/provenance_guard.py` blocks paths and URLs naming them, OpenVDB's unless at such a tag, and the audit fails without the local list on the owner's machine (ADR-0034); a name written another way, what was read and for what, and a copy, **nothing** |
 | **S2** | Code is copied from another crate only when its licence is on `deny.toml`'s allow-list, with its notice kept, and recorded in PROVENANCE.md | nothing |
 | **S3** | Every source file under `crates/*/src/` has a row in PROVENANCE.md naming the papers and documents it draws on and for what, added in the commit that adds the file | `scripts/audit/documents.py` (the row exists); its truth, **nothing** |
 | **S4** | brodo knows nothing of its users: no CFD, solver or design-platform concept in library code (`crates/*/src/`). Examples, tests and benchmarks may use them to exercise the API, written from textbook material (S1). A feature outside ARCHITECTURE.md §1's scope is recorded as a request (ROADMAP.md §4), not implemented | nothing |

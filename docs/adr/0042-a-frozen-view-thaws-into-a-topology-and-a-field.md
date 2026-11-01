@@ -1,6 +1,6 @@
 # ADR-0042: A frozen view thaws into a topology and a field
 
-- **Status**: Accepted
+- **Status**: Amended
 - **Date**: 2026-10-26
 
 ## Context

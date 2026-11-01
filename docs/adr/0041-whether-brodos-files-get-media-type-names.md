@@ -1,4 +1,4 @@
-# ADR-0041: Whether brodo's files get media type names
+# ADR-0041: brodo's files get media type names, stated but not registered
 
 - **Status**: Accepted
 - **Date**: 2026-10-25

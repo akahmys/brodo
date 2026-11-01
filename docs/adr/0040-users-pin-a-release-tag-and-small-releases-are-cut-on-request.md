@@ -1,6 +1,6 @@
 # ADR-0040: Users pin a release tag, and small releases are cut on request
 
-- **Status**: Accepted
+- **Status**: Amended
 - **Date**: 2026-10-25
 
 ## Context

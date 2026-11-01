@@ -1,6 +1,6 @@
 # ADR-0017: colino converts meshes to narrow-band SDFs and reports topology changes without repairing them
 
-- **Status**: Accepted
+- **Status**: Amended
 - **Date**: 2026-10-16
 
 ## Context
@@ -28,3 +28,10 @@ memory.
 ## Consequences
 
 Inputs come in the order STL, OBJ, 3MF; STEP is later. The third layer is after P2.
+
+## Amendment: STEP is not read
+
+- **Date**: 2026-11-02
+
+The Consequences' "STEP is later" was reversed by ADR-0031: colino reads triangle meshes,
+not STEP.

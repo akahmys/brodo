@@ -1,6 +1,6 @@
 # ADR-0044: OpenVDB from 12.0 on is read for its file format, and never copied
 
-- **Status**: Accepted
+- **Status**: Amended
 - **Date**: 2026-10-31
 
 ## Context
@@ -110,3 +110,12 @@ commands were rewritten to pass. The owner had a path end at white space, a quot
 before, four naming a tagged directory so were blocked; after, those four pass, and a
 directory without a tag, one before `v12.0.0`, one with text after its tag, and OpenFOAM's,
 each followed by such punctuation, are still blocked.
+
+## Amendment: the files read at `v14.0.0` counted again
+
+- **Date**: 2026-11-02
+
+The review of the whole repository found `spikes/vdb/REPORT.md` counting 27 files read at
+`v14.0.0` where PROVENANCE.md, which the report names for the list, records 26, as it did
+when the row was written (5baff74); no other record lists them. The owner decided, on
+2026-11-02, that the report's count was wrong, and it was set to 26.

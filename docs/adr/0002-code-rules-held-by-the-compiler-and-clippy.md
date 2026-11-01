@@ -62,3 +62,18 @@ function's body from the line after its signature, so that a recursive function 
 one line passed. `cargo fmt`, held by Rule 10, never leaves a body on its signature's line,
 and the same function formatted failed. The owner decided, on 2026-11-02, to keep the check
 as it is and state that it leans on `cargo fmt`, in CODING.md Rule 15 and AUDITING.md.
+
+## Amendment: production code read up to the test module
+
+- **Date**: 2026-11-02
+
+The review of the whole repository found `scripts/audit/source.py` taking a file's
+production code to end at its first line reading `#[cfg(test)]`, indented or not, so that a
+test-only item before the test module ended it early: in `bvh.rs`, `accessor.rs`, `tree.rs`
+and `topology.rs`, about 940 lines of production code went unread by the checks on asserts,
+recursion and the lints an exception names; none held anything they would refuse. It also
+found the gate's step titles naming neither Rule 18, which `source.py` checks, nor L2, which
+`paths.py` checks. The owner decided, on 2026-11-02, that production code ends at an
+unindented `#[cfg(test)]` followed by `mod`, a test-only item before it read as production
+code, and that the titles name both. Shown to fire: an assert added to `tree.rs` after its
+first `#[cfg(test)]` passed the old check and failed the new one.

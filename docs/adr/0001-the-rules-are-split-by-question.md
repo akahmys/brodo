@@ -139,3 +139,24 @@ second as a refusal of files the reader was to read. The owner decided that a sp
 decides how a format is read measures, from what the producers to be read write, the inputs
 the reader will refuse or skip as well as those it reads (PLANNING.md §3). Held by review
 alone.
+
+## Amendment: the documents set against measurement
+
+- **Date**: 2026-11-02
+
+The review of the whole repository read each document against the code, one subagent a
+document, and found about ninety claims stale, restated or wrong. The owner decided, on
+2026-11-02:
+
+- PLANNING.md §2: an open question is answered by a measurement, a spike's or another the
+  ADR records, or set aside for now by the human, as ADR-0045 answered B-006 by measuring
+  `vdb-rs`'s dependencies and the human set B-018, B-019 and B-021 aside, where the rule had
+  said a spike's measurement alone.
+- docs/adr/README.md: a record's context and amendments are in the past tense and its
+  decision may be stated in the present, with no limit of a page, which 27 of 49 records
+  exceeded; a record reversed or narrowed in part is amended to name the record that did it.
+
+The other corrections, wording made true to the checks and the code with no rule changed,
+landed with them: in AUDITING.md, CODING.md, PLANNING.md and TESTING.md, eight records
+marked Amended, five amended to name what reversed or narrowed them, and two retitled as
+statements.

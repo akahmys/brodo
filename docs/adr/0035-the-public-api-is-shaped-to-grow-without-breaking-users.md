@@ -1,6 +1,6 @@
 # ADR-0035: The public API is shaped to grow without breaking users
 
-- **Status**: Accepted
+- **Status**: Amended
 - **Date**: 2026-10-25
 
 ## Context

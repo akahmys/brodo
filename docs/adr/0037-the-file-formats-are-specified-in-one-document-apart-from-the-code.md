@@ -1,6 +1,6 @@
 # ADR-0037: The file formats are specified in one document apart from the code
 
-- **Status**: Accepted
+- **Status**: Amended
 - **Date**: 2026-10-25
 
 ## Context
@@ -85,3 +85,12 @@ brodo does not read `.vdb` yet, so no damaged copy is compared; that waits for t
 step. Shown to fire: with a leaf's values taken y fastest by the reader, the test failed.
 OpenVDB 14.0.0 read the same file back with every voxel and tile the same, and wrote it
 again the same but for `file_mem_bytes`, by hand with `spikes/vdb/`'s oracle.
+
+## Amendment: the hierarchy of truth names the exception
+
+- **Date**: 2026-11-02
+
+The review of the whole repository found AGENTS.md's "Measurement outranks documentation"
+holding that a document disagreeing with a measurement is corrected, with no word of this
+record's rule that code disagreeing with docs/formats.md is corrected instead. The owner
+decided, on 2026-11-02, that AGENTS.md names the exception.

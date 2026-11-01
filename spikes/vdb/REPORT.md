@@ -20,7 +20,7 @@ and what does a writer of them need from brodo?
 
 ## Where the format came from
 
-OpenVDB at `v14.0.0` (`ecae2bda85744412b0cd47e1b8e1e4e76beb7b88`), 27 files, each stating
+OpenVDB at `v14.0.0` (`ecae2bda85744412b0cd47e1b8e1e4e76beb7b88`), 26 files, each stating
 `SPDX-License-Identifier: Apache-2.0`, read for the layout a writer emits; the files and
 the parts read are in PROVENANCE.md (ADR-0044). No code was copied. Facts the files read
 left open, each read from the bytes of files OpenVDB wrote (ADR-0045): a string is a `u32`

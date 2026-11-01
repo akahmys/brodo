@@ -1,6 +1,6 @@
 # ADR-0023: Mutation testing closes a milestone, behind a memory guard
 
-- **Status**: Accepted
+- **Status**: Amended
 - **Date**: 2026-10-18
 
 ## Context
@@ -253,3 +253,10 @@ Blosc chunks stored in ways OpenVDB did not use or beyond docs/formats.md §9.8;
 run by hand behind `rss_guard.py` against them, and 30 caught. The human decided that the
 six left, which no test can tell from the original, are excluded, each with its reason:
 three `|` over bits shared by none, and three indicator arms giving what the last arm gives.
+
+## Amendment: which checks a milestone closes with
+
+- **Date**: 2026-11-02
+
+From P5 on, the human chooses which of the closing checks this record holds a milestone
+to, by its content, and the milestone's checklist lists them (ADR-0033).

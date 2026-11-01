@@ -8,8 +8,10 @@ Why a rule or the design is the way it is. The design itself is in
 - **One topic per record.** Before adding a record, check whether an existing one on the
   topic can be amended: add a dated `## Amendment` section and set its Status to
   `Amended`. A new record is for a new topic, or for reversing an old one.
-- **Past tense**, under a page. If it needs more, the design belongs in ARCHITECTURE.md.
-- A record is not deleted. A reversed one is marked `Superseded by ADR-NNNN`.
+- **Past tense** for the context and the amendments; a decision may be stated in the
+  present. What the design is now belongs in ARCHITECTURE.md, not in a record.
+- A record is not deleted. A reversed one is marked `Superseded by ADR-NNNN`; one reversed
+  or narrowed in part is amended to name the record that did it.
 
 ```
 # ADR-NNNN: <the decision, as a statement>
@@ -66,9 +68,9 @@ A record is `Proposed` until the human accepts it.
 | [0036](0036-what-a-user-does-not-need-is-not-built-or-reached.md) | What a user does not need is not built or reached |
 | [0037](0037-the-file-formats-are-specified-in-one-document-apart-from-the-code.md) | The file formats are specified in one document apart from the code |
 | [0038](0038-a-format-version-is-raised-so-that-producers-and-readers-can-move-in-turn.md) | A format version is raised so that producers and readers can move in turn |
-| [0039](0039-whether-the-narrow-band-sdf-conventions-are-a-public-convention.md) | Whether the narrow-band SDF's conventions are a public convention |
+| [0039](0039-whether-the-narrow-band-sdf-conventions-are-a-public-convention.md) | The narrow-band SDF's conventions are a public convention |
 | [0040](0040-users-pin-a-release-tag-and-small-releases-are-cut-on-request.md) | Users pin a release tag, and small releases are cut on request |
-| [0041](0041-whether-brodos-files-get-media-type-names.md) | Whether brodo's files get media type names |
+| [0041](0041-whether-brodos-files-get-media-type-names.md) | brodo's files get media type names, stated but not registered |
 | [0042](0042-a-frozen-view-thaws-into-a-topology-and-a-field.md) | A frozen view thaws into a topology and a field |
 | [0043](0043-a-test-holds-the-code-to-its-promises-not-to-its-implementation.md) | A test holds the code to its promises, not to its implementation |
 | [0044](0044-openvdb-from-12-0-is-read-for-its-file-format.md) | OpenVDB from 12.0 on is read for its file format, and never copied |

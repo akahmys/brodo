@@ -1,6 +1,6 @@
 # ADR-0034: The gate and the mutation run can run on GitHub Actions
 
-- **Status**: Accepted
+- **Status**: Amended
 - **Date**: 2026-10-24
 
 ## Context

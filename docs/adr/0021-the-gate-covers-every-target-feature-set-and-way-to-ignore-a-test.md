@@ -59,3 +59,14 @@ read by them. That covered three of the nine modules in `UNTRUSTED_INPUT`, `arch
 to `vdb_read.rs` passed both steps; the code as it was passed them with every feature. The
 owner decided, on 2026-11-02, that both steps run with `--all-features`, as the tests do.
 Shown to fire: the same two breaks each failed its step, by name.
+
+## Amendment: the documentation with every feature
+
+- **Date**: 2026-11-02
+
+The review of the whole repository found `cargo doc` in the gate run with the default
+features only, so that the documentation of `archive`, `vdb`, `vtk` and `slice-png`, and a
+doc link within it, was never built with warnings denied; built with every feature, it
+passed. The owner decided, on 2026-11-02, that the gate builds the documentation with
+`--all-features`. Shown to fire: a doc link to nothing on a public item of `vdb.rs` passed
+the old step and failed the new one.
