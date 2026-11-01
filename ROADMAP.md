@@ -38,7 +38,9 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   reads them (2026-11-01).
 - **Done**: P7's closing runs the owner chose (2026-11-01): the fuzz round, the Miri run and
   the benchmarks, `leaf_parallel_update_x32` recorded again (ADR-0019).
-- **Next**: P7's retrospective, its proposals for the owner, then acceptance.
+- **Done**: P7's retrospective, its three proposals decided by the owner (ADR-0001,
+  ADR-0002, ADR-0044; 2026-11-01).
+- **Next**: P7's mutation run, then its acceptance and 0.8.0.
 
 ## 2. Milestones
 
@@ -365,8 +367,10 @@ built. brodo reads and writes `.vdb` itself, the format learnt from OpenVDB at `
       (ADR-0046)
 - [x] Reading: the files brodo writes, and those OpenVDB 12 to 14 writes for the same grid
       types by default (ADR-0047, 2026-11-01)
-- [ ] Retrospective and refactoring (ADR-0001); refactoring done: the magic number and
-      active-mask flag shared by the writer and the reader (2026-11-01)
+- [x] Retrospective and refactoring: a reading spike measures what its reader refuses or
+      skips (ADR-0001), Rule 8's grep takes `String` only as `Result`'s error (ADR-0002),
+      and the source guard ends a path at a shell's punctuation (ADR-0044); the magic
+      number and active-mask flag shared by the writer and the reader (2026-11-01)
 - [x] Fuzz round, the new reader included: eight targets, 900 s each, no finding
       (2026-11-01)
 - [x] Miri run: every `miri_*` test passes; the same warning from `crossbeam-epoch` 0.9.21

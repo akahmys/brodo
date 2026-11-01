@@ -111,7 +111,9 @@ hits=""
 for dir in $SRC_DIRS; do
     crate=$(basename "$(dirname "$dir")")
     grep -qw "$crate" <<<"$APPLICATIONS" && continue
-    hits+=$(grep -rnE '\bResult<[^;{]*, *String *>|anyhow' "$dir" --include='*.rs' || true)
+    # `String` as `Result`'s own error, its value type nested at most two deep, so that
+    # `Result<BTreeMap<String, String>, E>` passes (ADR-0002).
+    hits+=$(grep -rnE '\bResult<([^<>;{]|<([^<>]|<[^<>]*>)*>)*, *String *>|anyhow' "$dir" --include='*.rs' || true)
 done
 if [ -n "$hits" ]; then echo "$hits"; fail "untyped errors"; else echo "  PASS"; fi
 

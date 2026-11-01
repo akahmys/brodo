@@ -39,3 +39,16 @@ placed before it is built.
 
 The ban on indexing and slicing moved from crates to the modules that parse untrusted
 input (ADR-0009).
+
+## Amendment
+
+- **Date**: 2026-11-01
+
+P7's retrospective found Rule 8's grep failing `Result<BTreeMap<String, String>, VdbError>`,
+a typed error whose value type holds strings, so that the code took a type alias to pass.
+The owner had the grep match `String` only as `Result`'s own error, its value type nested at
+most two deep (`scripts/audit/verify_compliance.sh`). Shown to fire on sample lines: the new
+pattern matches `Result<(), String>`, `Result<Vec<u8>, String>` and
+`Result<BTreeMap<u32, Vec<u8>>, String>`, as the old one did, and no longer
+`Result<BTreeMap<String, String>, VdbError>` or `Result<Vec<String>, VdbError>`; a value type
+nested deeper is not matched.

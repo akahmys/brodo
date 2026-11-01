@@ -43,7 +43,9 @@ deliverables are a measurement report and the ADR built on it. A report that wei
 method's cost measures it at the size and on the shapes the method will meet: for a mesh,
 one of about 10⁵ triangles and one of slivers. Before it times a case, a spike asserts that
 the case holds what its report says is measured, such as the chunks a region reads, so
-that a timing of nothing stops the run. Held by review alone (ADR-0001).
+that a timing of nothing stops the run. A spike that decides how a format is read measures,
+from what the producers to be read write, the inputs the reader will refuse or skip as well
+as those it reads. Held by review alone (ADR-0001).
 
 ## 4. Keeping it small
 

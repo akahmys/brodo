@@ -12,7 +12,8 @@ hosts, not such segments, so their public documentation stays readable. OpenVDB 
 tag from `v12.0.0` on, its Apache-2.0 releases (ADR-0044): a segment `vMAJOR.MINOR.PATCH`
 among the two after its name, or a directory `openvdb-vMAJOR.MINOR.PATCH`, MAJOR 12 or more,
 the repository's own directories under that tag with it; a path that climbs with `..` is
-judged segment by segment.
+judged segment by segment. A path ends at white space, a quote, or a shell's `();,&|<>` or
+backtick.
 
 Read: the path fields of Read, Grep and Glob (and Glob's pattern), WebFetch's URL, and
 Bash's command. A name without a `/` before it passes; the rule binds regardless.
@@ -30,6 +31,10 @@ BUILT_IN = ("openvdb", "openfoam")
 # OpenVDB's first release under Apache-2.0 (ADR-0044).
 OPENVDB_FROM = 12
 TAG = re.compile(r"v(\d+)\.\d+\.\d+")
+# What ends a path: white space, a quote, or a shell's punctuation, so that a tagged
+# directory followed by `;` or `)` in a command is still that directory (ADR-0044).
+ENDS = " \t\n'\"();,&|<>`"
+SPLIT = re.compile("[" + re.escape(ENDS) + "]")
 FIELDS = ("file_path", "path", "url", "command", "notebook_path")
 
 
@@ -49,7 +54,7 @@ def local_names() -> list[str]:
 
 def forbidden() -> re.Pattern[str]:
     names = "|".join(re.escape(n) for n in (*BUILT_IN, *local_names()))
-    return re.compile(rf"/({names})[^/\s'\"]*", re.IGNORECASE)
+    return re.compile(rf"/({names})[^/{re.escape(ENDS)}]*", re.IGNORECASE)
 
 
 def relicensed(match: re.Match[str], value: str, pattern: re.Pattern[str]) -> bool:
@@ -58,8 +63,8 @@ def relicensed(match: re.Match[str], value: str, pattern: re.Pattern[str]) -> bo
     that tag pass with it."""
     if match.group(1).lower() != "openvdb":
         return False
-    start = max(value.rfind(c, 0, match.start()) for c in " \t\n'\"") + 1
-    if "/.." in re.split(r"[\s'\"]", value[start:], maxsplit=1)[0]:
+    start = max(value.rfind(c, 0, match.start()) for c in ENDS) + 1
+    if "/.." in SPLIT.split(value[start:], maxsplit=1)[0]:
         # A path that climbs out may leave the tagged directory: each segment on its own.
         return tagged(match, value)
     first = next(m for m in pattern.finditer(value, start) if m.group(1).lower() == "openvdb")
@@ -75,7 +80,7 @@ def tagged(match: re.Match[str], value: str) -> bool:
         return bool(own) and int(own.group(1)) >= OPENVDB_FROM
     if segment != "openvdb":
         return False
-    rest = re.split(r"[\s'\"]", value[match.end():], maxsplit=1)[0]
+    rest = SPLIT.split(value[match.end():], maxsplit=1)[0]
     for part in rest.split("/")[1:3]:
         tag = TAG.fullmatch(part)
         if tag:

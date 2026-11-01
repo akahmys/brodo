@@ -37,7 +37,7 @@ grep -E '^echo "\[' scripts/audit/verify_compliance.sh
 | clippy's panic lints over `--lib --bins`, filtered by `scripts/audit/lint_filter.py` | 2 |
 | `scripts/audit/source.py`: asserts and recursion in production code; the lints an exception names, in every target; `unsafe` outside `UNSAFE_MODULES`, in every file, but a call of `CacheFile::map` in `UNSAFE_CALLERS` | 2, 4, 15, 18, 19 |
 | clippy's `indexing_slicing` over the crate of each module in `UNTRUSTED_INPUT`, its findings kept to that module by `scripts/audit/lint_filter.py --under` | 3 |
-| grep for `String` and `anyhow` errors | 8 |
+| grep for `String` as `Result`'s error, its value type nested at most two deep, and for `anyhow` | 8 |
 | grep for `filter_map(Result::ok)` and its forms | 9 |
 | `cargo fmt --all --check` | 10 |
 | `cargo tree --all-features … -i cc` per member and target | 12 |
@@ -90,7 +90,8 @@ list, kept outside the repository so that it names no other project of the owner
 matches names only, so no directory on any machine is written into the repository.
 OpenVDB passes where a path or URL names a tag from `v12.0.0` on, a segment `vX.Y.Z` among
 the two after its name or a directory `openvdb-vX.Y.Z`, the repository's own directories
-under it included; a path that climbs with `..` is judged segment by segment (ADR-0044).
+under it included; a path that climbs with `..` is judged segment by segment, and a path
+ends at white space, a quote or a shell's punctuation (ADR-0044).
 Nothing backs it up: what was read leaves no trace in the tree.
 
 Install the hooks once per clone:

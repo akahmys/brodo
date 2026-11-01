@@ -97,3 +97,16 @@ distinguishes versions by the tag in a path, so a copy of the source checked out
 its tag in a directory name is blocked rather than allowed. ADR-0007's amendment of
 2026-10-24, that OpenVDB was under MPL-2.0 since the Academy Software Foundation took it
 on, held for releases before 12.0 only.
+
+## Amendment: where a path ends
+
+- **Date**: 2026-11-01
+
+P7's retrospective found `scripts/hooks/provenance_guard.py` blocking commands that named a
+tagged directory followed by a shell's punctuation, `build/<tag directory>;` or
+`(cd <tag directory>)`, the segment taken with the `;` or `)` and so not a tag; the
+commands were rewritten to pass. The owner had a path end at white space, a quote, or one of
+`();,&|<>` and the backtick, as well as at a slash. Shown to fire on eleven sample commands:
+before, four naming a tagged directory so were blocked; after, those four pass, and a
+directory without a tag, one before `v12.0.0`, one with text after its tag, and OpenFOAM's,
+each followed by such punctuation, are still blocked.

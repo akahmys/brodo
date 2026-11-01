@@ -126,3 +126,16 @@ human, who agreed to it only afterwards. The human decided that a spike asserts,
 times a case, that the case holds what its report says is measured (PLANNING.md §3), and
 that an ADR states as the human's decision only a point the human answered in the session,
 each put to the human before it is written (PLANNING.md §2). Held by review alone.
+
+## Amendment
+
+- **Date**: 2026-11-01
+
+P7's retrospective found that `spikes/vdbread/` measured the files OpenVDB writes by
+default but not the grids brodo's reader would skip: that OpenVDB writes a grid saved as
+half floats with `_HalfFloat` appended to its type name, and an instanced grid with its
+leaf buffers' offset 0, came to light only while the reader's test files were made, the
+second as a refusal of files the reader was to read. The owner decided that a spike that
+decides how a format is read measures, from what the producers to be read write, the inputs
+the reader will refuse or skip as well as those it reads (PLANNING.md §3). Held by review
+alone.
