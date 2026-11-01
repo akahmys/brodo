@@ -36,8 +36,9 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
 - **Done**: the reader, `vdb::from_bytes` and `vdb::read`, to docs/formats.md §9.7 and §9.8,
   in `UNTRUSTED_INPUT` and fuzzed; files OpenVDB 12.0.0 and 14.0.0 wrote read as OpenVDB
   reads them (2026-11-01).
-- **Next**: P7's close: retrospective and refactoring, the fuzz round with the new reader,
-  the Miri run, and the checks the milestone's list names.
+- **Done**: P7's closing runs the owner chose (2026-11-01): the fuzz round, the Miri run and
+  the benchmarks, `leaf_parallel_update_x32` recorded again (ADR-0019).
+- **Next**: P7's retrospective, its proposals for the owner, then acceptance.
 
 ## 2. Milestones
 
@@ -364,8 +365,14 @@ built. brodo reads and writes `.vdb` itself, the format learnt from OpenVDB at `
       (ADR-0046)
 - [x] Reading: the files brodo writes, and those OpenVDB 12 to 14 writes for the same grid
       types by default (ADR-0047, 2026-11-01)
-- [ ] Retrospective and refactoring; fuzz round, the new readers included; Miri run;
-      benchmarks; mutation run (ADR-0023), as the human chooses (ADR-0033)
+- [ ] Retrospective and refactoring (ADR-0001); refactoring done: the magic number and
+      active-mask flag shared by the writer and the reader (2026-11-01)
+- [x] Fuzz round, the new reader included: eight targets, 900 s each, no finding
+      (2026-11-01)
+- [x] Miri run: every `miri_*` test passes; the same warning from `crossbeam-epoch` 0.9.21
+      under Tree Borrows (ADR-0015, 2026-11-01)
+- [x] Benchmarks, every feature, at rest: every item within its baseline but
+      `leaf_parallel_update_x32`, as slow before P7, recorded again (ADR-0019, 2026-11-01)
 - [ ] **Accepted when** brodo's float and double grids are written to `.vdb` files that
       OpenVDB's tools read back the same, and such files are read back into brodo
 

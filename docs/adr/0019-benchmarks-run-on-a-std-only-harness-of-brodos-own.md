@@ -275,3 +275,16 @@ others keeping theirs: `leaf_parallel_update_x32` 3 080 250, `archive_write` 5 5
 `leaf_parallel_update_x32` read 3.69 ms in the first run and 3.08 ms in its record, 20 %
 apart between runs a few minutes apart, the first pair within 0.3 % and the record's
 within 10 %: drift between processes on four threads, its cause not measured.
+
+## Amendment: the leaf-parallel update recorded again at P7's close
+
+- **Date**: 2026-11-01
+
+P7's closing run, every feature, at one-minute loads of 1.71 to 1.92, found
+`leaf_parallel_update_x32` slower than its baseline of 3 080 250 ns by 12 to 21 % in every
+pair, every other item of both crates within it. P7 changed no path the item times: the
+commit before P7, `11e13a6`, benchmarked in turn with P7's, twice each, read 3.45 to
+3.72 ms against P7's 3.49 to 3.73 ms. The baseline was the faster of the two readings the
+amendment above records, 3.08 ms against 3.69 ms. The owner had the item recorded again,
+the cause still not measured: `--record leaf_parallel_update_x32` at a one-minute load of
+1.20 gave 3 398 084 ns.

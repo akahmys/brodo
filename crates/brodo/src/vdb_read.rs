@@ -16,15 +16,12 @@ use crate::field::{Field, LEAF_VOXELS};
 use crate::meta::GridMeta;
 use crate::topology::Topology;
 use crate::tree::{Coord, TileLevel};
-use crate::vdb::VdbValue;
+use crate::vdb::{ACTIVE_MASK, MAGIC, VdbValue};
 
-/// The file's magic number, read as an `i64`.
-const MAGIC: i64 = 0x5644_4220;
 /// The file versions read (ADR-0047).
 const VERSIONS: [u32; 2] = [224, 225];
-/// Compression flags (docs/formats.md §9.7).
+/// Compression flags besides active-mask (docs/formats.md §9.7).
 const ZIP: u32 = 1;
-const ACTIVE_MASK: u32 = 2;
 const BLOSC: u32 = 4;
 /// Blosc's flag bits (docs/formats.md §9.8).
 const BLOSC_SHUFFLE: u8 = 1;

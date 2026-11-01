@@ -19,16 +19,16 @@ use crate::topology::{LeafNumber, TileNumber, Topology};
 use crate::tree::{Coord, TileLevel};
 pub use crate::vdb_read::{VdbField, VdbFile, VdbGrid, from_bytes, read};
 
-/// The file's magic number, written as an `i64`.
-const MAGIC: i64 = 0x5644_4220;
+/// The file's magic number, an `i64`.
+pub(crate) const MAGIC: i64 = 0x5644_4220;
 /// The file version written (ADR-0046).
 const FILE_VERSION: u32 = 225;
 /// The library version a file states, major and minor (ADR-0046).
 const LIBRARY: [u32; 2] = [14, 0];
 /// The file's UUID: zeros, so that the same grids give the same bytes (ADR-0046).
 const UUID: &[u8; 36] = b"00000000-0000-0000-0000-000000000000";
-/// Compression flags: active-mask alone (ADR-0046).
-const ACTIVE_MASK: u32 = 2;
+/// Compression flags: active-mask, the one brodo writes alone (ADR-0046).
+pub(crate) const ACTIVE_MASK: u32 = 2;
 /// The places of an upper node, a lower node and a leaf.
 const UPPER_PLACES: usize = 1 << 15;
 const LOWER_PLACES: usize = 1 << 12;
