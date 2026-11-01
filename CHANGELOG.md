@@ -6,9 +6,15 @@ are recorded here when they change (V6).
 
 ## Unreleased
 
+## 0.8.1 (2026-11-02)
+
+Closes no milestone: the review of the whole repository after P7. Nothing breaks a user.
+
 - `vdb::from_bytes` and `vdb::read` refuse a Blosc chunk whose block does not start where
   its header ends, or with bytes after its values, as docs/formats.md §9.8 states; 0.8.0
   read past them.
+- The documentation of `vdb::from_bytes` and `vdb::read` states that what reading makes is
+  not bounded by `limit` (ARCHITECTURE.md §4.7, ADR-0047).
 
 ## 0.8.0 (2026-11-02)
 

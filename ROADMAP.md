@@ -8,13 +8,14 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: the review of the whole repository (§2, "After P7"), its first seven items: the
+- **Done**: the review of the whole repository (§2, "After P7"), closed as 0.8.1: the
   Blosc chunk refused off its place, the memory `vdb::read` makes stated (ADR-0047), the
   rules inventoried and their gaps closed (ADR-0002, ADR-0005, ADR-0021, ADR-0048), no code
   taken from outside (AGENTS.md S5, ADR-0049), every document read against the code
-  (ADR-0001's amendment of 2026-11-02), and three refactorings with no behaviour changed,
-  the benchmarks within their baselines and the mutants in the change all caught.
-- **Next**: the review's files no longer needed, then the version.
+  (ADR-0001's amendment of 2026-11-02), and three refactorings with no behaviour changed;
+  no file was found no longer needed.
+- **Next**: the units §2's "After P7" lists after the review, `limit` bounding what
+  `vdb::from_bytes` and `vdb::read` make among them.
 
 ## 2. Milestones
 
@@ -379,10 +380,10 @@ as a proposal for a unit of its own.
       `Clone` and `PartialEq` change public items, so they are a proposal, not part of this
       review. The last three done; `frozen::plan` and `vdb::Nodes::of` left, since they
       build different nodes in different orders
-- [ ] Files no longer needed: one list from the three steps, removed once the owner
+- [x] Files no longer needed: one list from the three steps, removed once the owner
       approves it; a test file kept only if removing it fails a test; every spike's
       REPORT.md kept, its code removed only where its ADR's decision was later reversed
-- [ ] A version only if code changed, 0.8.1 by the owner's choice; TESTING.md V2 raises
+- [x] A version only if code changed, 0.8.1 by the owner's choice; TESTING.md V2 raises
       PATCH for a fix, so whether a refactoring counts as one is put to the owner then
 
 Then, as units of their own after the review:
