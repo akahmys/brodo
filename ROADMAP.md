@@ -8,12 +8,13 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: the review of the whole repository (§2, "After P7"), its first four items: the
+- **Done**: the review of the whole repository (§2, "After P7"), its first five items: the
   Blosc chunk refused off its place, the memory `vdb::read` makes stated (ADR-0047), and
   the rules inventoried, every checked rule broken once: Rules 2 and 3 now read code behind
   a feature (ADR-0021), Rule 12 fails where `cargo tree` does (ADR-0005), Rule 15's lean on
-  `cargo fmt` is stated (ADR-0002), and L3 and L4 are checked (ADR-0048).
-- **Next**: the review's issues and pull requests, then the documents, among them amended
+  `cargo fmt` is stated (ADR-0002), and L3 and L4 are checked (ADR-0048); no code taken
+  from outside, an issue taken as a report (AGENTS.md S5, ADR-0049).
+- **Next**: the review's documents, among them amended
   ADRs still marked Accepted and two stale passages in TESTING.md §4 and AUDITING.md.
 
 ## 2. Milestones
@@ -378,7 +379,7 @@ as a proposal for a unit of its own.
       fails the check (TESTING.md T3), what it has caught in the history and what it costs
       the gate; each proposed to be kept, enforced, merged or retired, and the owner's
       decisions landed through the ADR on their topic (AGENTS.md, "Changing the rules")
-- [ ] Issues and pull requests, a rule proposed in the same step with an ADR of its own
+- [x] Issues and pull requests, a rule proposed in the same step with an ADR of its own
       (the owner, 2026-11-01): no code taken from outside, since much of it is written by
       agents and none of it can be shown to keep AGENTS.md's "Sources"; pull requests
       opened only by collaborators, GitHub's setting, set by the owner; issues taken, a

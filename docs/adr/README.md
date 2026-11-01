@@ -76,3 +76,4 @@ A record is `Proposed` until the human accepts it.
 | [0046](0046-how-brodo-writes-vdb-files.md) | How brodo writes `.vdb` files |
 | [0047](0047-how-brodo-reads-vdb-files.md) | How brodo reads `.vdb` files |
 | [0048](0048-where-files-go-is-checked.md) | Where files go at the root and where scripts lie is checked |
+| [0049](0049-code-is-not-taken-from-outside-and-an-issue-is-a-report.md) | Code is not taken from outside, and an issue is a report |

@@ -34,6 +34,12 @@ revisions build two copies of brodo whose types do not mix. If you need a change
 release, ask for a small release rather than pinning a revision (ADR-0040). Releases and
 their breaking changes are in [CHANGELOG.md](CHANGELOG.md).
 
+## Issues and pull requests
+
+Issues are welcome: a bug with the steps that show it and the result you expected, or a
+request. Pull requests are not accepted, and only collaborators can open one; a fix is
+written here from an issue, never from code it carries (AGENTS.md S5).
+
 ## Setting up a clone
 
 1. Install the commit hooks:
