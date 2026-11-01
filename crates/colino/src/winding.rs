@@ -18,21 +18,9 @@
 use std::f64::consts::PI;
 
 use crate::bvh::Bvh;
-use crate::distance::Point;
+use crate::distance::{Point, cross, dot, sub};
 use crate::error::MeshError;
 use crate::mesh::Mesh;
-
-fn sub(a: Point, b: Point) -> Point {
-    [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
-}
-
-fn dot(a: Point, b: Point) -> f64 {
-    a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
-}
-
-fn cross(a: Point, b: Point) -> Point {
-    [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
-}
 
 fn norm(a: Point) -> f64 {
     dot(a, a).sqrt()

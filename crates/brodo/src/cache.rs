@@ -456,6 +456,29 @@ pub(crate) fn zero(bytes: &[u8]) -> bool {
 
 /// Reads `source` to its end into `blocks`, from their start, growing them as it needs:
 /// the bytes read. A read interrupted is tried again.
+/// A file's bytes, of at most `limit`: a longer file is refused by its length before any of
+/// it is read, or by the bytes read where its length says less than it holds, as
+/// `too_large(length, limit)` (ADR-0036).
+#[cfg(any(feature = "archive", feature = "vdb"))]
+pub(crate) fn read_within<E: From<std::io::Error>>(
+    path: &Path,
+    limit: u64,
+    too_large: impl Fn(u64, u64) -> E,
+) -> Result<Vec<u8>, E> {
+    let file = std::fs::File::open(path)?;
+    let length = file.metadata()?.len();
+    if length > limit {
+        return Err(too_large(length, limit));
+    }
+    let mut bytes = Vec::new();
+    file.take(limit.saturating_add(1)).read_to_end(&mut bytes)?;
+    let read = u64::try_from(bytes.len()).unwrap_or(u64::MAX);
+    if read > limit {
+        return Err(too_large(read, limit));
+    }
+    Ok(bytes)
+}
+
 fn fill(source: &mut impl Read, blocks: &mut Vec<Block>) -> std::io::Result<usize> {
     let mut filled = 0_usize;
     loop {

@@ -9,9 +9,9 @@
 //! hundreds (ARCHITECTURE.md §4.7).
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::io::Read;
 use std::path::Path;
 
+use crate::cache::read_within;
 use crate::error::VdbError;
 use crate::field::{Field, LEAF_VOXELS};
 use crate::meta::GridMeta;
@@ -109,17 +109,7 @@ pub fn from_bytes(bytes: &[u8], unit: &str) -> Result<VdbFile, VdbError> {
 /// refused by its length before any of it is read, or by the bytes read where its length
 /// says less than it holds. `limit` does not bound what reading makes (ARCHITECTURE.md §4.7).
 pub fn read(path: &Path, unit: &str, limit: u64) -> Result<VdbFile, VdbError> {
-    let file = std::fs::File::open(path)?;
-    let length = file.metadata()?.len();
-    if length > limit {
-        return Err(VdbError::FileTooLarge { length, limit });
-    }
-    let mut bytes = Vec::new();
-    file.take(limit.saturating_add(1)).read_to_end(&mut bytes)?;
-    let read = u64::try_from(bytes.len()).unwrap_or(u64::MAX);
-    if read > limit {
-        return Err(VdbError::FileTooLarge { length: read, limit });
-    }
+    let bytes = read_within(path, limit, |length, limit| VdbError::FileTooLarge { length, limit })?;
     from_bytes(&bytes, unit)
 }
 

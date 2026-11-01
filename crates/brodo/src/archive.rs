@@ -7,7 +7,6 @@
 //! Format version 1's bytes are in `docs/formats.md` §8, which this code follows. A region's
 //! read (§8.6) checks the archive's structure and only the chunks it decompresses.
 
-use std::io::Read;
 use std::path::Path;
 
 use rayon::prelude::*;
@@ -15,7 +14,7 @@ use zerocopy::{FromBytes, FromZeros, IntoBytes};
 
 use crate::cache::{
     CacheEntry, CacheFile, Cursor, Part, Storage, decode_meta, encode_meta, head, index, pad_to,
-    put_u32, range, u32_of, zero,
+    put_u32, range, read_within, u32_of, zero,
 };
 use crate::error::{CacheError, FormatError};
 use crate::field::{ForType, LEAF_VOXELS, Stored, with_type};
@@ -544,18 +543,7 @@ pub fn read(path: &Path, limit: u64) -> Result<CacheFile, CacheError> {
 /// An archive's bytes, of at most `limit`, refused by its length before any of it is read,
 /// or by the bytes read where its length says less than it holds.
 fn load(path: &Path, limit: u64) -> Result<Vec<u8>, CacheError> {
-    let file = std::fs::File::open(path)?;
-    let length = file.metadata()?.len();
-    if length > limit {
-        return Err(CacheError::FileTooLarge { length, limit });
-    }
-    let mut bytes = Vec::new();
-    file.take(limit.saturating_add(1)).read_to_end(&mut bytes)?;
-    let read = u64::try_from(bytes.len()).unwrap_or(u64::MAX);
-    if read > limit {
-        return Err(CacheError::FileTooLarge { length: read, limit });
-    }
-    Ok(bytes)
+    read_within(path, limit, |length, limit| CacheError::FileTooLarge { length, limit })
 }
 
 /// One grid's region of an archive, a box of voxels, read without the leaf chunks it does
@@ -791,7 +779,7 @@ impl<'a, T: Stored> RegionView<'a, T> {
         match self.locate(v)? {
             ViewLocation::Leaf(n) => {
                 let [x, y, z] = local(v, 0, 3).map(|c| c as usize);
-                self.leaf(n)?
+                self.values(n)?
                     .get(x + 8 * y + 64 * z)
                     .copied()
                     .ok_or(FormatError::Inconsistent("leaf value"))
@@ -807,6 +795,12 @@ impl<'a, T: Stored> RegionView<'a, T> {
         self.leaves
             .binary_search_by_key(&n, |(m, _)| *m)
             .map_err(|_| FormatError::OutsideRegion)?;
+        self.values(n)
+    }
+
+    /// A leaf's 512 values from its chunk, for a leaf known to meet the box: one that holds
+    /// a voxel within it, as `get` finds.
+    fn values(&self, n: u32) -> Result<&'a [T; LEAF_VOXELS], FormatError> {
         let n = n as usize;
         let lost = FormatError::Inconsistent("leaf value");
         let i =

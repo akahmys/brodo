@@ -8,13 +8,13 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: the review of the whole repository (§2, "After P7"), its first six items: the
+- **Done**: the review of the whole repository (§2, "After P7"), its first seven items: the
   Blosc chunk refused off its place, the memory `vdb::read` makes stated (ADR-0047), the
   rules inventoried and their gaps closed (ADR-0002, ADR-0005, ADR-0021, ADR-0048), no code
-  taken from outside (AGENTS.md S5, ADR-0049), and every document read against the code,
-  its claims corrected (ADR-0001's amendment of 2026-11-02).
-- **Next**: the review's refactoring of the code (PLANNING.md §7), then the files no longer
-  needed and the version.
+  taken from outside (AGENTS.md S5, ADR-0049), every document read against the code
+  (ADR-0001's amendment of 2026-11-02), and three refactorings with no behaviour changed,
+  the benchmarks within their baselines and the mutants in the change all caught.
+- **Next**: the review's files no longer needed, then the version.
 
 ## 2. Milestones
 
@@ -369,7 +369,7 @@ as a proposal for a unit of its own.
       the golden files, the build steps run, PROVENANCE.md's rows), and what restates
       another home or narrates history removed; each document read by a subagent of its
       own, briefed with AGENTS.md's "Sources"
-- [ ] Code: refactoring (PLANNING.md §7), the tests unchanged, the gate passing before and
+- [x] Code: refactoring (PLANNING.md §7), the tests unchanged, the gate passing before and
       after, the golden files the same bytes, the benchmarks within their baselines, then a
       mutation run with none missed, since `.cargo/mutants.toml` names functions. Among the
       candidates, from the same review: `frozen::plan` and `vdb::Nodes::of` each rebuilding
@@ -377,7 +377,8 @@ as a proposal for a unit of its own.
       `distance.rs` has; `archive::load` and `vdb_read::read` reading a file within a limit
       alike; `RegionView` searching twice for a leaf. Public errors that differ in deriving
       `Clone` and `PartialEq` change public items, so they are a proposal, not part of this
-      review
+      review. The last three done; `frozen::plan` and `vdb::Nodes::of` left, since they
+      build different nodes in different orders
 - [ ] Files no longer needed: one list from the three steps, removed once the owner
       approves it; a test file kept only if removing it fails a test; every spike's
       REPORT.md kept, its code removed only where its ADR's decision was later reversed
