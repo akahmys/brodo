@@ -112,3 +112,19 @@ the scissors line and must name an ADR that is staged. Shown to fire: of 47 comm
 guard before this amendment passed the ten above, and the new one blocks the 30 it should and
 passes the 17 it should; of four messages, the old check passed one naming ADR-0005 with
 ADR-0003 staged and one naming an ADR only below the scissors, and the new one fails both.
+
+## Amendment: SVGs scanned, and HTML links
+
+- **Date**: 2026-11-02
+
+With the logo's SVGs added, a further outside review found that betterleaks' own default
+allow-list skips every path ending `.svg`, that `documents.py` and `paths.py` read no SVG,
+and that `documents.py` checked Markdown links alone, not the `src` and `srcset` of the
+README's HTML. The owner decided, on 2026-11-02, that it be fixed: the pre-commit hook and
+the audit also pass each SVG, staged, in the tree or in the history, to `betterleaks
+stdin`, where no path is matched; `documents.py` and `paths.py` read SVGs; and a
+document's HTML `src`, `srcset` and `href` must resolve. Shown to fire: a staged SVG
+holding a key passed the old hook and failed the new; an SVG holding Japanese and a path
+leading outside the project, and a README naming a logo that does not exist, passed the
+old checks and failed the new. It also reported that `env -u VAR git …`, `export …; git …`
+and a `git` after a pipe passed the guard, which blocked each already.

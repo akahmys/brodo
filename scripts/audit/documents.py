@@ -4,8 +4,8 @@
 1. Language: no Japanese script in the repository's text files (AGENTS.md writing rule 6).
 2. Tense: `ARCHITECTURE.md` and `AGENTS.md` say what is true now. A line carrying both a
    date and a past-tense verb is the shape of a dated self-correction (writing rule 2).
-3. Links: every relative Markdown link in the documents and in source comments resolves
-   (writing rule 1).
+3. Links: every relative Markdown link in the documents and in source comments, and every
+   relative `src`, `srcset` and `href` of HTML in a document, resolves (writing rule 1).
 4. The ADR index: no duplicate or missing number, the index and the directory agree in
    both directions, and every record carries a Status and a Date.
 5. No CLAUDE.md: Claude Code reads AGENTS.md only while none of these exists.
@@ -27,7 +27,7 @@ from paths import committable
 from project import LAYERS
 
 ROOT = Path(__file__).resolve().parent.parent.parent
-TEXT = {".md", ".rs", ".toml", ".py", ".sh", ".txt", ".json", ".yml", ".yaml"}
+TEXT = {".md", ".rs", ".toml", ".py", ".sh", ".txt", ".json", ".yml", ".yaml", ".svg"}
 
 PRESENT_TENSE = ["ARCHITECTURE.md", "AGENTS.md"]
 DATE = re.compile(r"\b20\d\d-\d\d-\d\d\b")
@@ -37,6 +37,8 @@ JAPANESE = re.compile("[\u3000-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uff00-\uffef]")
 # `NAME.md §N`, a root document's or `docs/`'s, its name in a link or in backquotes or bare.
 SECTION = re.compile(r"\b((?:docs/)?[A-Za-z][A-Za-z_]*\.md)[)`]? §(\d+(?:\.\d+)*)")
 LINK = re.compile(r"\]\(([^)#:\s][^)\s#]*)(#[^)]*)?\)")
+# HTML in a document: `<img src="…">`, `<source srcset="… 2x, …">`, `<a href="…">`.
+HTML_LINK = re.compile(r'\b(src|srcset|href)\s*=\s*"([^"]*)"')
 
 
 def walk() -> list[Path]:
@@ -71,11 +73,18 @@ def links(paths: list[Path]) -> list[str]:
     for path in paths:
         if path.suffix not in {".md", ".rs"}:
             continue
-        for match in LINK.finditer(path.read_text(errors="replace")):
-            if ":" in match.group(1):
+        text = path.read_text(errors="replace")
+        targets = [m.group(1) for m in LINK.finditer(text)]
+        if path.suffix == ".md":
+            for m in HTML_LINK.finditer(text):
+                urls = m.group(2).split(",") if m.group(1) == "srcset" else [m.group(2)]
+                targets += [u.split()[0] for u in urls if u.split()]
+        for target in targets:
+            target = target.split("#")[0]
+            if not target or ":" in target:
                 continue
-            if not (path.parent / match.group(1)).exists():
-                out.append(f"  {path.relative_to(ROOT)}: {match.group(1)} does not exist")
+            if not (path.parent / target).exists():
+                out.append(f"  {path.relative_to(ROOT)}: {target} does not exist")
     return out
 
 

@@ -55,6 +55,7 @@ The dependency order between crates is CODING.md Rule 11, listed in
 ├── .github/workflows/           # GitHub Actions: the gate and the mutation run (ADR-0034)
 ├── docs/adr/                    # decision records
 ├── docs/formats.md              # the bytes of each file brodo writes
+├── docs/logo/                   # the logo, light and dark, and the icons, as SVG and PNG
 ├── scripts/audit/               # the audit, and project.py, its settings
 ├── scripts/hooks/               # git and Claude Code hooks
 ├── crates/brodo/, crates/colino/, crates/piatto/ (if built)

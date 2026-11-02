@@ -31,8 +31,13 @@ Closes no milestone: the review of the whole repository after P7. Nothing breaks
   a point farther than its nearest edge's, so a distance too large, by up to 0.13 of the
   triangle's size; the distance is now within the rounding of the coordinates over the sine
   of the triangle's sharpest angle, at most √ε of its size (ARCHITECTURE.md §5.1, ADR-0027).
+- `colino::intersect::crossing`, and so Hermite data and the parity count, crossed a
+  triangle whose corners lie on a line where a segment passed through the line, against
+  its documentation; Hermite data was then refused for a normal of no length. A triangle
+  with edges below about 10⁻⁸¹ or above about 10⁷⁷ got such a normal too (ADR-0030).
 - `colino::report::report` refuses a region whose point is not finite, as the new
   `ReportError::Region`; 0.8.0 placed it outside the grid (ADR-0028).
+- The README shows the logo, kept with the icons in `docs/logo/`.
 - `scripts/audit/formats.py`, the reader written from docs/formats.md, reads an archive's
   region as §8.6 says, compared with the crates in the gate's tests (ADR-0037).
 - The documentation of `colino::error::ReportError::Mesh` names groups that do not fit the
@@ -42,7 +47,8 @@ Closes no milestone: the review of the whole repository after P7. Nothing breaks
   commit hooks, terminal and browser tools, sources named after `:` or `=`, Rules 8, 9 and
   19 and T1 written over several lines or under `cfg_attr`, output directories deeper than
   the root, a mutation run whose baseline failed, was missing or whose list was empty, and
-  a commit message's ADR not staged or named only in `git commit -v`'s diff (ADR-0002,
+  a commit message's ADR not staged or named only in `git commit -v`'s diff, strings over
+  lines, and SVGs and a README's HTML links (ADR-0002,
   ADR-0003, ADR-0007, ADR-0021, ADR-0023, ADR-0034).
 
 ## 0.8.0 (2026-11-02)

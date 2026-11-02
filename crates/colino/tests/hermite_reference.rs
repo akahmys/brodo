@@ -619,3 +619,45 @@ fn signs_follow_the_conversions_accuracy() {
 
 /// A β coarse enough to decide some points otherwise than β = 2.
 const BETA: f64 = 0.3;
+
+/// A cube holding, just inside a face, a triangle whose corners lie on a line through a
+/// point of a crossed edge: the triangle is never hit, so Hermite data is made, where it was
+/// refused for a normal of no length (ARCHITECTURE.md §5.1 takes degenerate triangles).
+#[test]
+fn a_triangle_on_a_line_through_a_crossed_edge_is_not_hit() {
+    let cube = turned_cube(4.3, [0.0; 3], 0.0, 0.0);
+    let mut state = 0x2545_f491_4f6c_dd1d_u64;
+    let mut next = || {
+        state ^= state << 13;
+        state ^= state >> 7;
+        state ^= state << 17;
+        (state >> 11) as f64 / (1_u64 << 53) as f64
+    };
+    let mut made_with = 0;
+    while made_with < 40 {
+        // Through (x, y, z), y and z whole, on the edges along x crossing the face x = 4.3.
+        let m = [4.2 + next() * 0.1, (next() * 6.0).floor() - 3.0, (next() * 6.0).floor() - 3.0];
+        let d = [next() * 0.2 - 0.1, next() * 2.0 - 1.0, next() * 2.0 - 1.0];
+        let (a, b) = ([0, 1, 2].map(|k| m[k] - d[k]), [0, 1, 2].map(|k| m[k] + d[k]));
+        let t = 2.0 + next();
+        let c = [0, 1, 2].map(|k| a[k] + t * (b[k] - a[k]));
+        let (ab, ac) = ([0, 1, 2].map(|k| b[k] - a[k]), [0, 1, 2].map(|k| c[k] - a[k]));
+        let n = [
+            ab[1] * ac[2] - ab[2] * ac[1],
+            ab[2] * ac[0] - ab[0] * ac[2],
+            ab[0] * ac[1] - ab[1] * ac[0],
+        ];
+        if n.iter().any(|x| *x != 0.0) || c[1].abs() > 4.0 || c[2].abs() > 4.0 {
+            continue;
+        }
+        let mut vertices = cube.vertices.clone();
+        let first = u32::try_from(vertices.len()).unwrap();
+        vertices.extend([a, b, c]);
+        let mut triangles = cube.triangles.clone();
+        triangles.push([first, first + 1, first + 2]);
+        let m = Mesh::new(vertices, triangles).with_unit(Some("millimeter".into()));
+        let c = convert(&m, &Options::new(1.0)).unwrap();
+        assert!(hermite(&m, &c).is_ok(), "{:?}", [a, b, ab]);
+        made_with += 1;
+    }
+}

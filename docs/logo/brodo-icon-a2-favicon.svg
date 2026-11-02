@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" rx="108" fill="#0F172A"/>
+  <g>
+    <polygon points="256.00,148.00 349.53,202.00 256.00,256.00 162.47,202.00" fill="#FBBF24" stroke="#0F172A" stroke-width="4.0" stroke-linejoin="round" stroke-linecap="round"/>
+    <polygon points="162.47,202.00 256.00,256.00 256.00,364.00 162.47,310.00" fill="#D97706" stroke="#0F172A" stroke-width="4.0" stroke-linejoin="round" stroke-linecap="round"/>
+    <polygon points="349.53,202.00 256.00,256.00 256.00,364.00 349.53,310.00" fill="#92400E" stroke="#0F172A" stroke-width="4.0" stroke-linejoin="round" stroke-linecap="round"/>
+  </g>
+  <g>
+    <polygon points="256.00,40.00 349.53,94.00 256.00,148.00 162.47,94.00" fill="#FBBF24" stroke="#0F172A" stroke-width="4.0" stroke-linejoin="round" stroke-linecap="round"/>
+    <polygon points="162.47,94.00 256.00,148.00 256.00,256.00 162.47,202.00" fill="#D97706" stroke="#0F172A" stroke-width="4.0" stroke-linejoin="round" stroke-linecap="round"/>
+    <polygon points="349.53,94.00 256.00,148.00 256.00,256.00 349.53,202.00" fill="#92400E" stroke="#0F172A" stroke-width="4.0" stroke-linejoin="round" stroke-linecap="round"/>
+  </g>
+  <g>
+    <polygon points="162.47,202.00 256.00,256.00 162.47,310.00 68.94,256.00" fill="#FBBF24" stroke="#0F172A" stroke-width="4.0" stroke-linejoin="round" stroke-linecap="round"/>
+    <polygon points="68.94,256.00 162.47,310.00 162.47,418.00 68.94,364.00" fill="#D97706" stroke="#0F172A" stroke-width="4.0" stroke-linejoin="round" stroke-linecap="round"/>
+    <polygon points="256.00,256.00 162.47,310.00 162.47,418.00 256.00,364.00" fill="#92400E" stroke="#0F172A" stroke-width="4.0" stroke-linejoin="round" stroke-linecap="round"/>
+  </g>
+  <g>
+    <polygon points="349.53,202.00 443.06,256.00 349.53,310.00 256.00,256.00" fill="#FBBF24" stroke="#0F172A" stroke-width="4.0" stroke-linejoin="round" stroke-linecap="round"/>
+    <polygon points="256.00,256.00 349.53,310.00 349.53,418.00 256.00,364.00" fill="#D97706" stroke="#0F172A" stroke-width="4.0" stroke-linejoin="round" stroke-linecap="round"/>
+    <polygon points="443.06,256.00 349.53,310.00 349.53,418.00 443.06,364.00" fill="#92400E" stroke="#0F172A" stroke-width="4.0" stroke-linejoin="round" stroke-linecap="round"/>
+  </g>
+  <g>
+    <polygon points="162.47,94.00 256.00,148.00 162.47,202.00 68.94,148.00" fill="#FBBF24" stroke="#0F172A" stroke-width="4.0" stroke-linejoin="round" stroke-linecap="round"/>
+    <polygon points="68.94,148.00 162.47,202.00 162.47,310.00 68.94,256.00" fill="#D97706" stroke="#0F172A" stroke-width="4.0" stroke-linejoin="round" stroke-linecap="round"/>
+    <polygon points="256.00,148.00 162.47,202.00 162.47,310.00 256.00,256.00" fill="#92400E" stroke="#0F172A" stroke-width="4.0" stroke-linejoin="round" stroke-linecap="round"/>
+  </g>
+  <g>
+    <polygon points="349.53,94.00 443.06,148.00 349.53,202.00 256.00,148.00" fill="#FBBF24" stroke="#0F172A" stroke-width="4.0" stroke-linejoin="round" stroke-linecap="round"/>
+    <polygon points="256.00,148.00 349.53,202.00 349.53,310.00 256.00,256.00" fill="#D97706" stroke="#0F172A" stroke-width="4.0" stroke-linejoin="round" stroke-linecap="round"/>
+    <polygon points="443.06,148.00 349.53,202.00 349.53,310.00 443.06,256.00" fill="#92400E" stroke="#0F172A" stroke-width="4.0" stroke-linejoin="round" stroke-linecap="round"/>
+  </g>
+  <g>
+    <polygon points="256.00,256.00 349.53,310.00 256.00,364.00 162.47,310.00" fill="#FBBF24" stroke="#0F172A" stroke-width="4.0" stroke-linejoin="round" stroke-linecap="round"/>
+    <polygon points="162.47,310.00 256.00,364.00 256.00,472.00 162.47,418.00" fill="#D97706" stroke="#0F172A" stroke-width="4.0" stroke-linejoin="round" stroke-linecap="round"/>
+    <polygon points="349.53,310.00 256.00,364.00 256.00,472.00 349.53,418.00" fill="#92400E" stroke="#0F172A" stroke-width="4.0" stroke-linejoin="round" stroke-linecap="round"/>
+  </g>
+  <g>
+    <polygon points="256.00,202.00 302.77,229.00 256.00,256.00 209.23,229.00" fill="#FCD34D" stroke="#0F172A" stroke-width="3.6" stroke-linejoin="round" stroke-linecap="round"/>
+    <polygon points="209.23,229.00 256.00,256.00 256.00,310.00 209.23,283.00" fill="#F59E0B" stroke="#0F172A" stroke-width="3.6" stroke-linejoin="round" stroke-linecap="round"/>
+    <polygon points="302.77,229.00 256.00,256.00 256.00,310.00 302.77,283.00" fill="#B45309" stroke="#0F172A" stroke-width="3.6" stroke-linejoin="round" stroke-linecap="round"/>
+  </g>
+  <g>
+    <polygon points="256.00,148.00 302.77,175.00 256.00,202.00 209.23,175.00" fill="#FCD34D" stroke="#0F172A" stroke-width="3.6" stroke-linejoin="round" stroke-linecap="round"/>
+    <polygon points="209.23,175.00 256.00,202.00 256.00,256.00 209.23,229.00" fill="#F59E0B" stroke="#0F172A" stroke-width="3.6" stroke-linejoin="round" stroke-linecap="round"/>
+    <polygon points="302.77,175.00 256.00,202.00 256.00,256.00 302.77,229.00" fill="#B45309" stroke="#0F172A" stroke-width="3.6" stroke-linejoin="round" stroke-linecap="round"/>
+  </g>
+  <g>
+    <polygon points="209.23,229.00 256.00,256.00 209.23,283.00 162.47,256.00" fill="#FCD34D" stroke="#0F172A" stroke-width="3.6" stroke-linejoin="round" stroke-linecap="round"/>
+    <polygon points="162.47,256.00 209.23,283.00 209.23,337.00 162.47,310.00" fill="#F59E0B" stroke="#0F172A" stroke-width="3.6" stroke-linejoin="round" stroke-linecap="round"/>
+    <polygon points="256.00,256.00 209.23,283.00 209.23,337.00 256.00,310.00" fill="#B45309" stroke="#0F172A" stroke-width="3.6" stroke-linejoin="round" stroke-linecap="round"/>
+  </g>
+  <g>
+    <polygon points="302.77,229.00 349.53,256.00 302.77,283.00 256.00,256.00" fill="#FCD34D" stroke="#0F172A" stroke-width="3.6" stroke-linejoin="round" stroke-linecap="round"/>
+    <polygon points="256.00,256.00 302.77,283.00 302.77,337.00 256.00,310.00" fill="#F59E0B" stroke="#0F172A" stroke-width="3.6" stroke-linejoin="round" stroke-linecap="round"/>
+    <polygon points="349.53,256.00 302.77,283.00 302.77,337.00 349.53,310.00" fill="#B45309" stroke="#0F172A" stroke-width="3.6" stroke-linejoin="round" stroke-linecap="round"/>
+  </g>
+  <g>
+    <polygon points="209.23,175.00 256.00,202.00 209.23,229.00 162.47,202.00" fill="#7DD3FC" stroke="#0F172A" stroke-width="3.6" stroke-linejoin="round" stroke-linecap="round"/>
+    <polygon points="162.47,202.00 209.23,229.00 209.23,283.00 162.47,256.00" fill="#0EA5E9" stroke="#0F172A" stroke-width="3.6" stroke-linejoin="round" stroke-linecap="round"/>
+    <polygon points="256.00,202.00 209.23,229.00 209.23,283.00 256.00,256.00" fill="#0369A1" stroke="#0F172A" stroke-width="3.6" stroke-linejoin="round" stroke-linecap="round"/>
+  </g>
+  <g>
+    <polygon points="302.77,175.00 349.53,202.00 302.77,229.00 256.00,202.00" fill="#7DD3FC" stroke="#0F172A" stroke-width="3.6" stroke-linejoin="round" stroke-linecap="round"/>
+    <polygon points="256.00,202.00 302.77,229.00 302.77,283.00 256.00,256.00" fill="#0EA5E9" stroke="#0F172A" stroke-width="3.6" stroke-linejoin="round" stroke-linecap="round"/>
+    <polygon points="349.53,202.00 302.77,229.00 302.77,283.00 349.53,256.00" fill="#0369A1" stroke="#0F172A" stroke-width="3.6" stroke-linejoin="round" stroke-linecap="round"/>
+  </g>
+  <g>
+    <polygon points="256.00,256.00 302.77,283.00 256.00,310.00 209.23,283.00" fill="#7DD3FC" stroke="#0F172A" stroke-width="3.6" stroke-linejoin="round" stroke-linecap="round"/>
+    <polygon points="209.23,283.00 256.00,310.00 256.00,364.00 209.23,337.00" fill="#0EA5E9" stroke="#0F172A" stroke-width="3.6" stroke-linejoin="round" stroke-linecap="round"/>
+    <polygon points="302.77,283.00 256.00,310.00 256.00,364.00 302.77,337.00" fill="#0369A1" stroke="#0F172A" stroke-width="3.6" stroke-linejoin="round" stroke-linecap="round"/>
+  </g>
+  <g>
+    <polygon points="256.00,69.16 302.77,96.16 256.00,123.16 209.23,96.16" fill="#FDE68A" stroke="#0F172A" stroke-width="3.6" stroke-linejoin="round" stroke-linecap="round"/>
+    <polygon points="209.23,96.16 256.00,123.16 256.00,177.16 209.23,150.16" fill="#FBBF24" stroke="#0F172A" stroke-width="3.6" stroke-linejoin="round" stroke-linecap="round"/>
+    <polygon points="302.77,96.16 256.00,123.16 256.00,177.16 302.77,150.16" fill="#D97706" stroke="#0F172A" stroke-width="3.6" stroke-linejoin="round" stroke-linecap="round"/>
+  </g>
+</svg>

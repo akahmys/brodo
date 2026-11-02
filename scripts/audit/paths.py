@@ -22,7 +22,7 @@ from pathlib import Path
 from project import OUTPUT_DIRS
 
 ROOT = Path(__file__).resolve().parent.parent.parent
-SUFFIXES = {".md", ".rs", ".toml", ".py", ".sh", ".txt", ".json", ".yml", ".yaml"}
+SUFFIXES = {".md", ".rs", ".toml", ".py", ".sh", ".txt", ".json", ".yml", ".yaml", ".svg"}
 EXTRA_FILES = {"pre-commit", "commit-msg"}
 
 RELATIVE = re.compile(r"(?<![\w.])((?:\.\./)+[^\s)\]'\"`>]*)")

@@ -268,3 +268,39 @@ fn a_crossing_exactly_at_the_end_is_kept() {
     b[2] += 5;
     assert_eq!(crossing(point(a), point(b), t.map(point)), Some(1.0));
 }
+
+/// Corners on a line, their edges' cross product exactly zero, and a segment through a
+/// point of the line: never crossed, though moved to the segment's start they may round off
+/// the line (docs of `crossing`). Before the check of the corners, about 15 % were.
+#[test]
+fn a_triangle_whose_corners_lie_on_a_line_is_never_crossed() {
+    let mut state = 0x9e37_79b9_7f4a_7c15_u64;
+    let mut next = || {
+        state ^= state << 13;
+        state ^= state >> 7;
+        state ^= state << 17;
+        (state >> 11) as f64 / (1_u64 << 53) as f64 * 2.0 - 1.0
+    };
+    let mut flat = 0;
+    for _ in 0..200_000 {
+        let (a, b) = ([next(), next(), next()], [next(), next(), next()]);
+        let t = next() * 1.5 + 0.5;
+        let c = [0, 1, 2].map(|k| a[k] + t * (b[k] - a[k]));
+        let (ab, ac) = ([0, 1, 2].map(|k| b[k] - a[k]), [0, 1, 2].map(|k| c[k] - a[k]));
+        let n = [
+            ab[1] * ac[2] - ab[2] * ac[1],
+            ab[2] * ac[0] - ab[0] * ac[2],
+            ab[0] * ac[1] - ab[1] * ac[0],
+        ];
+        if n.iter().any(|x| *x != 0.0) {
+            continue;
+        }
+        flat += 1;
+        let s = (next() + 1.0) / 2.0;
+        let m = [0, 1, 2].map(|k| a[k] + s * (b[k] - a[k]));
+        let d = [next(), next(), next()];
+        let (p, q) = ([0, 1, 2].map(|k| m[k] - d[k]), [0, 1, 2].map(|k| m[k] + d[k]));
+        assert_eq!(crossing(p, q, [a, b, c]), None, "{:?} from {p:?} to {q:?}", [a, b, c]);
+    }
+    assert!(flat > 10_000, "{flat} flat triangles");
+}

@@ -112,3 +112,18 @@ and it was: each line's strings and characters are blanked before its comment is
 every check; an exception's part is skipped as its reason when it holds `=`; and the `>`
 of `->` and `=>` closes no bracket. Shown to fire: a file holding each of the three passed
 the old checks and failed the new, which pass the repository.
+
+## Amendment: strings read across lines
+
+- **Date**: 2026-11-02
+
+A further outside review found `source.py` blanking strings line by line, so that a raw
+string holding a quote, `r#"x "Result<u8, String>" y"#`, and a string over lines were read
+as code where they held a rule's words, and a `//` in a string's last line cut the code
+after it. The owner decided, on 2026-11-02, that it be fixed: each file's raw strings,
+strings over lines, characters and comments, line and block, are blanked whole before any
+check reads it, line ends kept. Shown to fire: of three such files, the old check flagged
+the two holding the words in a string and passed the one hiding a `Result<u8, String>`
+after a string's `//`; the new one the reverse. It also reported that two lints in one
+`#[expect]`, a nested `cfg_attr` and `unsafe {` in a string passed, which the checks
+already held, as each case showed.

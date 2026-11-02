@@ -166,6 +166,14 @@ rules=$(betterleaks config check 2>&1 | sed -nE 's/^OK: ([0-9]+) rules.*/\1/p')
 [ "${rules:-0}" -ge 100 ] || fail "betterleaks loaded ${rules:-no} rules; is [extend] missing?"
 betterleaks dir . --no-banner --redact >/dev/null 2>&1 \
     || fail "betterleaks: run 'betterleaks dir . --no-banner --redact'"
+# betterleaks' default allow-list skips a `.svg` by its path; read through standard input it
+# has none, so each SVG git would commit, and each in the history, is read so (ADR-0003).
+svgs() {
+    git ls-files -co --exclude-standard -z -- '*.svg' | xargs -0 cat
+    git rev-list --all --objects | awk '$2 ~ /\.svg$/ {print $1}' | git cat-file --batch
+}
+svgs | betterleaks stdin --no-banner --redact -c .betterleaks.toml >/dev/null 2>&1 \
+    || fail "a secret or a path outside the project in an SVG"
 out=$(python3 scripts/audit/paths.py) || { echo "$out"; ERROR=1; }
 PERSONAL="${PERSONAL_LEAKS:-$HOME/.config/betterleaks/personal.toml}"
 if [ $REMOTE -eq 1 ]; then
@@ -179,6 +187,8 @@ elif [ ! -f "$PERSONAL" ]; then
 else
     betterleaks dir . --no-banner --redact -c "$PERSONAL" >/dev/null 2>&1 \
         || fail "personal data in the working tree"
+    svgs | betterleaks stdin --no-banner --redact -c "$PERSONAL" >/dev/null 2>&1 \
+        || fail "personal data in an SVG"
     if git rev-parse --verify -q HEAD >/dev/null; then
         # The history too: a commit made with --no-verify skipped the hooks.
         betterleaks git . --no-banner --redact >/dev/null 2>&1 \

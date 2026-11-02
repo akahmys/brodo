@@ -265,3 +265,23 @@ triangle a scan would choose is passed. Three mutants that shrink the margin dif
 the scan only where two distances are equal within their rounding, which no test can build
 (ADR-0043). The human decided that of triangles whose distances to the edge are equal
 within their rounding, any one may be taken (ARCHITECTURE.md §5.1).
+
+## Amendment: a triangle on a line, and a normal of any size
+
+- **Date**: 2026-11-02
+
+An outside review found that `crossing` crossed a triangle whose corners lie on a line, its
+edges' cross product exactly zero, when a segment passed through the line: moved to the
+segment's start, the corners rounded off it, and the edge functions and their sum off 0.
+Of 222 630 such triangles with a segment through a point of the line, 32 835 were crossed;
+a cube holding one just inside a face, through a point of a crossed edge, was refused
+Hermite data for a normal of no length in 216 meshes of 300, where ARCHITECTURE.md §5.1
+takes degenerate triangles. The parity count's test along an axis is of the same shape. It
+also found the unit normal taken from the squared length, which underflows to 0 for a
+triangle of edges below about 10⁻⁸¹ and overflows above about 10⁷⁷, so that such a triangle
+crossed was given a normal of no length too. The owner decided, on 2026-11-02, that it be
+fixed: `crossing` and the parity count refuse a triangle by its own corners' cross product
+first, as Hermite data's nearest triangle does, and a normal is divided by its largest
+component before its length. Shown to fire: a search of 200 000 triangles for the crossing
+and the parity count, the cube with such a triangle, and normals of edges 10⁻⁹⁰ and 10⁸⁰,
+each failed with its fix taken out.

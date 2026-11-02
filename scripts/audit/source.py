@@ -89,26 +89,44 @@ def crates() -> list[Path]:
     return sorted(roots)
 
 
-# A string, a character, or a line's comment: what `blank` empties.
-LEXEME = re.compile(r'"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])\'|//.*')
+# What `blank` empties, the first to start winning: a raw string, `r#"…"#`; a string,
+# over lines too; a character; a line's comment; a block comment, not nested.
+LEXEME = re.compile(
+    r'(b?r(#*)")(.*?)("\2)'
+    r'|(b?")((?:\\.|[^"\\])*)(")'
+    r"|(b?')((?:\\.|[^'\\]))(')"
+    r"|()(//[^\n]*)()"
+    r"|()(/\*.*?\*/)()",
+    re.DOTALL,
+)
 
 
-def blank(line: str) -> str:
-    """A line with each string's and character's text made spaces, their quotes kept, and
-    its comment made spaces: its code alone, every position where it was. A string is found
-    before a comment, so `"http://…"` is a string."""
+def blank(text: str) -> str:
+    """Text with each string's and character's contents and each comment made spaces, its
+    quotes and line ends kept: its code alone, every character where it was. A string is
+    found before a comment that starts within it, so `"http://…"` is a string."""
     def empty(m: re.Match[str]) -> str:
-        text = m.group(0)
-        return " " * len(text) if text.startswith("//") else text[0] + " " * (len(text) - 2) + text[-1]
+        groups = [g for g in m.groups() if g is not None]
+        if m.group(1) is not None:  # a raw string: its opening, hashes, contents, closing
+            opening, _, inside, closing = groups
+        else:
+            opening, inside, closing = groups
+        return opening + re.sub(r"[^\n]", " ", inside) + closing
 
-    return LEXEME.sub(empty, line)
+    return LEXEME.sub(empty, text)
+
+
+def code_lines(path: Path) -> list[str]:
+    """A file's lines, its strings, characters and comments blanked across lines."""
+    return blank(path.read_text()).split("\n")
 
 
 def asserts(files: list[Path]) -> list[str]:
     out = []
     for path in files:
-        for number, line in enumerate(production(path), 1):
-            code = blank(line)
+        lines = code_lines(path)
+        for number, _ in enumerate(production(path), 1):
+            code = lines[number - 1]
             if ASSERT.search(code):
                 out.append(f"  {path.relative_to(ROOT)}:{number}: assert in production code (Rule 2)")
     return out
@@ -118,7 +136,7 @@ def exceptions(crate: Path, files: list[Path]) -> list[str]:
     out = []
     allowed = EXEMPTABLE | (PRINTING if crate.name in APPLICATION_CRATES else set())
     for path in files:
-        text = path.read_text()
+        text = code(path)
         may = unsafe_allowed(path) or caller(path)
         here = allowed | ({UNSAFE_LINT} if may else set())
         for match in LINT_ATTRIBUTE.finditer(text):
@@ -148,8 +166,7 @@ def unsafe_code(crate: Path) -> list[str]:
     for path in sorted(crate.rglob("*.rs")):
         if "target" in path.relative_to(crate).parts or unsafe_allowed(path):
             continue
-        for number, line in enumerate(path.read_text().split("\n"), 1):
-            code = blank(line)
+        for number, code in enumerate(code_lines(path), 1):
             if caller(path):
                 code = MAP_CALL.sub("", code)
             if UNSAFE.search(code):
@@ -161,6 +178,7 @@ def call_graph(files: list[Path]) -> tuple[dict, set, dict]:
     calls, bounded, where = {}, set(), {}
     for path in files:
         current, marked = None, False
+        blanked = code_lines(path)
         for number, line in enumerate(production(path), 1):
             match = FN.match(line)
             stripped = line.strip()
@@ -177,7 +195,7 @@ def call_graph(files: list[Path]) -> tuple[dict, set, dict]:
             elif stripped:
                 marked = False
             if current:
-                calls[current] |= set(CALL.findall(blank(line)))
+                calls[current] |= set(CALL.findall(blanked[number - 1]))
     for name in calls:
         calls[name] &= calls.keys()
     return calls, bounded, where
@@ -233,8 +251,8 @@ def recursion(crate: Path) -> list[str]:
 
 
 def code(path: Path) -> str:
-    """A file's text with each line's comment and strings blanked, positions kept."""
-    return "\n".join(blank(line) for line in path.read_text().split("\n"))
+    """A file's text with its strings, characters and comments blanked, positions kept."""
+    return blank(path.read_text())
 
 
 def line_of(text: str, at: int) -> int:

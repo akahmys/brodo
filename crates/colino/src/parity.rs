@@ -14,7 +14,7 @@
 //! fold none or twice. A triangle seen edge on is not crossed.
 
 use crate::bvh::Bvh;
-use crate::distance::Point;
+use crate::distance::{Point, has_area};
 use crate::intersect::edge;
 
 /// The sign at the plane's origin of the edge from `a` to `b`: of (b − a) × (o − a), the
@@ -44,6 +44,11 @@ fn side(a: [f64; 2], b: [f64; 2]) -> i8 {
 /// Where the line through `p` along axis `k` crosses triangle `t`, as its height along the
 /// axis above `p`; nothing where it does not.
 fn height(p: Point, k: usize, t: [Point; 3]) -> Option<f64> {
+    // Moved to the line, a triangle's corners on a line may round off it: it is refused by
+    // its own corners first.
+    if !has_area(t) {
+        return None;
+    }
     let (kx, ky) = ((k + 1) % 3, (k + 2) % 3);
     let q = t.map(|c| [c[kx] - p[kx], c[ky] - p[ky], c[k] - p[k]]);
     let flat = q.map(|c| [c[0], c[1]]);
@@ -103,6 +108,40 @@ mod tests {
         assert_eq!(side([2.0, 2.0], [2.0, 2.0]), 0);
         // Off the line, the function's own sign.
         assert_eq!(side([1.0, 0.0], [1.0, 1.0]), 1);
+    }
+
+    /// Corners on a line, their edges' cross product exactly zero, and an axis line through
+    /// a point of it: never crossed, though moved to the line they may round off it.
+    #[test]
+    fn a_triangle_whose_corners_lie_on_a_line_is_never_crossed() {
+        let mut state = 0x9e37_79b9_7f4a_7c15_u64;
+        let mut next = || {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            (state >> 11) as f64 / (1_u64 << 53) as f64 * 2.0 - 1.0
+        };
+        let mut flat = 0;
+        for _ in 0..200_000 {
+            let (a, b) = ([next(), next(), next()], [next(), next(), next()]);
+            let t = next() * 1.5 + 0.5;
+            let c = [0, 1, 2].map(|k| a[k] + t * (b[k] - a[k]));
+            if has_area([a, b, c]) {
+                continue;
+            }
+            flat += 1;
+            let s = (next() + 1.0) / 2.0;
+            let p = [0, 1, 2].map(|k| a[k] + s * (b[k] - a[k]));
+            for k in 0..3 {
+                assert_eq!(
+                    height(p, k, [a, b, c]),
+                    None,
+                    "{:?} through {p:?} along {k}",
+                    [a, b, c]
+                );
+            }
+        }
+        assert!(flat > 10_000, "{flat} flat triangles");
     }
 
     /// Two quads across one axis and none across another: the votes tie, and a tie is

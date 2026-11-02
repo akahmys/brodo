@@ -1,3 +1,8 @@
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/logo/brodo-logo-dark.svg">
+  <img alt="brodo: sparse volumes in pure Rust" src="docs/logo/brodo-logo-light.svg" width="410">
+</picture>
+
 # brodo
 
 Sparse volumes in pure Rust: a VDB-style sparse tree whose fields share one topology, a

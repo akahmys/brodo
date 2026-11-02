@@ -11,7 +11,7 @@
 //! Both faces of a triangle are hit; a segment in a triangle's plane, or a triangle with no
 //! area, is not.
 
-use crate::distance::{Point, along as at, dot, on_triangle, squared, sub};
+use crate::distance::{Point, along as at, dot, has_area, on_triangle, squared, sub};
 
 /// Below this, a product's rounding error may itself be rounded, so two equal products are
 /// left equal: 2⁵³ times the smallest normal `f64`.
@@ -36,6 +36,11 @@ pub(crate) fn edge(a: f64, b: f64, c: f64, d: f64) -> f64 {
 /// or the triangle has no area, or `a` is `b`. The fraction's rounding, and which axis
 /// the direction is sheared onto where its largest components tie, are not promised.
 pub fn crossing(a: Point, b: Point, t: [Point; 3]) -> Option<f64> {
+    // Moved to the segment's start, a triangle's corners on a line may round off it, and
+    // its determinant off 0: it is refused by its own corners first.
+    if !has_area(t) {
+        return None;
+    }
     let d = sub(b, a);
     let mut kz = 0;
     for k in 1..3 {

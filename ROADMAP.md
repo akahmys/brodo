@@ -19,7 +19,9 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   ADR-0007, ADR-0021, ADR-0023, ADR-0034), and named each test tolerance once; an outside
   review of that change then fixed a thin triangle's face point (ADR-0027), a report's
   region not finite (ADR-0028), more of the same gaps, and the format reader's missing
-  region read (ADR-0037).
+  region read (ADR-0037); and a third, a triangle on a line crossed and a normal's
+  length under- or overflowing (ADR-0030), strings over lines and SVGs unscanned
+  (ADR-0002, ADR-0003); the logo was added.
 - **Next**: the units §2's "After P7" lists after the review, `limit` bounding what
   `vdb::from_bytes` and `vdb::read` make among them.
 
@@ -396,7 +398,8 @@ Then, as units of their own after the review:
 
 - [ ] `limit` bounding what `vdb::from_bytes` and `vdb::read` make, as `archive` does, a
       unit of its own after the review, since it changes public items (the owner,
-      2026-11-02; ADR-0047)
+      2026-11-02; ADR-0047); the fuzz target `vdb` then passes a limit, as `archive`'s does,
+      since without one reading makes up to about 637 bytes for each byte read (ADR-0047)
 - [ ] Reading a region of an archive from only the bytes of the chunks it needs, the file
       not read whole (left to later by the human, 2026-10-29; ADR-0016)
 

@@ -35,7 +35,7 @@ grep -E '^echo "\[' scripts/audit/verify_compliance.sh
 | `cargo clippy --workspace --all-targets -- -D warnings`, with the lints in `Cargo.toml` and the bans in `clippy.toml` | 1, 4, 6, 7, 9, 10, 16, 17, 18, 19 |
 | `cargo clippy --all-targets -D warnings` per member with no default features and with each feature alone | 10 |
 | clippy's panic lints over `--lib --bins` with every feature, filtered by `scripts/audit/lint_filter.py` | 2 |
-| `scripts/audit/source.py`, each line's strings blanked before its comment is cut: asserts and recursion in production code, each file read up to its test module, `mod tests`, a body read from the line after its signature as `cargo fmt` writes it; the lints an exception names, directly or under `cfg_attr`, in every target and test module; `unsafe` outside `UNSAFE_MODULES`, in every file, but a call of `CacheFile::map` in `UNSAFE_CALLERS` | 2, 4, 15, 18, 19 |
+| `scripts/audit/source.py`, each file's strings, raw or over lines, characters and comments blanked first: asserts and recursion in production code, each file read up to its test module, `mod tests`, a body read from the line after its signature as `cargo fmt` writes it; the lints an exception names, directly or under `cfg_attr`, in every target and test module; `unsafe` outside `UNSAFE_MODULES`, in every file, but a call of `CacheFile::map` in `UNSAFE_CALLERS` | 2, 4, 15, 18, 19 |
 | clippy's `indexing_slicing` over the crate of each module in `UNTRUSTED_INPUT`, with every feature, its findings kept to that module by `scripts/audit/lint_filter.py --under` | 3 |
 | `scripts/audit/source.py --errors`: `String` as `Result`'s error and `anyhow` in a library crate, and `filter_map` or `flat_map` of `Result::ok` and its forms, however the types nest, an arrow among them, or the lines break | 8, 9 |
 | `cargo fmt --all --check` | 10 |
@@ -63,9 +63,9 @@ break the rule once and watch the step fail (TESTING.md T3).
 
 | Where | Reads |
 | :--- | :--- |
-| `scripts/hooks/pre-commit` | the staged change; also runs `paths.py` |
+| `scripts/hooks/pre-commit` | the staged change, each staged SVG through standard input; also runs `paths.py` |
 | `scripts/hooks/commit-msg` | the commit message; `commit_msg_check.py`, reading it up to the scissors line of `git commit -v`, also requires English, CJK punctuation refused, and a staged ADR named for a rule change (AGENTS.md), a lint level in `Cargo.toml` alone or in a table and a rule file renamed away included, or a test removed from a `test-list.txt` (TESTING.md T2) |
-| the audit | the working tree and the whole history; with the personal rules also every commit message and author |
+| the audit | the working tree and the whole history, each SVG of either through standard input; with the personal rules also every commit message and author |
 
 **On GitHub Actions** (`.github/workflows/audit.yml`, started by each push to `main` and by hand) the gate skips the
 local list of forbidden sources and the personal rules, which stay on the owner's machine,
@@ -112,7 +112,9 @@ temporary directory. A relative path that leads outside the root is found by
 The file's path allow-list skips what `.gitignore` ignores at the root: `target/` and
 `out/`, the directories of CODING.md L2, the spikes' and the fuzzer's `target/`, `.git/`
 and `.claude/settings.local.json`; the same name deeper in the tree is scanned, and
-`paths.py` and `documents.py` read every file git would commit.
+`paths.py` and `documents.py` read every file git would commit, SVGs among them.
+betterleaks' own default allow-list skips a path ending `.svg`, so the hook and the audit
+also pass each SVG to `betterleaks stdin`, where no path is matched.
 
 **Personal data** (the owner's name) is matched by rules kept outside the repository,
 because a committed rule naming a person leaks the name. The file is `$PERSONAL_LEAKS`,

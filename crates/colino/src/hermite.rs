@@ -30,7 +30,7 @@ use brodo::tree::Coord;
 
 use crate::bvh::Bvh;
 use crate::convert::{Converted, Inside, Lattice};
-use crate::distance::{Point, cross, dot, sub};
+use crate::distance::{Point, cross, has_area, sub, unit};
 use crate::error::HermiteError;
 use crate::intersect::crossing;
 use crate::mesh::Mesh;
@@ -71,13 +71,7 @@ fn after(
 /// The triangle's unit normal, by its corners' order; zero for one with no area.
 fn normal(t: [Point; 3]) -> Point {
     let [a, b, c] = t;
-    let n = cross(sub(b, a), sub(c, a));
-    let length = dot(n, n).sqrt();
-    if length > 0.0 { n.map(|x| x / length) } else { [0.0; 3] }
-}
-
-fn has_area(t: [Point; 3]) -> bool {
-    normal(t).iter().any(|x| *x != 0.0)
+    unit(cross(sub(b, a), sub(c, a))).unwrap_or([0.0; 3])
 }
 
 /// What the search finds on one edge: its fraction, its triangle, and whether one was hit.
@@ -91,8 +85,7 @@ struct Found {
 /// The crossing on the edge from `a` to `b`, the lower end inside when `lower_inside`.
 fn find(bvh: &Bvh, a: Point, b: Point, lower_inside: bool) -> Option<Found> {
     let mut best: Option<(f64, u32)> = None;
-    // A triangle with no area is never crossed: the test's determinant is 0 (Woop et al.
-    // §3.1).
+    // A triangle with no area is never crossed (`crossing`), so each one hit has a normal.
     for i in bvh.near_segment(a, b) {
         let Some(t) = bvh.corners(i) else { continue };
         let Some(s) = crossing(a, b, t) else { continue };

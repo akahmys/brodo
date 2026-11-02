@@ -26,7 +26,7 @@ use rayon::prelude::*;
 
 use crate::bvh::Bvh;
 use crate::convert::Inside;
-use crate::distance::{Point, add, cross, dot, length, scale, sub};
+use crate::distance::{Point, add, cross, dot, length, scale, sub, unit};
 use brodo::analysis::{AnalysisError, Connectivity, label};
 use brodo::error::FieldError;
 use brodo::euler::euler;
@@ -121,12 +121,7 @@ fn ray(bvh: &Bvh, x: Point, d: Point, reach: f64) -> Option<f64> {
 fn measure(bvh: &Bvh, inside: &Inside<'_>, own: u32, h: f64, reach: f64) -> Vec<Found> {
     let Some(t) = bvh.corners(own) else { return Vec::new() };
     let [a, b, c] = t;
-    let n = cross(sub(b, a), sub(c, a));
-    let norm = length(n);
-    if norm == 0.0 {
-        return Vec::new();
-    }
-    let n = scale(n, 1.0 / norm);
+    let Some(n) = unit(cross(sub(b, a), sub(c, a))) else { return Vec::new() };
     let mut out = Vec::new();
     for x in samples(t, h / 2.0) {
         for side in [1.0, -1.0] {

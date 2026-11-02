@@ -35,6 +35,25 @@ pub(crate) fn along(a: Point, b: Point, s: f64) -> Point {
     [a[0] + s * (b[0] - a[0]), a[1] + s * (b[1] - a[1]), a[2] + s * (b[2] - a[2])]
 }
 
+/// Whether triangle `t` has area: the cross product of its edges from its first corner is
+/// not exactly zero. One with none is never crossed, nor given a normal.
+pub(crate) fn has_area(t: [Point; 3]) -> bool {
+    let [a, b, c] = t;
+    cross(sub(b, a), sub(c, a)).iter().any(|x| *x != 0.0)
+}
+
+/// `n` scaled to unit length, nothing for a zero or a vector not finite: divided by its
+/// largest component first, so that its squared length neither underflows to 0 for a
+/// triangle of edges below 10⁻⁸¹ nor overflows for one above 10⁷⁷.
+pub(crate) fn unit(n: Point) -> Option<Point> {
+    let largest = n.iter().fold(0.0_f64, |m, x| m.max(x.abs()));
+    if largest == 0.0 || !n.iter().all(|x| x.is_finite()) {
+        return None;
+    }
+    let m = n.map(|x| x / largest);
+    Some(scale(m, 1.0 / length(m)))
+}
+
 /// The squared distance between two points.
 pub fn squared(a: Point, b: Point) -> f64 {
     let d = sub(a, b);
@@ -119,5 +138,25 @@ mod tests {
         assert_eq!(dot(a, [2.0, 1.0, -1.0]).to_bits(), (-3.0_f64).to_bits());
         assert_eq!(length([3.0, 4.0, 12.0]).to_bits(), 13.0_f64.to_bits());
         assert_eq!(squared(a, b).to_bits(), (9.0_f64 + 6.25 + 16.0).to_bits());
+    }
+
+    /// A normal of a triangle of edges 10⁻⁹⁰, or 10⁸⁰, whose squared length underflows to 0,
+    /// or overflows, is made of unit length all the same; a zero has none, nor a vector not
+    /// finite. Whether a triangle has area is its cross product's, however small.
+    #[test]
+    fn a_normal_of_any_size_is_made_unit() {
+        for size in [1e-90, 1e-30, 1.0, 1e30, 1e80] {
+            let t = [[0.0; 3], [size, 0.0, 0.0], [0.0, 2.0 * size, 0.0]];
+            assert!(has_area(t), "{size}");
+            let [a, b, c] = t;
+            let n = unit(cross(sub(b, a), sub(c, a))).unwrap();
+            assert_eq!(n.map(f64::to_bits), [0.0, 0.0, 1.0].map(f64::to_bits), "{size}");
+            let tilted = unit([size, -size, 2.0 * size]).unwrap();
+            assert!((length(tilted) - 1.0).abs() <= 2.0 * f64::EPSILON, "{size}: {tilted:?}");
+        }
+        assert_eq!(unit([0.0; 3]), None);
+        assert_eq!(unit([f64::INFINITY, 0.0, 0.0]), None);
+        assert_eq!(unit([f64::NAN, 1.0, 0.0]), None);
+        assert!(!has_area([[1.0, 2.0, 3.0], [2.0, 4.0, 6.0], [3.0, 6.0, 9.0]]));
     }
 }
