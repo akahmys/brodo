@@ -68,3 +68,47 @@ before it splits a command. Shown to fire: of three pushable commands with redir
 the guard before the change blocked two and after it blocked none; a forced push, another
 ref, a bare push and `--no-verify` stayed blocked with a redirection added.
 
+## Amendment: what the guards read, and what the scans skip
+
+- **Date**: 2026-11-02
+
+The second review of the whole repository ran commands past `claude_guard.py`: `--no-verif`,
+which git takes for `--no-verify`; `git -c 'core.hooksPath=…'`, its setting quoted;
+`GIT_CONFIG_*` variables; a commit in a subshell, after `if`, or in `$(…)`; `git -c
+remote.origin.url=… push origin main`; and an alias made with `git config alias.…`. It found
+`.claude/settings.json` running the guard on Bash alone, so a terminal tool's command passed
+it; `commit_msg_check.py` naming a renamed rule file by its new name only, missing a lint
+level written as a table, and taking CJK punctuation for English; and betterleaks'
+allow-list, `paths.py` and `documents.py` skipping `target/` and `out/` at any depth though
+`.gitignore` ignores them at the root alone, so that `crates/x/out/` could be committed
+unscanned. The owner decided, on 2026-11-02, that the guard reads quoted settings and
+`GIT_CONFIG_*` variables, blocks an abbreviated `--no-verify`, an alias and any option before
+`push` but `-C`, and finds a git command after shell keywords and in subshells; that it runs
+on terminal tools too; that `commit_msg_check.py` lists files without rename detection,
+reads a table's `level`, and refuses CJK punctuation, as `documents.py` does; and that the
+allow-list names each directory where `.gitignore` ignores it, while `paths.py` and
+`documents.py` read the files git would commit. Shown to fire: of 25 commands, the old
+guard missed 11 it should block and the new one none, passing the 14 it should pass; the
+three `commit_msg_check.py` cases passed the old check and failed the new; a Japanese line in
+`crates/brodo/out/` passed the old `documents.py` and failed the new; betterleaks with the
+new allow-list found a home path in `sub/out/` and skipped `out/` at the root.
+
+## Amendment: commands written another way, and a message's scissors
+
+- **Date**: 2026-11-02
+
+An outside review of the uncommitted change ran ten more commands past the guard: `git config
+--unset core.hooksPath scripts/hooks`, its value pattern read as the install; `"--no-verify"`
+and `"-n"` quoted; `"git"`, `/usr/bin/git`, `env -i git` and `command -p git`; `-P` or
+`--git-dir .git` before `push`, which the guard read as no push; and a command after a heredoc
+operator on its line, removed with the body. It found `commit_msg_check.py` reading the diff
+`git commit -v` writes below its scissors line as the message, an `ADR-NNNN` there passing it,
+and taking any ADR named with any ADR staged. The owner decided, on 2026-11-02, that all of it
+be fixed, and it was: a git command naming `core.hooksPath` passes only to install the hooks or read the setting;
+a quoted word is read unquoted; `git` is found as a path, quoted, and after `env`, `sudo` or
+`command` with their options; every option before `push` is read, its argument with it, and
+only `-C` passes; the rest of a heredoc operator's line is read; and the message is read up to
+the scissors line and must name an ADR that is staged. Shown to fire: of 47 commands, the
+guard before this amendment passed the ten above, and the new one blocks the 30 it should and
+passes the 17 it should; of four messages, the old check passed one naming ADR-0005 with
+ADR-0003 staged and one naming an ADR only below the scissors, and the new one fails both.

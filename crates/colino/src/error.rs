@@ -239,7 +239,8 @@ pub enum HermiteError {
 #[derive(Debug, Clone, PartialEq, thiserror::Error)]
 #[non_exhaustive]
 pub enum ReportError {
-    /// The mesh names a vertex it lacks, or holds one that is not finite.
+    /// The mesh names a vertex it lacks, holds one that is not finite, or its groups do not
+    /// fit it.
     #[error(transparent)]
     Mesh(#[from] MeshError),
     /// Labelling or the Euler characteristic was refused.
@@ -253,4 +254,7 @@ pub enum ReportError {
     /// origin, not the grid's, so a conversion that succeeded may be reported on with it.
     #[error("the mesh lies too far from the origin, in voxels, for its thin places to be found")]
     TooFar,
+    /// The region at this place in the regions given has a point that is not finite.
+    #[error("region {0}'s point is not finite")]
+    Region(usize),
 }

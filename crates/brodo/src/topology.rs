@@ -414,6 +414,15 @@ impl Before<'_> {
             self.old.locate(v)
         }
     }
+
+    /// Whether the edit removed a leaf in the lower node's region at `origin`.
+    fn removed_in(&self, origin: Coord) -> bool {
+        let lower = |c: &Coord| TileLevel::Upper.origin(*c);
+        self.removed
+            .range([origin[0], i32::MIN, i32::MIN]..)
+            .take_while(|c| lower(c)[0] == origin[0])
+            .any(|c| lower(c) == origin)
+    }
 }
 
 /// Where a new tile at `level` and `origin` comes from, pushing a merged tile's parts.
@@ -424,25 +433,37 @@ fn tile_source(
     parts: &mut Vec<Part>,
 ) -> Result<TileSource, TreeError> {
     let start = parts.len();
-    let was = old.locate(origin);
-    match (level, was) {
-        // The same tile, or a larger one it was split from.
-        (_, Location::Tile(t, l)) if l.edge_log2() >= level.edge_log2() => {
-            return Ok(TileSource::Tile(t));
+    match level {
+        // What held the region before the edit, its removals aside: a tile over all of it is
+        // the source only if the edit removed no leaf in it.
+        TileLevel::Upper => match old.old.locate(origin) {
+            Location::Tile(t, TileLevel::Root | TileLevel::Upper) if !old.removed_in(origin) => {
+                return Ok(TileSource::Tile(t));
+            }
+            // No lower node there, and no tile above it: the whole region was the background.
+            Location::Background if !old.tree.has_lower_node(origin) => {
+                return Ok(TileSource::Background);
+            }
+            Location::Leaf(_) | Location::Tile(..) | Location::Background => {
+                upper_parts(old, origin, parts);
+            }
+        },
+        TileLevel::Lower => match old.locate(origin) {
+            // The same tile, or a larger one it was split from.
+            Location::Tile(t, _) => return Ok(TileSource::Tile(t)),
+            Location::Leaf(n) => parts.push(Part::Leaf(n)),
+            Location::Background => return Ok(TileSource::Background),
+        },
+        // Nothing merges into a root tile: it is the same tile, or one added where nothing
+        // was or where the edit removed the leaf.
+        TileLevel::Root => {
+            return Ok(match old.locate(origin) {
+                Location::Tile(t, TileLevel::Root) => TileSource::Tile(t),
+                Location::Leaf(_) | Location::Tile(..) | Location::Background => {
+                    TileSource::Background
+                }
+            });
         }
-        (TileLevel::Lower, Location::Leaf(n)) => parts.push(Part::Leaf(n)),
-        // No lower node there, and no tile (above): the whole region was the background.
-        (TileLevel::Upper, _) if !old.tree.has_lower_node(origin) => {
-            return Ok(TileSource::Background);
-        }
-        (TileLevel::Upper, _) => upper_parts(old, origin, parts),
-        (TileLevel::Lower | TileLevel::Root, Location::Background) => {
-            return Ok(TileSource::Background);
-        }
-        // A lower tile has no smaller tile, and nothing merges into a root tile: a root
-        // tile over a leaf is added where the edit removed the leaf.
-        (TileLevel::Lower | TileLevel::Root, Location::Tile(..))
-        | (TileLevel::Root, Location::Leaf(_)) => return Ok(TileSource::Background),
     }
     // Only regions that were the background: an added tile, not a merge.
     if parts.get(start..).unwrap_or(&[]).iter().all(|p| matches!(p, Part::Background(_))) {
@@ -477,7 +498,8 @@ pub enum LeafSource {
     Leaf(LeafNumber),
     /// The old tile it was split from: every voxel takes the tile's value.
     Split(TileNumber),
-    /// The background: it was activated where nothing was.
+    /// The background: it was activated where nothing was, or where the edit removed a
+    /// leaf.
     Background,
 }
 
@@ -488,7 +510,7 @@ pub enum TileSource {
     Tile(TileNumber),
     /// The parts it merges, a range of `Remap::parts`.
     Merged(PartRange),
-    /// The background: it was added where nothing was.
+    /// The background: it was added where nothing was, or where the edit removed a leaf.
     Background,
 }
 
@@ -504,7 +526,7 @@ pub struct PartRange {
 pub enum Part {
     /// An old leaf: 512 voxels.
     Leaf(LeafNumber),
-    /// An old leaf-sized tile: 512 voxels of one value.
+    /// An old tile's leaf-sized region: 512 voxels of one value.
     Tile(TileNumber),
     /// This many leaf-sized regions that were the background, or whose leaves the edit
     /// removed: activated in the same commit as the merge.

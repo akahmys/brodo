@@ -155,3 +155,24 @@ labelled as two solids; and that it put a box's centres on its lower faces insid
 its upper ones outside, by the side the lines are moved to; and that Hermite data took
 such a point as inside. The human decided that a point at distance exactly 0 is inside,
 whichever sign is asked for, as Hermite data takes it.
+
+## Amendment: a thin triangle's nearest point
+
+- **Date**: 2026-11-02
+
+An outside review of the uncommitted fix of a sliver's distance found that the face's point,
+by its barycentric weights, ratios of |n|², lost ε over the square of the triangle's sine:
+with the normal just above the threshold at which the edges are compared, a point on an edge
+of a triangle 1.07 times past it was found 9.7 × 10⁻⁵ of the triangle's size away. Measured
+against the nearest point worked in rationals, on 40 000 triangles 10⁻¹² to 10⁻² thin, the
+weights' point was off by up to 0.13 of the size; p projected on the triangle's plane, by up
+to ε of |ap| over the sine where the normal is above the threshold, and by up to 0.24 below
+it, where the normal is rounding. The owner decided, on 2026-11-02, that it be fixed: above
+the threshold, ε of the edges' product, the face's point is the projection; below it, the
+nearest point is the edges', the weights' point compared with them having changed no answer,
+since a mutation run left 22 of its mutants alive. The distance is then within the rounding
+of the coordinates over the sine of the triangle's sharpest angle, at most 5.4 × 10⁻⁹ of its
+size, near the threshold, below √ε.
+ARCHITECTURE.md §5.1 states it. Shown to fire: a point on an edge of a triangle of any
+thinness, found within √ε of the triangle's size, failed with the weights' point and passed
+with the projection.

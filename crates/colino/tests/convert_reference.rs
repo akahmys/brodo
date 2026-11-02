@@ -104,21 +104,27 @@ fn cells(mesh: &Mesh, o: &Options) -> Vec<Coord> {
     out
 }
 
+/// The rounding of the coordinates a distance is worked within (ARCHITECTURE.md §5.1), on
+/// meshes within a few thousand units of the origin, as it shows in an `f32`.
+const COORDINATE_ROUNDING: f32 = 1e-12;
+
+/// Whether `got` is as the reference's `want` (ARCHITECTURE.md §5.1): the nearest `f32` of
+/// a distance worked in `f64` within the rounding of the coordinates, and `want` the
+/// nearest of the reference's, so a step of `f32` apart at most, or that rounding near 0.
+fn as_promised(got: f32, want: f32) -> bool {
+    let step = f32::from_bits(want.abs().to_bits() + 1) - want.abs();
+    (got - want).abs() <= step + COORDINATE_ROUNDING
+}
+
 fn voxels(cell: Coord) -> impl Iterator<Item = Coord> {
     (0..512).map(move |i| [cell[0] + i % 8, cell[1] + i / 8 % 8, cell[2] + i / 64])
 }
 
 #[expect(clippy::cast_possible_truncation, reason = "the band's width as f32, as converted")]
 /// Checks a conversion against the reference: leaves where a voxel is in the band, with
-/// the reference's values within `tolerance`; where `closed`, every other voxel too, ±N·h
-/// by the reference's sign.
-fn check(
-    mesh: &Mesh,
-    o: &Options,
-    c: &Converted,
-    closed: bool,
-    tolerance: f32,
-) -> Result<(), String> {
+/// the reference's values as promised (`as_promised`); where `closed`, every other voxel
+/// too, ±N·h by the reference's sign.
+fn check(mesh: &Mesh, o: &Options, c: &Converted, closed: bool) -> Result<(), String> {
     let w = Winding::new(mesh).unwrap();
     let edge = (f64::from(o.band) * o.voxel_size) as f32;
     for cell in cells(mesh, o) {
@@ -133,8 +139,7 @@ fn check(
         }
         for (v, x) in voxels(cell).zip(&want) {
             let got = c.field.value_at(&c.topology, v).map_err(|e| e.to_string())?;
-            let close =
-                if leaf { (got - x).abs() <= tolerance } else { got.to_bits() == x.to_bits() };
+            let close = if leaf { as_promised(got, *x) } else { got.to_bits() == x.to_bits() };
             if !close {
                 return Err(format!("voxel {v:?}: {got}, expected {x}"));
             }
@@ -154,7 +159,7 @@ fn a_sphere_converts_as_the_reference_says_everywhere() {
     let o = exact(1.0);
     let c = convert(&m, &o).unwrap();
     assert!(c.topology.tile_count() > 0);
-    check(&m, &o, &c, true, 1e-5).unwrap();
+    check(&m, &o, &c, true).unwrap();
     assert_eq!(c.meta.unit, "millimeter");
     assert_eq!(c.meta.voxel_size.map(f64::to_bits), [1.0_f64; 3].map(f64::to_bits));
     assert_eq!(c.meta.extra.get(SDF_KEY).map(String::as_str), Some(SDF_VERSION));
@@ -324,7 +329,7 @@ proptest! {
         let m = Mesh::new(vertices, triangles).with_unit(Some("m".into()));
         let o = exact(h).with_origin(origin).with_band(band);
         let c = convert(&m, &o).unwrap();
-        prop_assert_eq!(check(&m, &o, &c, false, 1e-5), Ok(()));
+        prop_assert_eq!(check(&m, &o, &c, false), Ok(()));
     }
 }
 
@@ -369,7 +374,7 @@ fn a_cell_reached_only_at_its_corner_is_a_leaf() {
         let o = exact(h);
         let c = convert(&m, &o).unwrap();
         assert!(matches!(c.topology.locate([0, 0, 0]), Location::Leaf(_)), "h = {h}");
-        assert_eq!(check(&m, &o, &c, false, 1e-5), Ok(()), "h = {h}");
+        assert_eq!(check(&m, &o, &c, false), Ok(()), "h = {h}");
     }
 }
 
@@ -385,7 +390,7 @@ fn larger_spheres_convert_as_the_reference_says_everywhere() {
         for v in [[x - 12, 0, 0], [x + 12, 0, 0], [x, -12, 0], [x, 0, 12]] {
             assert!(matches!(c.topology.locate(v), Location::Tile(..)), "{v:?}");
         }
-        assert_eq!(check(&m, &o, &c, true, 1e-5), Ok(()), "{x}");
+        assert_eq!(check(&m, &o, &c, true), Ok(()), "{x}");
     }
 }
 
@@ -404,5 +409,5 @@ fn a_cubes_inside_tiles_reach_near_its_box() {
     let o = exact(1.0);
     let c = convert(&m, &o).unwrap();
     assert!(matches!(c.topology.locate([24, 8, 8]), Location::Tile(..)));
-    assert_eq!(check(&m, &o, &c, true, 1e-5), Ok(()));
+    assert_eq!(check(&m, &o, &c, true), Ok(()));
 }

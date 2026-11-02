@@ -8,20 +8,26 @@ the mutants it matches are equivalent under the contract, ending in its kind (TE
 T11, ADR-0043): `[same]`, `[open: WHERE]` or `[unreached: WHERE]`, or `As above.` for the
 comment before. WHERE is a promise's home: `ARCHITECTURE.md §N` or `docs/formats.md §N`,
 a section that exists, or a public item by its path in backticks, `crate::module::Item`
-or `crate::module::Type::member`, in a public module; and its text says so in words, "not
-promised" for `open`, "refused" for `unreached`. The pattern excludes at least one mutant,
+or `crate::module::Type::member`, in a public module, the member in the type's definition
+or an `impl` of it; and its text says so in words, "not promised" for `open`, "refused" for
+`unreached`. The pattern excludes at least one mutant,
 by cargo-mutants' own regex engine. A pattern that matches nothing is stale, like an
 unfulfilled `#[expect]`.
 
 With `--run [ARGS…]`, the milestone-close run: `cargo mutants --workspace` behind
 `rss_guard.py`, with its copies of the tree under `target/`. It fails when a mutant is
 missed, or when a mutant timed out before any test failed, since only a failed test shows
-that the timeout was the mutant's doing. ARGS go to cargo-mutants (`-f <file>`,
-`--iterate`, `--shard k/n`). With `--report DIR [DIR…] [-- [ARGS]]`, the same verdict on
-reports already written, one or a shard each, taken together; given `--`, the whole run's
-ARGS after it, it also fails unless they report every mutant `cargo mutants --list` gives
-with ARGS but `--shard`, so that a shard cut off or lost shows (ADR-0023). A shard given
-no mutant, with an empty `mutants.json` and no `outcomes.json`, reports none.
+that the timeout was the mutant's doing; when the unmutated baseline failed; when the
+guard logged nothing; and, but with `--iterate`, unless the report holds every mutant
+`cargo mutants --list` gives with ARGS. ARGS go to cargo-mutants (`-f <file>`,
+`--iterate`, `--shard k/n`), followed by those of the variable `MUTANTS_ARGS`, split as a
+shell splits words but with no expansion, so that a workflow passes them quoted. With
+`--report DIR [DIR…] [-- [ARGS]]`, the same verdict on reports already written, one or a
+shard each, taken together, each DIR a `mutants.out` beside the guard's `rss_guard.log`;
+given `--`, the whole run's ARGS after it, it also fails unless they report every mutant
+`cargo mutants --list` gives with ARGS but `--shard`, so that a shard cut off or lost
+shows (ADR-0023). A list of no mutant fails. A shard given no mutant, with an empty
+`mutants.json` and no `outcomes.json`, reports none and needs no log.
 
 With `--run --patient`, the mutants the last report shows timing out before any test
 failed run again, alone, under `PATIENT_TIMEOUT` seconds each, into `out/mutants/patient`:
@@ -30,12 +36,16 @@ one caught is killed; one whose tests all pass is only slower, and is listed in
 verdict is the last report's missed mutants and the patient run's (ADR-0023). With
 `--patient --from DIR [DIR…] [-- ARGS]`, the reports are those, a sharded run's, held to
 every mutant as `--report` holds them; a `--shard k/n` among ARGS runs one of n parts of
-the timeouts, so that they run again in parallel (ADR-0034).
+the timeouts, so that they run again in parallel (ADR-0034). The patient run, or each part
+of it, fails unless it reports every timeout it was given, or cargo-mutants deals the part.
+
+Every report must hold an unmutated baseline that passed. Any other argument is refused.
 """
 
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -58,6 +68,8 @@ KIND = re.compile(r"\[(same|(open|unreached): ([\w./-]+\.md §\d[\d.]*|`[^`]+`))
 HOMES = ("ARCHITECTURE.md", "docs/formats.md")
 SAYS = {"open": "not promised", "unreached": "refused"}
 DEFINES = r"^\s*pub(?:\(crate\))? (?:struct|enum|trait|type|fn|const|static) {}\b"
+# An `impl` of a type, of a trait for it or not, its generics aside.
+IMPL = r"^impl(?:<[^>]*>)?\s+(?:[\w:<>, ]+\s+for\s+)?{}\b"
 MEMBER = r"^\s*(?:pub (?:fn|const) {0}\b|pub {0}\s*:|{0}\s*[({{,]|{0}\s*$)"
 # Thirty times the unmutated suite's largest peak, 32 MiB (2026-10-18, ADR-0023).
 GUARD_MIB = 1024
@@ -129,6 +141,18 @@ def section(home: str, number: str) -> Optional[str]:
     return None
 
 
+def owned(lines: list[str], defined: int, name: str) -> list[int]:
+    """The lines of a type's own blocks, its definition at `defined` and each `impl` of it,
+    wherever in the file, each up to the unindented `}` closing it."""
+    starts = [defined] + [i for i, l in enumerate(lines) if re.match(IMPL.format(re.escape(name)), l)]
+    out: list[int] = []
+    for start in starts:
+        end = start if lines[start].rstrip().endswith(";") else next(
+            (j for j in range(start, len(lines)) if lines[j] == "}"), len(lines) - 1)
+        out += range(start, end + 1)
+    return out
+
+
 def documented(path: str) -> Optional[str]:
     """The documentation of a public item, `crate::module::Item[::member]`; nothing when the
     module is not public or the item is not found."""
@@ -143,8 +167,8 @@ def documented(path: str) -> Optional[str]:
     if at is None or "pub(crate)" in lines[at]:
         return None
     if len(parts) == 4:
-        at = next((i for i, l in enumerate(lines[at:], start=at)
-                   if re.match(MEMBER.format(re.escape(parts[3])), l)), None)
+        member = MEMBER.format(re.escape(parts[3]))
+        at = next((i for i in owned(lines, at, parts[2]) if re.match(member, lines[i])), None)
         if at is None:
             return None
     doc = []
@@ -227,7 +251,10 @@ def run(args: list[str]) -> int:
     if args[:1] == ["--patient"]:
         return patient(args[1:])
     mutants(["--timeout-multiplier", TIMEOUT_MULTIPLIER, *args], OUT)
-    return report(verdict(OUT / "mutants.out") + guarded(OUT))
+    out = OUT / "mutants.out"
+    # `--iterate` leaves out the mutants an earlier run caught.
+    whole = [] if "--iterate" in args else unreported([out], args, shards=True)
+    return report(verdict(out) + guarded(OUT) + whole)
 
 
 def escaped(name: str) -> str:
@@ -243,21 +270,31 @@ def patient(args: list[str]) -> int:
         split = rest.index("--") if "--" in rest else len(rest)
         reports, args = [Path(d).resolve() for d in rest[:split]], rest[split + 1:]
         whole = args
-    failures_before = verdicts(reports, whole)
+    failures_before = verdicts(reports, whole) + logged(reports)
     missed = [f for f in failures_before if not f.startswith("  timed out before any test")]
     prefix = "  timed out before any test failed: "
     slow = [f.removeprefix(prefix) for f in failures_before if f.startswith(prefix)]
     if not slow:
         return report(missed)
     pattern = "^(" + "|".join(escaped(n) for n in slow) + ")$"
+    # A part runs the timeouts cargo-mutants deals it; the parts together run them all.
+    mine = slow
+    if "--shard" in args:
+        listed = set(listing(["--re", pattern, *args]))
+        mine = [n for n in slow if n in listed]
     mutants(["--timeout", PATIENT_TIMEOUT, "--re", pattern, *args], PATIENT_OUT)
     failures = []
     written = PATIENT_OUT / "mutants.out" / "outcomes.json"
-    if not written.exists() and "--shard" in args:
+    if not written.exists() and not mine:
         # A part of the timeouts with none of them to run writes no report.
         print("  this part holds none of the timeouts")
         return report(missed)
-    rerun = json.loads(written.read_text())
+    rerun = json.loads(written.read_text()) if written.exists() else {"outcomes": []}
+    failures += baseline(rerun["outcomes"])
+    names = {o["scenario"]["Mutant"]["name"] for o in rerun["outcomes"] if o["scenario"] != "Baseline"}
+    lost = [n for n in mine if n not in names]
+    if lost:
+        failures.append(f"  not run again, {len(lost)} timeouts, such as: {lost[0]}")
     for o in rerun["outcomes"]:
         if o["scenario"] == "Baseline":
             continue
@@ -269,7 +306,7 @@ def patient(args: list[str]) -> int:
             failures.append(f"  only slower, its tests passing: {name}")
         elif o["summary"] == "Timeout":
             failures.append(f"  still timing out after {PATIENT_TIMEOUT} s: {name}")
-    print(f"  {len(slow)} timeouts run again under {PATIENT_TIMEOUT} s")
+    print(f"  {len(mine)} of {len(slow)} timeouts given to this run, under {PATIENT_TIMEOUT} s each")
     return report(missed + failures + guarded(PATIENT_OUT))
 
 
@@ -280,6 +317,22 @@ def verdicts(outs: list[Path], args: Optional[list[str]]) -> list[str]:
     for out in outs:
         seen += [f for f in verdict(out) if f not in seen]
     return seen + (unreported(outs, args) if args is not None else [])
+
+
+def logged(outs: list[Path]) -> list[str]:
+    """What the guard's logs beside several reports show: a report of mutants run with no
+    log beside it ran unguarded."""
+    return [f for out in outs if outcomes(out) for f in guarded(out.parent)]
+
+
+def baseline(reported: list[dict]) -> list[str]:
+    """A failed or missing unmutated baseline, without which no mutant shows anything."""
+    base = [o for o in reported if o["scenario"] == "Baseline"]
+    if not base:
+        return ["  no unmutated baseline: no mutant was tested against a passing tree"]
+    if any(o["summary"] != "Success" for o in base):
+        return ["  the unmutated baseline failed: no mutant was tested"]
+    return []
 
 
 def unshard(args: list[str]) -> list[str]:
@@ -295,13 +348,21 @@ def unshard(args: list[str]) -> list[str]:
     return out
 
 
-def unreported(outs: list[Path], args: list[str]) -> list[str]:
-    """The mutants `cargo mutants --list` gives with ARGS, `--shard` aside, that no report
-    holds: a shard cut off, lost or never run."""
-    listed = subprocess.run(
-        ["cargo", "mutants", "--list", "--workspace", FEATURES, *unshard(args)],
+def listing(args: list[str]) -> list[str]:
+    """The mutants `cargo mutants --list` gives over the workspace with ARGS."""
+    return subprocess.run(
+        ["cargo", "mutants", "--list", "--workspace", FEATURES, *args],
         cwd=ROOT, capture_output=True, text=True, check=True,
     ).stdout.splitlines()
+
+
+def unreported(outs: list[Path], args: list[str], shards: bool = False) -> list[str]:
+    """The mutants `cargo mutants --list` gives with ARGS, `--shard` aside unless `shards`,
+    that no report holds: a shard cut off, lost or never run. A list of none fails, since a
+    run of nothing shows nothing."""
+    listed = listing(args if shards else unshard(args))
+    if not listed:
+        return ["  cargo mutants --list gives no mutant with these arguments"]
     reported = set()
     for out in outs:
         reported.update(o["scenario"]["Mutant"]["name"] for o in outcomes(out))
@@ -324,6 +385,9 @@ def outcomes(out: Path) -> list[dict]:
 def verdict(out: Path) -> list[str]:
     """What a cargo-mutants report shows was not caught."""
     failures = []
+    written = out / "outcomes.json"
+    if written.exists():
+        failures += baseline(json.loads(written.read_text())["outcomes"])
     reported = outcomes(out)
     for o in reported:
         name = o["scenario"]["Mutant"]["name"]
@@ -350,15 +414,19 @@ def main() -> int:
     if shutil.which("cargo-mutants") is None:
         print("  cargo-mutants is not installed: cargo install --locked cargo-mutants@27.1.0")
         return 1
-    if sys.argv[1:2] == ["--run"]:
-        return run(sys.argv[2:])
-    if sys.argv[1:2] == ["--report"] and len(sys.argv) >= 3:
-        rest = sys.argv[2:]
-        if "--" not in rest:
-            return report(verdicts([Path(d).resolve() for d in rest], None))
-        split = rest.index("--")
-        return report(verdicts([Path(d).resolve() for d in rest[:split]], rest[split + 1:]))
-    return check()
+    if not sys.argv[1:]:
+        return check()
+    argv = sys.argv[1:] + shlex.split(os.environ.get("MUTANTS_ARGS", ""))
+    if argv[:1] == ["--run"]:
+        return run(argv[1:])
+    if argv[:1] == ["--report"] and len(argv) >= 2:
+        rest = argv[1:]
+        split = rest.index("--") if "--" in rest else len(rest)
+        outs = [Path(d).resolve() for d in rest[:split]]
+        whole = rest[split + 1:] if "--" in rest else None
+        return report(verdicts(outs, whole) + logged(outs))
+    print("  usage: mutants.py [--run [--patient [--from DIR… [-- ARGS]]] [ARGS] | --report DIR… [-- ARGS]]")
+    return 2
 
 
 if __name__ == "__main__":

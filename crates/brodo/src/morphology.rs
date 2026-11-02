@@ -301,6 +301,7 @@ fn filter<T: Ordered>(
     k: u32,
     keep: Ordering,
 ) -> Result<Field<T>, FieldError> {
+    f.check(t)?;
     let near = neighbourhood(conn);
     let mut current = f.clone();
     for _ in 0..k {
@@ -340,7 +341,8 @@ fn same_leaves<T: Value>(t: &Topology, a: &Field<T>, b: &Field<T>) -> Result<boo
     Ok(true)
 }
 
-/// The field with each leaf voxel the largest of itself and its neighbours, k times over.
+/// The field with each leaf voxel the largest of itself and its neighbours, k times over; a
+/// field not on `t` is refused as `FieldError::StaleField`, whatever k.
 pub fn dilate_values<T: Ordered>(
     t: &Topology,
     f: &Field<T>,
@@ -350,7 +352,8 @@ pub fn dilate_values<T: Ordered>(
     filter(t, f, conn, k, Ordering::Greater)
 }
 
-/// The field with each leaf voxel the smallest of itself and its neighbours, k times over.
+/// The field with each leaf voxel the smallest of itself and its neighbours, k times over; a
+/// field not on `t` is refused as `FieldError::StaleField`, whatever k.
 pub fn erode_values<T: Ordered>(
     t: &Topology,
     f: &Field<T>,

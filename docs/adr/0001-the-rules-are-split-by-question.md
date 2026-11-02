@@ -158,5 +158,5 @@ document, and found about ninety claims stale, restated or wrong. The owner deci
 
 The other corrections, wording made true to the checks and the code with no rule changed,
 landed with them: in AUDITING.md, CODING.md, PLANNING.md and TESTING.md, eight records
-marked Amended, five amended to name what reversed or narrowed them, and two retitled as
+marked Amended, six amended to name what reversed or narrowed them, and two retitled as
 statements.

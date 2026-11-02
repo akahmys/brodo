@@ -6,6 +6,7 @@
 mod timed;
 
 use brodo::analysis::Connectivity;
+use brodo::error::FieldError;
 use brodo::field::Field;
 use brodo::morphology::{dilate_values, erode_values};
 use brodo::topology::{Location, Topology};
@@ -155,4 +156,20 @@ fn the_largest_k_ends_once_the_values_settle() {
     let bits = |f: &Field<f32>| f.leaf(&t, n).unwrap().map(f32::to_bits);
     assert_eq!(bits(&all), bits(&some));
     assert_eq!(bits(&all), [5.0_f32.to_bits(); 512]);
+}
+
+/// A field of another topology is refused, even by no pass at all.
+#[test]
+fn a_field_of_another_topology_is_refused_whatever_k() {
+    let empty = Topology::new();
+    let mut e = empty.edit();
+    e.activate([0, 0, 0]).unwrap();
+    let t = e.commit().unwrap().0;
+    let f = Field::new(&t, 0.0_f32);
+    let (t2, _) = t.edit().commit().unwrap();
+    for k in [0, 1] {
+        for g in [dilate_values, erode_values] {
+            assert_eq!(g(&t2, &f, Connectivity::Six, k).err(), Some(FieldError::StaleField), "{k}");
+        }
+    }
 }

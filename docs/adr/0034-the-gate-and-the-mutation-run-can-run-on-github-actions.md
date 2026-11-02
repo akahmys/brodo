@@ -122,3 +122,28 @@ mutants each, and runs the timeouts again in a matrix of 20 jobs, each one twent
 them by `--shard k/20` and each holding the shards' reports to every mutant listed
 (ADR-0023); the timeout multiplier stays 2.0. With 20 jobs at once, a run's wall time
 stays near its whole work over 20.
+
+## Amendment: arguments by variable, and the guard's log kept
+
+- **Date**: 2026-11-02
+
+The second review of the whole repository found the workflow passing its further arguments
+unquoted, so that `-f 'crates/colino/src/**'` reached cargo-mutants with its quotes and its
+glob expanded by the shell, and each shard keeping its report without the guard's log. The
+owner decided, on 2026-11-02, that the arguments reach `mutants.py` through `MUTANTS_ARGS`,
+split as a shell splits words with nothing expanded, and that each shard keeps
+`rss_guard.log` beside its report, which `--report` and `--patient --from` read.
+
+## Amendment: each part of the timeouts holds its own
+
+- **Date**: 2026-11-02
+
+An outside review found that a part of the timeouts run again, `--patient` with `--shard
+k/20`, checked none of them ran: a timeout lost from every part failed no job, and a part
+said it ran them all. The owner decided, on 2026-11-02, that it be fixed: a part lists the
+mutants cargo-mutants deals it, `--list` with the same `--re` and `--shard`, and fails unless
+it reports each timeout among them, saying how many of all it ran. Since `--re` lets a
+deleted struct field through, a part runs those too, at the patient timeout; they are
+listed and run but not judged. Shown to fire: with cargo-mutants replaced by a stand-in
+whose part ran a deleted field but not the timeout dealt it, the old part passed and the new
+one fails.

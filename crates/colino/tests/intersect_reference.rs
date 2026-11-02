@@ -14,8 +14,12 @@ use proptest::prelude::*;
 
 /// How far a crossing's fraction may be from the exact one: a few roundings of a division.
 const FRACTION_TOLERANCE: f64 = 1e-12;
-/// How far a nearest distance may be above a dense search's, relative to the shapes' size.
-const DENSE_TOLERANCE: f64 = 1e-9;
+/// How far a squared nearest distance may be from a dense search's: 10⁻⁹ of the shapes'
+/// squared size, some 10².
+const DENSE_TOLERANCE: f64 = 1e-7;
+/// The most the tree's search widens a segment's box by (`Bvh::near_segment`): twice the
+/// rounding of moving a corner, 4 ε times the largest coordinate, under 32 on the torus.
+const WIDENING: f64 = 4.0 * f64::EPSILON * 32.0;
 
 /// The test in exact arithmetic on integer coordinates, for a segment along axis `k`
 /// from `a`, of signed length `len`: the crossing's fraction as a numerator and positive
@@ -171,13 +175,13 @@ proptest! {
         prop_assert!((0.0..=1.0).contains(&s));
         let at = |s: f64| [0, 1, 2].map(|c| a[c] + s * (b[c] - a[c]));
         let q = at(s);
-        prop_assert!((squared(q, on_triangle(q, t)) - d).abs() <= DENSE_TOLERANCE * 100.0);
+        prop_assert!((squared(q, on_triangle(q, t)) - d).abs() <= DENSE_TOLERANCE);
         let dense = (0..=400).map(|i| {
             let p = at(f64::from(i) / 400.0);
             squared(p, on_triangle(p, t))
         });
         let best = dense.fold(f64::INFINITY, f64::min);
-        prop_assert!(d <= best + DENSE_TOLERANCE * 100.0, "{d} above {best}");
+        prop_assert!(d <= best + DENSE_TOLERANCE, "{d} above {best}");
     }
 }
 
@@ -202,9 +206,9 @@ fn the_trees_search_keeps_every_triangle_a_segment_crosses() {
                     t.iter().fold([f64::INFINITY; 3], |m, p| [0, 1, 2].map(|c| m[c].min(p[c])));
                 let hi =
                     t.iter().fold([f64::NEG_INFINITY; 3], |m, p| [0, 1, 2].map(|c| m[c].max(p[c])));
-                let apart = [0, 1, 2]
-                    .iter()
-                    .any(|&c| lo[c] > a[c].max(b[c]) + 1e-9 || hi[c] < a[c].min(b[c]) - 1e-9);
+                let apart = [0, 1, 2].iter().any(|&c| {
+                    lo[c] > a[c].max(b[c]) + WIDENING || hi[c] < a[c].min(b[c]) - WIDENING
+                });
                 assert!(!(apart && near.contains(&i)), "triangle {i} found though apart");
             }
         }

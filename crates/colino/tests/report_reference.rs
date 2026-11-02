@@ -58,6 +58,11 @@ fn double_torus(s: f64) -> Mesh {
     cubes(&cells, s)
 }
 
+/// The least thickness `shell(19.0)`'s wall is measured at: 1, its spheres' radii apart,
+/// at most, and above 0.9, less only where the outer sphere's facets sag toward the inner.
+const SHELL_WALL_ABOVE: f64 = 0.9;
+const SHELL_WALL_AT_MOST: f64 = 1.0;
+
 /// A sphere of radius 20 holding a cavity of radius `inner`: the inner sphere faces in.
 fn shell(inner: f64) -> Mesh {
     let mut m = sphere(4, 20.0, [0.0; 3]);
@@ -148,7 +153,7 @@ fn a_wall_thinner_than_a_voxel_shows_a_change() {
     assert_eq!(coarse.thin.len(), 1, "{:?}", coarse.thin);
     let wall = coarse.thin[0];
     assert_eq!(wall.kind, colino::report::ThinKind::Wall);
-    assert!(wall.least > 0.9 && wall.least <= 1.0, "{}", wall.least);
+    assert!(wall.least > SHELL_WALL_ABOVE && wall.least <= SHELL_WALL_AT_MOST, "{}", wall.least);
     // At h/2, 1 voxel, the shell is whole: one solid round a cavity.
     assert!(
         matches!(wall.check, colino::report::Check::Changed { fine, .. }
@@ -200,6 +205,18 @@ fn a_transform_not_axis_aligned_is_refused() {
     }
     // With no point to place, the third layer reads it.
     assert_eq!(report(&m, &c, &[]), Err(ReportError::Transform));
+}
+
+/// A region's point that is not finite is refused, by its place among the regions, not
+/// placed beyond the grid.
+#[test]
+fn a_region_not_finite_is_refused() {
+    let m = sphere(2, 10.0, [0.0; 3]);
+    let c = convert(&m, &Options::new(1.0)).unwrap();
+    for x in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+        let regions = [("in".into(), [0.0; 3]), ("bad".into(), [0.0, x, 0.0])];
+        assert_eq!(report(&m, &c, &regions), Err(ReportError::Region(1)), "{x}");
+    }
 }
 
 /// A point is placed by the grid's own origin: a sphere at x = 100 converted on a lattice

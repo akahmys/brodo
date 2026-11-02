@@ -6,7 +6,8 @@ OpenFOAM, and of the projects in the owner's local list, one name a line, `#` st
 comment, at `$BRODO_FORBIDDEN_SOURCES` or `~/.config/brodo/forbidden-sources`. The list
 stays outside the repository, which names no other project of its owner's (ADR-0007). It
 matches names, never a directory on this machine: a path or URL with a segment, after a
-`/`, that starts with one of the names (`~/x/<name>/src`, `../<name>-design.md`,
+`/`, or a `:` or `=` joining a path to what is before it (`<tag>:<name>/...`,
+`--dir=<name>`), that starts with one of the names (`~/x/<name>/src`, `../<name>-design.md`,
 `github.com/<org>/<name>/...`) is blocked. The project sites (`www.openvdb.org`) are
 hosts, not such segments, so their public documentation stays readable. OpenVDB passes at a
 tag from `v12.0.0` on, its Apache-2.0 releases (ADR-0044): a segment `vMAJOR.MINOR.PATCH`
@@ -15,8 +16,9 @@ the repository's own directories under that tag with it; a path that climbs with
 judged segment by segment. A path ends at white space, a quote, or a shell's `();,&|<>` or
 backtick.
 
-Read: the path fields of Read, Grep and Glob (and Glob's pattern), WebFetch's URL, and
-Bash's command. A name without a `/` before it passes; the rule binds regardless.
+Read: every string in the call's input, of each tool `.claude/settings.json` sends here:
+the reading tools, Bash, and every MCP tool, a terminal's command and a browser's URL among
+them. A name without a `/`, `:` or `=` before it passes; the rule binds regardless.
 
 With `--check`, the audit's: fails unless the local list exists and names a project.
 """
@@ -35,7 +37,6 @@ TAG = re.compile(r"v(\d+)\.\d+\.\d+")
 # directory followed by `;` or `)` in a command is still that directory (ADR-0044).
 ENDS = " \t\n'\"();,&|<>`"
 SPLIT = re.compile("[" + re.escape(ENDS) + "]")
-FIELDS = ("file_path", "path", "url", "command", "notebook_path")
 
 
 def local_list() -> Path:
@@ -54,7 +55,8 @@ def local_names() -> list[str]:
 
 def forbidden() -> re.Pattern[str]:
     names = "|".join(re.escape(n) for n in (*BUILT_IN, *local_names()))
-    return re.compile(rf"/({names})[^/{re.escape(ENDS)}]*", re.IGNORECASE)
+    # A `:` of C++'s `::` joins no path.
+    return re.compile(rf"(?:/|(?<!:):|=)({names})[^/{re.escape(ENDS)}]*", re.IGNORECASE)
 
 
 def relicensed(match: re.Match[str], value: str, pattern: re.Pattern[str]) -> bool:
@@ -88,6 +90,17 @@ def tagged(match: re.Match[str], value: str) -> bool:
     return False
 
 
+def strings(value: object) -> list[str]:
+    """Every string in a tool's input, however deep in its lists and objects."""
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, dict):
+        return [s for v in value.values() for s in strings(v)]
+    if isinstance(value, list):
+        return [s for v in value for s in strings(v)]
+    return []
+
+
 def check() -> int:
     names = local_names()
     if names:
@@ -102,13 +115,7 @@ def main() -> int:
     if sys.argv[1:] == ["--check"]:
         return check()
     pattern = forbidden()
-    call = json.load(sys.stdin)
-    tool_input = call.get("tool_input", {})
-    values = [tool_input.get(f, "") for f in FIELDS]
-    if call.get("tool_name") == "Glob":
-        values.append(tool_input.get("pattern", ""))
-    for value in values:
-        text = value if isinstance(value, str) else ""
+    for text in strings(json.load(sys.stdin).get("tool_input", {})):
         match = next((m for m in pattern.finditer(text) if not relicensed(m, text, pattern)), None)
         if match:
             print(f"Blocked by scripts/hooks/provenance_guard.py: {match.group(0)} is a source "

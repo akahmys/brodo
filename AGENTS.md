@@ -116,7 +116,7 @@ exemption lists included.
 4. **Numbers are never reused.** A retired rule leaves a gap, and its ADR says why.
 
 The `commit-msg` hook holds part of this: a commit that touches any of these files must
-name an ADR and stage one. Whether the human approved, **nothing** checks.
+name an ADR it stages. Whether the human approved, **nothing** checks.
 
 ## Principles
 

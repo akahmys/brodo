@@ -668,7 +668,8 @@ impl Flood {
 
     /// Whether the voxel is in the seed's component.
     pub fn contains(&self, t: &Topology, v: Coord) -> Result<bool, AnalysisError> {
-        Ok(self.label != Label::Excluded && self.labels.label_at(t, v)? == self.label)
+        let label = self.labels.label_at(t, v)?;
+        Ok(self.label != Label::Excluded && label == self.label)
     }
 
     /// Whether the seed's component reaches the outside.
@@ -884,9 +885,11 @@ mod tests {
             assert!(!none.contains(&t, v).unwrap(), "{v:?}");
         }
         let (t2, _) = t.edit().commit().unwrap();
-        assert_eq!(
-            fill.contains(&t2, [0, 0, 0]),
-            Err(AnalysisError::Field(FieldError::StaleField))
-        );
+        for flood in [&fill, &none] {
+            assert_eq!(
+                flood.contains(&t2, [0, 0, 0]),
+                Err(AnalysisError::Field(FieldError::StaleField))
+            );
+        }
     }
 }

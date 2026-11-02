@@ -122,3 +122,13 @@ normal of a turned face graze its neighbour and measure walls of 0.01. Points ar
 taken at every h/2 along the longest edge, each section of the triangle split into parts
 no longer than h/2, at each part's middle: about area / (h/2)² + length / (h/2) points,
 inside their sections, the same for a triangle turned over (2026-10-26).
+
+## Amendment: a region's point not finite
+
+- **Date**: 2026-11-02
+
+An outside review found that a region whose point was NaN or infinite was placed beyond the
+grid, in the complement's outside component, since its voxel index fell outside the `i32`
+range as a far point's does. The owner decided, on 2026-11-02, that it be fixed: such a
+region is refused, `ReportError::Region` naming its place among the regions given, which a
+caller can match while a NaN placed outside would pass unseen. ARCHITECTURE.md §5.2 states it.

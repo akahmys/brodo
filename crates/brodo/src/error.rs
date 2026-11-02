@@ -149,8 +149,8 @@ pub enum FormatError {
     #[error("the {0} section is inconsistent")]
     Inconsistent(&'static str),
     /// Walking the nodes from the root table reaches a node, a leaf or a tile value twice,
-    /// which a reader walking the whole tree refuses (docs/formats.md §2.6, and §4.2, rule
-    /// 11).
+    /// which a reader walking the whole tree, or a region's nodes, refuses (docs/formats.md
+    /// §2.6, §4.2, rule 11, and §8.6, rule 6).
     #[error("a node, leaf or tile value is reached twice from the root table")]
     Shared,
     /// A topology asked to hold a view's values does not hold the view's leaves and tiles.

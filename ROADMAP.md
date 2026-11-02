@@ -13,7 +13,13 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   rules inventoried and their gaps closed (ADR-0002, ADR-0005, ADR-0021, ADR-0048), no code
   taken from outside (AGENTS.md S5, ADR-0049), every document read against the code
   (ADR-0001's amendment of 2026-11-02), and three refactorings with no behaviour changed;
-  no file was found no longer needed.
+  no file was found no longer needed. A second review before the tag fixed four defects
+  (a merge over a removed leaf, a region read's memory before its limit and over shared
+  nodes, a sliver's distance) and the guards' and checks' gaps (ADR-0002, ADR-0003,
+  ADR-0007, ADR-0021, ADR-0023, ADR-0034), and named each test tolerance once; an outside
+  review of that change then fixed a thin triangle's face point (ADR-0027), a report's
+  region not finite (ADR-0028), more of the same gaps, and the format reader's missing
+  region read (ADR-0037).
 - **Next**: the units §2's "After P7" lists after the review, `limit` bounding what
   `vdb::from_bytes` and `vdb::read` make among them.
 

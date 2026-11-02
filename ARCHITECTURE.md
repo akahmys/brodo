@@ -343,8 +343,9 @@ are in ADR-0030.
 - Grid: the caller's voxel size, on the world's lattice unless given another origin; each
   voxel sampled at its centre (ADR-0027).
 - Distance: to the nearest triangle, through a BVH of axis-aligned boxes, worked in `f64`
-  to within the rounding of the coordinates and stored as the nearest `f32`; an outside
-  voxel whose distance rounds to zero holds +0.
+  to within the rounding of the coordinates over the sine of a triangle's sharpest angle,
+  at most √ε of the triangle's size for the thinnest (ADR-0027), and stored as the nearest
+  `f32`; an outside voxel whose distance rounds to zero holds +0.
 - Sign: inside where the generalised winding number is 1/2 or more, by Barill et al.'s
   far-field approximation (β = 2, second order) or the exact sum, by default; or, as an
   option that does not depend on orientation, where most of the three lines through the
@@ -391,8 +392,8 @@ are in ADR-0030.
 - Reference for layer 1: the input's V − E + F when, welded, it is a closed 2-manifold,
   the solid's χ being half the surface's; otherwise none, the report saying why. Layer 3's
   check stands in for it where it is thin, for any input.
-- Layer 2's regions are named points in world coordinates, each answered with its
-  complement component, whether that reaches the outside, or the solid.
+- Layer 2's regions are named points in world coordinates, finite or refused, each answered
+  with its complement component, whether that reaches the outside, or the solid.
 - Layer 3 samples points h/2 apart on every triangle and measures, along the triangle's
   normal both ways, the distance to the nearest other triangle: a side whose midpoint is
   inside by the conversion's sign is a wall that thick, otherwise a gap that wide. Points
@@ -416,8 +417,8 @@ In `brodo`, each behind a cargo feature:
 
 - **A slice as PNG** (`brodo::slice`, feature `slice-png`, opted into, ADR-0036), along x, y or z
   at a given position, one voxel to a pixel. Signed distances take a diverging colour map
-  centred on zero, with the zero contour drawn one pixel wide; other scalars a sequential
-  one. The colour range is given by the caller, never inferred, and refused unless it is
+  centred on zero, with the zero contour drawn one pixel wide, two where neighbours of
+  equal size and opposite sign meet; other scalars a sequential one. The colour range is given by the caller, never inferred, and refused unless it is
   finite and not empty. A tile's voxels take its
   value's colour, hatched; the background is a flat grey; a value that is not a number is
   magenta; with no per-voxel mask (ADR-0025), nothing else is inactive. The same input gives

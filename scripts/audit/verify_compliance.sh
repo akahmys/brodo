@@ -24,7 +24,6 @@ for tool in cargo cargo-deny cargo-mutants betterleaks python3 git; do
 done
 # The project's own settings (scripts/audit/project.py).
 setting() { python3 scripts/audit/project.py "$1"; }
-APPLICATIONS="$(setting APPLICATIONS) xtask"
 UNTRUSTED_INPUT=$(setting UNTRUSTED_INPUT)
 TARGETS=$(setting TARGETS)
 SRC_DIRS=$( (find crates -maxdepth 2 -type d -name src; [ -d xtask/src ] && echo xtask/src) | sort | tr '\n' ' ')
@@ -107,22 +106,11 @@ for module in $UNTRUSTED_INPUT; do
 done
 [ -n "$checked" ] || echo "  PASS (no module is listed in project.py)"
 
-echo "[Rule 8] No String or anyhow errors in library crates..."
-hits=""
-for dir in $SRC_DIRS; do
-    crate=$(basename "$(dirname "$dir")")
-    grep -qw "$crate" <<<"$APPLICATIONS" && continue
-    # `String` as `Result`'s own error, its value type nested at most two deep, so that
-    # `Result<BTreeMap<String, String>, E>` passes (ADR-0002).
-    hits+=$(grep -rnE '\bResult<([^<>;{]|<([^<>]|<[^<>]*>)*>)*, *String *>|anyhow' "$dir" --include='*.rs' || true)
-done
-if [ -n "$hits" ]; then echo "$hits"; fail "untyped errors"; else echo "  PASS"; fi
-
-echo "[Rule 9] No errors filtered away..."
-if hits=$(grep -rnE 'filter_map\(Result::ok\)|flat_map\(Result::ok\)|filter_map\(\|[a-z_]+\| *[a-z_]+\.ok\(\)\)' \
-        $SRC_DIRS --include='*.rs'); then
-    echo "$hits"; fail "errors filtered away"
-else echo "  PASS"; fi
+# `String` as `Result`'s own error however its types nest, so that
+# `Result<BTreeMap<String, String>, E>` passes, and errors filtered away, each however its
+# lines break (ADR-0002).
+echo "[Rules 8, 9] No String or anyhow errors in library crates, no errors filtered away..."
+python3 scripts/audit/source.py --errors || ERROR=1
 
 echo "[Rule 10] cargo fmt --all --check..."
 if cargo fmt --all --check >/dev/null 2>&1; then echo "  PASS"
@@ -149,12 +137,9 @@ done
 echo "[T1] Tests: no test file in src/, and #[ignore] only as needing what the repository lacks..."
 stray=$(find $SRC_DIRS \( -name '*_test.rs' -o -name '*_tests.rs' -o -name 'test_*.rs' \
     -o -name 'tests.rs' -o -name 'test.rs' \) 2>/dev/null)
-# An ignore written directly or under `cfg_attr`, in any target.
-ignores=$(grep -rnE --include='*.rs' '#\[ignore|#\[cfg_attr\(.*\bignore\b' $SRC_DIRS crates/*/tests \
-    crates/*/examples crates/*/benches 2>/dev/null | grep -v 'ignore = "needs ' || true)
 [ -z "$stray" ] || { echo "$stray"; fail "test files in src/"; }
-[ -z "$ignores" ] || { echo "$ignores"; fail "a test is switched off"; }
-[ -n "$stray$ignores" ] || echo "  PASS"
+# An ignore written directly or under `cfg_attr`, however its lines break, in any target.
+python3 scripts/audit/source.py --ignores || ERROR=1
 
 echo "[Docs, S3] Language, tense, links, ADR index, provenance record, rustdoc..."
 python3 scripts/audit/documents.py || ERROR=1

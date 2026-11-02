@@ -72,6 +72,18 @@ fn golden_entries() -> Vec<CacheEntry> {
 const GOLDEN: &[u8] = include_bytes!("data/archive_v1.bin");
 const QUANTISED: &[u8] = include_bytes!("data/archive_v1_quantised.bin");
 
+/// How far a binary16 value restores from x (docs/formats.md §8.5): 2⁻¹¹ × |x| + 2⁻²⁵.
+const BINARY16_RELATIVE: f32 = 1.0 / 2048.0;
+const BINARY16_ABSOLUTE: f32 = 1.0 / 33_554_432.0;
+/// The 8-bit grid's ranges, hi − lo per component: the golden velocity's k over its leaves,
+/// 0 to 1023, then 1 and −1 alone.
+const EIGHT_BIT_RANGES: [f64; 3] = [1023.0, 0.0, 0.0];
+/// An 8-bit value restores within the range over this of x (docs/formats.md §8.5).
+const EIGHT_BIT_DIVISOR: f64 = 510.0;
+/// The rounding of `f64` an 8-bit value restores within (docs/formats.md §8.5), relative to
+/// the range: a few roundings of a product and a sum.
+const EIGHT_BIT_F64_ROUNDING: f64 = 4.0 * f64::EPSILON;
+
 /// The golden grids, the first in binary16 and the second in 8 bits.
 fn quantised(e: &[CacheEntry]) -> Vec<(&CacheEntry, Encoding)> {
     e.iter().zip([Encoding::Binary16, Encoding::EightBit]).collect()
@@ -209,6 +221,55 @@ fn the_limit_bounds_the_file_and_what_it_decompresses_into() {
     ));
 }
 
+/// What `read_from` gives of a named pipe, which reports no length, written 1 MiB of zeros:
+/// the reader stops at its limit and closes the pipe, and the rest is refused.
+#[cfg(unix)]
+fn read_of_a_fifo<T>(name: &str, read_from: impl FnOnce(&std::path::Path) -> T) -> T {
+    use std::io::Write;
+    let path = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join(name);
+    std::fs::remove_file(&path).unwrap_or(());
+    let made = std::process::Command::new("mkfifo").arg(&path).status().unwrap();
+    assert!(made.success());
+    assert_eq!(std::fs::metadata(&path).unwrap().len(), 0);
+    let writer = {
+        let path = path.clone();
+        std::thread::spawn(move || {
+            let mut pipe = std::fs::OpenOptions::new().write(true).open(&path).unwrap();
+            pipe.write_all(&vec![0_u8; 1 << 20]).unwrap_or(());
+        })
+    };
+    let read = read_from(&path);
+    writer.join().unwrap();
+    std::fs::remove_file(&path).unwrap_or(());
+    read
+}
+
+/// An archive longer than the limit is refused by the bytes read, whatever length it
+/// reports, by `read` and `read_region` alike: a named pipe reports none, as `/dev/zero`
+/// does, and a file can grow after its length is read (ADR-0036).
+#[cfg(unix)]
+#[test]
+fn an_archive_longer_than_the_limit_is_refused_whatever_length_it_reports() {
+    let extent = Bounds::Box { min: [0; 3], max: [7; 3] };
+    let whole = read_of_a_fifo("archive_longer.fifo", |p| read(p, 1024).map(|_| ()));
+    assert!(matches!(whole, Err(CacheError::FileTooLarge { limit: 1024, .. })), "{whole:?}");
+    let region = read_of_a_fifo("archive_region_longer.fifo", |p| {
+        read_region(p, 1024, 0, extent).map(|_| ())
+    });
+    assert!(matches!(region, Err(CacheError::FileTooLarge { limit: 1024, .. })), "{region:?}");
+    let zero = std::path::Path::new("/dev/zero");
+    let zero_whole = read(zero, 1024).map(|_| ());
+    assert!(
+        matches!(zero_whole, Err(CacheError::FileTooLarge { length: 1025, limit: 1024 })),
+        "{zero_whole:?}"
+    );
+    let zero_region = read_region(zero, 1024, 0, extent).map(|_| ());
+    assert!(
+        matches!(zero_region, Err(CacheError::FileTooLarge { length: 1025, limit: 1024 })),
+        "{zero_region:?}"
+    );
+}
+
 #[test]
 fn each_check_refuses_its_damage() {
     let g = GOLDEN.to_vec();
@@ -326,19 +387,24 @@ fn quantised_values_keep_their_bytes_and_read_back_within_their_bounds() {
     );
     let (a, x) = (file.view::<f32>(0).unwrap(), exact.view::<f32>(0).unwrap());
     let (b, y) = (file.view::<[f32; 3]>(1).unwrap(), exact.view::<[f32; 3]>(1).unwrap());
-    let step = 1023.0 / 255.0;
+    // Within (hi − lo) / 510 of x, to the rounding of `f64` and of `f32`, half a step of x'.
+    let eight_bit = |c: usize, x: f32| {
+        EIGHT_BIT_RANGES[c] * (1.0 / EIGHT_BIT_DIVISOR + EIGHT_BIT_F64_ROUNDING)
+            + f64::from(x.abs() * f32::EPSILON / 2.0)
+    };
     for n in t.leaf_numbers() {
         let o = t.leaf_origin(n).unwrap();
         for i in 0..512 {
             let v = [o[0] + i % 8, o[1] + i / 8 % 8, o[2] + i / 64];
             let (got, want) = (a.get(v).unwrap(), x.get(v).unwrap());
             assert!(
-                (got - want).abs() <= want.abs() / 2048.0 + 2.0_f32.powi(-25),
+                (got - want).abs() <= want.abs() * BINARY16_RELATIVE + BINARY16_ABSOLUTE,
                 "{want} as {got}"
             );
             let (got, want) = (b.get(v).unwrap(), y.get(v).unwrap());
-            for (g, w) in got.iter().zip(want) {
-                assert!((g - w).abs() <= step / 2.0 * 1.000_001, "{w} as {g}");
+            for (c, (g, w)) in got.iter().zip(want).enumerate() {
+                let off = (f64::from(*g) - f64::from(w)).abs();
+                assert!(off <= eight_bit(c, *g), "{w} as {g}");
             }
         }
     }

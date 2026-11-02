@@ -116,3 +116,17 @@ checked in its release notes, `LICENSE` and `RE-LICENSE_NOTE.txt`; the amendment
 `v12.0.0` on is read to learn the `.vdb` format, never copied or translated, and that the
 guard lets it through at such a tag (ADR-0044). OpenFOAM and the owner's local list are
 unchanged.
+
+## Amendment: what the guard reads
+
+- **Date**: 2026-11-02
+
+The second review of the whole repository found `provenance_guard.py` reading named fields
+only, so that Grep's `glob` and WebSearch's domains went unread; matching a name only after
+a `/`, so that `git show <tag>:<name>/…` and `--dir=<name>` passed; and run by
+`.claude/settings.json` on the reading tools and Bash alone, so that a terminal tool's
+command or a browser's URL passed. The owner decided, on 2026-11-02, that the guard reads
+every string of a call's input, matches a name after a `/`, or a `:` or `=` joining a path,
+a `::` of C++ aside, and runs on WebSearch and every MCP tool as well. Shown to fire: of 14
+calls, the old guard missed 4 it should block and the new one none, passing the 5 it should
+pass, a tagged release and the project's documentation site among them.

@@ -8,34 +8,37 @@ names a sibling of the project in another. This resolves each `../` path against
 that holds it and fails when the result is outside the root.
 
 It also holds CODING.md L2 to one list, `OUTPUT_DIRS` in `project.py`: each directory there
-is git-ignored at the root and in `.betterleaks.toml`'s path allow-list, and this scan and
-`documents.py` skip the same directories.
+is git-ignored at the root and in `.betterleaks.toml`'s path allow-list at the root alone.
+This scan and `documents.py` read the files git would commit, tracked or not ignored, so
+that a directory of an output's name deeper in the tree is read.
 """
 
 import os
 import re
+import subprocess
 import sys
 from pathlib import Path
 
 from project import OUTPUT_DIRS
 
 ROOT = Path(__file__).resolve().parent.parent.parent
-SKIP_DIRS = {".git", *OUTPUT_DIRS}
 SUFFIXES = {".md", ".rs", ".toml", ".py", ".sh", ".txt", ".json", ".yml", ".yaml"}
 EXTRA_FILES = {"pre-commit", "commit-msg"}
 
 RELATIVE = re.compile(r"(?<![\w.])((?:\.\./)+[^\s)\]'\"`>]*)")
 
 
+def committable() -> list[Path]:
+    """The files git would commit: tracked, or untracked and not ignored."""
+    listed = subprocess.run(
+        ["git", "ls-files", "--cached", "--others", "--exclude-standard"],
+        cwd=ROOT, capture_output=True, text=True, check=True,
+    ).stdout.splitlines()
+    return [ROOT / f for f in listed if (ROOT / f).is_file()]
+
+
 def files() -> list[Path]:
-    out = []
-    for directory, subdirs, names in os.walk(ROOT):
-        subdirs[:] = [d for d in subdirs if d not in SKIP_DIRS]
-        for name in names:
-            path = Path(directory) / name
-            if path.suffix in SUFFIXES or name in EXTRA_FILES:
-                out.append(path)
-    return out
+    return [p for p in committable() if p.suffix in SUFFIXES or p.name in EXTRA_FILES]
 
 
 def output_dirs() -> list[str]:
@@ -48,7 +51,7 @@ def output_dirs() -> list[str]:
     for d in OUTPUT_DIRS:
         if f"/{d}/" not in ignored:
             failures.append(f"  .gitignore: /{d}/ is not ignored (CODING.md L2)")
-        if f"'''(^|/){d}/'''" not in allow:
+        if f"'''^{d}/'''" not in allow:
             failures.append(f"  .betterleaks.toml: {d}/ is not in the path allow-list (CODING.md L2)")
     return failures
 

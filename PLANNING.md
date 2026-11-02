@@ -7,7 +7,8 @@ A rule here that names no check is held by review alone (ADR-0001).
 
 ## 1. A unit of work
 
-1. **Start** by reading [ROADMAP.md](ROADMAP.md) §1 (status), after AGENTS.md, which a subagent is handed with its task.
+1. **Start** by reading [ROADMAP.md](ROADMAP.md) §1 (status), after AGENTS.md; a task
+   handed to a subagent carries the rules it needs instead.
 2. **Size** a unit as about one test made to pass.
 3. **End** by overwriting ROADMAP.md §1: what was done, the next step, and every
    unresolved problem. It is a snapshot, not a log; history is in git.

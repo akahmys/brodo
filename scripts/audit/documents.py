@@ -19,32 +19,29 @@
    so that its code runs as a doctest. What it says, nothing checks.
 """
 
-import os
 import re
 import sys
 from pathlib import Path
 
-from project import LAYERS, OUTPUT_DIRS
+from paths import committable
+from project import LAYERS
 
 ROOT = Path(__file__).resolve().parent.parent.parent
-SKIP_DIRS = {".git", *OUTPUT_DIRS}
 TEXT = {".md", ".rs", ".toml", ".py", ".sh", ".txt", ".json", ".yml", ".yaml"}
 
 PRESENT_TENSE = ["ARCHITECTURE.md", "AGENTS.md"]
 DATE = re.compile(r"\b20\d\d-\d\d-\d\d\b")
 PAST = re.compile(r"\b(was|were|had|used to|became|no longer|turned out)\b")
-JAPANESE = re.compile("[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uff66-\uff9f]")
+# Japanese letters, and CJK punctuation and full-width forms.
+JAPANESE = re.compile("[\u3000-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uff00-\uffef]")
 # `NAME.md §N`, a root document's or `docs/`'s, its name in a link or in backquotes or bare.
 SECTION = re.compile(r"\b((?:docs/)?[A-Za-z][A-Za-z_]*\.md)[)`]? §(\d+(?:\.\d+)*)")
 LINK = re.compile(r"\]\(([^)#:\s][^)\s#]*)(#[^)]*)?\)")
 
 
 def walk() -> list[Path]:
-    out = []
-    for directory, subdirs, names in os.walk(ROOT):
-        subdirs[:] = [d for d in subdirs if d not in SKIP_DIRS]
-        out += [Path(directory) / n for n in names if Path(n).suffix in TEXT]
-    return out
+    """The text files git would commit (paths.py)."""
+    return [p for p in committable() if p.suffix in TEXT]
 
 
 def language(paths: list[Path]) -> list[str]:

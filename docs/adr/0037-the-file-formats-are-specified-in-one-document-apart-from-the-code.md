@@ -94,3 +94,18 @@ The review of the whole repository found AGENTS.md's "Measurement outranks docum
 holding that a document disagreeing with a measurement is corrected, with no word of this
 record's rule that code disagreeing with docs/formats.md is corrected instead. The owner
 decided, on 2026-11-02, that AGENTS.md names the exception.
+
+## Amendment: a region read
+
+- **Date**: 2026-11-02
+
+An outside review found that the reader read §8.6, an archive's region, not at all, so that
+the section, and the rule 6 added to it on 2026-11-02, held only by the crates' tests. The
+owner decided, on 2026-11-02, that it be fixed: the reader reads a grid's region through a
+box as §8.6 says, with `--region`, and `format_document.rs` compares it with the crates' on
+each archive golden file through six boxes, by every voxel and leaf, accepts and refuses as
+they do 3 × 2 sets of damaged copies, some a whole read refuses and a region answers, and
+refuses with them a region walking to a leaf two lower nodes share, in an archive made so,
+while a region reaching it once is read. Shown to fire: without §3.4's check of the
+metadata, with a box met one voxel too far on either side, with a quantised leaf's values
+left unrestored, and without the check of a leaf reached twice, the reader disagreed.

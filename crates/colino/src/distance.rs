@@ -51,16 +51,20 @@ pub fn on_segment(p: Point, a: Point, b: Point) -> Point {
     along(a, b, (dot(sub(p, a), ab) / length).clamp(0.0, 1.0))
 }
 
-/// The point of the triangle `t` nearest `p`.
+/// The point of the triangle `t` nearest `p`. Of two points as near, apart by rounding
+/// alone, which is given is not promised; nor, for a triangle thinner than √ε of its size,
+/// which point within its width of the nearest.
 pub fn on_triangle(p: Point, t: [Point; 3]) -> Point {
     let [a, b, c] = t;
     let (ab, ac, ap) = (sub(b, a), sub(c, a), sub(p, a));
     let n = cross(ab, ac);
-    if dot(n, n) <= 0.0 {
-        let candidates = [on_segment(p, a, b), on_segment(p, b, c), on_segment(p, c, a)];
-        return candidates
-            .into_iter()
-            .fold(a, |best, q| if squared(p, q) < squared(p, best) { q } else { best });
+    // A normal shorter than √ε of its edges' product, the corners on a line or nearly, is
+    // rounding: the nearest point is taken on the edges, off by no more than the triangle's
+    // width, √ε of its size. Above it, the face's point is p's projection on the plane, off
+    // by ε of |ap| over the angle's sine; the barycentric weights, ratios of |n|², would be
+    // off by its square.
+    if dot(n, n) <= 0.0 || dot(n, n) < f64::EPSILON * dot(ab, ab) * dot(ac, ac) {
+        return nearest_edge(p, a, [on_segment(p, a, b), on_segment(p, b, c), on_segment(p, c, a)]);
     }
     let (d1, d2) = (dot(ab, ap), dot(ac, ap));
     if d1 <= 0.0 && d2 <= 0.0 {
@@ -88,9 +92,14 @@ pub fn on_triangle(p: Point, t: [Point; 3]) -> Point {
     if va <= 0.0 && d4 - d3 >= 0.0 && d5 - d6 >= 0.0 {
         return along(b, c, (d4 - d3) / ((d4 - d3) + (d5 - d6)));
     }
-    let denom = 1.0 / (va + vb + vc);
-    let (v, w) = (vb * denom, vc * denom);
-    [a[0] + ab[0] * v + ac[0] * w, a[1] + ab[1] * v + ac[1] * w, a[2] + ab[2] * v + ac[2] * w]
+    sub(p, scale(n, dot(ap, n) / dot(n, n)))
+}
+
+/// Of `first` and `others`, the point nearest `p`, the earliest of those as near.
+fn nearest_edge(p: Point, first: Point, others: [Point; 3]) -> Point {
+    others
+        .into_iter()
+        .fold(first, |best, q| if squared(p, q) < squared(p, best) { q } else { best })
 }
 
 #[cfg(test)]

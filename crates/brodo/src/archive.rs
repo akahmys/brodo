@@ -612,14 +612,16 @@ pub fn region_from_bytes(
         .map_err(|error| CacheError::Grid { index, error })?;
     let mut wanted: Vec<usize> = leaves.iter().map(|(n, _)| *n as usize / CHUNK_LEAVES).collect();
     wanted.dedup();
-    let mut chunks = Vec::new();
+    let mut sizes = Vec::new();
     let mut held = head.len().saturating_add(tail.len());
     for k in wanted {
         let (_, raw) = chunk(k.checked_add(1).ok_or(CacheError::TooLarge)?)?;
         held = held.saturating_add(raw);
-        chunks.push((k, vec![Block::new_zeroed(); raw]));
+        sizes.push((k, raw));
     }
     within(held, limit)?;
+    let mut chunks: Vec<_> =
+        sizes.into_iter().map(|(k, raw)| (k, vec![Block::new_zeroed(); raw])).collect();
     let mut work = Vec::new();
     for (k, room) in &mut chunks {
         let (bytes, _) = chunk(*k + 1)?;

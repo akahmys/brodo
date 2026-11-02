@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
 """A reader of brodo's files written from docs/formats.md alone (ADR-0037).
 
-    formats.py [--brief] FILE...
-    formats.py --patch FILE < PATCHES
+    formats.py [--brief] [--region I X0 Y0 Z0 X1 Y1 Z1] FILE...
+    formats.py --patch FILE [--region I X0 Y0 Z0 X1 Y1 Z1] < PATCHES
 
 For each file it prints `file PATH`, then either `refused REASON` or what it read: the
 grids, each with its metadata, background, leaves, some of their voxels found as §2.4
 says, and tiles, then each Hermite set's
 verdict, and `end`; for an OpenVDB file, §9, each grid's metadata, transform, background,
 leaves, their values in brodo's order, and tiles. With `--brief`, a read file prints `accepted` in place of its grids.
+With `--region`, an archive's grid I is read through the box of voxels X0 Y0 Z0 to X1 Y1 Z1
+as §8.6 says, printing each leaf meeting it, `leaf N X Y Z`, and each voxel in it, z
+slowest, `voxel X Y Z VALUE`, or `accepted` with `--brief`.
 With `--patch`, each line of standard input, a byte offset and a `u32` in hexadecimal,
 gives a copy of FILE with that word replaced, read as `--brief` reads, named
 `FILE@OFFSET=VALUE`.
@@ -72,6 +75,11 @@ def bit(mask, p):
     return (mask[p // 32] >> (p % 32)) & 1
 
 
+def set_bits(mask):
+    """The places whose bit is set, ascending."""
+    return [32 * i + j for i, w in enumerate(mask) if w for j in range(32) if (w >> j) & 1]
+
+
 def below(mask, p):
     n = sum(bin(w).count("1") for w in mask[: p // 32])
     return n + bin(mask[p // 32] & ((1 << (p % 32)) - 1)).count("1")
@@ -129,6 +137,35 @@ class Grid:
         need(first_tile + ones(tiles) <= self.ntiles, "node tiles")
         need(all(c & t == 0 for c, t in zip(children, tiles)), "node masks")
         return children, tiles, first_child, first_tile
+
+    def meeting(self, lo, hi):
+        """§8.6 rule 6: the leaves whose voxels meet the box `lo` to `hi`, by number, each
+        with its origin, walking from the root table into the regions meeting it alone, no
+        upper node, lower node or leaf reached twice."""
+        meets = lambda o, edge: all(o[k] <= hi[k] and lo[k] < o[k] + edge for k in range(3))
+        seen, out = set(), []
+
+        def once(what, i):
+            need((what, i) not in seen, "shared " + what)
+            seen.add((what, i))
+
+        for key, kind, index in self.roots:
+            if kind == 0 or not meets(key, 4096):
+                continue
+            once("upper", index)
+            children, _, fc, _ = self.uppers[index]
+            for p in set_bits(children):
+                at = [key[k] + 128 * c for k, c in enumerate(unplace(p, 5))]
+                if not meets(at, 128):
+                    continue
+                once("lower", fc + below(children, p))
+                lch, _, lfc, _ = self.lowers[fc + below(children, p)]
+                for q in set_bits(lch):
+                    leaf_at = [at[k] + 8 * c for k, c in enumerate(unplace(q, 4))]
+                    if meets(leaf_at, 8):
+                        once("leaf", lfc + below(lch, q))
+                        out.append((lfc + below(lch, q), leaf_at))
+        return sorted(out)
 
     def leaf(self, n):
         at = self.leaf_at + n * 512 * self.size
@@ -366,8 +403,11 @@ def ranges_of(t, comps):
     return r
 
 
-def archive(b):
-    """§8, checked as §8.4 says: the cache file it decompresses into, and the chunks' lengths."""
+def parse(b):
+    """§8.4 rules 1 to 3 and 7, and each grid's chunks' lengths adding up to its frozen
+    buffer's: for each grid, its metadata's bytes, its frozen buffer's length in blocks, its
+    value type and encoding, its ranges and its chunks, each its length before compression
+    in blocks and its bytes."""
     need(len(b) % BLOCK == 0, "length")
     need(len(b) >= BLOCK and b[0:4] == b"BRDA", "magic")
     need(u32(b, 4) == 1, "version")
@@ -403,6 +443,21 @@ def archive(b):
         grids.append((meta, grid_blocks, code, encoding, ranges, listed))
         after = end
     need(after == len(b), "end")
+    return grids
+
+
+def leaf_chunk(c, raw, code, encoding, ranges):
+    """§8.3, §8.5: a leaf chunk's bytes of the frozen buffer, its values restored."""
+    if not encoding:
+        return lz4(c, raw * BLOCK)
+    size = FLOATING[code][1]
+    return restore(encoding, code, ranges, lz4(c, raw * BLOCK // size * {1: 2, 2: 1}[encoding]))
+
+
+def archive(b):
+    """§8, checked as §8.4 says: the cache file it decompresses into, and the chunks' lengths."""
+    grids = parse(b)
+    count = len(grids)
     # The cache file of the same grids, §3, its frozen buffers decompressed: each first
     # chunk, its header telling how the grid is cut, then the others, leaf values restored.
     head, body, at = [b"BRDC", struct.pack("<II", 1, count), b"\0" * 20], [], 1 + count
@@ -415,13 +470,32 @@ def archive(b):
         need([r for r, _ in pieces] == [r for r, _ in listed] and not pieces[0][1], "chunks")
         body.append(first)
         for (raw, c), (_, leaf) in list(zip(listed, pieces))[1:]:
-            if leaf and encoding:
-                size = FLOATING[code][1]
-                body.append(restore(encoding, code, ranges, lz4(c, raw * BLOCK // size * {1: 2, 2: 1}[encoding])))
-            else:
-                body.append(lz4(c, raw * BLOCK))
+            body.append(leaf_chunk(c, raw, code, encoding, ranges) if leaf else lz4(c, raw * BLOCK))
         at = grid_at + grid_blocks
     return cache(b"".join(head + body))
+
+
+def region(b, index, lo, hi):
+    """§8.6: grid `index`'s region, the box of voxels `lo` to `hi`, checked as §8.6 says: the
+    grid, holding the chunks read, the others zero, and the leaves meeting the box."""
+    grids = parse(b)
+    need(index < len(grids), "no grid")
+    meta, grid_blocks, code, encoding, ranges, listed = grids[index]
+    metadata(meta)
+    need(listed, "chunks")
+    first = lz4(listed[0][1], listed[0][0] * BLOCK)
+    pieces = cuts(first, grid_blocks)
+    need([r for r, _ in pieces] == [r for r, _ in listed] and not pieces[0][1], "chunks")
+    starts = [sum(r for r, _ in pieces[:k]) * BLOCK for k in range(len(pieces))]
+    held = bytearray(grid_blocks * BLOCK)
+    held[: len(first)] = first
+    if len(pieces) > 1 and not pieces[-1][1]:
+        held[starts[-1] :] = lz4(listed[-1][1], listed[-1][0] * BLOCK)
+    leaves = Grid(bytes(held), code).meeting(lo, hi)
+    for k in sorted({n // 512 for n, _ in leaves}):
+        raw, c = listed[1 + k]
+        held[starts[1 + k] : starts[1 + k] + raw * BLOCK] = leaf_chunk(c, raw, code, encoding, ranges)
+    return Grid(bytes(held), code), leaves
 
 
 # §9: the value types of an OpenVDB file brodo writes, by tree type.
@@ -634,9 +708,35 @@ def hermite(grids, name):
     return names
 
 
-def read(path, brief, b=None):
+def read_region(path, brief, box, b):
+    """§8.6: grid `box[0]`'s region `box[1:4]` to `box[4:7]`: its leaves and each voxel's
+    value, or `accepted`, or `refused`."""
+    print("file", path)
+    lo, hi = box[1:4], box[4:7]
+    try:
+        g, leaves = region(b, box[0], lo, hi)
+    except (Refused, struct.error, IndexError) as e:
+        print("refused", e)
+        print("end")
+        return
+    if brief:
+        print("accepted")
+    else:
+        for n, o in leaves:
+            print("leaf", n, *o)
+        for z in range(lo[2], hi[2] + 1):
+            for y in range(lo[1], hi[1] + 1):
+                for x in range(lo[0], hi[0] + 1):
+                    print("voxel", x, y, z, g.get([x, y, z]).hex())
+    print("end")
+
+
+def read(path, brief, b=None, box=None):
     if b is None:
         b = open(path, "rb").read()
+    if box is not None:
+        read_region(path, brief, box, b)
+        return
     print("file", path)
     if b[0:8] == struct.pack("<q", 0x56444220):
         try:
@@ -696,14 +796,19 @@ def dump(i, m, g):
 
 if __name__ == "__main__":
     args = sys.argv[1:]
+    box = None
+    if "--region" in args:
+        at = args.index("--region")
+        box = [int(w) for w in args[at + 1 : at + 8]]
+        args = args[:at] + args[at + 8 :]
     if args[:1] == ["--patch"]:
         base = open(args[1], "rb").read()
         for line in sys.stdin:
             offset, value = line.split()
             at, word = int(offset), int(value, 16)
             b = base[:at] + struct.pack("<I", word) + base[at + 4 :]
-            read(f"{args[1]}@{offset}={value}", True, b)
+            read(f"{args[1]}@{offset}={value}", True, b, box)
     else:
         brief = "--brief" in args
         for path in (a for a in args if a != "--brief"):
-            read(path, brief)
+            read(path, brief, None, box)

@@ -83,6 +83,7 @@ fn report_error(e: &ReportError) -> &'static str {
         ReportError::Analysis(..) => "Analysis",
         ReportError::Transform => "Transform",
         ReportError::TooFar => "TooFar",
+        ReportError::Region(..) => "Region",
         _ => "later",
     }
 }

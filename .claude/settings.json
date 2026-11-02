@@ -2,7 +2,7 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Bash",
+        "matcher": "Bash|mcp__.*run_in_terminal",
         "hooks": [
           {
             "type": "command",
@@ -12,7 +12,7 @@
         ]
       },
       {
-        "matcher": "Read|Grep|Glob|WebFetch|NotebookEdit|Bash",
+        "matcher": "Read|Grep|Glob|WebFetch|WebSearch|NotebookEdit|Bash|mcp__.*",
         "hooks": [
           {
             "type": "command",

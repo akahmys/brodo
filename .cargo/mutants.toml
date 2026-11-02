@@ -185,10 +185,15 @@ exclude_re = [
     # centre lie on one side.
     # [same]
     'convert\.rs:\d+:48: replace / with % in inside$',
-    # A flat triangle's edges cover the segment between its farthest corners, so its nearest
-    # point is unique and no tie arises.
-    # [same]
-    'distance\.rs:.*: replace < with <= in on_triangle$',
+    # Candidates as near as each other are the triangle's one nearest point, unique since a
+    # triangle is convex, or points apart by rounding alone: which is given is not promised.
+    # [open: `colino::distance::on_triangle`]
+    'distance\.rs:.*: replace < with <= in nearest_edge$',
+    # A normal exactly at the threshold sends the triangle to its edges rather than the face:
+    # either point lies within the triangle's width, √ε of its size, of the nearest, and which
+    # is given there is not promised.
+    # [open: `colino::distance::on_triangle`]
+    'distance\.rs:\d+:38: replace < with <= in on_triangle$',
     # Zero is refused by the arm before, so `<` and `<=` agree.
     # [same]
     'obj\.rs:\d+:20: replace < with <= in face$',

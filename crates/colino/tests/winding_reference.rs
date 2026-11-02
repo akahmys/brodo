@@ -13,6 +13,21 @@ use proptest::prelude::*;
 
 const BETA: Accuracy = Accuracy::Approximate { beta: 2.0 };
 
+/// The rounding of one solid angle, or of a sum of nothing: a few ulps of π.
+const ANGLE_ROUNDING: f64 = 1e-15;
+/// The rounding of the exact sum over a few hundred triangles.
+const SUM_ROUNDING: f64 = 1e-12;
+/// How far the sum over every node opened lies from the exact sum, summed in another order.
+const ORDER_ROUNDING: f64 = 1e-9;
+/// Beyond the promise (T12): how far the approximation at β = 2 lies from 1 or 0 on a
+/// closed surface.
+const BETA_CLOSED: f64 = 0.01;
+/// Beyond the promise (T12): how far from 1/2 the exact sum lies where the approximation
+/// at β = 2 is held to its side.
+const NEAR_HALF: f64 = 0.05;
+/// The ratio of the expansion's errors a distance apart and twice as far: 2⁵ within 1/8.
+const FIFTH_POWER: std::ops::Range<f64> = 28.0..36.0;
+
 fn octahedron() -> Mesh {
     let vertices = vec![
         [1.0, 0.0, 0.0],
@@ -60,9 +75,9 @@ fn sphere(levels: u32) -> Mesh {
 #[test]
 fn an_octant_subtends_an_eighth_of_the_sphere() {
     let o = solid_angle([0.0; 3], [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]);
-    assert!((o - PI / 2.0).abs() < 1e-15, "{o}");
+    assert!((o - PI / 2.0).abs() < ANGLE_ROUNDING, "{o}");
     let reversed = solid_angle([0.0; 3], [[1.0, 0.0, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0, 0.0]]);
-    assert!((reversed + PI / 2.0).abs() < 1e-15, "{reversed}");
+    assert!((reversed + PI / 2.0).abs() < ANGLE_ROUNDING, "{reversed}");
 }
 
 #[test]
@@ -77,10 +92,10 @@ fn closed_surfaces_wind_once_inside_and_not_outside() {
             ([-3.0, 4.0, 1.0], false),
         ] {
             let want = if inside { 1.0 } else { 0.0 };
-            assert!((w.number(q, Accuracy::Exact) - want).abs() < 1e-12, "{q:?}");
+            assert!((w.number(q, Accuracy::Exact) - want).abs() < SUM_ROUNDING, "{q:?}");
             // Beyond the promise (T12): at β = 2 Barill et al. report the approximation
             // thresholds as the exact sum does, held here so that a change to it is seen.
-            assert!((w.number(q, BETA) - want).abs() < 0.01, "{q:?}: {}", w.number(q, BETA));
+            assert!((w.number(q, BETA) - want).abs() < BETA_CLOSED, "{q:?}: {}", w.number(q, BETA));
         }
     }
 }
@@ -102,7 +117,7 @@ fn the_expansion_error_falls_as_the_fifth_power_of_distance() {
     };
     for d in [4.0, 8.0, 16.0] {
         let ratio = error(d) / error(2.0 * d);
-        assert!((28.0..36.0).contains(&ratio), "from {d}: {ratio}");
+        assert!(FIFTH_POWER.contains(&ratio), "from {d}: {ratio}");
     }
 }
 
@@ -144,9 +159,9 @@ proptest! {
             let exact = w.number(q, Accuracy::Exact);
             let approx = w.number(q, BETA);
             let far = w.number(q, Accuracy::Approximate { beta: 1e9 });
-            prop_assert!((far - exact).abs() < 1e-9, "β huge: {} against {}", far, exact);
+            prop_assert!((far - exact).abs() < ORDER_ROUNDING, "β huge: {} against {}", far, exact);
             // Beyond the promise (T12), as above: the sign agrees away from 1/2.
-            if (exact - 0.5).abs() >= 0.05 {
+            if (exact - 0.5).abs() >= NEAR_HALF {
                 prop_assert_eq!(approx >= 0.5, exact >= 0.5, "{} against {} at {:?}", approx, exact, q);
             }
         }
@@ -162,7 +177,7 @@ fn triangles_with_no_area_wind_nothing() {
     let triangles = (0..10).map(|i| [3 * i, 3 * i, 3 * i + 1]).collect();
     let w = Winding::new(&Mesh::new(vertices, triangles).with_unit(None)).unwrap();
     for q in [[0.0, 0.0, 0.0], [10.0, 10.0, 10.0], [2.0, 2.0, 1.5]] {
-        assert!(w.number(q, Accuracy::Exact).abs() < 1e-15, "{q:?}");
-        assert!(w.number(q, BETA).abs() < 1e-15, "{q:?}");
+        assert!(w.number(q, Accuracy::Exact).abs() < ANGLE_ROUNDING, "{q:?}");
+        assert!(w.number(q, BETA).abs() < ANGLE_ROUNDING, "{q:?}");
     }
 }

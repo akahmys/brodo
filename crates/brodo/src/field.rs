@@ -192,7 +192,7 @@ impl<T: Value> Field<T> {
         self.background
     }
 
-    fn check(&self, t: &Topology) -> Result<(), FieldError> {
+    pub(crate) fn check(&self, t: &Topology) -> Result<(), FieldError> {
         if self.stamp == t.stamp() { Ok(()) } else { Err(FieldError::StaleField) }
     }
 

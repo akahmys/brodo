@@ -297,9 +297,7 @@ fn the_crossing_nearest_the_inside_end_and_the_lowest_triangle_are_kept() {
     let i = t.leaf_voxels(n).unwrap().position(|w| w == v).unwrap();
     let x = &p.set.axes()[0];
     assert_eq!(p.set.signs().value_at(t, v).unwrap(), 1);
-    assert!(
-        (f64::from(x.fraction.leaf(t, n).unwrap()[i]) - 0.05).abs() <= FRACTION_TOLERANCE * 10.0
-    );
+    assert!((f64::from(x.fraction.leaf(t, n).unwrap()[i]) - 0.05).abs() <= FRACTION_TOLERANCE);
     assert_eq!(x.group.leaf(t, n).unwrap()[i], 3);
     assert_eq!(
         x.normal.leaf(t, n).unwrap()[i].map(f32::to_bits),
@@ -508,9 +506,7 @@ fn of_an_edge_whose_lower_end_is_outside_the_crossing_nearest_its_upper_end_is_k
     assert_eq!(p.set.signs().value_at(t, [-4, 0, 0]).unwrap(), 1);
     let (n, i) = place(t, v);
     let x = &p.set.axes()[0];
-    assert!(
-        (f64::from(x.fraction.leaf(t, n).unwrap()[i]) - 0.8).abs() <= FRACTION_TOLERANCE * 10.0
-    );
+    assert!((f64::from(x.fraction.leaf(t, n).unwrap()[i]) - 0.8).abs() <= FRACTION_TOLERANCE);
     assert_eq!(x.group.leaf(t, n).unwrap()[i], 3);
     assert_eq!(
         x.normal.leaf(t, n).unwrap()[i].map(f32::to_bits),
@@ -590,7 +586,7 @@ fn an_edge_to_beyond_the_range_crosses_where_the_mesh_does() {
     assert_eq!(p.unhit, 0);
     let (t, x) = (p.set.topology(), &p.set.axes()[0]);
     let half = x.fraction.value_at(t, [i32::MAX, 3, 3]).unwrap();
-    assert!((half - 0.5).abs() < 1e-6, "{half}");
+    assert!((f64::from(half) - 0.5).abs() <= FRACTION_TOLERANCE, "{half}");
 }
 
 /// Hermite data follows its conversion's accuracy (Q5 of P5's review): made from a

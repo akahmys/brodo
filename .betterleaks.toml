@@ -16,9 +16,13 @@ keywords = ["/users/", "/home/", ":\\users\\", "/private/", "/var/folders/"]
 
 [[allowlists]]
 description = "Build and run output, git internals, and git-ignored per-machine settings"
+# Each where .gitignore ignores it, and nowhere else: a directory of the same name deeper
+# in the tree can be committed, so it is scanned (ADR-0003).
 paths = [
-    '''(^|/)target/''',
-    '''(^|/)out/''',
-    '''(^|/)\.git/''',
+    '''^target/''',
+    '''^out/''',
+    '''^spikes/[^/]+/target/''',
+    '''^fuzz/target/''',
+    '''^\.git/''',
     '''^\.claude/settings\.local\.json$''',
 ]

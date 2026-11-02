@@ -448,7 +448,9 @@ meet the box (ADR-0016). It refuses a file, before answering anything, unless:
 4. the grid's chunks are cut as §8.3 cuts its frozen buffer, read from the frozen header in
    its first chunk;
 5. its frozen buffer passes §2.5's rules 2 to 6, the leaf values section's bytes aside,
-   with the directory's value type.
+   with the directory's value type;
+6. walking the grid's nodes from its root table, as §2.4 does, into the regions that meet
+   the box alone, reaches no upper node, lower node or leaf twice.
 
 A chunk it does not decompress is not checked to decompress, nor are its values: a file
 that a whole read (§8.4) refuses may answer a region. It answers a voxel within the box as

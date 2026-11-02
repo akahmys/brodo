@@ -70,3 +70,28 @@ doc link within it, was never built with warnings denied; built with every featu
 passed. The owner decided, on 2026-11-02, that the gate builds the documentation with
 `--all-features`. Shown to fire: a doc link to nothing on a public item of `vdb.rs` passed
 the old step and failed the new one.
+
+## Amendment: exceptions under `cfg_attr`, and ignores over several lines
+
+- **Date**: 2026-11-02
+
+The second review of the whole repository found `source.py` reading the lints an exception
+names only in `#[expect(…)]` written directly, and in a `src/` file only up to its test
+module, so that `#[cfg_attr(test, expect(…))]` and an `#[expect]` in a test module went
+unchecked; and the gate's grep for T1 missing a `cfg_attr` whose `ignore` is on a line of its
+own. The owner decided, on 2026-11-02, that Rule 19's check reads both forms in every file
+whole, and that `source.py --ignores` reads each attribute naming `ignore` across its
+lines. Shown to fire: a file holding each form passed the old checks and failed the new.
+
+## Amendment: an ignore read in the code alone
+
+- **Date**: 2026-11-02
+
+An outside review found `source.py --ignores` finding attributes and their brackets in
+text whose strings were kept, so that a string holding `#[ignore]` was taken for a test
+switched off, and an attribute ended at a `]` in a string before its `ignore`, which passed.
+The owner decided, on 2026-11-02, that it be fixed: attributes and their brackets are found
+in the code alone, its strings blanked, and the reason is the string an `ignore =` of the
+code opens, so that a string spelling one is not taken for it. Shown to fire: the old check
+flagged the string and passed the `]`; the new one flags the attribute after the `]` and a
+string spelling a reason, and passes the string and two attributes with their reasons.

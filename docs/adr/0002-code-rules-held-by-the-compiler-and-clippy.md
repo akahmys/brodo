@@ -77,3 +77,38 @@ found the gate's step titles naming neither Rule 18, which `source.py` checks, n
 unindented `#[cfg(test)]` followed by `mod`, a test-only item before it read as production
 code, and that the titles name both. Shown to fire: an assert added to `tree.rs` after its
 first `#[cfg(test)]` passed the old check and failed the new one.
+
+## Amendment: Rules 8 and 9 read as code, and the test module by its name
+
+- **Date**: 2026-11-02
+
+The second review of the whole repository found the gate's greps for Rules 8 and 9 passing
+`Result<T, std::string::String>`, a `Result` whose types nest three deep or break over
+lines, `filter_map(|r2| r2.ok())` and `filter_map(std::result::Result::ok)`; that
+`source.py` took production code to end at an unindented `#[cfg(test)]` before any `mod`,
+where only `mod tests` is the test module; and that Rule 15's text named closures and trait
+objects as what the call graph misses, though it misses a method called on another receiver
+or by a path too. The owner decided, on 2026-11-02, that `source.py --errors` checks Rules 8
+and 9 on each file's code, its comments cut, matching a `Result`'s brackets and reading
+across lines; that production code ends at `#[cfg(test)]` followed by `mod tests`; and that
+Rule 15's text names what the graph misses, since counting every `.name(` as a call joined
+each function to the methods of its name on other types and made 21 cycles, 18 of them of
+one function alone, such as `len` calling a `Vec`'s `len`. Shown to fire: a file holding
+those four forms passed the greps and failed `source.py --errors` at each.
+
+## Amendment: a string before a comment, a lint named `reason`, and an arrow
+
+- **Date**: 2026-11-02
+
+An outside review of the uncommitted checks found `source.py` cutting each line at its
+first `//` before emptying its strings, so that code after `"http://…"` on its line, a
+`Result<u8, String>` or an `unsafe`, went unread; skipping every part of an exception
+holding the word `reason`, so that an `#[expect]` of `clippy::allow_attributes_without_reason`
+passed Rule 19; and taking the `>` of `->` for a bracket, so that `Result<fn() -> usize,
+String>` passed Rule 8. It also reported that a second unsafe operation in the block of
+`unsafe { CacheFile::map(` passed Rule 4, which clippy's `multiple_unsafe_ops_per_block`,
+denied in every target, refuses. The owner decided, on 2026-11-02, that all of it be fixed,
+and it was: each line's strings and characters are blanked before its comment is found, in
+every check; an exception's part is skipped as its reason when it holds `=`; and the `>`
+of `->` and `=>` closes no bracket. Shown to fire: a file holding each of the three passed
+the old checks and failed the new, which pass the repository.

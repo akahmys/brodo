@@ -1,11 +1,13 @@
 //! Format tier (TESTING.md §1) for the format document (ADR-0037): `scripts/audit/formats.py`,
 //! a reader written from `docs/formats.md` alone, reads every golden file as the crates
 //! read it, value for value, and accepts or refuses each damaged copy of them as the
-//! crates do. A difference means the document leaves out or misstates what a reader needs.
+//! crates do, an archive's region (§8.6) among them. A difference means the document leaves out or misstates what a reader needs.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+#[cfg(feature = "archive")]
+use brodo::archive::region_from_bytes;
 use brodo::cache::CacheFile;
 use brodo::field::Stored;
 use brodo::hermite::HermiteView;
@@ -363,4 +365,178 @@ fn the_document_s_reader_accepts_and_refuses_damaged_files_as_the_crates_do() {
     }
     // Every golden file damaged in more than a few places.
     assert!(cases > 1000, "{cases} damaged files");
+}
+
+/// The archive golden files, and the boxes their grids are read through by region
+/// (docs/formats.md §8.6): about a leaf and the lower tile beside it, about the other leaf,
+/// within the root tile, meeting nothing, and just past a leaf's last voxel and just short
+/// of its first.
+#[cfg(feature = "archive")]
+const ARCHIVES: [&str; 2] = ["archive_v1.bin", "archive_v1_quantised.bin"];
+#[cfg(feature = "archive")]
+const BOXES: [[i32; 6]; 6] = [
+    [-12, -4, -4, 3, 11, 11],
+    [4090, -2, 6, 4105, 9, 17],
+    [0, 8192, 0, 5, 8197, 5],
+    [100_000, 0, 0, 100_003, 3, 3],
+    [0, 0, 0, 3, 3, 3],
+    [-12, 0, 0, -9, 3, 3],
+];
+
+/// The crates' region of grid `index` through `b`, printed as the reader prints it, or
+/// nothing where it is refused.
+#[cfg(feature = "archive")]
+fn crates_region(bytes: &[u8], index: usize, b: [i32; 6]) -> Option<Vec<String>> {
+    fn lines<T: Stored>(r: &brodo::archive::Region, b: [i32; 6]) -> Vec<String> {
+        let view = r.view::<T>().unwrap();
+        let mut out: Vec<String> =
+            view.leaves().map(|(n, o)| format!("leaf {n} {} {} {}", o[0], o[1], o[2])).collect();
+        for z in b[2]..=b[5] {
+            for y in b[1]..=b[4] {
+                for x in b[0]..=b[3] {
+                    let v = view.get([x, y, z]).unwrap();
+                    out.push(format!("voxel {x} {y} {z} {}", hex(v.as_bytes())));
+                }
+            }
+        }
+        out
+    }
+    let extent = Bounds::Box { min: [b[0], b[1], b[2]], max: [b[3], b[4], b[5]] };
+    let r = region_from_bytes(bytes, u64::MAX, index, extent).ok()?;
+    Some(match r.value_type() {
+        1 => lines::<f32>(&r, b),
+        2 => lines::<f64>(&r, b),
+        3 => lines::<u8>(&r, b),
+        4 => lines::<u32>(&r, b),
+        5 => lines::<[f32; 3]>(&r, b),
+        6 => lines::<[f64; 3]>(&r, b),
+        code => panic!("value type {code}"),
+    })
+}
+
+/// The reader's arguments for a region of grid `index` through `b`.
+#[cfg(feature = "archive")]
+fn region_args(index: usize, b: [i32; 6]) -> Vec<String> {
+    std::iter::once("--region".to_owned())
+        .chain(std::iter::once(index.to_string()))
+        .chain(b.iter().map(ToString::to_string))
+        .collect()
+}
+
+#[cfg(feature = "archive")]
+#[test]
+fn the_document_s_reader_reads_every_region_of_the_archives_as_the_crates_do() {
+    for golden in ARCHIVES {
+        let path = data(golden).display().to_string();
+        let bytes = std::fs::read(&path).unwrap();
+        for index in 0..cache_file(&bytes).unwrap().grid_count() {
+            for b in BOXES {
+                let mut args = region_args(index, b);
+                args.push(path.clone());
+                let args: Vec<&str> = args.iter().map(String::as_str).collect();
+                let out = reports(&reader(&args, ""));
+                let ours = crates_region(&bytes, index, b).expect("the crates read the region");
+                assert_eq!(out[0].1, ours, "{golden}, grid {index}, box {b:?}");
+            }
+        }
+    }
+}
+
+#[cfg(feature = "archive")]
+#[test]
+fn the_document_s_reader_accepts_and_refuses_damaged_regions_as_the_crates_do() {
+    let (mut cases, mut whole_refused) = (0, 0);
+    for golden in ARCHIVES {
+        let path = data(golden);
+        let bytes = std::fs::read(&path).unwrap();
+        for (index, b) in [(0, BOXES[0]), (1, BOXES[1]), (1, BOXES[2])] {
+            let mut patches = String::new();
+            let mut ours = Vec::new();
+            for at in damaged_words(&bytes) {
+                let was = u32::from_le_bytes(bytes[at..at + 4].try_into().unwrap());
+                for value in [0, 0xFFFF_FFFF, was ^ 1, was ^ 0x8000_0000] {
+                    if value == was {
+                        continue;
+                    }
+                    let mut damaged = bytes.clone();
+                    damaged[at..at + 4].copy_from_slice(&value.to_le_bytes());
+                    patches.push_str(&format!("{at} {value:x}\n"));
+                    let accepted = crates_region(&damaged, index, b).is_some();
+                    if accepted && cache_file(&damaged).is_err() {
+                        whole_refused += 1;
+                    }
+                    ours.push((format!("{at} {value:x}"), accepted));
+                }
+            }
+            let mut args = vec!["--patch".to_owned(), path.display().to_string()];
+            args.extend(region_args(index, b));
+            let args: Vec<&str> = args.iter().map(String::as_str).collect();
+            let theirs = reports(&reader(&args, &patches));
+            assert_eq!(theirs.len(), ours.len(), "{golden}");
+            for ((name, lines), (patch, accepted)) in theirs.iter().zip(&ours) {
+                let want = if *accepted { "accepted" } else { "refused" };
+                assert_eq!(verdict(lines), [want], "{golden}, grid {index}, {patch} ({name})");
+            }
+            cases += ours.len();
+        }
+    }
+    // Damaged in more than a few places, some of them a whole read refuses and a region
+    // answers.
+    assert!(cases > 1000, "{cases} damaged files");
+    assert!(whole_refused > 0, "no damage a region reads past");
+}
+
+/// An archive of one grid, its leaves at the origin and 128 voxels on in x, two lower nodes
+/// of one upper node, the second lower node's first child made the first's leaf: its first
+/// chunk changed and compressed again, the chunk after it moved (docs/formats.md §8.2, §8.3).
+#[cfg(feature = "archive")]
+fn archive_with_a_shared_leaf() -> Vec<u8> {
+    use brodo::cache::CacheEntry;
+    use brodo::field::Field;
+    use brodo::meta::GridMeta;
+    use brodo::topology::Topology;
+    let empty = Topology::new();
+    let mut e = empty.edit();
+    e.activate([0, 0, 0]).unwrap();
+    e.activate([128, 0, 0]).unwrap();
+    let t = e.commit().unwrap().0;
+    let meta = GridMeta::new("g", [1.0; 3], "mm").unwrap();
+    let entry = CacheEntry::new(&meta, &t, &Field::new(&t, 1.0_f32)).unwrap();
+    let bytes = brodo::archive::to_bytes(&[entry]).unwrap();
+    let word = |b: &[u8], at: usize| u32::from_le_bytes(b[at..at + 4].try_into().unwrap()) as usize;
+    let (table, chunks) = (word(&bytes, 40) * 32, word(&bytes, 44));
+    assert_eq!(chunks, 2, "the nodes, then the leaves");
+    let (raw, len) = (word(&bytes, table) * 32, word(&bytes, table + 4));
+    let start = (table + 8 * chunks).next_multiple_of(32);
+    let mut head = lz4_flex::block::decompress(&bytes[start..start + len], raw).unwrap();
+    // The lower nodes' section, from the frozen header; the second node's first child.
+    let at = word(&head, 44) * 32 + 1056 + 1024;
+    assert_eq!(word(&head, at), 1);
+    head[at..at + 4].fill(0);
+    let packed = lz4_flex::block::compress(&head);
+    let mut out = bytes[..start].to_vec();
+    out[table + 4..table + 8].copy_from_slice(&u32::try_from(packed.len()).unwrap().to_le_bytes());
+    out.extend(&packed);
+    out.resize(out.len().next_multiple_of(32), 0);
+    out.extend(&bytes[(start + len).next_multiple_of(32)..]);
+    out
+}
+
+/// A region whose walk reaches a leaf twice is refused, and one reaching it once read, by
+/// the document's reader as by the crates (§8.6 rule 6).
+#[cfg(feature = "archive")]
+#[test]
+fn the_document_s_reader_refuses_a_region_reaching_a_leaf_twice_as_the_crates_do() {
+    let bytes = archive_with_a_shared_leaf();
+    let path = Path::new(env!("CARGO_TARGET_TMPDIR")).join("archive_with_a_shared_leaf.bin");
+    std::fs::write(&path, &bytes).unwrap();
+    for (b, accepted) in [([0, 0, 0, 135, 7, 7], false), ([128, 0, 0, 135, 7, 7], true)] {
+        let mut args = region_args(0, b);
+        args.extend(["--brief".to_owned(), path.display().to_string()]);
+        let args: Vec<&str> = args.iter().map(String::as_str).collect();
+        let out = reports(&reader(&args, ""));
+        assert_eq!(crates_region(&bytes, 0, b).is_some(), accepted, "the crates, box {b:?}");
+        let want = if accepted { "accepted" } else { "refused" };
+        assert_eq!(verdict(&out[0].1), [want], "the reader, box {b:?}");
+    }
 }

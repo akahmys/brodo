@@ -227,6 +227,34 @@ fn a_file_above_the_limit_is_refused_before_it_is_read() {
     );
 }
 
+/// A file longer than the limit is refused by the bytes read, whatever length it reports:
+/// a named pipe reports none, as `/dev/zero` does, and a file can grow after its length is
+/// read (ADR-0036).
+#[cfg(unix)]
+#[test]
+fn a_file_longer_than_the_limit_is_refused_whatever_length_it_reports() {
+    use std::io::Write;
+    let path = Path::new(env!("CARGO_TARGET_TMPDIR")).join("vdb_longer_than_its_length.fifo");
+    std::fs::remove_file(&path).unwrap_or(());
+    let made = std::process::Command::new("mkfifo").arg(&path).status().unwrap();
+    assert!(made.success());
+    assert_eq!(std::fs::metadata(&path).unwrap().len(), 0);
+    let writer = {
+        let path = path.clone();
+        std::thread::spawn(move || {
+            let mut pipe = std::fs::OpenOptions::new().write(true).open(&path).unwrap();
+            // The reader stops at its limit and closes the pipe: the rest is refused.
+            pipe.write_all(&vec![0_u8; 1 << 20]).unwrap_or(());
+        })
+    };
+    let fifo = read(&path, "m", 1024).map(|_| ());
+    writer.join().unwrap();
+    std::fs::remove_file(&path).unwrap_or(());
+    assert!(matches!(fifo, Err(VdbError::FileTooLarge { limit: 1024, .. })), "{fifo:?}");
+    let zero = read(Path::new("/dev/zero"), "m", 1024).map(|_| ());
+    assert!(matches!(zero, Err(VdbError::FileTooLarge { length: 1025, limit: 1024 })), "{zero:?}");
+}
+
 // What OpenVDB's files do not hold, made from them or from brodo's (TESTING.md T3): each
 // test below fails on a mutant of the reader that the files above leave alive.
 

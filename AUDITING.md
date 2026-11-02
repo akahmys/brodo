@@ -3,15 +3,16 @@
 > **Phase: audit.** What is checked mechanically, and by what. The rules themselves are in
 > [CODING.md](CODING.md) and [TESTING.md](TESTING.md).
 
-One script runs everything, the tests last: [`scripts/audit/verify_compliance.sh`](scripts/audit/verify_compliance.sh).
+One script runs every check, then the tests, then the check that every test is listed: [`scripts/audit/verify_compliance.sh`](scripts/audit/verify_compliance.sh).
 It must end `=== AUDIT PASSED ===`. It needs `cargo`, `cargo-deny`, `cargo-mutants`,
 `betterleaks`, `python3` and `git`, and stops if one is missing. It runs with `RUSTFLAGS` empty, which
 overrides `rustflags` in any cargo configuration, so no configuration outside the
 repository can switch a lint off.
 
 Not in it: the fuzzer and Miri, which build on nightly, and the mutation run, which takes
-hours, its verdict by `scripts/audit/mutants.py` holding a sharded run's reports to every
-mutant `cargo mutants --list` gives; TESTING.md T6, T7 and T11 say when they run.
+hours, its verdict by `scripts/audit/mutants.py` holding a run's or a sharded run's reports
+to every mutant `cargo mutants --list` gives, to a baseline that passed and to the memory
+guard's log; TESTING.md T6, T7 and T11 say when they run.
 Nor the benchmark harness, which runs its children on as many threads as the machine has
 performance cores and refuses a pair of runs that disagree on an item by more than 10 %
 (TESTING.md T5); it runs with the benchmarks, under TESTING.md T10.
@@ -34,15 +35,14 @@ grep -E '^echo "\[' scripts/audit/verify_compliance.sh
 | `cargo clippy --workspace --all-targets -- -D warnings`, with the lints in `Cargo.toml` and the bans in `clippy.toml` | 1, 4, 6, 7, 9, 10, 16, 17, 18, 19 |
 | `cargo clippy --all-targets -D warnings` per member with no default features and with each feature alone | 10 |
 | clippy's panic lints over `--lib --bins` with every feature, filtered by `scripts/audit/lint_filter.py` | 2 |
-| `scripts/audit/source.py`: asserts and recursion in production code, each file read up to its test module, a body read from the line after its signature as `cargo fmt` writes it; the lints an exception names, in every target; `unsafe` outside `UNSAFE_MODULES`, in every file, but a call of `CacheFile::map` in `UNSAFE_CALLERS` | 2, 4, 15, 18, 19 |
+| `scripts/audit/source.py`, each line's strings blanked before its comment is cut: asserts and recursion in production code, each file read up to its test module, `mod tests`, a body read from the line after its signature as `cargo fmt` writes it; the lints an exception names, directly or under `cfg_attr`, in every target and test module; `unsafe` outside `UNSAFE_MODULES`, in every file, but a call of `CacheFile::map` in `UNSAFE_CALLERS` | 2, 4, 15, 18, 19 |
 | clippy's `indexing_slicing` over the crate of each module in `UNTRUSTED_INPUT`, with every feature, its findings kept to that module by `scripts/audit/lint_filter.py --under` | 3 |
-| grep for `String` as `Result`'s error, its value type nested at most two deep, and for `anyhow` | 8 |
-| grep for `filter_map(Result::ok)` and its forms | 9 |
+| `scripts/audit/source.py --errors`: `String` as `Result`'s error and `anyhow` in a library crate, and `filter_map` or `flat_map` of `Result::ok` and its forms, however the types nest, an arrow among them, or the lines break | 8, 9 |
 | `cargo fmt --all --check` | 10 |
 | `cargo tree --all-features --edges normal,build` per member and target, searched for `cc`, failing where cargo gives no tree | 12 |
-| test files in `src/`, and `#[ignore]` reasons, direct or under `cfg_attr`, in every target | T1 |
+| test files in `src/`, and, by `scripts/audit/source.py --ignores`, `#[ignore]` reasons, direct or under `cfg_attr`, however their lines break, found in the code and not its strings, in every target | T1 |
 | `scripts/audit/documents.py`, and `cargo doc` with every feature and warnings denied | AGENTS.md writing rules 1, 2, 6, S3, the ADR index, no `CLAUDE.md`, and each crate's README read in; Rule 10 |
-| `scripts/audit/mutants.py`: `.cargo/mutants.toml` holds no setting, and each pattern in its `exclude_re` has a comment above it ending in its kind and, for `open` and `unreached`, where, and excludes a mutant | T11 |
+| `scripts/audit/mutants.py` with no argument: `.cargo/mutants.toml` holds no setting, and each pattern in its `exclude_re` has a comment above it ending in its kind and, for `open` and `unreached`, where, and excludes a mutant | T11 |
 | `cargo deny check` | 13 |
 | `scripts/hooks/provenance_guard.py --check`: the local list of forbidden sources exists and names a project | S1 |
 | hooks installed; betterleaks over the tree and the history, personal rules, `scripts/audit/paths.py` (also: each of `OUTPUT_DIRS` git-ignored and in betterleaks' allow-list) | 14, L2 |
@@ -64,7 +64,7 @@ break the rule once and watch the step fail (TESTING.md T3).
 | Where | Reads |
 | :--- | :--- |
 | `scripts/hooks/pre-commit` | the staged change; also runs `paths.py` |
-| `scripts/hooks/commit-msg` | the commit message; `commit_msg_check.py` also requires English, and an ADR for a rule change (AGENTS.md) or a test removed from a `test-list.txt` (TESTING.md T2) |
+| `scripts/hooks/commit-msg` | the commit message; `commit_msg_check.py`, reading it up to the scissors line of `git commit -v`, also requires English, CJK punctuation refused, and a staged ADR named for a rule change (AGENTS.md), a lint level in `Cargo.toml` alone or in a table and a rule file renamed away included, or a test removed from a `test-list.txt` (TESTING.md T2) |
 | the audit | the working tree and the whole history; with the personal rules also every commit message and author |
 
 **On GitHub Actions** (`.github/workflows/audit.yml`, started by each push to `main` and by hand) the gate skips the
@@ -73,16 +73,22 @@ and says so; the gate on that machine before every push runs them (ADR-0034).
 
 **Getting round the hooks.** The audit fails while `core.hooksPath` is not `scripts/hooks`.
 In Claude Code, [`.claude/settings.json`](.claude/settings.json) runs
-`scripts/hooks/claude_guard.py` before every shell command, which blocks skipping the
-hooks, a change to `core.hooksPath`, and every push but `git push origin` of `main` and
-version tags `vX.Y.Z`, with no option (ADR-0003). A command written another way can pass
-the guard; the history scan is the backstop.
+`scripts/hooks/claude_guard.py` before every shell command, Bash's or a terminal tool's,
+which blocks skipping the hooks, `--no-verify` abbreviated or quoted included, a change to
+`core.hooksPath`, by `git -c`, `--unset` or `GIT_CONFIG_*` variables too, an alias made in
+git's configuration, and every push but `git push origin` of `main` and version tags
+`vX.Y.Z`, with no option but `-C` (ADR-0003). It reads a git command after shell keywords
+and `env`, `sudo` or `command` with their options, named by a path or quoted, in a subshell,
+a command substitution or on a heredoc operator's line. A command written another way can pass the guard; the
+history scan is the backstop.
 
 **Forbidden sources.** The same file runs `scripts/hooks/provenance_guard.py` before every
-Read, Grep, Glob, WebFetch, NotebookEdit and Bash call, which blocks a path, URL or command
-naming a source AGENTS.md S1 forbids: OpenVDB but at a tag from `v12.0.0` on, OpenFOAM, and the names in the owner's local
+Read, Grep, Glob, WebFetch, WebSearch, NotebookEdit, Bash and MCP tool call, a terminal's
+or a browser's among them, reading every string of the call's input, which blocks a path,
+URL or command naming a source AGENTS.md S1 forbids: OpenVDB but at a tag from `v12.0.0` on, OpenFOAM, and the names in the owner's local
 list, kept outside the repository so that it names no other project of the owner's. It
-matches names only, so no directory on any machine is written into the repository.
+matches names only, so no directory on any machine is written into the repository: a name
+after a `/`, or after a `:` or `=` joining a path (`<tag>:<name>/…`, `--dir=<name>`).
 OpenVDB passes where a path or URL names a tag from `v12.0.0` on, a segment `vX.Y.Z` among
 the two after its name or a directory `openvdb-vX.Y.Z`, the repository's own directories
 under it included; a path that climbs with `..` is judged segment by segment, and a path
@@ -103,9 +109,10 @@ that line the file's own rules are the only ones. The audit fails when fewer tha
 rules load. It adds one rule, `path-outside-project`, for absolute paths into a home or
 temporary directory. A relative path that leads outside the root is found by
 `scripts/audit/paths.py`, which resolves each relative path against the file holding it.
-The file's path allow-list skips `target/` and `out/`, the git-ignored directories of
-CODING.md L2, as `paths.py` and `documents.py` do, and `.git/` and
-`.claude/settings.local.json`.
+The file's path allow-list skips what `.gitignore` ignores at the root: `target/` and
+`out/`, the directories of CODING.md L2, the spikes' and the fuzzer's `target/`, `.git/`
+and `.claude/settings.local.json`; the same name deeper in the tree is scanned, and
+`paths.py` and `documents.py` read every file git would commit.
 
 **Personal data** (the owner's name) is matched by rules kept outside the repository,
 because a committed rule naming a person leaks the name. The file is `$PERSONAL_LEAKS`,

@@ -290,6 +290,7 @@ fn third_layer(mesh: &Mesh, converted: &Converted) -> Result<Vec<Thin>, ReportEr
 }
 
 /// The report on `converted`, the conversion of `mesh`, with the named points `regions`.
+/// A region whose point is not finite is refused, [`ReportError::Region`].
 pub fn report(
     mesh: &Mesh,
     converted: &Converted,
@@ -313,7 +314,11 @@ pub fn report(
     };
     let regions = regions
         .iter()
-        .map(|(name, point)| {
+        .enumerate()
+        .map(|(i, (name, point))| {
+            if !point.iter().all(|x| x.is_finite()) {
+                return Err(ReportError::Region(i));
+            }
             Ok(Region {
                 name: name.clone(),
                 point: *point,

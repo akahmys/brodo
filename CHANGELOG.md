@@ -10,11 +10,40 @@ are recorded here when they change (V6).
 
 Closes no milestone: the review of the whole repository after P7. Nothing breaks a user.
 
-- `vdb::from_bytes` and `vdb::read` refuse a Blosc chunk whose block does not start where
-  its header ends, or with bytes after its values, as docs/formats.md §9.8 states; 0.8.0
-  read past them.
-- The documentation of `vdb::from_bytes` and `vdb::read` states that what reading makes is
-  not bounded by `limit` (ARCHITECTURE.md §4.7, ADR-0047).
+- `vdb::from_bytes` and `vdb::read` refuse a Blosc chunk whose block does not start at its
+  byte 20, after its start entry, or with bytes after its values, as docs/formats.md §9.8
+  states; 0.8.0 read past them.
+- The documentation of `vdb::from_bytes` states how much memory reading makes, and that of
+  `vdb::read` that its `limit` bounds the file, not what reading makes (ARCHITECTURE.md
+  §4.7, ADR-0047).
+- A topology edit that removed a leaf and merged its lower node's region into an upper-level
+  tile, where an old tile held the region, gave the new tile the old tile's value, or the
+  background, without the merge rule; the removed leaf's region now counts as the
+  background, as ARCHITECTURE.md §4.2 states (ADR-0014).
+- `archive::read_region` and `region_from_bytes` refuse the leaf chunks beyond `limit`
+  before making room for them; 0.8.0 made it first, a multiple of `limit`. They
+  refuse an upper node, lower node or leaf the walk of the box reaches twice as
+  `FormatError::Shared`, a new rule of docs/formats.md §8.6; 0.8.0 walked a shared node
+  again for each entry naming it.
+- `morphology::dilate_values` and `erode_values` refuse a field of another topology when
+  `k` is 0, and `analysis::Flood::contains` when the seed met no condition; 0.8.0 answered.
+- `colino::distance::on_triangle` gave, for a triangle whose corners lie nearly on a line,
+  a point farther than its nearest edge's, so a distance too large, by up to 0.13 of the
+  triangle's size; the distance is now within the rounding of the coordinates over the sine
+  of the triangle's sharpest angle, at most √ε of its size (ARCHITECTURE.md §5.1, ADR-0027).
+- `colino::report::report` refuses a region whose point is not finite, as the new
+  `ReportError::Region`; 0.8.0 placed it outside the grid (ADR-0028).
+- `scripts/audit/formats.py`, the reader written from docs/formats.md, reads an archive's
+  region as §8.6 says, compared with the crates in the gate's tests (ADR-0037).
+- The documentation of `colino::error::ReportError::Mesh` names groups that do not fit the
+  triangles, and ARCHITECTURE.md §6.1 the zero contour drawn two pixels wide where values of
+  equal size and opposite sign meet.
+- The repository's guards and checks read what they missed: commands that got round the
+  commit hooks, terminal and browser tools, sources named after `:` or `=`, Rules 8, 9 and
+  19 and T1 written over several lines or under `cfg_attr`, output directories deeper than
+  the root, a mutation run whose baseline failed, was missing or whose list was empty, and
+  a commit message's ADR not staged or named only in `git commit -v`'s diff (ADR-0002,
+  ADR-0003, ADR-0007, ADR-0021, ADR-0023, ADR-0034).
 
 ## 0.8.0 (2026-11-02)
 

@@ -3,7 +3,8 @@
 //! maps, and gives values by position (ADR-0014): a new leaf takes what its region held
 //! before (its leaf, its tile's value, or the background); a new tile takes the old tile
 //! that held it, the background where nothing was, or the merge rule applied to what its
-//! region held before, the commit refused if the rule refuses. After every commit, three
+//! region held before, the commit refused if the rule refuses. A region whose leaf the edit
+//! removed held the background. After every commit, three
 //! fields must hold the same bits as their models, leaves and tiles must be numbered in
 //! Morton order, and the fields not yet remapped must be refused.
 
@@ -11,7 +12,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use brodo::error::FieldError;
 use brodo::field::{Field, LEAF_VOXELS, Value, uniform};
-use brodo::topology::Topology;
+use brodo::topology::{TileSource, Topology};
 use brodo::tree::{Coord, TileLevel};
 use proptest::prelude::*;
 
@@ -55,11 +56,13 @@ fn regions(o: Coord) -> impl Iterator<Item = Coord> {
     (0..4096).map(move |i| [o[0] + i % 16 * 8, o[1] + i / 16 % 16 * 8, o[2] + i / 256 * 8])
 }
 
-/// The structure: leaves by origin, tiles by level and origin.
+/// The structure: leaves by origin, tiles by level and origin, and the leaves the edit
+/// being built removed.
 #[derive(Clone, Default)]
 struct Shape {
     leaves: BTreeSet<Coord>,
     tiles: BTreeSet<(TileLevel, Coord)>,
+    removed: BTreeSet<Coord>,
 }
 
 impl Shape {
@@ -70,6 +73,16 @@ impl Shape {
     fn activate(&mut self, v: Coord) -> bool {
         if self.tile_at(v).is_none() {
             self.leaves.insert(align(v, 3));
+        }
+        true
+    }
+
+    fn deactivate(&mut self, v: Coord) -> bool {
+        if self.tile_at(v).is_some() {
+            return false;
+        }
+        if self.leaves.remove(&align(v, 3)) {
+            self.removed.insert(align(v, 3));
         }
         true
     }
@@ -169,7 +182,10 @@ enum Held<'a, T> {
 }
 
 impl<T: Val> Values<T> {
-    fn held(&self, r: Coord) -> Held<'_, T> {
+    fn held(&self, r: Coord, removed: &BTreeSet<Coord>) -> Held<'_, T> {
+        if removed.contains(&r) {
+            return Held::Background;
+        }
         if let Some(v) = self.leaves.get(&r) {
             return Held::Leaf(v);
         }
@@ -185,7 +201,7 @@ impl<T: Val> Values<T> {
             .leaves
             .iter()
             .map(|r| {
-                let v = match self.held(*r) {
+                let v = match self.held(*r, &shape.removed) {
                     Held::Leaf(v) => v.to_vec(),
                     Held::Tile(x, _) => vec![x; LEAF_VOXELS],
                     Held::Background => vec![self.background; LEAF_VOXELS],
@@ -195,14 +211,15 @@ impl<T: Val> Values<T> {
             .collect();
         let mut tiles = BTreeMap::new();
         for (level, o) in &shape.tiles {
-            tiles.insert((*level, *o), self.tile_after(*level, *o)?);
+            tiles.insert((*level, *o), self.tile_after(*level, *o, &shape.removed)?);
         }
         Some(Values { leaves, tiles, background: self.background })
     }
 
-    fn tile_after(&self, level: TileLevel, o: Coord) -> Option<T> {
-        if let Held::Tile(x, l) = self.held(o)
+    fn tile_after(&self, level: TileLevel, o: Coord, removed: &BTreeSet<Coord>) -> Option<T> {
+        if let Held::Tile(x, l) = self.held(o, removed)
             && l.edge_log2() >= level.edge_log2()
+            && !removed.iter().any(|r| align(*r, level.edge_log2()) == o)
         {
             return Some(x);
         }
@@ -212,7 +229,7 @@ impl<T: Val> Values<T> {
         };
         let mut list = Vec::new();
         for r in covered {
-            match self.held(r) {
+            match self.held(r, removed) {
                 Held::Leaf(v) => list.extend(v.iter().map(|x| (*x, 1))),
                 Held::Tile(x, _) => list.push((x, 512)),
                 Held::Background => {}
@@ -244,6 +261,7 @@ fn morton_less(a: Coord, b: Coord) -> bool {
 #[derive(Debug, Clone, Copy)]
 enum Op {
     Activate(Coord),
+    Deactivate(Coord),
     AddTile(TileLevel, Coord),
     Split(Coord),
     Merge(TileLevel, Coord),
@@ -274,6 +292,8 @@ fn commits() -> impl Strategy<Value = Vec<(Vec<Op>, u64)>> {
         2 => Just(4),
         1 => Just(5),
         2 => Just(6),
+        2 => Just(7),
+        2 => Just(8),
     ];
     let edit = (kind, level(), 0..6_usize, [0..2_i32, 0..2, 0..2]);
     let commit = (prop::collection::vec(edit, 1..6), any::<u64>());
@@ -289,6 +309,15 @@ fn commits() -> impl Strategy<Value = Vec<(Vec<Op>, u64)>> {
                     3 => vec![Op::Merge(TileLevel::Lower, v)],
                     4 => vec![Op::Merge(TileLevel::Upper, v)],
                     5 => vec![Op::FillTiles(v)],
+                    6 => vec![Op::Deactivate(v)],
+                    // An upper-level tile, if an earlier commit added one, split and its leaf
+                    // removed and activated again, merged back in the same commit.
+                    7 => vec![
+                        Op::Split(v),
+                        Op::Deactivate(v),
+                        Op::Activate(v),
+                        Op::Merge(TileLevel::Upper, v),
+                    ],
                     // A lower node's region of tiles, two split into leaves, merged into an
                     // upper-level tile in the same commit.
                     _ => {
@@ -406,6 +435,7 @@ fn edit(
 ) -> Result<(), TestCaseError> {
     let (got, want) = match op {
         Op::Activate(v) => (e.activate(v).is_ok(), s.activate(v)),
+        Op::Deactivate(v) => (e.deactivate(v).is_ok(), s.deactivate(v)),
         Op::AddTile(l, v) => (e.add_tile(l, v).is_ok(), s.add_tile(l, v)),
         Op::Split(v) => (e.split_tile(v).is_ok(), s.split(v)),
         Op::Merge(l, v) => (e.merge(l, v).is_ok(), s.merge(l, v)),
@@ -438,6 +468,7 @@ proptest! {
         for (ops, seed) in commits {
             let mut e = t.edit();
             let mut next = shape.clone();
+            next.removed.clear();
             for op in ops {
                 edit(&mut e, &mut next, op)?;
             }
@@ -532,4 +563,89 @@ fn every_tile_in_a_region_splits_in_one_edit() {
         );
         assert_eq!(g.value_at(&after, [64, 64, 64]).unwrap().to_bits(), 9.0_f32.to_bits());
     }
+}
+
+/// A root tile split, the leaf holding one voxel removed and activated again, and the upper
+/// node's region merged back into a tile, all in one edit: the removed leaf's region is the
+/// background, so a merge rule that takes one value refuses the tile's value beside it,
+/// whether the leaf was at the merged tile's origin or elsewhere in it.
+#[test]
+fn a_merge_over_a_tile_counts_the_leaf_the_edit_removed() {
+    let empty = Topology::new();
+    let mut e = empty.edit();
+    e.add_tile(TileLevel::Root, [0, 0, 0]).unwrap();
+    let (t, _) = e.commit().unwrap();
+    let mut f = Field::new(&t, 0.0_f32);
+    let n = t.tile_numbers().next().unwrap();
+    f.set_tile(&t, n, 5.0).unwrap();
+    for removed in [[0, 0, 0], [8, 0, 0]] {
+        let mut e = t.edit();
+        e.split_tile(removed).unwrap();
+        e.deactivate(removed).unwrap();
+        e.activate(removed).unwrap();
+        e.merge(TileLevel::Upper, [0, 0, 0]).unwrap();
+        let (_, r) = e.commit().unwrap();
+        assert!(
+            matches!(f.remap(&r, &uniform), Err(FieldError::MergeRefused(_))),
+            "removed at {removed:?}"
+        );
+    }
+}
+
+/// An upper-level tile an edit leaves alone, and one split off a root tile with no leaf
+/// removed in its region, each come from the old tile itself, not from a merge of its parts
+/// (ADR-0014).
+#[test]
+fn a_tile_no_edit_reaches_comes_from_the_old_tile() {
+    let empty = Topology::new();
+    let mut e = empty.edit();
+    e.add_tile(TileLevel::Upper, [0, 0, 0]).unwrap();
+    e.add_tile(TileLevel::Root, [4096, 0, 0]).unwrap();
+    let (t, _) = e.commit().unwrap();
+    let mut e = t.edit();
+    e.activate([8192, 0, 0]).unwrap();
+    e.split_tile([4096, 0, 0]).unwrap();
+    e.deactivate([4096, 0, 0]).unwrap();
+    let (after, r) = e.commit().unwrap();
+    let upper = TileSource::Tile(t.tile_numbers().next().unwrap());
+    let root = TileSource::Tile(t.tile_numbers().nth(1).unwrap());
+    for (n, source) in after.tile_numbers().zip(r.tile_sources()) {
+        let (level, o) = after.tile(n).unwrap();
+        match (level, o) {
+            (TileLevel::Upper, [0, 0, 0]) => assert_eq!(*source, upper),
+            // The upper-level tiles beside the removed leaf's lower node.
+            (TileLevel::Upper, _) if o[0] >= 4096 => assert_eq!(*source, root, "{o:?}"),
+            _ => {}
+        }
+    }
+}
+
+/// An upper-level tile merged where the old lower node held leaves but not at its origin
+/// merges them, the origin's region counted as the background; one added where no lower
+/// node was is the background (ADR-0014).
+#[test]
+fn a_merge_whose_origin_was_empty_merges_the_lower_nodes_leaves() {
+    let empty = Topology::new();
+    let mut e = empty.edit();
+    for r in regions([0, 0, 0]).skip(1) {
+        e.activate(r).unwrap();
+    }
+    let (t, _) = e.commit().unwrap();
+    let mut e = t.edit();
+    e.activate([0, 0, 0]).unwrap();
+    e.merge(TileLevel::Upper, [0, 0, 0]).unwrap();
+    e.add_tile(TileLevel::Upper, [128, 0, 0]).unwrap();
+    let (after, r) = e.commit().unwrap();
+    let sources: Vec<(Coord, TileSource)> = after
+        .tile_numbers()
+        .zip(r.tile_sources())
+        .map(|(n, s)| (after.tile(n).unwrap().1, *s))
+        .collect();
+    assert!(
+        matches!(
+            sources[..],
+            [([0, 0, 0], TileSource::Merged(_)), ([128, 0, 0], TileSource::Background)]
+        ),
+        "{sources:?}"
+    );
 }

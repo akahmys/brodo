@@ -202,7 +202,7 @@ pub fn render<T: Value + Into<f64>>(
 
 /// Whether a pixel lies on the zero contour of a diverging map: its value and a neighbour's
 /// (left, right, up or down) differ in sign, and its value is the one nearer zero, so the
-/// line is one pixel wide and unbroken.
+/// line is one pixel wide and unbroken, two where both are as near.
 fn on_contour(map: ColorMap, pixels: &[Pixel], i: usize, w: usize) -> bool {
     let (ColorMap::Diverging { .. }, Some(Pixel::Value(x))) = (map, pixels.get(i)) else {
         return false;

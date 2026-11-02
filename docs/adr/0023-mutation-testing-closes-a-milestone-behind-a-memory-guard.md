@@ -260,3 +260,54 @@ three `|` over bits shared by none, and three indicator arms giving what the las
 
 From P5 on, the human chooses which of the closing checks this record holds a milestone
 to, by its content, and the milestone's checklist lists them (ADR-0033).
+
+## Amendment: the run's verdict holds its baseline, its guard and its list
+
+- **Date**: 2026-11-02
+
+The second review of the whole repository found `mutants.py --run` passing a run whose
+unmutated baseline failed, which tests no mutant; never holding a local run's report to the
+mutants listed; passing a list of none; not checking the guard's log behind `--report` or
+`--patient --from`; and the patient run not checking that every timeout it was given ran
+again. The owner decided, on 2026-11-02, that every verdict fails on a failed baseline and a
+list of none, a run's but with `--iterate` is held to its list, a report of mutants run needs
+the guard's log beside it, and an unparted patient run reports every timeout. Shown to fire:
+a report with a failed baseline, one with no guard log and a list of none each passed the
+old verdict and failed the new.
+
+With it, the fix of a sliver's distance moved the comparison of `on_triangle`'s
+candidates into `nearest_edge`, which the face's candidate joins, so that the exclusion of
+`<` made `<=` there, `[same]` while only a flat triangle's edges met in it, matched no
+mutant. The owner approved, on 2026-11-02, excluding the same mutant in `nearest_edge` as
+`[open: `colino::distance::on_triangle`]`, whose documentation now says which of two
+points as near, apart by rounding alone, is given is not promised.
+That fix compares the edges only where the triangle's normal is shorter than √ε of its
+edges' product, since comparing them always made colino's conversions 22 to 42 % slower.
+Of the mutants of that test, three only compare the edges more often, which changes a
+point only by rounding: `<` made `<=`, and either `*` made `+`. The owner approved, on
+2026-11-02, excluding them as `[open: `colino::distance::on_triangle`]`; the two making
+the test depend on the coordinates' size are killed by slivers a million times larger.
+An outside review then made the face's point the projection on the plane and a thin
+triangle's point its edges' alone (ADR-0027). Those three mutants then send triangles to
+the edges that the face would answer within rounding, are killed by a point on a thin
+triangle's edge, and their exclusions, matching no mutant, were withdrawn. Of the new
+test's mutants one alone lived: `<` made `<=`, which differs only at a normal exactly at
+the threshold, where either point lies within the triangle's width of the nearest. The
+owner approved, on 2026-11-02, excluding it as `[open: `colino::distance::on_triangle`]`,
+whose documentation now says which point within a thin triangle's width is given is not
+promised.
+
+## Amendment: a promise found in its own type, a missing baseline, and arguments refused
+
+- **Date**: 2026-11-02
+
+An outside review found that `mutants.py` looked for an exclusion's `Type::member` from the
+type's definition to the end of its file, so that another type's member of that name, or a
+call at a line's start, stood for it, and an `impl` above the definition was never read; that
+a report with no unmutated baseline passed; and that an argument it did not know, a
+misspelt `--report`, ran the gate's check and passed. The owner decided, on 2026-11-02, that
+all of it be fixed, and it was: the member is found in the type's definition and its `impl`
+blocks alone, wherever they lie; a report must hold a baseline that passed; and any other
+argument is refused. Shown to fire: on a scratch crate the old lookup found another type's
+member and missed one in an `impl` above its type, and the new one the reverse; a report of
+mutants with no baseline and `--rpeort` passed before and fail now.

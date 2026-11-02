@@ -454,8 +454,6 @@ pub(crate) fn zero(bytes: &[u8]) -> bool {
     bytes.iter().all(|b| *b == 0)
 }
 
-/// Reads `source` to its end into `blocks`, from their start, growing them as it needs:
-/// the bytes read. A read interrupted is tried again.
 /// A file's bytes, of at most `limit`: a longer file is refused by its length before any of
 /// it is read, or by the bytes read where its length says less than it holds, as
 /// `too_large(length, limit)` (ADR-0036).
@@ -479,6 +477,8 @@ pub(crate) fn read_within<E: From<std::io::Error>>(
     Ok(bytes)
 }
 
+/// Reads `source` to its end into `blocks`, from their start, growing them as it needs:
+/// the bytes read. A read interrupted is tried again.
 fn fill(source: &mut impl Read, blocks: &mut Vec<Block>) -> std::io::Result<usize> {
     let mut filled = 0_usize;
     loop {

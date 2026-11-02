@@ -15,9 +15,9 @@ is the design: what a conversion gives, and what each layer of the report finds.
   exact (`with_accuracy`), or, for a mesh whose triangles are turned at random, a parity
   count (`with_sign(Sign::Parity)`).
 - **Reporting**: `report` gives the solid's and its complement's Betti numbers, the Euler
-  characteristic against the input's, the component of each named point, and the places
-  thinner, or gaps narrower, than two voxels. With the feature `serde`, the report
-  serialises.
+  characteristic against the input's when it is a closed 2-manifold, the component of each
+  named point, and the places thinner, or gaps narrower, than two voxels. With the feature
+  `serde`, the report serialises.
 - **Hermite data**: on the corners of a conversion's voxels, signs and, on each edge whose
   ends differ, where the mesh crosses it, its normal and its triangle's group, in brodo's
   format (`colino::hermite`).

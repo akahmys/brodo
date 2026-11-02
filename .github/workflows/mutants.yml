@@ -5,7 +5,9 @@
 # holding the reports together to every mutant listed; or one job takes them together.
 # A job may run six hours at most: at 80 shards P5's two heaviest, of 46 mutants, were cut
 # off at five hours fifty and the one job running the timeouts again too, so 160 keep each
-# near half that, and the timeouts run in parallel (ADR-0034).
+# near half that, and the timeouts run in parallel (ADR-0034). The further arguments reach
+# cargo-mutants through MUTANTS_ARGS, which mutants.py splits as a shell would but expands
+# nothing, and each shard keeps the guard's log beside its report, which the verdict reads.
 name: mutants
 
 on:
@@ -56,12 +58,14 @@ jobs:
         # Its verdict is taken with the others' in the last job.
         env:
           SHARD: ${{ matrix.k }}/${{ inputs.shards }}
-          ARGS: ${{ inputs.args }}
-        run: python3 scripts/audit/mutants.py --run --shard "$SHARD" $ARGS || true
+          MUTANTS_ARGS: ${{ inputs.args }}
+        run: python3 scripts/audit/mutants.py --run --shard "$SHARD" || true
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: mutants-${{ matrix.k }}
-          path: out/mutants/mutants.out
+          path: |
+            out/mutants/mutants.out
+            out/mutants/rss_guard.log
 
   verdict:
     needs: shard
@@ -80,8 +84,8 @@ jobs:
           cargo install --locked cargo-mutants@27.1.0
       - name: Every shard's report, together, holding every mutant
         env:
-          ARGS: ${{ inputs.args }}
-        run: python3 scripts/audit/mutants.py --report shards/* -- $ARGS
+          MUTANTS_ARGS: ${{ inputs.args }}
+        run: python3 scripts/audit/mutants.py --report shards/*/mutants.out --
 
   patient:
     needs: shard
@@ -105,5 +109,5 @@ jobs:
       - name: Part ${{ matrix.k }} of 20 of the timeouts before any failed test, again
         env:
           PART: ${{ matrix.k }}/20
-          ARGS: ${{ inputs.args }}
-        run: python3 scripts/audit/mutants.py --run --patient --from shards/* -- --shard "$PART" $ARGS
+          MUTANTS_ARGS: ${{ inputs.args }}
+        run: python3 scripts/audit/mutants.py --run --patient --from shards/*/mutants.out -- --shard "$PART"
