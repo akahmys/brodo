@@ -4,7 +4,37 @@ Each version, newest first, with the milestones it closed and every change that 
 user (TESTING.md V2, V3). Format versions of the `GridView` layout and the file profiles
 are recorded here when they change (V6).
 
-## Unreleased
+## 0.8.2 (2026-11-02)
+
+Closes no milestone: what a survey of the whole repository found fixed by patch rather
+than at its cause, fixed at its cause (ROADMAP.md §2, "0.8.2"). One change breaks a user,
+the first below; the owner kept the version a PATCH all the same, an exception to
+TESTING.md V2.
+
+- `CacheFile::map` refuses a file of no bytes as `CacheError::Truncated("header")`, as
+  `CacheFile::read` and `from_bytes` do; 0.8.1 gave `Inconsistent("length")`. A caller
+  matching the old variant for an empty file breaks.
+- `vdb::from_bytes` and `vdb::read` refuse a Blosc chunk stating no bytes as
+  `VdbError::Malformed("Blosc chunk")`; 0.8.1 gave it as unsupported.
+- `brodo::slice::render` draws the zero contour on a tile's voxel too, where it is nearer
+  zero than a leaf's voxel of the other sign beside it, so that the line does not break
+  at a leaf's edge (ARCHITECTURE.md §6.1, ADR-0018). An image with such a meeting changes.
+- `colino::distance::on_triangle` gives the nearest point whatever the triangle's size,
+  10⁻¹⁰⁰ to 10¹⁰⁰ tested, where 0.8.1 found a point above a face of a triangle 10⁻¹⁰⁰ wide
+  on an edge (ADR-0027).
+- Hermite data: an edge whose inside end lies on the mesh takes the normal and group of
+  the triangle holding that end, not of one farther along (ADR-0030).
+- `colino::bvh::Bvh::nearest` keeps its promise of a scan's answer with a margin derived
+  from the rounding of a distance, as the segment queries' margins now are (ADR-0030).
+- The repository's checks: both guards on every tool, the guard reading the shell as the
+  shell splits it, and each commit not yet pushed, or pushed, held to the commit-msg check
+  in the audit (ADR-0003, ADR-0034); every text file passed to betterleaks whatever its
+  name (ADR-0003); Rust read by a lexer, every exception's part held, and Rule 8 refusing
+  any untyped error (ADR-0002); doctests listed (ADR-0021); `.cargo/mutants.toml` read by
+  its shape (ADR-0023); one list of the files, the headings and the rule files (ADR-0001).
+- The READMEs, rewritten for a user: what the crates are for, where to start, their
+  features, how the code is written, by its owner with AI coding agents, and why pull
+  requests are not accepted.
 
 ## 0.8.1 (2026-11-02)
 

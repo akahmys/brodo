@@ -95,3 +95,13 @@ in the code alone, its strings blanked, and the reason is the string an `ignore 
 code opens, so that a string spelling one is not taken for it. Shown to fire: the old check
 flagged the string and passed the `]`; the new one flags the attribute after the `]` and a
 string spelling a reason, and passes the string and two attributes with their reasons.
+
+## Amendment: doctests listed
+
+- **Date**: 2026-11-02
+
+The survey of the whole repository found `tests.py` listing no doctest, so that a crate
+README's example or a `compile_fail` one could be deleted with no record, and a crate with a
+list and no test never compared. The owner decided, on 2026-11-02, that doctests be listed,
+each by its file, its item and its place among the item's, without the line rustdoc names,
+which an edit above it would change; and that every crate with a list be held to it.

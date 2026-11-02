@@ -11,7 +11,9 @@
 //! Both faces of a triangle are hit; a segment in a triangle's plane, or a triangle with no
 //! area, is not.
 
-use crate::distance::{Point, along as at, dot, has_area, on_triangle, squared, sub};
+use crate::distance::{
+    Point, along as at, dot, fraction_on_segment, has_area, on_triangle, squared, sub,
+};
 
 /// Below this, a product's rounding error may itself be rounded, so two equal products are
 /// left equal: 2⁵³ times the smallest normal `f64`.
@@ -79,13 +81,6 @@ pub fn crossing(a: Point, b: Point, t: [Point; 3]) -> Option<f64> {
     Some(along / limit)
 }
 
-/// The fraction along the segment from `a` to `b` nearest `p`, the lowest of equals.
-fn nearest_fraction(p: Point, a: Point, b: Point) -> f64 {
-    let ab = sub(b, a);
-    let length = dot(ab, ab);
-    if length <= 0.0 { 0.0 } else { (dot(sub(p, a), ab) / length).clamp(0.0, 1.0) }
-}
-
 /// The nearest points of segments `a`–`b` and `p`–`q`, as fractions `(s, u)` along each:
 /// the least of the interior stationary point, if inside, and each side's clamped optimum.
 fn segments(a: Point, b: Point, p: Point, q: Point) -> (f64, f64) {
@@ -101,10 +96,10 @@ fn segments(a: Point, b: Point, p: Point, q: Point) -> (f64, f64) {
         }
     }
     for s in [0.0, 1.0] {
-        candidates.push((s, nearest_fraction(at(a, b, s), p, q)));
+        candidates.push((s, fraction_on_segment(at(a, b, s), p, q)));
     }
     for u in [0.0, 1.0] {
-        candidates.push((nearest_fraction(at(p, q, u), a, b), u));
+        candidates.push((fraction_on_segment(at(p, q, u), a, b), u));
     }
     let gap = |(s, u): (f64, f64)| squared(at(a, b, s), at(p, q, u));
     candidates.into_iter().fold((0.0, 0.0), |best, c| {

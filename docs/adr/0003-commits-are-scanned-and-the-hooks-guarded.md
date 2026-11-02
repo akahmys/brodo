@@ -128,3 +128,26 @@ holding a key passed the old hook and failed the new; an SVG holding Japanese an
 leading outside the project, and a README naming a logo that does not exist, passed the
 old checks and failed the new. It also reported that `env -u VAR git …`, `export …; git …`
 and a `git` after a pipe passed the guard, which blocked each already.
+
+## Amendment: the guard a convenience, the backstop whole
+
+- **Date**: 2026-11-02
+
+The survey of the whole repository found the guards run on a list of tool names, so that a
+tool added later, such as one running a shell command, was unguarded; `claude_guard.py`
+reading the shell with regular expressions, so that `--no-''verify`, `\git`, `nice git`,
+`HOME=… git`, `git config include.path` and `git commit-tree` passed; the backstop it named,
+the history scan, checking none of what `commit_msg_check.py` checks, and commit messages
+scanned with the personal rules alone; and betterleaks' default allow-list skipping
+`node_modules/`, `.gltf` and more by name, not `.svg` alone. The owner decided, on
+2026-11-02, that it be fixed at its cause: both guards run on every tool; the guard splits
+words as the shell does, finds `git` wherever it stands in a command, and stops git's
+configuration changed by the environment, an include, a remote's URL and plumbing that
+runs no hook, as a convenience; the backstop is the audit, which holds each commit not yet
+pushed, and on GitHub each commit a push brought, to `commit_msg_check.py`, and every
+message to the project's rules; and every text file git would commit, staged or in the
+history, is passed to `betterleaks stdin` by `leak_input.py`, where no path is matched.
+Shown to fire: the old guard passed each command above, and of 63 the new one blocks the
+43 it should and passes the 20 it should; a commit of the history, made before the hook held an ADR to its
+number, fails `--commits`; staged files under `node_modules/` and ending `.gltf` passed
+betterleaks and fail through standard input.

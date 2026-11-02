@@ -17,8 +17,9 @@ use crate::cache::{
     put_u32, range, read_within, u32_of, zero,
 };
 use crate::error::{CacheError, FormatError};
+use crate::field::local_index;
 use crate::field::{ForType, LEAF_VOXELS, Stored, with_type};
-use crate::frozen::{BLOCK, Block, Header, local};
+use crate::frozen::{BLOCK, Block, Header};
 use crate::meta::{Bounds, GridMeta};
 use crate::quantise::{self, Kind, Quantised};
 use crate::tree::Coord;
@@ -779,13 +780,11 @@ impl<'a, T: Stored> RegionView<'a, T> {
     /// The value at a voxel within the box: its leaf's, its tile's, or the background.
     pub fn get(&self, v: Coord) -> Result<T, FormatError> {
         match self.locate(v)? {
-            ViewLocation::Leaf(n) => {
-                let [x, y, z] = local(v, 0, 3).map(|c| c as usize);
-                self.values(n)?
-                    .get(x + 8 * y + 64 * z)
-                    .copied()
-                    .ok_or(FormatError::Inconsistent("leaf value"))
-            }
+            ViewLocation::Leaf(n) => self
+                .values(n)?
+                .get(local_index(v))
+                .copied()
+                .ok_or(FormatError::Inconsistent("leaf value")),
             ViewLocation::Tile(t, _) => self.nodes.tile_value(t),
             ViewLocation::Background => Ok(self.nodes.background()),
         }

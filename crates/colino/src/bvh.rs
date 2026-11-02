@@ -5,13 +5,25 @@
 //! that the answer does not depend on the walk; for the triangle nearest a segment,
 //! ARCHITECTURE.md §5.1 says which is taken.
 
-use crate::distance::{Point, on_triangle, squared};
+use crate::distance::{Point, centroid, on_triangle, squared};
 use crate::error::MeshError;
 use crate::intersect::{crossing, nearest};
 use crate::mesh::Mesh;
 
 /// The most triangles a leaf holds.
 const LEAF: usize = 4;
+
+/// How far rounding may move a triangle's corner in `crossing`, as a multiple of the
+/// largest coordinate in play, twice over: each sheared coordinate is a difference of
+/// coordinates, a quotient of the direction's, its product and a difference, four roundings
+/// of values no larger than twice that coordinate, so off by at most 8ε of it.
+const CROSSING_ROUNDING: f64 = 16.0 * f64::EPSILON;
+
+/// How far a distance found may lie below the true one, as a multiple of the largest
+/// coordinate in play, twice over: a point on a triangle's edges lies on the triangle, and
+/// its face's point, the projection, is off by ε of |ap| over the sine of the angle it is
+/// taken at, which `on_triangle` holds to at least √ε (ARCHITECTURE.md §5.1). 2⁻²⁵ is 2√ε.
+const DISTANCE_ROUNDING: f64 = 1.0 / 33_554_432.0;
 
 /// A box, its smallest and largest corner.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -81,13 +93,7 @@ fn tested() {
 fn tested() {}
 
 fn centre(t: &[Point; 3]) -> Point {
-    let [a, b, c] = *t;
-    [0, 1, 2].map(|k| {
-        (a.get(k).copied().unwrap_or(0.0)
-            + b.get(k).copied().unwrap_or(0.0)
-            + c.get(k).copied().unwrap_or(0.0))
-            / 3.0
-    })
+    centroid(*t)
 }
 
 /// Each triangle's corners, refusing a triangle that names a vertex the mesh lacks.
@@ -191,17 +197,33 @@ impl Bvh {
     /// The distance from `p` to the nearest triangle, and that triangle's number: of
     /// triangles at one distance, the lowest-numbered. Nothing for a mesh with no triangle.
     pub fn nearest(&self, p: Point) -> Option<(f64, u32)> {
+        self.nearest_where(p, |_| true)
+    }
+
+    /// As `nearest`, of the triangles `keep` accepts.
+    pub(crate) fn nearest_where(
+        &self,
+        p: Point,
+        keep: impl Fn([Point; 3]) -> bool,
+    ) -> Option<(f64, u32)> {
+        // A node is passed only when its box lies farther than the best distance so far by
+        // more than a distance found may lie below the true one, so that no triangle a scan
+        // of every triangle would choose is left out.
+        let margin = DISTANCE_ROUNDING * self.reach(&[p]);
         let mut best: Option<(f64, u32)> = None;
         let mut stack = vec![0_usize];
         while let Some(id) = stack.pop() {
             let Some(node) = self.nodes.get(id) else { continue };
-            let reach = node.bounds.squared_to(p);
-            if best.is_some_and(|(d, _)| reach > d) {
+            let gap = node.bounds.squared_to(p).sqrt();
+            if best.is_some_and(|(d, _)| gap > d.sqrt() + margin) {
                 continue;
             }
             if node.children == 0 {
                 for i in self.order.get(node.first..node.first + node.count).unwrap_or(&[]) {
-                    let Some(t) = self.corners.get(usize::try_from(*i).unwrap_or(usize::MAX))
+                    let Some(t) = self
+                        .corners
+                        .get(usize::try_from(*i).unwrap_or(usize::MAX))
+                        .filter(|t| keep(**t))
                     else {
                         continue;
                     };
@@ -225,25 +247,22 @@ impl Bvh {
         best.map(|(d, i)| (d.sqrt(), i))
     }
 
-    /// Twice the rounding of moving a corner by `a` or `b`, as the crossing test does: the
-    /// margin a segment's query widens boxes by.
-    fn margin(&self, a: Point, b: Point) -> f64 {
+    /// The largest coordinate in play, of the tree's box and `points`: the size every
+    /// rounding here is a multiple of.
+    fn reach(&self, points: &[Point]) -> f64 {
         let root = self.nodes.first().map_or(Aabb::EMPTY, |n| n.bounds);
-        let reach = root
-            .lo
+        root.lo
             .iter()
             .chain(&root.hi)
-            .chain(&a)
-            .chain(&b)
-            .fold(0.0_f64, |m, c| if c.is_finite() { m.max(c.abs()) } else { m });
-        4.0 * f64::EPSILON * reach
+            .chain(points.iter().flatten())
+            .fold(0.0_f64, |m, c| if c.is_finite() { m.max(c.abs()) } else { m })
     }
 
     /// The triangles whose boxes meet the box of the segment from `a` to `b`, in ascending
     /// order. The box is widened by twice the rounding of moving a corner by `a`, as the
     /// crossing test does, so that no triangle it would hit is left out (ADR-0030).
     pub fn near_segment(&self, a: Point, b: Point) -> Vec<u32> {
-        let margin = self.margin(a, b);
+        let margin = CROSSING_ROUNDING * self.reach(&[a, b]);
         let query = Aabb::EMPTY.grow(a).grow(b);
         let query = Aabb { lo: query.lo.map(|c| c - margin), hi: query.hi.map(|c| c + margin) };
         let meets = |x: &Aabb| (0..3).all(|k| x.lo[k] <= query.hi[k] && query.lo[k] <= x.hi[k]);
@@ -284,15 +303,7 @@ impl Bvh {
         b: Point,
         keep: impl Fn([Point; 3]) -> bool,
     ) -> Option<(f64, f64, u32)> {
-        let root = self.nodes.first().map_or(Aabb::EMPTY, |n| n.bounds);
-        let reach = root
-            .lo
-            .iter()
-            .chain(&root.hi)
-            .chain(&a)
-            .chain(&b)
-            .fold(0.0_f64, |m, c| if c.is_finite() { m.max(c.abs()) } else { m });
-        let margin = 64.0 * f64::EPSILON * reach;
+        let margin = DISTANCE_ROUNDING * self.reach(&[a, b]);
         let segment = Aabb::EMPTY.grow(a).grow(b);
         // The distance between two boxes, zero where they meet.
         let gap = |x: &Aabb| {
@@ -335,7 +346,7 @@ impl Bvh {
     /// The tree is walked nearest box first, each box widened as `near_segment`'s query is,
     /// and a box the segment enters beyond the best crossing so far is passed.
     pub(crate) fn first_crossing(&self, a: Point, b: Point) -> Option<f64> {
-        let margin = self.margin(a, b);
+        let margin = CROSSING_ROUNDING * self.reach(&[a, b]);
         let enters = |x: &Aabb| entry(x, a, b, margin);
         let mut best: Option<f64> = None;
         let mut stack = vec![0_usize];
@@ -395,6 +406,7 @@ impl Bvh {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::distance::has_area;
 
     /// A fixed linear congruential sequence of values in [−20, 20).
     fn sequence() -> impl FnMut() -> f64 {
@@ -420,12 +432,6 @@ mod tests {
             }
         }
         Mesh { vertices, triangles, ..Mesh::default() }
-    }
-
-    fn has_area(t: [Point; 3]) -> bool {
-        let (u, v) = ([0, 1, 2].map(|k| t[1][k] - t[0][k]), [0, 1, 2].map(|k| t[2][k] - t[0][k]));
-        let n = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
-        n.iter().any(|x| *x != 0.0)
     }
 
     /// The tree's nearest triangle to a segment is the one a scan of every triangle in
@@ -560,7 +566,9 @@ mod tests {
                 found = bvh.first_crossing(a, b);
                 found.is_some()
             });
-            assert!(found.is_some_and(|s| (s - first).abs() < 1e-12), "{found:?}");
+            // The fraction, the ratio of a few products of coordinates below 102, holds to 64
+            // roundings of 1.
+            assert!(found.is_some_and(|s| (s - first).abs() <= 64.0 * f64::EPSILON), "{found:?}");
             assert!(n <= 2 * LEAF as u64, "{n} tested");
         }
     }

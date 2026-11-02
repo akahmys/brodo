@@ -135,8 +135,10 @@ pub fn hermite(mesh: &Mesh, c: &Converted) -> Result<Produced, HermiteError> {
     Ok(Produced { set, meta, unhit })
 }
 
-fn on_mesh(bvh: &Bvh, p: Point) -> bool {
-    bvh.nearest(p).is_some_and(|(d, _)| d == 0.0)
+/// The triangle with area holding `p`, the lowest-numbered of those at distance 0, if `p`
+/// is on one: a triangle with none has no normal to give.
+fn on_mesh(bvh: &Bvh, p: Point) -> Option<u32> {
+    bvh.nearest_where(p, has_area).filter(|(d, _)| *d == 0.0).map(|(_, i)| i)
 }
 
 /// Each leaf point's sign, tiles inside, the background outside.
@@ -183,11 +185,11 @@ fn crossings(
             let lower_inside = *inside == 1;
             let Some(mut f) = find(bvh, a, b, lower_inside) else { continue };
             // An inside end on the mesh holds the crossing exactly, though the edge may only
-            // graze the mesh there and hit nothing; it is not counted as unhit.
-            if lower_inside && on_mesh(bvh, a) {
-                (f.fraction, f.hit) = (0.0, true);
-            } else if !lower_inside && on_mesh(bvh, b) {
-                (f.fraction, f.hit) = (1.0, true);
+            // graze the mesh there and hit nothing; it is not counted as unhit, and takes the
+            // normal and group of the triangle holding it, not of one farther along.
+            let (end, fraction) = if lower_inside { (a, 0.0) } else { (b, 1.0) };
+            if let Some(triangle) = on_mesh(bvh, end) {
+                f = Found { fraction, triangle, hit: true };
             }
             out.push((n, i, f));
         }

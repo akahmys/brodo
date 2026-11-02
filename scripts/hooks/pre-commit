@@ -10,11 +10,10 @@ PERSONAL="${PERSONAL_LEAKS:-$HOME/.config/betterleaks/personal.toml}"
     || { echo "pre-commit: no personal rules (AUDITING.md §2); refusing to commit unscanned." >&2; exit 1; }
 betterleaks git --pre-commit --staged --no-banner --redact -c .betterleaks.toml
 betterleaks git --pre-commit --staged --no-banner --redact -c "$PERSONAL"
-# betterleaks' default allow-list skips a staged `.svg` by its path; read through standard
-# input it has none (ADR-0003).
+# betterleaks' default allow-list skips paths by name (`node_modules/`, `.svg`, …); read
+# through standard input, every staged text file is scanned whatever its name (ADR-0003).
 for config in .betterleaks.toml "$PERSONAL"; do
-    git diff --cached --name-only --diff-filter=d -z -- '*.svg' \
-        | xargs -0 -I{} git show ":{}" \
+    python3 scripts/audit/leak_input.py --staged \
         | betterleaks stdin --no-banner --redact -c "$config"
 done
 python3 scripts/audit/paths.py >/dev/null || { python3 scripts/audit/paths.py; exit 1; }

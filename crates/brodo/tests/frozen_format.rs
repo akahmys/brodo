@@ -12,18 +12,15 @@ use brodo::view::{GridView, ViewLocation};
 use proptest::prelude::*;
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
+#[path = "support/anchored.rs"]
+mod anchored;
+
 #[derive(Debug, Clone, Copy)]
 enum Op {
     Activate(Coord),
     AddTile(TileLevel, Coord),
     Split(Coord),
     Merge(Coord),
-}
-
-fn coord() -> impl Strategy<Value = Coord> {
-    let anchors = vec![-4097, -4096, -129, -128, -9, -8, -1, 0, 7, 8, 127, 128, 4095, 4096];
-    let axis = (prop::sample::select(anchors), 0..20_i32).prop_map(|(a, d)| a + d);
-    [axis.clone(), axis.clone(), axis]
 }
 
 /// Root tiles are rarer: splitting one makes 36 862 tiles.
@@ -34,7 +31,7 @@ fn level() -> impl Strategy<Value = TileLevel> {
 fn ops() -> impl Strategy<Value = Vec<Op>> {
     let kind = prop_oneof![6 => Just(0_u8), 2 => Just(1), 1 => Just(2), 1 => Just(3)];
     let edit = (kind, level(), 0..4_usize, [0..24_i32, 0..24, 0..24]);
-    (prop::collection::vec(coord(), 4), prop::collection::vec(edit, 1..40)).prop_map(
+    (prop::collection::vec(anchored::coord(20), 4), prop::collection::vec(edit, 1..40)).prop_map(
         |(pool, edits)| {
             edits
                 .into_iter()

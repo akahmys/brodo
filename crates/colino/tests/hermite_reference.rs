@@ -110,7 +110,9 @@ impl Cube {
     fn crossing(&self, start: Point, axis: usize, h: f64) -> Option<(usize, f64, bool)> {
         let mut best = None;
         for (f, (n, d)) in self.faces.iter().enumerate() {
-            if n[axis].abs() < 1e-12 {
+            // A face parallel to the axis, its normal's component zero but for the rounding of
+            // the turn, products of sines and cosines below 1.
+            if n[axis].abs() <= 64.0 * f64::EPSILON {
                 continue;
             }
             let s = (d - (0..3).map(|k| n[k] * start[k]).sum::<f64>()) / (n[axis] * h);
@@ -120,7 +122,10 @@ impl Cube {
             let mut p = start;
             p[axis] += h * s;
             let l = self.local(p);
-            if l.iter().all(|x| x.abs() <= self.r + 1e-9) {
+            // On the cube to within the rounding of turning back a point a few times its size.
+            if l.iter()
+                .all(|x| x.abs() <= self.r * (1.0 + 64.0 * f64::EPSILON) + 64.0 * f64::EPSILON)
+            {
                 let edges = l.iter().filter(|x| (x.abs() - self.r).abs() < EDGE_MARGIN).count();
                 best = Some((f, s, edges > 1));
             }
@@ -249,13 +254,19 @@ fn every_band_keeps_crossed_edges_owned_by_leaves() {
 #[test]
 fn an_open_mesh_counts_its_edges_with_no_triangle_hit() {
     let closed = common::sphere(4, 20.0, [0.0; 3]);
-    let mut holed = closed.clone();
-    let middle_z =
-        |t: &[u32; 3]| t.iter().map(|i| closed.vertices[*i as usize][2]).sum::<f64>() / 3.0;
-    holed.triangles.retain(|t| middle_z(t) <= 18.0);
+    let holed = holed(&closed, 18.0);
     let o = Options::new(1.0);
     assert_eq!(made(&closed, &o).unhit, 0);
     assert!(made(&holed, &o).unhit > 0);
+}
+
+/// `closed` holed at the top: its triangles whose corners' mean z is above `below` left out.
+fn holed(closed: &Mesh, below: f64) -> Mesh {
+    let mut m = closed.clone();
+    let middle_z =
+        |t: &[u32; 3]| t.iter().map(|i| closed.vertices[*i as usize][2]).sum::<f64>() / 3.0;
+    m.triangles.retain(|t| middle_z(t) <= below);
+    m
 }
 
 /// Boxes appended to one mesh, each its own group in order.
@@ -309,10 +320,7 @@ fn the_crossing_nearest_the_inside_end_and_the_lowest_triangle_are_kept() {
 fn an_unhit_edge_takes_the_triangle_with_area_nearest_it() {
     use colino::intersect::{crossing, nearest};
     let closed = common::sphere(3, 20.0, [0.0; 3]);
-    let mut m = closed.clone();
-    let middle_z =
-        |t: &[u32; 3]| t.iter().map(|i| closed.vertices[*i as usize][2]).sum::<f64>() / 3.0;
-    m.triangles.retain(|t| middle_z(t) <= 17.0);
+    let mut m = holed(&closed, 17.0);
     // Each triangle its own group, so the group names the triangle.
     m.groups = (1..=u32::try_from(m.triangles.len()).unwrap()).collect();
     m.group_names = std::iter::once(String::new())
@@ -451,10 +459,7 @@ fn a_triangle_with_no_area_never_gives_an_unhit_edge_its_data() {
     // its unhit edges than any triangle with area. With it taken, its zero normal would
     // break the format and the set be refused.
     let closed = common::sphere(3, 20.0, [0.0; 3]);
-    let mut m = closed.clone();
-    let middle_z =
-        |t: &[u32; 3]| t.iter().map(|i| closed.vertices[*i as usize][2]).sum::<f64>() / 3.0;
-    m.triangles.retain(|t| middle_z(t) <= 17.0);
+    let mut m = holed(&closed, 17.0);
     let flat = [[-9.0, 0.4, 18.5], [0.0, 0.4, 18.5], [9.0, 0.4, 18.5]];
     let base = u32::try_from(m.vertices.len()).unwrap();
     m.vertices.extend(flat);
@@ -620,44 +625,78 @@ fn signs_follow_the_conversions_accuracy() {
 /// A β coarse enough to decide some points otherwise than β = 2.
 const BETA: f64 = 0.3;
 
-/// A cube holding, just inside a face, a triangle whose corners lie on a line through a
-/// point of a crossed edge: the triangle is never hit, so Hermite data is made, where it was
-/// refused for a normal of no length (ARCHITECTURE.md §5.1 takes degenerate triangles).
-#[test]
-fn a_triangle_on_a_line_through_a_crossed_edge_is_not_hit() {
-    let cube = turned_cube(4.3, [0.0; 3], 0.0, 0.0);
-    let mut state = 0x2545_f491_4f6c_dd1d_u64;
-    let mut next = || {
-        state ^= state << 13;
-        state ^= state >> 7;
-        state ^= state << 17;
-        (state >> 11) as f64 / (1_u64 << 53) as f64
-    };
-    let mut made_with = 0;
-    while made_with < 40 {
-        // Through (x, y, z), y and z whole, on the edges along x crossing the face x = 4.3.
-        let m = [4.2 + next() * 0.1, (next() * 6.0).floor() - 3.0, (next() * 6.0).floor() - 3.0];
-        let d = [next() * 0.2 - 0.1, next() * 2.0 - 1.0, next() * 2.0 - 1.0];
+/// Hermite data of `m`, as the bytes of the cache file holding it.
+fn hermite_bytes(m: &Mesh) -> Vec<u8> {
+    let p = made(m, &Options::new(1.0));
+    to_bytes(&p.set.entries("s", &p.meta).unwrap()).unwrap()
+}
+
+proptest::proptest! {
+    #![proptest_config(proptest::prelude::ProptestConfig::with_cases(64))]
+
+    /// A cube holding, just inside a face, a triangle whose corners lie on a line through a
+    /// point of a crossed edge, or nearly but for rounding: Hermite data are made, where a
+    /// crossing of one with no area was refused for a normal of no length (ARCHITECTURE.md
+    /// §5.1 takes degenerate triangles); and of one with no area, its edges' cross product
+    /// zero, they are the cube's alone, the triangle never hit.
+    #[test]
+    fn a_triangle_on_a_line_through_a_crossed_edge_changes_nothing(
+        x in 4.2..4.3_f64,
+        y in -3_i32..3,
+        z in -3_i32..3,
+        d in proptest::array::uniform3(-0.1..0.1_f64),
+    ) {
+        let cube = turned_cube(4.3, [0.0; 3], 0.0, 0.0);
+        // Through (x, y, z), y and z whole, on an edge along x crossing the face x = 4.3.
+        let m = [x, f64::from(y), f64::from(z)];
         let (a, b) = ([0, 1, 2].map(|k| m[k] - d[k]), [0, 1, 2].map(|k| m[k] + d[k]));
-        let t = 2.0 + next();
-        let c = [0, 1, 2].map(|k| a[k] + t * (b[k] - a[k]));
-        let (ab, ac) = ([0, 1, 2].map(|k| b[k] - a[k]), [0, 1, 2].map(|k| c[k] - a[k]));
-        let n = [
-            ab[1] * ac[2] - ab[2] * ac[1],
-            ab[2] * ac[0] - ab[0] * ac[2],
-            ab[0] * ac[1] - ab[1] * ac[0],
-        ];
-        if n.iter().any(|x| *x != 0.0) || c[1].abs() > 4.0 || c[2].abs() > 4.0 {
-            continue;
-        }
+        let third = |t: f64| [0, 1, 2].map(|k| a[k] + t * (b[k] - a[k]));
+        let normal = |c: Point| {
+            let (u, v) = ([0, 1, 2].map(|k| b[k] - a[k]), [0, 1, 2].map(|k| c[k] - a[k]));
+            [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]]
+        };
+        // The third corner 2 to 3 times the first edge on, by sixteenths: one whose edges'
+        // cross product rounds to zero where there is one, a triangle with no area.
+        let c = (0..=16)
+            .map(|i| third(2.0 + f64::from(i) / 16.0))
+            .find(|c| normal(*c).iter().all(|x| *x == 0.0))
+            .unwrap_or_else(|| third(2.0));
         let mut vertices = cube.vertices.clone();
         let first = u32::try_from(vertices.len()).unwrap();
         vertices.extend([a, b, c]);
         let mut triangles = cube.triangles.clone();
         triangles.push([first, first + 1, first + 2]);
-        let m = Mesh::new(vertices, triangles).with_unit(Some("millimeter".into()));
-        let c = convert(&m, &Options::new(1.0)).unwrap();
-        assert!(hermite(&m, &c).is_ok(), "{:?}", [a, b, ab]);
-        made_with += 1;
+        let mut groups = cube.groups.clone();
+        groups.push(1);
+        let with = Mesh::new(vertices, triangles)
+            .with_unit(cube.unit.clone())
+            .with_groups(groups, cube.group_names.clone());
+        let bytes = hermite_bytes(&with);
+        if normal(c).iter().all(|x| *x == 0.0) {
+            proptest::prop_assert!(bytes == hermite_bytes(&cube), "{:?}", [a, b, c]);
+        }
     }
+}
+
+/// An edge whose inside end lies on the mesh, running in a face's plane out across another
+/// face: its crossing is at that end, with the normal of the face holding the end, not of
+/// the face the edge crosses farther along.
+#[test]
+fn a_crossing_at_an_end_on_the_mesh_takes_that_ends_face() {
+    // The box's top face at z = 3 holds the lattice point (2, 0, 3), inside at distance 0;
+    // the edge from it along x to (3, 0, 3) runs in that face's plane and crosses the side
+    // face x = 2.5 halfway.
+    let m = boxes(&[([-2.5, -2.5, 0.0], [2.5, 2.5, 3.0], false)]);
+    let p = made(&m, &Options::new(1.0));
+    let t = p.set.topology();
+    let v = [2, 0, 3];
+    let brodo::topology::Location::Leaf(n) = t.locate(v) else { panic!("no leaf at {v:?}") };
+    let i = t.leaf_voxels(n).unwrap().position(|w| w == v).unwrap();
+    let x = &p.set.axes()[0];
+    assert_eq!(p.set.signs().value_at(t, v).unwrap(), 1);
+    assert_eq!(x.fraction.leaf(t, n).unwrap()[i].to_bits(), 0.0_f32.to_bits());
+    assert_eq!(
+        x.normal.leaf(t, n).unwrap()[i].map(f32::to_bits),
+        [0.0_f32, 0.0, 1.0].map(f32::to_bits)
+    );
 }

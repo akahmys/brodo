@@ -554,6 +554,10 @@ fn blosc_chunks_beyond_section_9_8_are_refused() {
         "a Blosc chunk of more than one block"
     );
     assert_eq!(malformed(&stored_as(p, n, &counted(&chunk(&raw, LZ4, 0, len)))), "Blosc chunk");
+    // A chunk stating no bytes is not one of more than one block: it is malformed.
+    let mut none = chunk(&raw, LZ4 | NO_SPLIT, 4, len);
+    none[4..8].fill(0);
+    assert_eq!(malformed(&stored_as(p, n, &counted(&none))), "Blosc chunk");
 }
 
 /// `c` with `with` put at `at` and its own byte count kept true.

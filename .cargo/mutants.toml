@@ -32,13 +32,13 @@ exclude_re = [
     'bvh\.rs:.*: replace < with <= in entry$',
     # As above.
     'bvh\.rs:.*: replace > with >= in entry$',
-    # A smaller margin, or a node passed at an equal bound, prunes more only where distances
-    # tie within rounding, where any of the triangles may be found; 160 000 queries agreed
-    # with a scan (P5's review, C6).
+    # A smaller margin, or a node passed at an equal bound, prunes more only where distances,
+    # or the fractions at which a segment crosses, tie within rounding, where any of the
+    # triangles may be found; 160 000 queries agreed with a scan (P5's review, C6).
     # [open: ARCHITECTURE.md §5.1]
-    'bvh\.rs:\d+:42: replace \* with / in Bvh::nearest_segment$',
+    'bvh\.rs:\d+:40: replace \* with / in Bvh::(nearest_where|nearest_segment|first_crossing)$',
     # As above.
-    'bvh\.rs:.*: replace > with >= in Bvh::nearest_segment$',
+    'bvh\.rs:.*: replace > with >= in Bvh::nearest_(where|segment)$',
     # As above.
     'bvh\.rs:\d+:74: replace \+ with - in Bvh::nearest_segment$',
     # A box entered exactly at the best crossing so far holds none nearer, so passing it
@@ -133,7 +133,14 @@ exclude_re = [
     # [same]
     'topology\.rs:.*: replace match guard !old\.tree\.has_lower_node\(origin\) with false in tile_source$',
     # As above.
-    'bvh\.rs:.*: replace <= with > in Bvh::nearest$',
+    'bvh\.rs:.*: replace <= with > in Bvh::nearest_where$',
+    # Only slower, beyond the patient run's 1800 s (ADR-0023): a margin as wide as the tree,
+    # or a node passed only at a bound equal to the best distance, prunes no node, so the walk
+    # is a scan of every triangle, whose answer the tree promises to be.
+    # [same]
+    'bvh\.rs:\d+:40: replace \* with \+ in Bvh::nearest_where$',
+    # As above.
+    'bvh\.rs:.*: replace > with == in Bvh::nearest_where$',
     # As above.
     'bvh\.rs:.*: replace Aabb::squared_to \-> f64 with \-1\.0$',
     # As above.
@@ -142,10 +149,6 @@ exclude_re = [
     'bvh\.rs:.*: replace \+ with \- in Aabb::squared_to$',
     # As above.
     'bvh\.rs:.*: replace centre \-> Point with Default::default\(\)$',
-    # As above.
-    'bvh\.rs:.*: replace \+ with \* in centre$',
-    # As above.
-    'bvh\.rs:.*: replace / with % in centre$',
     # As above.
     'bvh\.rs:.*: replace longest \-> usize with 0$',
     # As above.
@@ -159,10 +162,6 @@ exclude_re = [
     # The tree's partition changes, not its answer: every node's box still holds its triangles,
     # and ties go to the lowest triangle number.
     # [same]
-    'bvh\.rs:.*: replace \+ with \- in centre$',
-    # As above.
-    'bvh\.rs:.*: replace / with \* in centre$',
-    # As above.
     'bvh\.rs:.*: replace \&\& with \|\| in longest$',
     # More cells are scanned at the range's ends, each held to the band or the winding number.
     # [same]
@@ -189,11 +188,6 @@ exclude_re = [
     # triangle is convex, or points apart by rounding alone: which is given is not promised.
     # [open: `colino::distance::on_triangle`]
     'distance\.rs:.*: replace < with <= in nearest_edge$',
-    # A normal exactly at the threshold sends the triangle to its edges rather than the face:
-    # either point lies within the triangle's width, √ε of its size, of the nearest, and which
-    # is given there is not promised.
-    # [open: `colino::distance::on_triangle`]
-    'distance\.rs:\d+:38: replace < with <= in on_triangle$',
     # Zero is refused by the arm before, so `<` and `<=` agree.
     # [same]
     'obj\.rs:\d+:20: replace < with <= in face$',
@@ -216,10 +210,6 @@ exclude_re = [
     'winding\.rs:.*: replace > with >= in Winding::approximate$',
     # As above.
     'winding\.rs:\d+:46: replace \* with \+ in Winding::approximate$',
-    # As above.
-    'winding\.rs:\d+:83: replace / with % in Expansion::of$',
-    # As above.
-    'winding\.rs:\d+:83: replace / with \* in Expansion::of$',
     # As above.
     'winding\.rs:.*: replace > with < in Expansion::of$',
     # As above.

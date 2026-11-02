@@ -269,38 +269,69 @@ fn a_crossing_exactly_at_the_end_is_kept() {
     assert_eq!(crossing(point(a), point(b), t.map(point)), Some(1.0));
 }
 
-/// Corners on a line, their edges' cross product exactly zero, and a segment through a
-/// point of the line: never crossed, though moved to the segment's start they may round off
-/// the line (docs of `crossing`). Before the check of the corners, about 15 % were.
-#[test]
-fn a_triangle_whose_corners_lie_on_a_line_is_never_crossed() {
-    let mut state = 0x9e37_79b9_7f4a_7c15_u64;
-    let mut next = || {
-        state ^= state << 13;
-        state ^= state >> 7;
-        state ^= state << 17;
-        (state >> 11) as f64 / (1_u64 << 53) as f64 * 2.0 - 1.0
-    };
-    let mut flat = 0;
-    for _ in 0..200_000 {
-        let (a, b) = ([next(), next(), next()], [next(), next(), next()]);
-        let t = next() * 1.5 + 0.5;
-        let c = [0, 1, 2].map(|k| a[k] + t * (b[k] - a[k]));
-        let (ab, ac) = ([0, 1, 2].map(|k| b[k] - a[k]), [0, 1, 2].map(|k| c[k] - a[k]));
-        let n = [
-            ab[1] * ac[2] - ab[2] * ac[1],
-            ab[2] * ac[0] - ab[0] * ac[2],
-            ab[0] * ac[1] - ab[1] * ac[0],
-        ];
-        if n.iter().any(|x| *x != 0.0) {
-            continue;
-        }
-        flat += 1;
-        let s = (next() + 1.0) / 2.0;
-        let m = [0, 1, 2].map(|k| a[k] + s * (b[k] - a[k]));
-        let d = [next(), next(), next()];
-        let (p, q) = ([0, 1, 2].map(|k| m[k] - d[k]), [0, 1, 2].map(|k| m[k] + d[k]));
-        assert_eq!(crossing(p, q, [a, b, c]), None, "{:?} from {p:?} to {q:?}", [a, b, c]);
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(4096))]
+
+    /// Corners exactly on a line, whole numbers and the third `k` times the first edge on,
+    /// and a segment through a point of the line: never crossed, as `crossing` documents a
+    /// triangle with no area is not.
+    #[test]
+    fn a_triangle_whose_corners_lie_exactly_on_a_line_is_never_crossed(
+        a in [-8_i32..8, -8..8, -8..8],
+        b in [-8_i32..8, -8..8, -8..8],
+        k in prop::sample::select(vec![-1, 2, 3]),
+        s in 0.0..1.0_f64,
+        d in [-1.0..1.0_f64, -1.0..1.0, -1.0..1.0],
+    ) {
+        let [a, b] = [a, b].map(|p| p.map(f64::from));
+        let c = [0, 1, 2].map(|i| a[i] + f64::from(k) * (b[i] - a[i]));
+        let m = [0, 1, 2].map(|i| a[i] + s * (b[i] - a[i]));
+        let (p, q) = ([0, 1, 2].map(|i| m[i] - d[i]), [0, 1, 2].map(|i| m[i] + d[i]));
+        prop_assert_eq!(crossing(p, q, [a, b, c]), None);
     }
-    assert!(flat > 10_000, "{flat} flat triangles");
+
+    /// Whatever triangle `crossing` crosses has area: its edges' cross product, worked as
+    /// Hermite data works its normal, is not zero, so that a crossing found always has a
+    /// normal. The third corner lies on the line of the others, or nearly, but for rounding.
+    #[test]
+    fn whatever_is_crossed_has_area(
+        a in [-1.0..1.0_f64, -1.0..1.0, -1.0..1.0],
+        b in [-1.0..1.0_f64, -1.0..1.0, -1.0..1.0],
+        t in -1.0..2.0_f64,
+        s in 0.0..1.0_f64,
+        d in [-1.0..1.0_f64, -1.0..1.0, -1.0..1.0],
+    ) {
+        let c = [0, 1, 2].map(|i| a[i] + t * (b[i] - a[i]));
+        let m = [0, 1, 2].map(|i| a[i] + s * (b[i] - a[i]));
+        let (p, q) = ([0, 1, 2].map(|i| m[i] - d[i]), [0, 1, 2].map(|i| m[i] + d[i]));
+        if crossing(p, q, [a, b, c]).is_some() {
+            let (u, v) = ([0, 1, 2].map(|i| b[i] - a[i]), [0, 1, 2].map(|i| c[i] - a[i]));
+            let n = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
+            prop_assert!(n.iter().any(|x| *x != 0.0), "{:?} crossed", [a, b, c]);
+        }
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(4096))]
+
+    /// Whatever triangle a segment crosses, the tree's search keeps it, whatever the
+    /// coordinates' size and place: triangles across the segment's end, at 1 + kε of its
+    /// length, where rounding may put a crossing past the end (the two cases above, made a
+    /// class).
+    #[test]
+    fn whatever_is_crossed_the_tree_keeps_at_any_size_and_place(
+        corners in [[-3.0..3.0_f64, -3.0..3.0], [-3.0..3.0, -3.0..3.0], [-3.0..3.0, -3.0..3.0]],
+        k in -2..=2_i32,
+        size in prop::sample::select(vec![1e-3, 1.0, 1e3, 1e6]),
+        shift in [-1e3..1e3_f64, -1e3..1e3, -1e3..1e3],
+    ) {
+        let z = shift[2] + size * (1.0 + f64::from(k) * f64::EPSILON);
+        let t = corners.map(|[x, y]| [shift[0] + size * x, shift[1] + size * y, z]);
+        let (a, b) = (shift, [shift[0], shift[1], shift[2] + size]);
+        if crossing(a, b, t).is_some() {
+            let m = colino::mesh::Mesh::new(t.to_vec(), vec![[0, 1, 2]]);
+            prop_assert_eq!(Bvh::new(&m).unwrap().near_segment(a, b), vec![0]);
+        }
+    }
 }

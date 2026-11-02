@@ -11,9 +11,8 @@ use std::path::Path;
 
 use memmap2::Mmap;
 
-use crate::cache::{CacheFile, Storage, index};
+use crate::cache::{CacheFile, Storage, index, whole_blocks};
 use crate::error::CacheError;
-use crate::frozen::BLOCK;
 
 impl CacheFile {
     /// Maps a cache file into memory and checks it whole, without a copy. Behind the
@@ -29,9 +28,7 @@ impl CacheFile {
     pub unsafe fn map(path: &Path) -> Result<CacheFile, CacheError> {
         let file = std::fs::File::open(path)?;
         let len = file.metadata()?.len();
-        if len == 0 || !len.is_multiple_of(BLOCK as u64) {
-            return Err(CacheError::Inconsistent("length"));
-        }
+        whole_blocks(len)?;
         // SAFETY: `Mmap::map` is unsafe because the mapped bytes change if the file is
         // modified or truncated while mapped. This function's caller promises, by its own
         // `unsafe`, to keep the file unchanged while the mapping lives (`# Safety` above),

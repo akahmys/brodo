@@ -9,12 +9,18 @@ use brodo::field::Stored;
 use brodo::topology::Topology;
 use libfuzzer_sys::fuzz_target;
 
+#[path = "shared/probes.rs"]
+mod probes;
+use probes::PROBES;
+
 /// Reads, thaws and compares grid `i` of `file` as a grid of `T`, if it is one: a voxel, its
 /// leaves and one beyond them, its values on its own topology and on an empty one, and
 /// whether every grid of `T` holds its tree.
 fn exercise<T: Stored>(file: &CacheFile, i: usize) {
     let Ok(view) = file.view::<T>(i) else { return };
-    let _read = view.get([0, 0, 0]);
+    for v in PROBES {
+        let _read = view.get(v);
+    }
     let count = u32::try_from(view.leaf_count()).unwrap_or(u32::MAX);
     for n in [0, count.saturating_sub(1), count] {
         let _leaf = view.leaf(n);

@@ -30,6 +30,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+from paths import committable
 from project import LAYERS, TOOLS, UNTRUSTED_INPUT, crate_of
 
 ROOT = Path(__file__).resolve().parent.parent.parent
@@ -156,11 +157,8 @@ def fuzzer() -> list[str]:
 
 
 def files() -> list[str]:
-    out = subprocess.run(
-        ["git", "ls-files", "--cached", "--others", "--exclude-standard"],
-        cwd=ROOT, capture_output=True, text=True, check=True,
-    )
-    return [f for f in out.stdout.splitlines() if (ROOT / f).is_file()]
+    """The files git would commit, by `paths.committable`, relative to the root."""
+    return [str(p.relative_to(ROOT)) for p in committable()]
 
 
 def layout() -> list[str]:

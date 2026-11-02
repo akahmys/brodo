@@ -43,6 +43,7 @@ import re
 import sys
 from pathlib import Path
 
+from paths import committable
 from project import APPLICATIONS, UNSAFE_CALLERS, UNSAFE_MODULES
 
 ROOT = Path(__file__).resolve().parent.parent.parent
@@ -50,10 +51,6 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 ASSERT = re.compile(r"(?<![\w:])(?:std::|core::)?assert(?:_eq|_ne)?!")
 FN = re.compile(r"^\s*(?:pub(?:\([^)]*\))?\s+)?(?:const\s+)?(?:async\s+)?fn\s+(\w+)")
 MARKER = re.compile(r"^\s*// Bounded recursion: \S")
-# Directly, or as the attribute a `cfg_attr` applies, its condition never holding a `]`.
-LINT_ATTRIBUTE = re.compile(
-    r"#!?\[\s*(?:cfg_attr\s*\([^\]]*?,\s*)?(?:allow|expect)\s*\((.*?)\)\s*\)?\s*\]", re.DOTALL
-)
 LINT_NAME = re.compile(r"^\s*([\w:]+)\s*$")
 # The lints an exception may cover, by the rule that allows it.
 EXEMPTABLE = {
@@ -89,31 +86,70 @@ def crates() -> list[Path]:
     return sorted(roots)
 
 
-# What `blank` empties, the first to start winning: a raw string, `r#"…"#`; a string,
-# over lines too; a character; a line's comment; a block comment, not nested.
-LEXEME = re.compile(
-    r'(b?r(#*)")(.*?)("\2)'
-    r'|(b?")((?:\\.|[^"\\])*)(")'
-    r"|(b?')((?:\\.|[^'\\]))(')"
-    r"|()(//[^\n]*)()"
-    r"|()(/\*.*?\*/)()",
-    re.DOTALL,
-)
-
-
 def blank(text: str) -> str:
     """Text with each string's and character's contents and each comment made spaces, its
-    quotes and line ends kept: its code alone, every character where it was. A string is
-    found before a comment that starts within it, so `"http://…"` is a string."""
-    def empty(m: re.Match[str]) -> str:
-        groups = [g for g in m.groups() if g is not None]
-        if m.group(1) is not None:  # a raw string: its opening, hashes, contents, closing
-            opening, _, inside, closing = groups
-        else:
-            opening, inside, closing = groups
-        return opening + re.sub(r"[^\n]", " ", inside) + closing
+    quotes and line ends kept: its code alone, every character where it was. Read by a
+    lexer, left to right, as rustc reads it: a line comment; a block comment, nested; a raw
+    string, `r#"…"#`, `br…` or `cr…`; a string or byte string, over lines too; a character
+    or byte, `'x'`, `'\\n'`, `'\\u{…}'`, told from a lifetime, `'a`, which is code."""
+    out = list(text)
+    n, i = len(text), 0
 
-    return LEXEME.sub(empty, text)
+    def empty(start: int, end: int) -> None:
+        for k in range(start, min(end, n)):
+            if out[k] != "\n":
+                out[k] = " "
+
+    while i < n:
+        c = text[i]
+        two = text[i : i + 2]
+        if two == "//":
+            end = text.find("\n", i)
+            end = n if end < 0 else end
+            empty(i, end)
+            i = end
+        elif two == "/*":
+            depth, k = 1, i + 2
+            while k < n and depth:
+                if text.startswith("/*", k):
+                    depth, k = depth + 1, k + 2
+                elif text.startswith("*/", k):
+                    depth, k = depth - 1, k + 2
+                else:
+                    k += 1
+            empty(i, k)
+            i = k
+        elif (raw := re.match(r'(?:b|c)?r(#*)"', text[i:])) and not ident_before(text, i):
+            close = '"' + raw.group(1)
+            start = i + raw.end()
+            end = text.find(close, start)
+            end = n if end < 0 else end
+            empty(start, end)
+            i = end + len(close)
+        elif c == '"' or (two in ('b"', 'c"') and not ident_before(text, i)):
+            k = i + (2 if c != '"' else 1)
+            start = k
+            while k < n and text[k] != '"':
+                k += 2 if text[k] == "\\" else 1
+            empty(start, k)
+            i = k + 1
+        elif c == "'" or (two == "b'" and not ident_before(text, i)):
+            k = i + (2 if c != "'" else 1)
+            char = re.match(r"\\(?:u\{[0-9A-Fa-f_]*\}|x[0-9A-Fa-f]{2}|.)'|[^\\']'", text[k:], re.DOTALL)
+            if char:
+                empty(k, k + char.end() - 1)
+                i = k + char.end()
+            else:
+                i = k  # a lifetime or a label: code
+        else:
+            i += 1
+    return "".join(out)
+
+
+def ident_before(text: str, i: int) -> bool:
+    """Whether the character before `i` continues an identifier, so that `b`, `c` or `r` at
+    `i` ends a name rather than prefixing a literal."""
+    return i > 0 and (text[i - 1].isalnum() or text[i - 1] == "_")
 
 
 def code_lines(path: Path) -> list[str]:
@@ -139,14 +175,31 @@ def exceptions(crate: Path, files: list[Path]) -> list[str]:
         text = code(path)
         may = unsafe_allowed(path) or caller(path)
         here = allowed | ({UNSAFE_LINT} if may else set())
-        for match in LINT_ATTRIBUTE.finditer(text):
-            number = text.count("\n", 0, match.start()) + 1
-            for part in match.group(1).split(","):
-                if "=" in part or not LINT_NAME.match(part):
-                    continue
-                lint = part.strip()
-                if lint not in here:
-                    out.append(f"  {path.relative_to(ROOT)}:{number}: {lint} may not be excepted (Rule 19)")
+        for number, part in lint_parts(text):
+            where = f"  {path.relative_to(ROOT)}:{number}:"
+            if not LINT_NAME.match(part):
+                out.append(f"{where} an exception's part neither a lint nor its reason: {part} (Rule 19)")
+            elif part.strip() not in here:
+                out.append(f"{where} {part.strip()} may not be excepted (Rule 19)")
+    return out
+
+
+EXCEPTION = re.compile(r"\b(?:allow|expect)\s*\(")
+
+
+def lint_parts(text: str) -> list[tuple[int, str]]:
+    """Each part of every `allow(…)` and `expect(…)` in every attribute, directly or under
+    `cfg_attr`, however many it holds, its reason left out: by its line, read with its
+    brackets matched in the code alone."""
+    out = []
+    for m in ATTRIBUTE.finditer(text):
+        end = closing(text, m.end() - 1, "[", "]")
+        for e in EXCEPTION.finditer(text, m.end(), end):
+            inside = text[e.end() : closing(text, e.end() - 1, "(", ")") - 1]
+            number = line_of(text, e.start())
+            for part in arguments(inside):
+                if part.strip() and not re.match(r"\s*reason\s*=", part):
+                    out.append((number, part.strip()))
     return out
 
 
@@ -163,8 +216,8 @@ MAP_CALL = re.compile(r"\bunsafe \{ CacheFile::map\(")
 
 def unsafe_code(crate: Path) -> list[str]:
     out = []
-    for path in sorted(crate.rglob("*.rs")):
-        if "target" in path.relative_to(crate).parts or unsafe_allowed(path):
+    for path in every_target(crate):
+        if unsafe_allowed(path):
             continue
         for number, code in enumerate(code_lines(path), 1):
             if caller(path):
@@ -241,7 +294,7 @@ def cycles(calls: dict) -> list[list[str]]:
 
 
 def recursion(crate: Path) -> list[str]:
-    calls, bounded, where = call_graph(sorted(crate.rglob("src/**/*.rs")))
+    calls, bounded, where = call_graph(sources(crate))
     out = []
     for component in cycles(calls):
         if not bounded & set(component):
@@ -293,7 +346,12 @@ def arguments(inside: str) -> list[str]:
 
 
 RESULT = re.compile(r"\bResult\s*<")
-STRING_TYPE = re.compile(r"^(?:(?:std|alloc)::string::)?String$")
+# An error with no type of its own (Rule 8): a string, owned, borrowed, boxed or copied on
+# write, or a boxed `dyn Error`, read with its white space removed.
+STRING_TYPE = re.compile(
+    r"^(?:(?:std|alloc)::string::)?String$|^&(?:'\w+)?str$|^(?:(?:std::)?boxed::)?Box<(?:str|dyn.*)>$"
+    r"|^(?:(?:std|alloc)::borrow::)?Cow<(?:'\w+,)?str>$"
+)
 ANYHOW = re.compile(r"\banyhow\b")
 OK_PATH = re.compile(
     r"\b(?:filter_map|flat_map)\s*\(\s*(?:(?:std|core)\s*::\s*result\s*::\s*)?Result\s*"
@@ -314,7 +372,7 @@ def errors(crate: Path, files: list[Path]) -> list[str]:
                 end = closing(text, m.end() - 1, "<", ">")
                 parts = arguments(text[m.end() : end - 1])
                 if len(parts) == 2 and STRING_TYPE.match(re.sub(r"\s+", "", parts[1])):
-                    out.append(f"  {where}:{line_of(text, m.start())}: String as an error (Rule 8)")
+                    out.append(f"  {where}:{line_of(text, m.start())}: an error with no type of its own (Rule 8)")
             out += [f"  {where}:{line_of(text, m.start())}: anyhow (Rule 8)" for m in ANYHOW.finditer(text)]
         for m in [*OK_PATH.finditer(text), *OK_CLOSURE.finditer(text)]:
             out.append(f"  {where}:{line_of(text, m.start())}: an error filtered away (Rule 9)")
@@ -345,7 +403,14 @@ def ignores(files: list[Path]) -> list[str]:
 
 
 def every_target(crate: Path) -> list[Path]:
-    return [p for p in sorted(crate.rglob("*.rs")) if "target" not in p.relative_to(crate).parts]
+    """Every `.rs` file of the crate git would commit, by `paths.committable`: a directory
+    named as an output's but within `src/` is read, and no build output is."""
+    return sorted(p for p in committable() if p.suffix == ".rs" and crate in p.parents)
+
+
+def sources(crate: Path) -> list[Path]:
+    """The crate's `src/` files git would commit."""
+    return [p for p in every_target(crate) if (crate / "src") in p.parents]
 
 
 def main() -> int:
@@ -353,7 +418,7 @@ def main() -> int:
         found = []
         for crate in crates():
             if sys.argv[1] == "--errors":
-                found += errors(crate, sorted(crate.rglob("src/**/*.rs")))
+                found += errors(crate, sources(crate))
             else:
                 found += ignores(every_target(crate))
         print("\n".join(found) if found else "  PASS")
@@ -364,7 +429,7 @@ def main() -> int:
     failures += [f"  {m} (UNSAFE_MODULES) does not exist" for m in UNSAFE_MODULES
                  if not (ROOT / m).is_file()]
     for crate in crates():
-        files = sorted(crate.rglob("src/**/*.rs"))
+        files = sources(crate)
         failures += asserts(files)
         # Rule 19 holds in every target: tests, examples and benchmarks too.
         failures += exceptions(crate, every_target(crate))

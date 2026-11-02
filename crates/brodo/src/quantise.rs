@@ -243,6 +243,7 @@ pub(crate) fn restore(q: &Quantised, kind: Kind, codes: &[u8], room: &mut [u8]) 
             let Some((low, high)) = codes.split_at_checked(codes.len() / 2) else {
                 return false;
             };
+            // A `u16` indexes one of the table's 65 536 values: the fallback is never taken.
             let value = |(l, h): (&u8, &u8)| {
                 values.get(usize::from(u16::from_le_bytes([*l, *h]))).copied().unwrap_or(f32::NAN)
             };
@@ -256,6 +257,8 @@ pub(crate) fn restore(q: &Quantised, kind: Kind, codes: &[u8], room: &mut [u8]) 
         }
         Quantised::EightBit(r) => {
             let steps: Vec<[f64; 256]> = r.iter().map(|c| steps(*c)).collect();
+            // A `u8` indexes one of a component's 256 steps, and a grid has a component at
+            // least, so the cycle never ends: the fallback is never taken.
             let mut at = steps.iter().cycle();
             let mut value = move |q: &u8| {
                 at.next().and_then(|s| s.get(usize::from(*q))).copied().unwrap_or(f64::NAN)

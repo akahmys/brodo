@@ -279,6 +279,7 @@ fn pick<T: Ordered>(a: T, b: T, keep: Ordering) -> T {
 
 /// The places in a gathered array of a voxel's neighbours, as offsets from it.
 fn neighbourhood(conn: Connectivity) -> Vec<isize> {
+    // `GATHER_EDGE` is 10: the conversion cannot fail, and its fallback is never taken.
     let edge = isize::try_from(GATHER_EDGE).unwrap_or(10);
     let mut out = Vec::new();
     for z in -1..=1_isize {
@@ -314,7 +315,9 @@ fn filter<T: Ordered>(
                     + GATHER_EDGE * (i / 8 % 8 + 1)
                     + GATHER_EDGE * GATHER_EDGE * (i / 64 + 1);
                 *o = near.iter().fold(g[c], |v, d| {
-                    // The gather holds one layer around the leaf, so every neighbour is in it.
+                    // The gather holds one layer around the leaf, so every neighbour is in it:
+                    // `c` is 111 to 888 and an offset at most 111 either way, so `get` always
+                    // finds one, and the fallback is never taken.
                     g.get(c.wrapping_add_signed(*d)).map_or(v, |w| pick(v, *w, keep))
                 });
             }

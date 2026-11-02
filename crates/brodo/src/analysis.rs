@@ -14,6 +14,7 @@ use crate::error::{FieldError, TreeError};
 use crate::field::{Field, Value, leaf_place};
 use crate::topology::{Location, Topology};
 use crate::tree::{Coord, Place, TileLevel, align, child_place};
+use crate::tree::{LEAF_LOG2, LOWER_SPAN_LOG2, UPPER_SPAN_LOG2};
 
 /// Which neighbours touch.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -76,7 +77,7 @@ pub enum Label {
 /// The largest compressed root grid, in cells.
 const ROOT_CELLS: usize = 1 << 22;
 /// log2 of a region's edge at each level: a root region, a lower node's, a leaf's, a voxel.
-const LOG: [u32; 4] = [12, 7, 3, 0];
+const LOG: [u32; 4] = [UPPER_SPAN_LOG2, LOWER_SPAN_LOG2, LEAF_LOG2, 0];
 
 /// One axis of the compressed root grid: intervals of root-region numbers, in order; the
 /// first and last are unbounded.

@@ -26,7 +26,8 @@ use rayon::prelude::*;
 
 use crate::bvh::Bvh;
 use crate::convert::Inside;
-use crate::distance::{Point, add, cross, dot, length, scale, sub, unit};
+use crate::distance::{Point, add, centroid, cross, dot, length, scale, sub, unit};
+use crate::surface::root;
 use brodo::analysis::{AnalysisError, Connectivity, label};
 use brodo::error::FieldError;
 use brodo::euler::euler;
@@ -81,7 +82,7 @@ fn samples(t: [Point; 3], step: f64) -> Vec<Point> {
         // The section's height at x: rising to c above cx, falling to b. The longest edge
         // puts cx within it.
         let height = |x: f64| {
-            if x <= cx { cy * x / cx.max(f64::MIN_POSITIVE) } else { cy * (long - x) / (long - cx) }
+            if x <= cx { cy * x / cx } else { cy * (long - x) / (long - cx) }
         };
         #[expect(clippy::cast_possible_truncation, reason = "a count of sections, at least 1")]
         #[expect(clippy::cast_sign_loss, reason = "a count of sections, at least 1")]
@@ -100,7 +101,7 @@ fn samples(t: [Point; 3], step: f64) -> Vec<Point> {
         }
     }
     if out.is_empty() {
-        out.push([0, 1, 2].map(|k| (p[k] + q[k] + r[k]) / 3.0));
+        out.push(centroid(t));
     }
     out
 }
@@ -139,20 +140,6 @@ fn measure(bvh: &Bvh, inside: &Inside<'_>, own: u32, h: f64, reach: f64) -> Vec<
 }
 
 /// The root of `x`, halving the path.
-fn find(parent: &mut [usize], mut x: usize) -> usize {
-    loop {
-        let p = parent.get(x).copied().unwrap_or(x);
-        if p == x {
-            return x;
-        }
-        let grand = parent.get(p).copied().unwrap_or(p);
-        if let Some(slot) = parent.get_mut(x) {
-            *slot = grand;
-        }
-        x = grand;
-    }
-}
-
 /// The places of thin points of one kind: points within `reach` joined, the smaller root
 /// winning, each place in the order of its first point.
 fn places(points: &[Found], kind: ThinKind, reach: f64) -> Vec<Thin> {
@@ -168,7 +155,7 @@ fn places(points: &[Found], kind: ThinKind, reach: f64) -> Vec<Thin> {
             for &k in cells.get(&near).map_or(&[][..], Vec::as_slice) {
                 let q = mine.get(k).map_or(p.at, |q| q.at);
                 if length(sub(p.at, q)) <= reach {
-                    let (a, b) = (find(&mut parent, j), find(&mut parent, k));
+                    let (a, b) = (root(&mut parent, j), root(&mut parent, k));
                     let (lo, hi) = (a.min(b), a.max(b));
                     if let Some(slot) = parent.get_mut(hi) {
                         *slot = lo;
@@ -180,7 +167,7 @@ fn places(points: &[Found], kind: ThinKind, reach: f64) -> Vec<Thin> {
     }
     let mut by_root: BTreeMap<usize, Thin> = BTreeMap::new();
     for (j, p) in mine.iter().enumerate() {
-        let root = find(&mut parent, j);
+        let root = root(&mut parent, j);
         let place = by_root.entry(root).or_insert(Thin {
             kind,
             lo: p.at,
@@ -335,8 +322,14 @@ mod tests {
         let want = [[1.0, 1.0], [3.0, 5.0 / 6.0], [3.0, 2.5], [5.0, 1.0], [7.0, 1.0 / 3.0]];
         let got = samples(t, 2.0);
         assert_eq!(got.len(), want.len(), "{got:?}");
+        // Each coordinate, below 8, is a few products and sums of the corners': 64
+        // roundings of 8 at most.
+        let rounding = 64.0 * 8.0 * f64::EPSILON;
         for (g, w) in got.iter().zip(want) {
-            assert!((g[0] - w[0]).abs() < 1e-12 && (g[1] - w[1]).abs() < 1e-12, "{g:?} {w:?}");
+            assert!(
+                (g[0] - w[0]).abs() <= rounding && (g[1] - w[1]).abs() <= rounding,
+                "{g:?} {w:?}"
+            );
             assert_eq!(g[2].to_bits(), 0.0_f64.to_bits());
         }
         // A triangle of no area has its centroid alone.
@@ -428,7 +421,9 @@ mod tests {
             Bvh::new(&crate::mesh::Mesh { vertices, triangles, ..Default::default() }).unwrap();
         let x = [0.25, 0.25, 0.0];
         let up = ray(&bvh, x, [0.0, 0.0, 1.0], 4.0).unwrap();
-        assert!((up - 1.0).abs() < 1e-9, "{up}");
+        // The ray starts off its plane by 2⁻⁴⁰ of the largest coordinate it works with, 4
+        // here: the distance found is 1 to within twice that.
+        assert!((up - 1.0).abs() <= 2.0 * 4.0 / 1_099_511_627_776.0, "{up}");
         assert_eq!(ray(&bvh, x, [0.0, 0.0, 1.0], 0.5), None);
         assert_eq!(ray(&bvh, x, [0.0, 0.0, -1.0], 4.0), None);
     }

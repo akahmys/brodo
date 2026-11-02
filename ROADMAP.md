@@ -8,22 +8,15 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: the review of the whole repository (§2, "After P7"), closed as 0.8.1: the
-  Blosc chunk refused off its place, the memory `vdb::read` makes stated (ADR-0047), the
-  rules inventoried and their gaps closed (ADR-0002, ADR-0005, ADR-0021, ADR-0048), no code
-  taken from outside (AGENTS.md S5, ADR-0049), every document read against the code
-  (ADR-0001's amendment of 2026-11-02), and three refactorings with no behaviour changed;
-  no file was found no longer needed. A second review before the tag fixed four defects
-  (a merge over a removed leaf, a region read's memory before its limit and over shared
-  nodes, a sliver's distance) and the guards' and checks' gaps (ADR-0002, ADR-0003,
-  ADR-0007, ADR-0021, ADR-0023, ADR-0034), and named each test tolerance once; an outside
-  review of that change then fixed a thin triangle's face point (ADR-0027), a report's
-  region not finite (ADR-0028), more of the same gaps, and the format reader's missing
-  region read (ADR-0037); and a third, a triangle on a line crossed and a normal's
-  length under- or overflowing (ADR-0030), strings over lines and SVGs unscanned
-  (ADR-0002, ADR-0003); the logo was added.
-- **Next**: the units §2's "After P7" lists after the review, `limit` bounding what
-  `vdb::from_bytes` and `vdb::read` make among them.
+- **Done**: 0.8.2 (§2), what a survey of the whole repository found fixed by patch
+  rather than at its cause, made principled: a triangle's nearest point by its largest
+  angle and scaled (ADR-0027), a crossing at an end on the mesh, and every margin of the
+  tree derived from its rounding (ADR-0030), a merge's rule at every level of a tile, a
+  slice's contour across tiles (ADR-0018), the guards and checks reading as the shell and
+  Rust do (ADR-0002, ADR-0003, ADR-0034), and the tests' builders and tolerances shared
+  and derived. Its one breaking change kept a PATCH by the owner's exception to TESTING.md
+  V2.
+- **Next**: the units §2's "After P7" lists, in its order, each once the owner approves it.
 
 ## 2. Milestones
 
@@ -394,14 +387,125 @@ as a proposal for a unit of its own.
 - [x] A version only if code changed, 0.8.1 by the owner's choice; TESTING.md V2 raises
       PATCH for a fix, so whether a refactoring counts as one is put to the owner then
 
-Then, as units of their own after the review:
+Then, as units of their own after the review, in this order, each started once the owner
+approves it; the estimates are an agent's working time, the gate, the mutation run of what
+changed and the benchmarks besides (2026-11-02):
+
+1. `limit` bounding what `vdb::from_bytes` and `vdb::read` make, below; first, since the
+   command of 2 reads `.vdb` files as untrusted input and should read them within a limit
+   (about half a day)
+2. A command to look inside brodo's files, below (about a day, after its ADR)
+3. README.md's "Looking inside" section, below (about half a day, the viewers installed)
+4. B-023 and B-022 together, below, since both raise a format version (about a day's
+   spike, then two to three days)
+5. Reading a region of an archive from only its chunks' bytes, below, left to later
 
 - [ ] `limit` bounding what `vdb::from_bytes` and `vdb::read` make, as `archive` does, a
       unit of its own after the review, since it changes public items (the owner,
       2026-11-02; ADR-0047); the fuzz target `vdb` then passes a limit, as `archive`'s does,
       since without one reading makes up to about 637 bytes for each byte read (ADR-0047)
+- [ ] A command to look inside brodo's files, for someone who receives a cache file, an
+      archive or a `.vdb` and writes no Rust; `piatto` stays held (B-021), so it uses no
+      GPU and no GUI (the owner, 2026-11-02):
+      - [ ] An ADR, its options put to the owner with a recommendation each: where it lives,
+            a crate of its own or a program in an existing one (ARCHITECTURE.md §2,
+            `project.py`'s `APPLICATIONS` and `LAYERS`); whether its arguments are parsed by
+            a crate, approved under CODING.md Rule 20 and measured by Rules 12 and 13 if so;
+            its input, every file read as untrusted through the fuzzed readers and within a
+            limit (`UNTRUSTED_INPUT`); its output, where it writes and what it refuses to
+            overwrite (CODING.md L2); its tests, golden files; and which of brodo's features,
+            `archive`, `vdb` and `slice-png`, it is built with
+      - [ ] `info`: each grid's name, value type, bounds, count of active voxels, least and
+            greatest value, and metadata
+      - [ ] `slice`: an axis and a position, the slice written as PNG (`slice-png`)
+      - [ ] `convert`: a cache file or an archive to `.vdb` or VTK
+      - [ ] Tests on the golden files, each subcommand's output held to a committed one
+- [ ] README.md's "Looking inside" section: `.vdb` opened in Blender and Houdini, VTK in
+      ParaView, and the command of the unit above; only what was opened and seen, each
+      with the version it was seen in, by a script run headless where the viewer has one
+      (Blender's Python, ParaView's `pvpython`), the viewers installed first with the
+      owner's approval, none being on this machine (2026-11-02)
+- [ ] B-023 and B-022 (§3), the owner's order (2026-11-02):
+      - [ ] B-023's spike: Hermite data's crossings held only on the edges that hold one,
+            its memory and writing time measured against the dense fields' on spheres of
+            radius 200 and 1500 voxels, the answer an ADR
+      - [ ] Hermite data's format version raised if the spike keeps it sparse; the frozen
+            layout's and the cache profile's raised with B-022's checks; each reading the
+            version before it and writing it on request (ADR-0038), docs/formats.md and the
+            golden files with them
 - [ ] Reading a region of an archive from only the bytes of the chunks it needs, the file
       not read whole (left to later by the human, 2026-10-29; ADR-0016)
+
+### 0.8.2 — the ad hoc made principled
+
+The owner set it on 2026-11-02, after a survey of the whole repository, by four readers
+and checked against the code, for what was fixed by patch rather than at its cause. Each
+item is fixed at its cause, a test or check failing first (TESTING.md T3); a rule changed
+lands with its ADR and the owner's approval (AGENTS.md, "Changing the rules").
+
+Code:
+
+- [x] Hermite data: an edge whose inside end lies on the mesh takes its crossing there with
+      the normal and group of a triangle at distance 0, not of the one `find` chose
+      farther along or nearest the edge (ADR-0030)
+- [x] `distance::on_triangle`: edges divided by their largest component, so that nothing
+      under- or overflows; turning the largest angle first was tried and taken back, its
+      cost beyond what it bought (ADR-0027); the benchmarks within their baselines
+- [x] The slice's zero contour unbroken where a leaf meets a tile, as ARCHITECTURE.md §6.1
+      states (ADR-0018)
+- [x] The BVH's pruning margins derived once from the rounding of `crossing` and
+      `on_triangle`, in one helper, and `Bvh::nearest` held to its promise of the lowest of
+      equals as `nearest_segment` is (ADR-0030)
+- [x] A field's topology checked for every function that takes both, by a test calling each
+      on an empty topology and on another, `stale_field.rs`, which a new such function
+      joins; each function's own check kept, a structure for all of them changing public
+      items
+- [x] One definition of a triangle with no area, a unit normal and an area in colino;
+      duplicated helpers (`on_segment` and `nearest_fraction`, `norm` and `length`, the
+      centroid, union-find) made one; the tree's shape and a voxel's place in its leaf taken
+      from `tree.rs` and `field.rs` rather than restated; `tile_source` one rule at every
+      level; one length rule for an empty cache file in the three readers; a fallback no
+      input reaches said so where it stands, and a Blosc chunk of no bytes refused as
+      malformed rather than as unsupported
+
+Checks (each a rule, with its ADR):
+
+- [x] `.claude/settings.json` running both guards on every tool, not a list of names, so
+      that a tool added later, such as one running a shell command, is guarded (ADR-0003)
+- [x] The guards made a convenience, and the backstop made whole: the pushed range of
+      commits checked in CI, and the unpushed here, by `commit_msg_check.py`, and every
+      message by the project's rules; `claude_guard.py` splitting words as the shell does
+      (`shlex`), quotes and escapes removed (ADR-0003, ADR-0034)
+- [x] `.cargo/mutants.toml` read by its whole shape, its only key `exclude_re`, so that a
+      quoted key is refused too (ADR-0023)
+- [x] betterleaks reading every text file git would commit, its default allow-list's paths
+      (`node_modules/`, `.gltf`, `.svg` and more) included, by `leak_input.py`, which the
+      hook and the audit share (ADR-0003)
+- [x] `source.py`'s Rust read by a lexer rather than regular expressions, with no
+      dependency, so that an attribute holding two exceptions, a `src/target/` directory
+      and Rule 8's other spellings are read (ADR-0002); Rule 9 by `flatten`, which needs
+      types, left to review
+- [x] `tests.py` listing doctests, a `compile_fail` one among them (ADR-0021)
+- [x] One list of the files git would commit and of which are text, one heading parser and
+      one list of the rule files, each imported where it is used now restated (ADR-0001)
+
+Tests:
+
+- [x] The tests of a triangle on a line: exactly collinear corners never crossed; whatever
+      is crossed has area, as a property rather than a filter; and the Hermite one made a
+      property asserting the bytes of the cube without a triangle with no area
+- [x] The tests of one reported input (a far cube, a crossing at `1 + ε`) made properties
+      over translation and scale
+- [x] References that share no code with what they check (the edge distance, by the cross
+      product)
+- [x] The archive's fuzz target taking a region's box from its input, and every target the
+      same probes
+- [x] Each literal tolerance given its derivation (TESTING.md T4), the thin neck's and
+      tube's thickness worked from their polygons
+- [x] One random generator and one set of mesh and tree builders a crate, in a module of
+      its own each, `tests/support/`, since a shared module whose every item a test does
+      not use fails `dead_code`; proptest drawing in place of a hand-made sequence where it
+      can
 
 ## 3. Open questions and spikes
 
@@ -412,12 +516,15 @@ implementation (PLANNING.md §2).
 | :--- | :--- | :--- |
 | B-023 | Does Hermite data hold its crossings sparsely, only on the edges that hold one, rather than nine dense fields over every leaf? | Not yet: found by P5's review (M2): the fields take about 61 bytes a voxel and writing them about three times as much, so that a sphere of radius 1500 voxels does not fit in 32 GB, read against a measurement of 613 MB at radius 200 (2026-10-26). It changes the Hermite format, so it waits for a spike and a version raised (ADR-0038); the owner set it aside for P5 (2026-10-27) |
 | B-022 | Does a later version of the frozen layout and the cache profile check what version 1's readers leave unchecked: padding and the background's bytes beyond its size, the order of nodes, whether every node and leaf is reached, and a cache file's bounds against its grid (docs/formats.md §2.5, §3.4)? | Not yet: found writing the format document (ADR-0037); each check a reader adds refuses files version 1 accepts, so it waits for a version raised for another reason (ADR-0038). Now for `GridView::new` and the cache reader alone: the Hermite reader and thawing refuse nodes reached twice and leaves never reached at version 1 (ADR-0038's amendment of 2026-10-27, ADR-0042). For the links, one pass would do: each node's `first_child` and `first_tile`, where it has children or tiles, the end of the previous such node's, the last end the count, so that no child is shared or unreached |
+
+Questions decided "not now", each revisited only when what it names happens:
+
+| # | Question | Decision |
+| :--- | :--- | :--- |
 | B-019 | Does `colino` move to a repository of its own? | Not now (owner, 2026-10-23; ADR-0012 keeps two crates in one repository): changes span both, as P3's Hermite format and producer did, and before 1.0 a split would turn each into two releases, duplicate the rules and their audit, and take colino's tests out of brodo's gate. Revisited when brodo's API and formats settle (1.0), both are on crates.io, colino needs what brodo's rules forbid, or others maintain it. Publishing does not split them: both crates are published from this repository (owner, 2026-10-29). A split waits for colino needing what brodo's rules forbid, or for others maintaining it, and is then a milestone of its own that gives colino its own rules, audit and CI (owner, 2026-10-29) |
 | B-021 | Does brodo build `piatto`? | Not now (owner, 2026-10-24; ADR-0018): no user has asked for a viewer, the slice as PNG and VTK for ParaView serve checking, `.vdb` from P7 would open in common tools, and a GPU, window and GUI stack is costly. Revisited when a user asks for a viewer or for drawing to embed, or grids too large for VTK and `.vdb` must be looked at |
-| B-018 | Does model checking with Kani join the closing checks? | Not now (owner, 2026-10-23): it fits only integer bit work and `view.rs`'s small helpers, already fuzzed and mutation-tested, and cannot reach rayon or the memory mapping; this milestone's defects were numeric and in design claims. Revisited by a spike if Miri-unreachable unsafe code grows, an integer coordinate bug escapes the tests, or before 1.0 |
-| B-003 | Do level-set operations (CSG, redistancing) belong in brodo? | No, until shown to be general |
-| B-004 | Does a shared IR schema crate live in this repository? | Undecided; for brodo's users to agree, not for brodo to anticipate |
-| B-013 | Which crates handle `piatto`'s window, input and GUI parts? | `winit` and `egui`, to be measured against Rules 12 and 13 (ADR-0018) |
+| B-013 | Which crates handle `piatto`'s window, input and GUI parts? | Left with B-021: `winit` and `egui`, to be measured against Rules 12 and 13 if `piatto` is built (ADR-0018) |
+| B-018 | Does model checking with Kani join the closing checks? | Not now (owner, 2026-10-23, kept 2026-11-02): it fits only integer bit work and `view.rs`'s small helpers, already fuzzed and mutation-tested, and cannot reach rayon or the memory mapping; this milestone's defects were numeric and in design claims. Revisited by a spike if Miri-unreachable unsafe code grows, an integer coordinate bug escapes the tests, or before 1.0 |
 
 Questions answered, each by its spike and ADR:
 
@@ -441,6 +548,8 @@ Questions answered, each by its spike and ADR:
 - `spikes/vdb/`: the writing step (ADR-0046)
 - `spikes/vdbread/`: the reading step (ADR-0047)
 - `spikes/vdbmemory/`: the memory `vdb::read` makes (ADR-0047's amendment of 2026-11-02)
+- No spike: B-003 and B-004, both no, questions of scope (ADR-0012's amendment of
+  2026-11-02)
 
 No spike is running.
 
@@ -450,35 +559,17 @@ No spike is running.
   P1, for `piatto` if it is built: a GPU, window and GUI stack (B-013).
 - A smaller codec for the archive: `ruzstd` measured again as `spikes/archive/` did, once
   it implements levels above its fastest (0.9.1 does not; ADR-0016, 2026-10-29).
-- Before any distribution: confirm the licence terms for that form of distribution
-  (ADR-0007).
-- Making the repository public, which the owner decides later (2026-10-24). Readiness is
-  kept up meanwhile; checked 2026-10-24: every author and committer is the noreply
-  address, no path into a home directory is in the history, the gate's history scans
-  pass, and the workflows start by hand only (ADR-0034). Once the owner decides, in order:
-  1. Patents: whether the methods brodo implements from papers, the VDB tree among them,
-     are under patent, looked into by the owner, with advice if needed.
-  2. Licences: the terms confirmed for this form of distribution (ADR-0007); `cargo deny`
-     already holds every dependency to the allow-list.
-  3. History: the two names of the owner's local list of forbidden sources that the first
-     commits carried, removed on 2026-10-20, rewritten out of every commit
-     before it. `git filter-repo`, approved first, runs in a fresh clone with
-     `--replace-text` and its table kept outside the repository; a search of every
-     commit for the two names then finds none; the gate passes; the tags `v0.1.0` and
-     later are set again on the rewritten commits; the owner force-pushes `main` and the
-     tags, and any other clone is made afresh.
-  4. Settings on GitHub, by the owner: the visibility made public; `main` protected
-     against force pushes and deletion; workflows from forks' pull requests held for
-     approval.
-  5. CI: with standard runners free for a public repository, whether `audit.yml` also runs
-     on each push, decided then (ADR-0034).
-
-  Done on 2026-10-25, the owner having decided to publish: step 3, the history rewritten
-  and force-pushed, the old workflow runs deleted; step 5, `audit.yml` on each push to
-  `main` (ADR-0034); the repository made public by the owner; step 4, `main` protected
-  against force pushes and deletion for everyone, and workflows from every outside
-  contributor's pull request held for approval. Steps 1 and 2, patents and licences, judged by the owner on a
-  preliminary search (ADR-0007); asked again when the form of distribution changes.
+- The repository is public, since 2026-10-25 (the owner; ADR-0034). Kept so: every
+  author and committer the noreply address, no path into a home directory and no name of
+  the owner's local list of forbidden sources in any commit (checked 2026-11-02: none of
+  its names in any commit's patch or message), the gate's history scans passing, `main`
+  protected against force pushes and deletion, and workflows from an outside
+  contributor's pull request held for approval. Patents and licences were judged by the
+  owner on a preliminary search for this form of distribution (ADR-0007), and are asked
+  again when the form changes, registering on crates.io among them.
+- The API reference is not hosted: the crates are not on crates.io, so docs.rs holds
+  none, and a reader builds it with `cargo doc` (README.md). Hosting it, on GitHub Pages
+  from each release tag, is the owner's to decide.
 - Before registering on crates.io: `publish`, and each crate's description and keywords
   naming its function (sparse volume, VDB, SDF, level set, voxel). Both names were found
   unregistered on 2026-10-16, per the design.

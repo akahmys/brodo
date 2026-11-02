@@ -16,6 +16,12 @@ use brodo::topology::{TileSource, Topology};
 use brodo::tree::{Coord, TileLevel};
 use proptest::prelude::*;
 
+#[path = "support/lcg.rs"]
+mod lcg;
+
+#[path = "support/anchored.rs"]
+mod anchored;
+
 const LEVELS: [TileLevel; 3] = [TileLevel::Root, TileLevel::Upper, TileLevel::Lower];
 
 trait Val: Value + std::fmt::Debug {
@@ -269,12 +275,6 @@ enum Op {
     FillTiles(Coord),
 }
 
-fn coord() -> impl Strategy<Value = Coord> {
-    let anchors = vec![-4097, -4096, -129, -128, -9, -8, -1, 0, 7, 8, 127, 128, 4095, 4096];
-    let axis = (prop::sample::select(anchors), 0..3_i32).prop_map(|(a, d)| a + d);
-    [axis.clone(), axis.clone(), axis]
-}
-
 /// A tile level. No root tiles: splitting one makes 36 862 tiles, which every later
 /// commit would carry through the model; the tree's tests and `field`'s split a root tile.
 fn level() -> impl Strategy<Value = TileLevel> {
@@ -334,17 +334,9 @@ fn commits() -> impl Strategy<Value = Vec<(Vec<Op>, u64)>> {
             })
             .collect()
     };
-    (prop::collection::vec(coord(), 6), prop::collection::vec(commit, 1..6)).prop_map(
+    (prop::collection::vec(anchored::coord(3), 6), prop::collection::vec(commit, 1..6)).prop_map(
         move |(pool, cs)| cs.into_iter().map(|(edits, seed)| (ops(&pool, edits), seed)).collect(),
     )
-}
-
-struct Lcg(u64);
-impl Lcg {
-    fn next(&mut self) -> u32 {
-        self.0 = self.0.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
-        (self.0 >> 33) as u32
-    }
 }
 
 /// A field and its model.
@@ -383,7 +375,7 @@ impl<T: Val> Pair<T> {
     /// Writes values; one round in three writes one value everywhere, so that merges are
     /// accepted as well as refused.
     fn write(&mut self, t: &Topology, seed: u64) {
-        let mut g = Lcg(seed);
+        let mut g = lcg::Lcg(seed);
         let everywhere = g.next().is_multiple_of(3).then(|| g.next() % 8);
         for n in t.leaf_numbers() {
             let vals: Vec<T> = (0..LEAF_VOXELS)

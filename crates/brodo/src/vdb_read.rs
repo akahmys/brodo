@@ -13,10 +13,12 @@ use std::path::Path;
 
 use crate::cache::read_within;
 use crate::error::VdbError;
+use crate::field::local_index;
 use crate::field::{Field, LEAF_VOXELS};
 use crate::meta::GridMeta;
 use crate::topology::Topology;
 use crate::tree::{Coord, TileLevel};
+use crate::tree::{LEAF_LOG2, LOWER_DIM_LOG2, LOWER_SPAN_LOG2, UPPER_DIM_LOG2, UPPER_SPAN_LOG2};
 use crate::vdb::{ACTIVE_MASK, MAGIC, VdbValue};
 
 /// The file versions read (ADR-0047).
@@ -30,14 +32,14 @@ const BLOSC_MEMCPY: u8 = 2;
 const BLOSC_BITSHUFFLE: u8 = 4;
 const BLOSC_NO_SPLIT: u8 = 0x10;
 const BLOSC_LZ4: u8 = 1;
-/// The places of an upper node, a lower node and a leaf, as log₂ of a side.
-const UPPER_LOG: u32 = 5;
-const LOWER_LOG: u32 = 4;
-/// log₂ of the edge of an upper node's and a lower node's children.
-const UPPER_CHILD: u32 = 7;
-const LOWER_CHILD: u32 = 3;
+/// The places of an upper node and a lower node, as log₂ of a side, and of the edge of
+/// their children: brodo's tree's, which OpenVDB's `5_4_3` trees share (docs/formats.md §9).
+const UPPER_LOG: u32 = UPPER_DIM_LOG2;
+const LOWER_LOG: u32 = LOWER_DIM_LOG2;
+const UPPER_CHILD: u32 = LOWER_SPAN_LOG2;
+const LOWER_CHILD: u32 = LEAF_LOG2;
 /// The edge of the root's tiles and upper nodes.
-const ROOT_EDGE: i32 = 4096;
+const ROOT_EDGE: i32 = 1 << UPPER_SPAN_LOG2;
 
 /// A grid's values, of the type its file states.
 #[derive(Debug, Clone)]
@@ -314,8 +316,9 @@ fn brodo_order<T: Scalar>(values: &[T]) -> Result<Box<[T; LEAF_VOXELS]>, VdbErro
     let mut out =
         Box::new([values.first().copied().ok_or(VdbError::Malformed("leaf"))?; LEAF_VOXELS]);
     for (p, v) in values.iter().enumerate() {
-        let (x, y, z) = (p >> 6, (p >> 3) & 7, p & 7);
-        *out.get_mut(x + 8 * y + 64 * z).ok_or(VdbError::Malformed("leaf"))? = *v;
+        // Each of `p`'s three octal digits is below 8, so in `i32`.
+        let [x, y, z] = [p >> 6, (p >> 3) & 7, p & 7].map(|c| i32::try_from(c).unwrap_or(0));
+        *out.get_mut(local_index([x, y, z])).ok_or(VdbError::Malformed("leaf"))? = *v;
     }
     Ok(out)
 }
@@ -624,7 +627,10 @@ fn blosc(chunk: &[u8], raw: usize) -> Result<Vec<u8>, VdbError> {
     if flags >> 5 != BLOSC_LZ4 || flags & BLOSC_BITSHUFFLE != 0 {
         return Err(VdbError::Unsupported("a Blosc codec other than LZ4 with byte shuffle"));
     }
-    if nbytes == 0 || nbytes > block {
+    if nbytes == 0 {
+        return Err(VdbError::Malformed("Blosc chunk"));
+    }
+    if nbytes > block {
         return Err(VdbError::Unsupported("a Blosc chunk of more than one block"));
     }
     let start = c.i32("Blosc block start")?;

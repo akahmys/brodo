@@ -3,12 +3,16 @@
 
 The tests of each member's library, binaries, integration tests and examples are listed by
 their own executables (`--list`), ignored ones included, one line each:
-`<kind> <target> <test>`. The gate fails when the list and the tests differ, either way;
-`--update` rewrites the lists. A test removed from a list is a test deleted or renamed,
+`<kind> <target> <test>`; its doctests, a README's code and a `compile_fail` example among
+them, by `cargo test --doc -- --list`, as `doc <crate> <file> - <item> #<k>`, the k-th of
+that item's, without the line rustdoc names, so that an edit above one does not rename it.
+A crate with a list and no test is held to an empty one. The gate fails when the list and
+the tests differ, either way; `--update` rewrites the lists. A test removed from a list is a test deleted or renamed,
 which the `commit-msg` hook lets through only with an ADR (`commit_msg_check.py`).
 """
 
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -32,13 +36,33 @@ def executables() -> list[tuple[Path, str, str, str]]:
     return found
 
 
+def doctests(crate: Path) -> list[str]:
+    """A crate's doctests, each by its file, its item and its place among the item's."""
+    listed = subprocess.run(
+        ["cargo", "test", "-p", crate.name, "--doc", "--all-features", "--", "--list",
+         "--format", "terse"],
+        cwd=ROOT, capture_output=True, text=True, check=True,
+    ).stdout
+    out, seen = [], {}
+    for line in listed.splitlines():
+        if not line.endswith(": test"):
+            continue
+        name = re.sub(r" \(line \d+\)", "", line[: -len(": test")])
+        seen[name] = seen.get(name, 0) + 1
+        out.append(f"doc {crate.name} {name} #{seen[name]}")
+    return out
+
+
 def actual() -> dict[Path, list[str]]:
-    lists: dict[Path, list[str]] = {}
+    lists: dict[Path, list[str]] = {p.parent: [] for p in (ROOT / "crates").glob(f"*/{LIST}")}
     for crate, kind, target, exe in executables():
         listed = subprocess.run([exe, "--list", "--format", "terse"], capture_output=True,
                                 text=True, check=True).stdout
         names = [l[: -len(": test")] for l in listed.splitlines() if l.endswith(": test")]
         lists.setdefault(crate, []).extend(f"{kind} {target} {n}" for n in names)
+    for crate in list(lists):
+        if (crate / "src" / "lib.rs").exists():
+            lists[crate].extend(doctests(crate))
     return {c: sorted(ls) for c, ls in lists.items()}
 
 

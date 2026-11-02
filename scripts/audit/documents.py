@@ -22,18 +22,16 @@
 import re
 import sys
 from pathlib import Path
+from typing import Optional
 
-from paths import committable
-from project import LAYERS
+from paths import JAPANESE, text_files
+from project import LAYERS, RULE_FILES
 
 ROOT = Path(__file__).resolve().parent.parent.parent
-TEXT = {".md", ".rs", ".toml", ".py", ".sh", ".txt", ".json", ".yml", ".yaml", ".svg"}
 
 PRESENT_TENSE = ["ARCHITECTURE.md", "AGENTS.md"]
 DATE = re.compile(r"\b20\d\d-\d\d-\d\d\b")
 PAST = re.compile(r"\b(was|were|had|used to|became|no longer|turned out)\b")
-# Japanese letters, and CJK punctuation and full-width forms.
-JAPANESE = re.compile("[\u3000-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uff00-\uffef]")
 # `NAME.md §N`, a root document's or `docs/`'s, its name in a link or in backquotes or bare.
 SECTION = re.compile(r"\b((?:docs/)?[A-Za-z][A-Za-z_]*\.md)[)`]? §(\d+(?:\.\d+)*)")
 LINK = re.compile(r"\]\(([^)#:\s][^)\s#]*)(#[^)]*)?\)")
@@ -43,7 +41,29 @@ HTML_LINK = re.compile(r'\b(src|srcset|href)\s*=\s*"([^"]*)"')
 
 def walk() -> list[Path]:
     """The text files git would commit (paths.py)."""
-    return [p for p in committable() if p.suffix in TEXT]
+    return text_files()
+
+
+# A numbered heading: `#`s, its number, a dot or not, and a space, so that `4.2` is not
+# found in `4.2.1`.
+HEADING = re.compile(r"^(#+) (\d+(?:\.\d+)*)\.? ", re.MULTILINE)
+
+
+def section(home: str, number: str) -> Optional[str]:
+    """The text of section `number` of document `home`, to the next heading as high, or
+    nothing if it has none so numbered: the one reading of a section by its number."""
+    path = ROOT / home
+    if not path.is_file():
+        return None
+    lines = path.read_text().splitlines()
+    for i, line in enumerate(lines):
+        heading = HEADING.match(line)
+        if heading and heading.group(2) == number:
+            depth = len(heading.group(1))
+            rest = lines[i + 1:]
+            ends = [j for j, l in enumerate(rest) if re.match(r"^#{1,%d} " % depth, l)]
+            return "\n".join(rest[:ends[0]] if ends else rest)
+    return None
 
 
 def language(paths: list[Path]) -> list[str]:
@@ -91,7 +111,7 @@ def links(paths: list[Path]) -> list[str]:
 def sections(paths: list[Path]) -> list[str]:
     headings = {}
     for doc in [*ROOT.glob("*.md"), *(ROOT / "docs").glob("*.md")]:
-        found = set(re.findall(r"^#+ (\d+(?:\.\d+)*)\.? ", doc.read_text(), re.MULTILINE))
+        found = {m.group(2) for m in HEADING.finditer(doc.read_text())}
         headings[doc.name] = found
         headings[str(doc.relative_to(ROOT))] = found
     out = []
@@ -127,6 +147,24 @@ def adr_index() -> list[str]:
             if field not in head:
                 out.append(f"  {f.name} has no {field}")
     return out
+
+
+def rule_files() -> list[str]:
+    """Each path AGENTS.md's "Changing the rules" names in backquotes is one `project.py`'s
+    RULE_FILES holds, so that the hook holds a commit to the list the rule states. A path
+    ending in `/` is a directory, held by a file in it."""
+    text = (ROOT / "AGENTS.md").read_text()
+    start = text.find("## Changing the rules")
+    paragraph = text[start:].split("\n\n")[1] if start >= 0 else ""
+    pattern = re.compile(RULE_FILES)
+    out = []
+    for path in re.findall(r"`([^`]+)`", paragraph):
+        if path == "Cargo.toml":
+            continue  # its lint levels, read from its diff
+        probe = path + "x" if path.endswith("/") else path
+        if not pattern.search(probe):
+            out.append(f"  AGENTS.md names {path} as a rule, which RULE_FILES does not hold")
+    return out if paragraph else ["  AGENTS.md has no paragraph under 'Changing the rules'"]
 
 
 def instruction_files() -> list[str]:
@@ -168,6 +206,7 @@ def main() -> int:
         ("links", lambda: links(paths)),
         ("sections", lambda: sections(paths)),
         ("ADR index", adr_index),
+        ("rule files", rule_files),
         ("instruction files", instruction_files),
         ("provenance", provenance),
         ("crate READMEs", readmes),

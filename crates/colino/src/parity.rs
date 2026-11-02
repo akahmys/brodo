@@ -110,38 +110,26 @@ mod tests {
         assert_eq!(side([1.0, 0.0], [1.0, 1.0]), 1);
     }
 
-    /// Corners on a line, their edges' cross product exactly zero, and an axis line through
-    /// a point of it: never crossed, though moved to the line they may round off it.
-    #[test]
-    fn a_triangle_whose_corners_lie_on_a_line_is_never_crossed() {
-        let mut state = 0x9e37_79b9_7f4a_7c15_u64;
-        let mut next = || {
-            state ^= state << 13;
-            state ^= state >> 7;
-            state ^= state << 17;
-            (state >> 11) as f64 / (1_u64 << 53) as f64 * 2.0 - 1.0
-        };
-        let mut flat = 0;
-        for _ in 0..200_000 {
-            let (a, b) = ([next(), next(), next()], [next(), next(), next()]);
-            let t = next() * 1.5 + 0.5;
-            let c = [0, 1, 2].map(|k| a[k] + t * (b[k] - a[k]));
-            if has_area([a, b, c]) {
-                continue;
-            }
-            flat += 1;
-            let s = (next() + 1.0) / 2.0;
-            let p = [0, 1, 2].map(|k| a[k] + s * (b[k] - a[k]));
-            for k in 0..3 {
-                assert_eq!(
-                    height(p, k, [a, b, c]),
-                    None,
-                    "{:?} through {p:?} along {k}",
-                    [a, b, c]
-                );
+    proptest::proptest! {
+        #![proptest_config(proptest::prelude::ProptestConfig::with_cases(4096))]
+
+        /// Whatever triangle an axis line through a point near it crosses has area, its
+        /// edges' cross product not zero, the third corner on the line of the others but for
+        /// rounding, as `crossing` holds a segment (`intersect_reference.rs`).
+        #[test]
+        fn whatever_an_axis_line_crosses_has_area(
+            a in proptest::array::uniform3(-1.0..1.0_f64),
+            b in proptest::array::uniform3(-1.0..1.0_f64),
+            t in -1.0..2.0_f64,
+            s in 0.0..1.0_f64,
+            k in 0..3_usize,
+        ) {
+            let c = [0, 1, 2].map(|i| a[i] + t * (b[i] - a[i]));
+            let p = [0, 1, 2].map(|i| a[i] + s * (b[i] - a[i]));
+            if height(p, k, [a, b, c]).is_some() {
+                proptest::prop_assert!(has_area([a, b, c]), "{:?} crossed along {}", [a, b, c], k);
             }
         }
-        assert!(flat > 10_000, "{flat} flat triangles");
     }
 
     /// Two quads across one axis and none across another: the votes tie, and a tie is

@@ -18,13 +18,9 @@
 use std::f64::consts::PI;
 
 use crate::bvh::Bvh;
-use crate::distance::{Point, cross, dot, sub};
+use crate::distance::{Point, area, centroid, cross, dot, length as norm, sub};
 use crate::error::MeshError;
 use crate::mesh::Mesh;
-
-fn norm(a: Point) -> f64 {
-    dot(a, a).sqrt()
-}
 
 /// The signed solid angle of triangle `t` seen from `p`.
 pub fn solid_angle(p: Point, t: [Point; 3]) -> f64 {
@@ -53,8 +49,8 @@ fn shifted(points: [Point; 3], c: Point) -> [Point; 3] {
 
 impl Expansion {
     fn of(triangles: &[[Point; 3]]) -> Expansion {
-        let area = |t: &[Point; 3]| norm(cross(sub(t[1], t[0]), sub(t[2], t[0]))) / 2.0;
-        let mid = |t: &[Point; 3]| [0, 1, 2].map(|k| (t[0][k] + t[1][k] + t[2][k]) / 3.0);
+        let area = |t: &[Point; 3]| area(*t);
+        let mid = |t: &[Point; 3]| centroid(*t);
         let total: f64 = triangles.iter().map(area).sum();
         let mut centre = [0.0; 3];
         for t in triangles {
@@ -243,7 +239,8 @@ mod tests {
     /// here, in the first test binary, not in a slow test (TESTING.md T11).
     #[test]
     fn an_expansion_is_about_the_area_weighted_centroid() {
-        let near = |a: Point, b: Point| (0..3).all(|k| (a[k] - b[k]).abs() < 1e-12);
+        // The centroids, below 2, are sums of products of corners below 2: 64 roundings of 2.
+        let near = |a: Point, b: Point| (0..3).all(|k| (a[k] - b[k]).abs() <= 128.0 * f64::EPSILON);
         // Areas 2 and 0.5, centroids (2/3, 2/3, 0) and (1/3, 1/3, 1).
         let big = [[0.0, 0.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0]];
         let small = [[0.0, 0.0, 1.0], [1.0, 0.0, 1.0], [0.0, 1.0, 1.0]];
@@ -276,7 +273,12 @@ mod tests {
         let (exact, near) =
             (w.number(q, Accuracy::Exact), w.number(q, Accuracy::Approximate { beta: 2.0 }));
         let off = (near - exact).abs();
-        assert!(off > 1e-12 && off < 1e-3 * exact.abs().max(1e-6), "{exact} {near}");
+        // The second-order expansion errs by about (r/d)³ of the number, r = √3 the cube's
+        // half-diagonal and d = |q| ≈ 37 the distance, some 10⁻⁴: it must err, by more than
+        // rounding, and by less than ten times that.
+        let (r, d) = (3.0_f64.sqrt(), q.iter().map(|x| x * x).sum::<f64>().sqrt());
+        let bound = 10.0 * (r / d).powi(3) * exact.abs().max(1e-6);
+        assert!(off > 64.0 * f64::EPSILON && off < bound, "{exact} {near}");
     }
 
     /// The approximation over a few hundred triangles ends: a mutant that makes its walk

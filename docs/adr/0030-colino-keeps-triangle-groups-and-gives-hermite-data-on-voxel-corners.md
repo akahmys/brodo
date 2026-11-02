@@ -285,3 +285,21 @@ first, as Hermite data's nearest triangle does, and a normal is divided by its l
 component before its length. Shown to fire: a search of 200 000 triangles for the crossing
 and the parity count, the cube with such a triangle, and normals of edges 10⁻⁹⁰ and 10⁸⁰,
 each failed with its fix taken out.
+
+## Amendment: an end on the mesh, and the tree's margins derived
+
+- **Date**: 2026-11-02
+
+The survey of the whole repository found that an edge whose inside end lay on the mesh
+took its crossing at that end with the normal and group of the triangle `find` chose
+farther along, or nearest the edge: a box's top face at a lattice plane gave an edge in
+that plane the side face's normal. It found the tree's margins, 4ε for a segment's query
+and 64ε for the nearest triangle, chosen by a test failing with one less, and
+`Bvh::nearest` passing a node with no margin though it promises a scan's answer. The owner
+decided, on 2026-11-02, that both be fixed at their cause: the end takes the triangle
+holding it, the lowest-numbered with area at distance 0; and each margin is derived, once:
+a crossing's corner moves by at most four roundings of twice the largest coordinate, 8ε
+of it, and the margin is twice that; a distance found lies below the true one by at most
+√ε of the largest coordinate (ADR-0027), and the margin, `nearest`'s too, is twice that.
+Shown to fire: the box's edge took the side face's normal before and takes the top face's
+now; no input was found on which the old margins and the new differ.

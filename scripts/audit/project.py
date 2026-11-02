@@ -46,6 +46,17 @@ UNSAFE_CALLERS = ["crates/brodo/tests/cache_format.rs", "crates/brodo/benches/br
 # to this list.
 OUTPUT_DIRS = ["target", "out"]
 
+# The files that state or enforce a rule, as paths from the root (AGENTS.md, "Changing the
+# rules"): a commit touching one names an ADR it stages (`commit_msg_check.py`), and every
+# path AGENTS.md names there is one (`documents.py`). Cargo.toml's lint levels are a rule
+# too, read from its diff.
+RULE_FILES = (
+    r"^(AGENTS|PLANNING|CODING|TESTING|AUDITING)\.md$"
+    r"|^(clippy|rustfmt|rust-toolchain|deny)\.toml$|^\.betterleaks\.toml$"
+    r"|^scripts/(audit|hooks)/|^\.claude/settings\.json$|^\.github/workflows/"
+    r"|^\.cargo/mutants\.toml$"
+)
+
 # The targets the project is built for (Rule 12). Adding one is a claim that it is.
 TARGETS = ["aarch64-apple-darwin", "x86_64-unknown-linux-gnu"]
 

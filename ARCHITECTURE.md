@@ -419,7 +419,7 @@ In `brodo`, each behind a cargo feature:
 - **A slice as PNG** (`brodo::slice`, feature `slice-png`, opted into, ADR-0036), along x, y or z
   at a given position, one voxel to a pixel. Signed distances take a diverging colour map
   centred on zero, with the zero contour drawn one pixel wide, two where neighbours of
-  equal size and opposite sign meet; other scalars a sequential one. The colour range is given by the caller, never inferred, and refused unless it is
+  equal size and opposite sign meet, across leaves and tiles alike; other scalars a sequential one. The colour range is given by the caller, never inferred, and refused unless it is
   finite and not empty. A tile's voxels take its
   value's colour, hatched; the background is a flat grey; a value that is not a number is
   magenta; with no per-voxel mask (ADR-0025), nothing else is inactive. The same input gives

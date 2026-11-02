@@ -6,6 +6,7 @@ use zerocopy::little_endian::U32;
 use zerocopy::{FromBytes, IntoBytes};
 
 use crate::error::FormatError;
+use crate::field::local_index;
 use crate::field::{Field, LEAF_VOXELS, Stored};
 use crate::frozen::{
     BLOCK, Header, LOWER_PLACES, LowerNode, MAGIC, ROOT_NODE, ROOT_TILE, RootEntry, UPPER_PLACES,
@@ -13,6 +14,7 @@ use crate::frozen::{
 };
 use crate::topology::{Location, Topology};
 use crate::tree::{Coord, TileLevel};
+use crate::tree::{LEAF_LOG2, LOWER_DIM_LOG2, LOWER_SPAN_LOG2, UPPER_DIM_LOG2, UPPER_SPAN_LOG2};
 
 /// What holds a voxel in a view.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -205,7 +207,7 @@ impl<'a, T: Stored> GridView<'a, T> {
     fn check_links(&self) -> Result<(), FormatError> {
         let keys = self.roots.iter().map(|e| e.key.map(|k| k.get()));
         let sorted = keys.clone().zip(keys.clone().skip(1)).all(|(a, b)| a < b);
-        let aligned = keys.clone().all(|k| k.iter().all(|c| c & 4095 == 0));
+        let aligned = keys.clone().all(|k| k.iter().all(|c| c & ((1 << UPPER_SPAN_LOG2) - 1) == 0));
         let pointing = self.roots.iter().all(|e| match e.kind.get() {
             ROOT_NODE => usize::try_from(e.index.get()).is_ok_and(|i| i < self.uppers.len()),
             ROOT_TILE => usize::try_from(e.index.get()).is_ok_and(|i| i < self.tiles.len()),
@@ -262,7 +264,7 @@ impl<'a, T: Stored> GridView<'a, T> {
             return Ok(ViewLocation::Tile(e.index.get(), TileLevel::Root));
         }
         let u = self.uppers.get(e.index.get() as usize).ok_or(lost("root"))?;
-        let p = place(local(v, 7, 5), 5);
+        let p = place(local(v, LOWER_SPAN_LOG2, UPPER_DIM_LOG2), UPPER_DIM_LOG2);
         if is_set(&u.tiles, p) {
             return Ok(ViewLocation::Tile(
                 nth(u.first_tile, &u.tiles, p, "upper node")?,
@@ -274,7 +276,7 @@ impl<'a, T: Stored> GridView<'a, T> {
         }
         let l = self.lowers.get(nth(u.first_child, &u.children, p, "upper node")? as usize);
         let l = l.ok_or(lost("upper node"))?;
-        let p = place(local(v, 3, 4), 4);
+        let p = place(local(v, LEAF_LOG2, LOWER_DIM_LOG2), LOWER_DIM_LOG2);
         Ok(if is_set(&l.children, p) {
             ViewLocation::Leaf(nth(l.first_child, &l.children, p, "lower node")?)
         } else if is_set(&l.tiles, p) {
@@ -294,7 +296,10 @@ impl<'a, T: Stored> GridView<'a, T> {
             TileLevel::Upper if e.kind.get() == ROOT_TILE => false,
             TileLevel::Upper => {
                 let u = self.uppers.get(e.index.get() as usize).ok_or(lost("root"))?;
-                is_set(&u.children, place(local(v, 7, 5), 5))
+                is_set(
+                    &u.children,
+                    place(local(v, LOWER_SPAN_LOG2, UPPER_DIM_LOG2), UPPER_DIM_LOG2),
+                )
             }
             TileLevel::Lower => matches!(self.locate(v)?, ViewLocation::Leaf(_)),
         })
@@ -304,8 +309,7 @@ impl<'a, T: Stored> GridView<'a, T> {
     pub fn get(&self, v: Coord) -> Result<T, FormatError> {
         match self.locate(v)? {
             ViewLocation::Leaf(n) => {
-                let [x, y, z] = local(v, 0, 3).map(|c| c as usize);
-                self.leaf(n)?.get(x + 8 * y + 64 * z).copied().ok_or(lost("leaf value"))
+                self.leaf(n)?.get(local_index(v)).copied().ok_or(lost("leaf value"))
             }
             ViewLocation::Tile(t, _) => {
                 self.tiles.get(t as usize).copied().ok_or(lost("tile value"))

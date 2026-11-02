@@ -4,11 +4,13 @@
 #![cfg(feature = "serde")]
 
 use colino::convert::{Options, convert};
-use colino::mesh::Mesh;
 use colino::report::{Report, report};
 
 mod common;
+#[path = "support/shell.rs"]
+mod shell;
 use common::{sphere, torus};
+use shell::shell;
 
 fn round_trip(r: &Report) -> serde_json::Value {
     let text = serde_json::to_string(r).unwrap();
@@ -17,18 +19,9 @@ fn round_trip(r: &Report) -> serde_json::Value {
     serde_json::from_str(&text).unwrap()
 }
 
-fn shell() -> Mesh {
-    let mut m = sphere(3, 20.0, [0.0; 3]);
-    let hole = sphere(3, 12.0, [0.0; 3]);
-    let base = u32::try_from(m.vertices.len()).unwrap();
-    m.vertices.extend(hole.vertices);
-    m.triangles.extend(hole.triangles.iter().map(|[a, b, c]| [a + base, c + base, b + base]));
-    m
-}
-
 #[test]
 fn a_report_is_read_back_as_it_was_written() {
-    let m = shell();
+    let m = shell(3, 12.0);
     let c = convert(&m, &Options::new(1.0)).unwrap();
     let points = [
         ("cavity".to_string(), [0.5, 0.5, 0.5]),

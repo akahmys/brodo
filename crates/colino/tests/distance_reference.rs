@@ -8,6 +8,9 @@ use colino::distance::{Point, on_segment, on_triangle, squared};
 use colino::mesh::Mesh;
 use proptest::prelude::*;
 
+#[path = "support/edge.rs"]
+mod edge;
+
 /// The rounding of a distance found by two methods, relative to the distance, or to 1 for
 /// a shorter one.
 const RELATIVE_ROUNDING: f64 = 1e-12;
@@ -36,7 +39,7 @@ fn dot(a: Point, b: Point) -> f64 {
 fn by_projection(p: Point, [a, b, c]: [Point; 3]) -> f64 {
     let edges = [(a, b), (b, c), (c, a)];
     let to_edges =
-        edges.iter().map(|(u, v)| squared(p, on_segment(p, *u, *v))).fold(f64::INFINITY, f64::min);
+        edges.iter().map(|(u, v)| edge::squared_to_edge(p, *u, *v)).fold(f64::INFINITY, f64::min);
     let n = cross(sub(b, a), sub(c, a));
     let nn = dot(n, n);
     if nn == 0.0 {
@@ -176,5 +179,20 @@ proptest! {
         let extent = [b, c].map(|q| dot(sub(q, a), sub(q, a))).into_iter().fold(0.0, f64::max).sqrt();
         let d = squared(p, on_triangle(p, tri)).sqrt();
         prop_assert!(d <= SLIVER_ROUNDING * extent, "{} of {} for {:?} at {:?}", d, extent, tri, p);
+    }
+}
+
+/// A point above a triangle's face, at a height a fraction of its size, is found at that
+/// height whatever the triangle's size, 10⁻¹⁰⁰ to 10¹⁰⁰, where the normal's squared length
+/// would under- or overflow, and whichever corner comes first.
+#[test]
+fn a_point_above_a_face_is_found_at_its_height_whatever_the_size_or_order() {
+    for size in [1e-100, 1e-30, 1.0, 1e30, 1e100] {
+        let t = [[0.0, 0.0, 0.0], [size, 0.0, 0.0], [0.0, size, 0.0]];
+        let p = [0.25 * size, 0.25 * size, 0.125 * size];
+        for tri in [t, [t[1], t[2], t[0]], [t[2], t[0], t[1]]] {
+            let d = squared(p, on_triangle(p, tri)).sqrt();
+            assert!((d / size - 0.125).abs() <= RELATIVE_ROUNDING, "{size}: {d} for {tri:?}");
+        }
     }
 }

@@ -13,6 +13,8 @@ use colino::mesh::Mesh;
 use colino::report::{Check, Invariants, Thin, ThinKind, report};
 use common::{sphere, torus};
 
+mod boxes;
+
 /// Turned about x and then z, and moved off the lattice.
 fn turn(p: Point) -> Point {
     let (a, b) = (0.5_f64, 0.3_f64);
@@ -25,26 +27,11 @@ fn turn(p: Point) -> Point {
 /// Axis-aligned boxes, facing out, turned by `turn`.
 fn boxes(parts: &[(Point, Point)]) -> Mesh {
     let (mut vertices, mut triangles) = (Vec::new(), Vec::new());
-    let faces: [[u32; 3]; 12] = [
-        [0, 2, 3],
-        [0, 3, 1],
-        [4, 5, 7],
-        [4, 7, 6],
-        [0, 1, 5],
-        [0, 5, 4],
-        [2, 6, 7],
-        [2, 7, 3],
-        [0, 4, 6],
-        [0, 6, 2],
-        [1, 3, 7],
-        [1, 7, 5],
-    ];
     for (lo, hi) in parts {
         let base = u32::try_from(vertices.len()).unwrap();
-        vertices.extend(
-            (0..8).map(|i| turn([0, 1, 2].map(|k| if i >> k & 1 == 1 { hi[k] } else { lo[k] }))),
-        );
-        triangles.extend(faces.iter().map(|t| t.map(|i| i + base)));
+        let (v, t) = boxes::boxed(*lo, *hi, false);
+        vertices.extend(v.into_iter().map(turn));
+        triangles.extend(t.iter().map(|t| t.map(|i| i + base)));
     }
     Mesh::new(vertices, triangles).with_unit(Some("millimeter".into()))
 }
@@ -194,7 +181,9 @@ fn a_dumbbells_neck_is_reported_and_its_lobes_are_not() {
     let walls: Vec<&Thin> = places.iter().filter(|p| p.kind == ThinKind::Wall).collect();
     assert_eq!(walls.len(), 1, "{places:?}");
     let neck = walls[0];
-    assert!(neck.least > 1.3 && neck.least < 1.4, "{}", neck.least);
+    // The neck's 48 sides, of apothem 0.7 cos(π/48), face each other across its axis.
+    let across = 1.4 * (std::f64::consts::PI / 48.0).cos();
+    assert!((neck.least - across).abs() <= measured(1.0), "{} against {across}", neck.least);
     assert!(neck.lo[2] > -4.5 && neck.hi[2] < 4.5, "{neck:?}");
     assert!(neck.hi[2] - neck.lo[2] > 5.0, "{neck:?}");
 }
@@ -229,7 +218,10 @@ fn a_thin_torus_is_one_wall_the_width_of_its_tube() {
     let places = thin(&torus(8.0, 0.7, 64).with_unit(Some("millimeter".into())), &options());
     assert_eq!(places.len(), 1, "{places:?}");
     assert_eq!(places[0].kind, ThinKind::Wall);
-    assert!(places[0].least > 1.3 && places[0].least < 1.4, "{}", places[0].least);
+    // The tube's 64 sides, of apothem 0.7 cos(π/64), face each other across its centre.
+    let across = 1.4 * (std::f64::consts::PI / 64.0).cos();
+    let least = places[0].least;
+    assert!((least - across).abs() <= measured(1.0), "{least} against {across}");
 }
 
 #[test]
@@ -297,5 +289,26 @@ fn two_plates_at_half_a_voxel_are_two_walls_checked_where_they_lie() {
         // Two faces of 36 each, a point every h/2 = 0.25: some 1150 points.
         assert!(p.points > 1000, "{}", p.points);
         assert!(matches!(p.check, Check::Same(i) if i.solid >= 1), "{:?}", p.check);
+    }
+}
+
+proptest::proptest! {
+    #![proptest_config(proptest::prelude::ProptestConfig::with_cases(16))]
+
+    /// The ray's start off its own triangle follows the coordinates' size, so that a cube
+    /// ten voxels wide has no thin place wherever it lies and whatever the voxel's size,
+    /// from 10⁻⁵ to 1, its corner up to 10⁹ voxels from the world's origin (the two cases
+    /// above, made a class).
+    #[test]
+    fn a_cube_ten_voxels_wide_has_no_thin_place_at_any_size_or_place(
+        h in proptest::sample::select(vec![1e-5, 1e-3, 1.0]),
+        voxels in proptest::sample::select(vec![0.0, 1e3, 1e5, 1e9]),
+    ) {
+        // Within the lattice's 2³¹ voxels of its origin, which conversion holds to.
+        let far = voxels * h + 1.0;
+        let lo = [far, far * 0.5, -far * 0.25];
+        let hi = lo.map(|c| c + 10.0 * h);
+        let m = boxes(&[(lo, hi)]);
+        proptest::prop_assert_eq!(thin(&m, &Options::new(h).with_origin(lo)), Vec::new());
     }
 }

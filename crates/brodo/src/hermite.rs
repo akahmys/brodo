@@ -19,6 +19,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::cache::{CacheEntry, CacheFile};
 use crate::error::{FormatError, HermiteError, Rule};
+use crate::field::local_index;
 use crate::field::{Field, LEAF_VOXELS, Value};
 use crate::meta::GridMeta;
 use crate::topology::{Location, Topology};
@@ -40,8 +41,11 @@ pub const FIELDS: [&str; 10] = [
     "z.normal",
     "z.group",
 ];
-/// How far a normal's length may be from 1 (ADR-0032): a unit `f64` vector rounded to
-/// `f32` errs by about 1e-7.
+/// How far a normal's length may be from 1 (ADR-0032): each component of a unit `f64`
+/// vector rounded to `f32` moves by at most 2⁻²⁴ of itself, so its length by at most 2⁻²⁴,
+/// about 6 × 10⁻⁸, and the length worked in `f64` adds a rounding of 10⁻¹⁶; 10⁻⁶ holds
+/// that sixteen times over, so that a producer rounding once more, as a normal averaged
+/// then rounded does, is still read.
 pub const NORMAL_TOLERANCE: f64 = 1e-6;
 /// The fraction, normal and group of an edge with no crossing, of a tile and of the
 /// background.
@@ -242,8 +246,7 @@ fn check_leaf(s: &impl Source, n: u32, origin: Coord, groups: usize) -> Result<(
     let sign_of = |v: Coord| -> Result<u8, HermiteError> {
         let local = minus(v, origin);
         if local.iter().all(|c| (0..8).contains(c)) {
-            let [x, y, z] = local.map(|c| usize::try_from(c).unwrap_or(0));
-            return signs.get(x + 8 * y + 64 * z).copied().ok_or(HermiteError::Violation {
+            return signs.get(local_index(v)).copied().ok_or(HermiteError::Violation {
                 at: Some(v),
                 axis: None,
                 rule: Rule::Sign,

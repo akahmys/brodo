@@ -166,15 +166,31 @@ rules=$(betterleaks config check 2>&1 | sed -nE 's/^OK: ([0-9]+) rules.*/\1/p')
 [ "${rules:-0}" -ge 100 ] || fail "betterleaks loaded ${rules:-no} rules; is [extend] missing?"
 betterleaks dir . --no-banner --redact >/dev/null 2>&1 \
     || fail "betterleaks: run 'betterleaks dir . --no-banner --redact'"
-# betterleaks' default allow-list skips a `.svg` by its path; read through standard input it
-# has none, so each SVG git would commit, and each in the history, is read so (ADR-0003).
-svgs() {
-    git ls-files -co --exclude-standard -z -- '*.svg' | xargs -0 cat
-    git rev-list --all --objects | awk '$2 ~ /\.svg$/ {print $1}' | git cat-file --batch
-}
-svgs | betterleaks stdin --no-banner --redact -c .betterleaks.toml >/dev/null 2>&1 \
-    || fail "a secret or a path outside the project in an SVG"
+# betterleaks' default allow-list skips paths by name (`node_modules/`, `.svg`, …); read
+# through standard input, every text file git would commit, and every text blob of the
+# history, is scanned whatever its name (ADR-0003).
+everything() { python3 scripts/audit/leak_input.py --tree; python3 scripts/audit/leak_input.py --history; }
+everything | betterleaks stdin --no-banner --redact -c .betterleaks.toml >/dev/null 2>&1 \
+    || fail "a secret or a path outside the project, read through standard input: run 'python3 scripts/audit/leak_input.py --tree | betterleaks stdin'"
 out=$(python3 scripts/audit/paths.py) || { echo "$out"; ERROR=1; }
+# The commits the hooks may have been skipped for: on GitHub those a push brought
+# (`$COMMIT_RANGE`, set by the workflow), here those not yet pushed. Each is held to the
+# commit-msg check, and every message to the project's rules (ADR-0003).
+range="${COMMIT_RANGE:-}"
+if [ -z "$range" ] && git rev-parse -q --verify '@{upstream}' >/dev/null; then range='@{upstream}..HEAD'; fi
+case "$range" in 0000000000000000000000000000000000000000..*) range="${range#*..}^!";; esac
+if [ -n "$range" ] && git rev-parse --verify -q HEAD >/dev/null; then
+    commits=$(git rev-list "$range")
+    if [ -n "$commits" ]; then
+        # shellcheck disable=SC2086
+        out=$(python3 scripts/hooks/commit_msg_check.py --commits $commits) \
+            || { echo "$out"; fail "a commit made breaks the commit-msg check"; }
+    fi
+fi
+if git rev-parse --verify -q HEAD >/dev/null; then
+    git log --format='%B' | betterleaks stdin --no-banner --redact -c .betterleaks.toml >/dev/null 2>&1 \
+        || fail "a secret or a path outside the project in a commit message"
+fi
 PERSONAL="${PERSONAL_LEAKS:-$HOME/.config/betterleaks/personal.toml}"
 if [ $REMOTE -eq 1 ]; then
     echo "  SKIPPED on GitHub Actions: the personal rules stay on the owner's machine"
@@ -187,8 +203,8 @@ elif [ ! -f "$PERSONAL" ]; then
 else
     betterleaks dir . --no-banner --redact -c "$PERSONAL" >/dev/null 2>&1 \
         || fail "personal data in the working tree"
-    svgs | betterleaks stdin --no-banner --redact -c "$PERSONAL" >/dev/null 2>&1 \
-        || fail "personal data in an SVG"
+    everything | betterleaks stdin --no-banner --redact -c "$PERSONAL" >/dev/null 2>&1 \
+        || fail "personal data, read through standard input"
     if git rev-parse --verify -q HEAD >/dev/null; then
         # The history too: a commit made with --no-verify skipped the hooks.
         betterleaks git . --no-banner --redact >/dev/null 2>&1 \

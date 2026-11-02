@@ -147,3 +147,11 @@ deleted struct field through, a part runs those too, at the patient timeout; the
 listed and run but not judged. Shown to fire: with cargo-mutants replaced by a stand-in
 whose part ran a deleted field but not the timeout dealt it, the old part passed and the new
 one fails.
+
+## Amendment: the commits a push brought
+
+- **Date**: 2026-11-02
+
+With the backstop made whole (ADR-0003), `audit.yml` passes the gate the range of commits
+the push brought, `COMMIT_RANGE`, so that each is held to `commit_msg_check.py`; a push
+starting a branch holds its head alone, and a run by hand none.

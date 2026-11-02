@@ -52,13 +52,17 @@ import sys
 from pathlib import Path
 from typing import Optional
 
+from documents import section
+
 ROOT = Path(__file__).resolve().parent.parent.parent
 CONFIG = ROOT / ".cargo" / "mutants.toml"
 OUT = ROOT / "out" / "mutants"
 GUARD = ROOT / "scripts" / "audit" / "rss_guard.py"
-# A key at the start of a line: the file holds the exceptions only, so that a setting of
-# the run, which is a rule, is changed here with an ADR (AGENTS.md, "Changing the rules").
-SETTING = re.compile(r"^\s*[\w.\-\[]+\s*(=|\])")
+# The file holds the exceptions only, so that a setting of the run, which is a rule, is
+# changed here with an ADR (AGENTS.md, "Changing the rules"): one `exclude_re = [` line,
+# its patterns and comments, a `]`, and outside them blank lines and comments alone, so
+# that no key, bare or quoted, and no table, is read by cargo-mutants.
+OPENING = "exclude_re = ["
 # An exclusion's kind, at the end of its comment (TESTING.md T11, ADR-0043): the same
 # result for every input, or a difference only where a promise leaves it open or only on
 # input a documented limit refuses, naming where that is written.
@@ -90,14 +94,16 @@ FEATURES = "--all-features"
 def patterns() -> tuple[list[str], list[str]]:
     """The `exclude_re` patterns, and what is wrong with how they are written."""
     lines = CONFIG.read_text().splitlines()
+    starts = [i for i, l in enumerate(lines) if l.strip() == OPENING]
+    if len(starts) != 1:
+        return [], [f"  .cargo/mutants.toml: no single '{OPENING}' line"]
+    ends = [i for i, l in enumerate(lines) if i > starts[0] and l.strip() == "]"]
+    inside = range(starts[0], ends[0] + 1) if ends else range(starts[0], len(lines))
     settings = [n for n, l in enumerate(lines, start=1)
-                if SETTING.match(l) and not l.strip().startswith("exclude_re")]
+                if n - 1 not in inside and l.strip() and not l.strip().startswith("#")]
     if settings:
         return [], [f"  .cargo/mutants.toml:{n}: a setting; only 'exclude_re' belongs here, "
                     "the run's settings are in mutants.py" for n in settings]
-    starts = [i for i, l in enumerate(lines) if l.strip().startswith("exclude_re")]
-    if len(starts) != 1 or not lines[starts[0]].rstrip().endswith("["):
-        return [], ["  .cargo/mutants.toml: no 'exclude_re = [' line"]
     found, errors = [], []
     comment: list[str] = []
     kind = ""
@@ -126,19 +132,6 @@ def patterns() -> tuple[list[str], list[str]]:
                               "[same], [open: WHERE] or [unreached: WHERE] (T11)")
         comment = []
     return found, errors + ["  .cargo/mutants.toml: 'exclude_re' is not closed"]
-
-
-def section(home: str, number: str) -> Optional[str]:
-    """The text of section `number` of document `home`, to the next heading as high."""
-    lines = (ROOT / home).read_text().splitlines()
-    for i, line in enumerate(lines):
-        heading = re.match(r"^(#+) " + re.escape(number) + r"\b", line)
-        if heading:
-            depth = len(heading.group(1))
-            rest = lines[i + 1:]
-            ends = [j for j, l in enumerate(rest) if re.match(r"^#{1,%d} " % depth, l)]
-            return "\n".join(rest[:ends[0]] if ends else rest)
-    return None
 
 
 def owned(lines: list[str], defined: int, name: str) -> list[int]:

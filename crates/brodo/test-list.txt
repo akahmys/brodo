@@ -1,3 +1,5 @@
+doc brodo crates/brodo/src/field.rs - field::Stored #1
+doc brodo crates/brodo/src/lib.rs - #1
 example diffusion tests::the_gaussian_is_followed_to_second_order_and_its_sum_kept
 example spheres tests::exact_distances_before_and_after_pruning
 lib brodo accessor::tests::accessors_read_and_write_as_the_field_does
@@ -47,6 +49,7 @@ lib brodo slice::tests::a_colour_map_with_no_usable_range_is_refused
 lib brodo slice::tests::a_range_empty_along_one_axis_is_refused
 lib brodo slice::tests::a_range_too_large_to_hold_is_refused
 lib brodo slice::tests::a_sequential_map_spans_its_range
+lib brodo slice::tests::a_tile_nearer_zero_than_its_leaf_neighbour_is_on_the_contour
 lib brodo slice::tests::equal_and_opposite_neighbours_are_both_on_the_contour
 lib brodo slice::tests::zeros_among_positives_are_off_the_contour
 lib brodo topology::tests::a_commit_keeps_no_arena_entry_a_merge_left
@@ -186,6 +189,7 @@ test remap_reference remap_keeps_every_fields_values
 test slice_images slices_keep_their_golden_pixels
 test slice_images the_same_image_encodes_to_the_same_bytes_and_decodes_back
 test slice_images write_scenes_for_a_look
+test stale_field every_function_taking_a_field_refuses_one_of_another_topology
 test value_morphology_reference a_field_of_another_topology_is_refused_whatever_k
 test value_morphology_reference an_integer_peak_spreads_and_shrinks
 test value_morphology_reference the_largest_k_ends_once_the_values_settle

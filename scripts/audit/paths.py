@@ -9,8 +9,9 @@ that holds it and fails when the result is outside the root.
 
 It also holds CODING.md L2 to one list, `OUTPUT_DIRS` in `project.py`: each directory there
 is git-ignored at the root and in `.betterleaks.toml`'s path allow-list at the root alone.
-This scan and `documents.py` read the files git would commit, tracked or not ignored, so
-that a directory of an output's name deeper in the tree is read.
+This scan and `documents.py` read the text files git would commit, tracked or not ignored,
+by `text_files`, so that a directory of an output's name deeper in the tree, and a file of
+any name, is read.
 """
 
 import os
@@ -22,8 +23,9 @@ from pathlib import Path
 from project import OUTPUT_DIRS
 
 ROOT = Path(__file__).resolve().parent.parent.parent
-SUFFIXES = {".md", ".rs", ".toml", ".py", ".sh", ".txt", ".json", ".yml", ".yaml", ".svg"}
-EXTRA_FILES = {"pre-commit", "commit-msg"}
+# Japanese letters, and CJK punctuation and full-width forms (AGENTS.md writing rule 6),
+# for every check of the repository's text and of a commit's message.
+JAPANESE = re.compile("[\u3000-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uff00-\uffef]")
 
 RELATIVE = re.compile(r"(?<![\w.])((?:\.\./)+[^\s)\]'\"`>]*)")
 
@@ -37,8 +39,30 @@ def committable() -> list[Path]:
     return [ROOT / f for f in listed if (ROOT / f).is_file()]
 
 
+def is_text(path: Path) -> bool:
+    """Whether a file is text: UTF-8 with no NUL, whatever its name."""
+    return is_text_bytes(path.read_bytes())
+
+
+def is_text_bytes(data: bytes) -> bool:
+    """Whether bytes are text: UTF-8 with no NUL."""
+    if b"\0" in data:
+        return False
+    try:
+        data.decode("utf-8")
+    except UnicodeDecodeError:
+        return False
+    return True
+
+
+def text_files() -> list[Path]:
+    """The files git would commit that are text: what every check of the repository's text
+    reads, so that none is left out by its name."""
+    return [p for p in committable() if is_text(p)]
+
+
 def files() -> list[Path]:
-    return [p for p in committable() if p.suffix in SUFFIXES or p.name in EXTRA_FILES]
+    return text_files()
 
 
 def output_dirs() -> list[str]:

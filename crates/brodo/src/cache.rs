@@ -477,13 +477,27 @@ pub(crate) fn read_within<E: From<std::io::Error>>(
     Ok(bytes)
 }
 
-/// Reads `source` to its end into `blocks`, from their start, growing them as it needs:
-/// the bytes read. A read interrupted is tried again.
+/// The length rule every reader of a cache file holds before it reads one: whole blocks,
+/// and at least the header's (docs/formats.md §3.4 rules 1 and 2). `CacheFile::map` holds
+/// it before mapping, so that a file of no bytes is refused as the others refuse it rather
+/// than by the mapping.
+pub(crate) fn whole_blocks(length: u64) -> Result<(), CacheError> {
+    if !length.is_multiple_of(BLOCK as u64) {
+        return Err(CacheError::Inconsistent("length"));
+    }
+    if length == 0 {
+        return Err(CacheError::Truncated("header"));
+    }
+    Ok(())
+}
+
+/// Reads `source` to its end into `blocks`, from their start, growing them as it needs, a
+/// block at least: the bytes read. A read interrupted is tried again.
 fn fill(source: &mut impl Read, blocks: &mut Vec<Block>) -> std::io::Result<usize> {
     let mut filled = 0_usize;
     loop {
         if filled == blocks.len() * BLOCK {
-            blocks.resize(blocks.len() * 2, Block::new_zeroed());
+            blocks.resize((blocks.len() * 2).max(1), Block::new_zeroed());
         }
         let Some(free) = blocks.as_mut_bytes().get_mut(filled..) else { return Ok(filled) };
         match source.read(free) {
@@ -517,9 +531,7 @@ impl CacheFile {
         if read > limit {
             return Err(CacheError::FileTooLarge { length: read, limit });
         }
-        if !filled.is_multiple_of(BLOCK) {
-            return Err(CacheError::Inconsistent("length"));
-        }
+        whole_blocks(read)?;
         blocks.truncate(filled / BLOCK);
         let grids = index(blocks.as_bytes())?;
         Ok(Self { storage: Storage::Copied(blocks), grids })
@@ -529,9 +541,7 @@ impl CacheFile {
     /// docs/formats.md §3.4 states; of several broken rules, which is named is not
     /// promised.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, CacheError> {
-        if !bytes.len().is_multiple_of(BLOCK) {
-            return Err(CacheError::Inconsistent("length"));
-        }
+        whole_blocks(u64::try_from(bytes.len()).unwrap_or(u64::MAX))?;
         let blocks = aligned(bytes);
         let grids = index(blocks.as_bytes())?;
         Ok(Self { storage: Storage::Copied(blocks), grids })

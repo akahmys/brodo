@@ -127,3 +127,22 @@ the two holding the words in a string and passed the one hiding a `Result<u8, St
 after a string's `//`; the new one the reverse. It also reported that two lints in one
 `#[expect]`, a nested `cfg_attr` and `unsafe {` in a string passed, which the checks
 already held, as each case showed.
+
+## Amendment: Rust read by a lexer, and errors with no type
+
+- **Date**: 2026-11-02
+
+The survey of the whole repository found `source.py` still reading Rust by regular
+expressions, one reported form at a time: a nested block comment's text read as code, an
+attribute holding two `expect`s under `cfg_attr` passing both unchecked, a part of an
+exception that was neither a lint nor its reason dropped silently, a `src/target/`
+directory skipped by its name, and Rule 8 holding `String` alone, so that `Box<str>`,
+`&'static str` and `Box<dyn Error>` passed. The owner decided, on 2026-11-02, that it be
+fixed at its cause, with no dependency added: a lexer reads each file as rustc reads it,
+line and nested block comments, raw, byte and C strings, characters told from lifetimes,
+and blanks them; attributes are read with their brackets matched, every part of every
+`allow` and `expect` held, one that is neither a lint nor `reason = …` failing; the files
+are those git would commit; and Rule 8 refuses an error that is a string, owned, borrowed,
+boxed or copied on write, or a boxed `dyn Error`. Rule 9 by `flatten`, which needs the
+iterator's item type, is left to review. Shown to fire: each such file passed the old
+checks and fails the new, and the repository passes.

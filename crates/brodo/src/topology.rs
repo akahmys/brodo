@@ -43,7 +43,7 @@ pub(crate) fn morton(c: Coord) -> u128 {
 }
 
 fn to_usize(i: u32) -> usize {
-    // Lossless: brodo's targets have pointers of at least 32 bits (`TARGETS`).
+    // Lossless: brodo builds for 64-bit targets alone (`lib.rs`).
     i as usize
 }
 
@@ -415,13 +415,13 @@ impl Before<'_> {
         }
     }
 
-    /// Whether the edit removed a leaf in the lower node's region at `origin`.
-    fn removed_in(&self, origin: Coord) -> bool {
-        let lower = |c: &Coord| TileLevel::Upper.origin(*c);
+    /// Whether the edit removed a leaf in the region a tile at `level` and `origin` covers.
+    fn removed_in(&self, level: TileLevel, origin: Coord) -> bool {
+        let region = |c: &Coord| level.origin(*c);
         self.removed
             .range([origin[0], i32::MIN, i32::MIN]..)
-            .take_while(|c| lower(c)[0] == origin[0])
-            .any(|c| lower(c) == origin)
+            .take_while(|c| region(c)[0] == origin[0])
+            .any(|c| region(c) == origin)
     }
 }
 
@@ -433,11 +433,13 @@ fn tile_source(
     parts: &mut Vec<Part>,
 ) -> Result<TileSource, TreeError> {
     let start = parts.len();
+    // At every level, what held the region before the edit, its removals aside: a tile over
+    // all of it is the source only if the edit removed no leaf in it.
     match level {
-        // What held the region before the edit, its removals aside: a tile over all of it is
-        // the source only if the edit removed no leaf in it.
         TileLevel::Upper => match old.old.locate(origin) {
-            Location::Tile(t, TileLevel::Root | TileLevel::Upper) if !old.removed_in(origin) => {
+            Location::Tile(t, TileLevel::Root | TileLevel::Upper)
+                if !old.removed_in(level, origin) =>
+            {
                 return Ok(TileSource::Tile(t));
             }
             // No lower node there, and no tile above it: the whole region was the background.
@@ -448,6 +450,7 @@ fn tile_source(
                 upper_parts(old, origin, parts);
             }
         },
+        // A leaf's region: `Before::locate` holds a removed leaf's as the background.
         TileLevel::Lower => match old.locate(origin) {
             // The same tile, or a larger one it was split from.
             Location::Tile(t, _) => return Ok(TileSource::Tile(t)),
@@ -455,7 +458,8 @@ fn tile_source(
             Location::Background => return Ok(TileSource::Background),
         },
         // Nothing merges into a root tile: it is the same tile, or one added where nothing
-        // was or where the edit removed the leaf.
+        // was or where the edit removed every leaf. A root tile's region held no leaf, so
+        // none was removed from it.
         TileLevel::Root => {
             return Ok(match old.locate(origin) {
                 Location::Tile(t, TileLevel::Root) => TileSource::Tile(t),

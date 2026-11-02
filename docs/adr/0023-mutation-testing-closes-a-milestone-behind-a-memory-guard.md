@@ -311,3 +311,30 @@ blocks alone, wherever they lie; a report must hold a baseline that passed; and 
 argument is refused. Shown to fire: on a scratch crate the old lookup found another type's
 member and missed one in an `impl` above its type, and the new one the reverse; a report of
 mutants with no baseline and `--rpeort` passed before and fail now.
+
+## Amendment: the exclusions file read by its whole shape
+
+- **Date**: 2026-11-02
+
+The survey of the whole repository found `.cargo/mutants.toml` held to its exclusions by a
+pattern for a bare key, so that `"exclude_globs" = [...]`, quoted, which cargo-mutants reads
+as the same key, passed and could exclude a whole crate with no reason. The owner decided,
+on 2026-11-02, that the file be read by its shape: one `exclude_re = [` line, its patterns
+and comments, a `]`, and outside them blank lines and comments alone. Shown to fire: a
+quoted key, a single-quoted one and a table after the list each passed the old check and
+fail the new.
+
+## Amendment: 0.8.2's missed mutants
+
+- **Date**: 2026-11-02
+
+The run on the lines 0.8.2 changed (227 mutants, 2026-11-02) missed 16 and timed out on 3.
+Ten, in a triangle's area and in turning its largest angle first, were killed by tests
+written for them, each shown to fail with its mutant applied by hand, those of the
+turning since gone with it (ADR-0027); two, a guard on a
+root tile that could never fail, went with the guard, a root tile's region holding no leaf.
+The human decided, on 2026-11-02, that four mutants of the tree's margins be excluded as
+`[open: ARCHITECTURE.md §5.1]`, beside the segment query's, and that two of the nearest
+query's that still timed out after the patient run's 1800 s, each making the walk a scan
+of every triangle, be excluded as only slower. Seven exclusions no longer matching any
+mutant, their code moved or gone, were removed.

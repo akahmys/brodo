@@ -189,7 +189,7 @@ pub fn render<T: Value + Into<f64>>(
         let (row, col) = (i / w, i % w);
         let rgb = match *p {
             Pixel::Background => BACKGROUND,
-            Pixel::Value(_) if on_contour(map, &pixels, i, w) => CONTOUR,
+            Pixel::Value(_) | Pixel::Tile(_) if on_contour(map, &pixels, i, w) => CONTOUR,
             Pixel::Value(x) => color(map, x),
             Pixel::Tile(x) if (row + col).is_multiple_of(4) => color(map, x).map(|c| c / 2 + c / 8),
             Pixel::Tile(x) => color(map, x),
@@ -200,11 +200,13 @@ pub fn render<T: Value + Into<f64>>(
     Ok(Image { width, height, rgba })
 }
 
-/// Whether a pixel lies on the zero contour of a diverging map: its value and a neighbour's
-/// (left, right, up or down) differ in sign, and its value is the one nearer zero, so the
-/// line is one pixel wide and unbroken, two where both are as near.
+/// Whether a pixel, a leaf's voxel or a tile's, lies on the zero contour of a diverging
+/// map: its value and a neighbour's (left, right, up or down) differ in sign, and its value
+/// is the one nearer zero, so the line is one pixel wide and unbroken, two where both are as
+/// near, across leaves and tiles alike.
 fn on_contour(map: ColorMap, pixels: &[Pixel], i: usize, w: usize) -> bool {
-    let (ColorMap::Diverging { .. }, Some(Pixel::Value(x))) = (map, pixels.get(i)) else {
+    let (ColorMap::Diverging { .. }, Some(Pixel::Value(x) | Pixel::Tile(x))) = (map, pixels.get(i))
+    else {
         return false;
     };
     let left =
@@ -235,6 +237,7 @@ pub fn encode_png(image: &Image) -> Result<Vec<u8>, SliceError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tree::TileLevel;
 
     fn draw(map: ColorMap) -> Result<Image, SliceError> {
         let empty = Topology::new();
@@ -323,6 +326,28 @@ mod tests {
         let rgb = |x: usize| &image.rgba[(7 * 8 + x) * 4..(7 * 8 + x) * 4 + 3];
         assert_eq!((rgb(0), rgb(1)), (&CONTOUR[..], &CONTOUR[..]));
         assert_ne!(rgb(2), &CONTOUR[..]);
+    }
+
+    /// Where a leaf's voxel far from zero meets a tile's value near it, of the other sign,
+    /// the tile's voxel is on the contour, so that the line does not break at the leaf's
+    /// edge.
+    #[test]
+    fn a_tile_nearer_zero_than_its_leaf_neighbour_is_on_the_contour() {
+        let empty = Topology::new();
+        let mut e = empty.edit();
+        e.activate([0, 0, 0]).unwrap();
+        e.add_tile(TileLevel::Lower, [8, 0, 0]).unwrap();
+        let t = e.commit().unwrap().0;
+        let mut f = Field::new(&t, 5.0_f32);
+        let tile = t.tile_numbers().next().unwrap();
+        f.set_tile(&t, tile, -0.1).unwrap();
+        let slice = Slice::new(Axis::Z, 0, [0, 0], [15, 7]);
+        let image = render(&t, &f, slice, ColorMap::Diverging { limit: 6.0 }).unwrap();
+        // The bottom row, y = 0: x = 7 the leaf's last voxel at 5, x = 8 the tile's first.
+        let rgb = |x: usize| &image.rgba[(7 * 16 + x) * 4..(7 * 16 + x) * 4 + 3];
+        assert_ne!(rgb(7), &CONTOUR[..]);
+        assert_eq!(rgb(8), &CONTOUR[..]);
+        assert_ne!(rgb(9), &CONTOUR[..]);
     }
 
     /// A sequential map runs from dark at `min` through the middle colour to light at

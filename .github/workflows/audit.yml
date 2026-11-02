@@ -38,4 +38,8 @@ jobs:
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           git config core.hooksPath scripts/hooks
       - name: Gate
+        env:
+          # The commits this push brought, held to the commit-msg check (ADR-0003); by hand,
+          # none.
+          COMMIT_RANGE: ${{ github.event_name == 'push' && format('{0}..{1}', github.event.before, github.sha) || '' }}
         run: ./scripts/audit/verify_compliance.sh

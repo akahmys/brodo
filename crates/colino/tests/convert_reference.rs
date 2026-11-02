@@ -10,13 +10,15 @@ use brodo::meta::{SDF_KEY, SDF_VERSION};
 use brodo::topology::Location;
 use brodo::tree::Coord;
 use colino::convert::{Converted, Options, convert};
-use colino::distance::{Point, on_segment, squared};
+use colino::distance::{Point, squared};
 use colino::error::{ConvertError, MeshError};
 use colino::mesh::Mesh;
 use colino::winding::{Accuracy, Winding};
 use proptest::prelude::*;
 
 mod common;
+#[path = "support/edge.rs"]
+mod edge;
 use common::{sphere, torus};
 
 fn sub(a: Point, b: Point) -> Point {
@@ -47,7 +49,7 @@ fn distance(mesh: &Mesh, p: Point) -> f64 {
         let edges = [(a, b), (b, c), (c, a)];
         let mut d = edges
             .iter()
-            .map(|(u, v)| squared(p, on_segment(p, *u, *v)))
+            .map(|(u, v)| edge::squared_to_edge(p, *u, *v))
             .fold(f64::INFINITY, f64::min);
         let n = cross(sub(b, a), sub(c, a));
         let nn = dot(n, n);

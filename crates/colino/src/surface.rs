@@ -97,7 +97,7 @@ impl Surface {
 }
 
 /// The root of `x` in a union-find forest, halving paths on the way.
-fn root(parent: &mut [usize], mut x: usize) -> usize {
+pub(crate) fn root(parent: &mut [usize], mut x: usize) -> usize {
     while let Some(&p) = parent.get(x) {
         if p == x {
             break;

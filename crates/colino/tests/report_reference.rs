@@ -11,7 +11,10 @@ use colino::mesh::Mesh;
 use colino::report::{Betti, Place, Reference, Report, report};
 
 mod common;
+#[path = "support/shell.rs"]
+mod shell;
 use common::{sphere, torus};
+use shell::shell;
 
 /// The boundary of the union of cubes of edge `s` at `cells`, each face between a cube and
 /// no cube facing out of the cube, as two triangles.
@@ -58,20 +61,10 @@ fn double_torus(s: f64) -> Mesh {
     cubes(&cells, s)
 }
 
-/// The least thickness `shell(19.0)`'s wall is measured at: 1, its spheres' radii apart,
+/// The least thickness `shell(4, 19.0)`'s wall is measured at: 1, its spheres' radii apart,
 /// at most, and above 0.9, less only where the outer sphere's facets sag toward the inner.
 const SHELL_WALL_ABOVE: f64 = 0.9;
 const SHELL_WALL_AT_MOST: f64 = 1.0;
-
-/// A sphere of radius 20 holding a cavity of radius `inner`: the inner sphere faces in.
-fn shell(inner: f64) -> Mesh {
-    let mut m = sphere(4, 20.0, [0.0; 3]);
-    let hole = sphere(4, inner, [0.0; 3]);
-    let base = u32::try_from(m.vertices.len()).unwrap();
-    m.vertices.extend(hole.vertices);
-    m.triangles.extend(hole.triangles.iter().map(|[a, b, c]| [a + base, c + base, b + base]));
-    m
-}
 
 fn reported(m: &Mesh, h: f64, points: &[(&str, [f64; 3])]) -> Report {
     let c = convert(m, &Options::new(h)).unwrap();
@@ -87,7 +80,7 @@ fn betti(b: [i64; 3]) -> Betti {
 fn known_shapes_report_their_betti_numbers() {
     for (name, mesh, h, solid, chi) in [
         ("sphere", sphere(4, 20.0, [0.0; 3]), 1.0, [1, 0, 0], 1),
-        ("shell", shell(12.0), 1.0, [1, 0, 1], 2),
+        ("shell", shell(4, 12.0), 1.0, [1, 0, 1], 2),
         ("torus", torus(20.0, 7.0, 48), 1.0, [1, 1, 0], 0),
         ("double torus", double_torus(8.0), 1.0, [1, 2, 0], -1),
     ] {
@@ -110,7 +103,7 @@ fn known_shapes_report_their_betti_numbers() {
 #[test]
 fn named_points_find_the_cavity_the_wall_and_the_outside() {
     let r = reported(
-        &shell(12.0),
+        &shell(4, 12.0),
         1.0,
         &[
             ("cavity", [0.5, 0.5, 0.5]),
@@ -141,11 +134,11 @@ fn named_points_find_the_cavity_the_wall_and_the_outside() {
 
 #[test]
 fn a_wall_thinner_than_a_voxel_shows_a_change() {
-    let fine = reported(&shell(19.0), 0.25, &[]);
+    let fine = reported(&shell(4, 19.0), 0.25, &[]);
     assert_eq!(fine.euler_change, Some(0), "{:?}", fine.solid);
     // At h = 2 the wall falls between voxel centres in places: its pieces, and the holes
     // left through it, as measured (2026-10-20).
-    let coarse = reported(&shell(19.0), 2.0, &[]);
+    let coarse = reported(&shell(4, 19.0), 2.0, &[]);
     assert_eq!((coarse.solid, coarse.euler), (betti([13, 107, 0]), -94));
     assert_eq!(coarse.euler_change, Some(-96));
     // The third layer finds the wall, 1 thick, below 2h at h = 2 and not at h = 0.25.

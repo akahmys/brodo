@@ -10,6 +10,9 @@ use brodo::topology::Topology;
 use brodo::tree::{Coord, TileLevel};
 use proptest::prelude::*;
 
+#[path = "support/lcg.rs"]
+mod lcg;
+
 /// The dense box: voxels from LO to HI - 1 on each axis, one beyond the leaves and tiles
 /// `coord` places, whose voxels lie in -16..16.
 const LO: i32 = -17;
@@ -99,8 +102,8 @@ proptest! {
         }
         let (t, _) = e.commit().unwrap();
         let mut f = Field::new(&t, OUT);
-        let mut g = seed;
-        let mut next = || { g = g.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407); g >> 33 };
+        let mut g = lcg::Lcg(seed);
+        let mut next = || u64::from(g.next());
         for n in t.leaf_numbers().collect::<Vec<_>>() {
             for v in f.leaf_mut(&t, n).unwrap() {
                 *v = if next() % 5 < dense_fill { IN } else { OUT };

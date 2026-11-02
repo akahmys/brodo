@@ -10,17 +10,14 @@ use brodo::topology::Topology;
 use brodo::tree::{Coord, TileLevel};
 use proptest::prelude::*;
 
+#[path = "support/anchored.rs"]
+mod anchored;
+
 #[derive(Debug, Clone)]
 enum Op {
     Activate(Coord),
     AddTile(TileLevel, Coord),
     Split(Coord),
-}
-
-fn coord() -> impl Strategy<Value = Coord> {
-    let anchors = vec![-4097, -4096, -129, -128, -9, -8, -1, 0, 7, 8, 127, 128, 4095, 4096];
-    let axis = (prop::sample::select(anchors), 0..20_i32).prop_map(|(a, d)| a + d);
-    [axis.clone(), axis.clone(), axis]
 }
 
 /// Root tiles are rarer: splitting one makes 36 862 tiles.
@@ -32,7 +29,7 @@ fn level() -> impl Strategy<Value = TileLevel> {
 fn ops() -> impl Strategy<Value = Vec<Op>> {
     let kind = prop_oneof![6 => Just(None), 2 => level().prop_map(Some)];
     let edit = (kind, any::<bool>(), 0..4_usize, [0..24_i32, 0..24, 0..24]);
-    (prop::collection::vec(coord(), 4), prop::collection::vec(edit, 1..40)).prop_map(
+    (prop::collection::vec(anchored::coord(20), 4), prop::collection::vec(edit, 1..40)).prop_map(
         |(pool, edits)| {
             edits
                 .into_iter()

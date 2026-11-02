@@ -115,3 +115,14 @@ The review of the whole repository found the condition that `piatto` is built if
 cannot be written named as P5's in this record, P6's in ROADMAP.md and P7's in
 ARCHITECTURE.md §6.2. P7 wrote `.vdb` (ADR-0046), so the condition can no longer be met; it
 was dropped from ARCHITECTURE.md §6.2 and ROADMAP.md's B-021, and the two others stand.
+
+## Amendment: the contour across leaves and tiles
+
+- **Date**: 2026-11-02
+
+The survey of the whole repository found the slice's zero contour drawn on leaf voxels
+alone, so that it broke where a leaf's voxel far from zero met a tile's near it. The owner
+decided, on 2026-11-02, that it be fixed: a tile's voxel nearer zero than its neighbour of
+the other sign is on the contour too, as ARCHITECTURE.md §6.1 now states. The golden
+slices hold no such meeting and are unchanged. Shown to fire: a leaf at 5 beside a tile
+at −0.1 left the tile's voxel off the contour before and draws it now.

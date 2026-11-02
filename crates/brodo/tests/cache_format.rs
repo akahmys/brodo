@@ -18,6 +18,9 @@ use brodo::topology::Topology;
 use brodo::tree::{Coord, TileLevel};
 use proptest::prelude::*;
 
+#[path = "support/anchored.rs"]
+mod anchored;
+
 fn build(leaves: &[Coord], tiles: &[(TileLevel, Coord)]) -> Topology {
     let empty = Topology::new();
     let mut e = empty.edit();
@@ -55,12 +58,6 @@ fn meta(name: &str, extra: &[(&str, &str)]) -> GridMeta {
     m
 }
 
-fn coord() -> impl Strategy<Value = Coord> {
-    let anchors = vec![-4097, -4096, -129, -128, -9, -8, -1, 0, 7, 8, 127, 128, 4095, 4096];
-    let axis = (prop::sample::select(anchors), 0..20_i32).prop_map(|(a, d)| a + d);
-    [axis.clone(), axis.clone(), axis]
-}
-
 fn level() -> impl Strategy<Value = TileLevel> {
     prop_oneof![1 => Just(TileLevel::Root), 3 => Just(TileLevel::Upper), 3 => Just(TileLevel::Lower)]
 }
@@ -70,8 +67,8 @@ proptest! {
 
     #[test]
     fn a_file_reads_back_what_was_written(
-        leaves in prop::collection::vec(coord(), 0..12),
-        tiles in prop::collection::vec((level(), coord()), 0..4),
+        leaves in prop::collection::vec(anchored::coord(20), 0..12),
+        tiles in prop::collection::vec((level(), anchored::coord(20)), 0..4),
         name in "[a-zA-Zα-ω0-9 ]{0,12}",
         extra in prop::collection::btree_map("[a-z]{1,5}", "[ -~]{0,9}", 0..3),
     ) {
@@ -490,6 +487,7 @@ fn a_grid_of_f64_vectors_reads_copied_and_mapped() {
 #[test]
 #[cfg_attr(miri, ignore = "needs a real file mapping, which Miri cannot run")]
 fn a_file_unfit_to_map_is_refused() {
+    // A file of no bytes, refused before it is mapped as the other readers refuse it.
     let empty = tmp("empty.brdc");
     std::fs::write(&empty, []).unwrap();
     assert!(matches!(
@@ -497,8 +495,10 @@ fn a_file_unfit_to_map_is_refused() {
             // SAFETY: no process changes this test's own files while they are mapped.
             unsafe { CacheFile::map(&empty) }
         },
-        Err(CacheError::Inconsistent("length"))
+        Err(CacheError::Truncated("header"))
     ));
+    assert!(matches!(CacheFile::read(&empty, 1024), Err(CacheError::Truncated("header"))));
+    assert!(matches!(CacheFile::from_bytes(&[]), Err(CacheError::Truncated("header"))));
     let odd = tmp("odd.brdc");
     std::fs::write(&odd, [0_u8; 33]).unwrap();
     assert!(matches!(

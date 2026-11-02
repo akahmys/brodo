@@ -176,3 +176,30 @@ size, near the threshold, below √ε.
 ARCHITECTURE.md §5.1 states it. Shown to fire: a point on an edge of a triangle of any
 thinness, found within √ε of the triangle's size, failed with the weights' point and passed
 with the projection.
+
+## Amendment: the nearest point whatever the triangle's size
+
+- **Date**: 2026-11-02
+
+A survey of the whole repository for what was fixed by patch found `on_triangle`'s
+thinness measured at whichever corner came first, so that one needle took the face or its
+edges by the corners' order, and its products of four lengths under- or overflowing for a
+triangle far from 1 in size: at 10⁻¹⁰⁰ a point above the face was found on an edge. The
+owner decided, on 2026-11-02, that it be fixed at its cause: the triangle is turned, its
+order kept, so that the corner opposite its longest edge, its largest angle, comes first,
+where the normal and the region tests round least; and the edges and `p` are divided by
+their largest component before the tests, which compare ratios the division leaves as
+they were. Against the nearest point worked in rationals, the largest error fell from
+5.4 × 10⁻⁹ to 2.8 × 10⁻⁹ of the triangle's size. Shown to fire: a point above a face of
+triangles 10⁻¹⁰⁰ to 10¹⁰⁰ in size, in each of three orders, and above a needle whose
+sharpest angle is 10⁻⁹, failed before and passed then.
+
+On 2026-11-03 the turning was taken back, its code and tests more than what it bought,
+which lies beyond what `on_triangle` promises: a triangle whose first corner's angle is
+below √ε is thinner than √ε of its size, for which only a point within its width is
+promised, and above it the projection is off by no more than √ε of `p`'s
+distance from that corner. The owner decided, on 2026-11-03, that thinness be measured at
+the first corner again and the division kept; the needle's check went with the turning.
+The slab benchmark's slowing, first laid to the turning, was the region tests no longer
+inlined once moved to a function of their own: inlined always, it measured within its
+baseline (`cargo bench -p colino`, 2026-11-03).

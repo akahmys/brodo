@@ -10,15 +10,15 @@ use crate::error::{NodeKind, TreeError};
 pub type Coord = [i32; 3];
 
 /// log2 of a leaf's edge, in voxels.
-const LEAF_LOG2: u32 = 3;
+pub(crate) const LEAF_LOG2: u32 = 3;
 /// log2 of a lower node's edge, in children.
-const LOWER_DIM_LOG2: u32 = 4;
+pub(crate) const LOWER_DIM_LOG2: u32 = 4;
 /// log2 of an upper node's edge, in children.
-const UPPER_DIM_LOG2: u32 = 5;
+pub(crate) const UPPER_DIM_LOG2: u32 = 5;
 /// log2 of a lower node's edge, in voxels.
-const LOWER_SPAN_LOG2: u32 = LEAF_LOG2 + LOWER_DIM_LOG2;
+pub(crate) const LOWER_SPAN_LOG2: u32 = LEAF_LOG2 + LOWER_DIM_LOG2;
 /// log2 of an upper node's edge, in voxels.
-const UPPER_SPAN_LOG2: u32 = LOWER_SPAN_LOG2 + UPPER_DIM_LOG2;
+pub(crate) const UPPER_SPAN_LOG2: u32 = LOWER_SPAN_LOG2 + UPPER_DIM_LOG2;
 
 /// The corner of the aligned cube of edge `2^log2` holding `v`, rounding toward negative
 /// infinity.
@@ -53,7 +53,7 @@ fn child_origin(origin: Coord, i: usize, child_log2: u32, dim_log2: u32) -> Coor
 }
 
 fn to_usize(i: u32) -> usize {
-    // Lossless: brodo's targets have pointers of at least 32 bits (`TARGETS`).
+    // Lossless: brodo builds for 64-bit targets alone (`lib.rs`).
     i as usize
 }
 

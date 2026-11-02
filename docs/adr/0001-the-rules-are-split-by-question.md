@@ -160,3 +160,17 @@ The other corrections, wording made true to the checks and the code with no rule
 landed with them: in AUDITING.md, CODING.md, PLANNING.md and TESTING.md, eight records
 marked Amended, six amended to name what reversed or narrowed them, and two retitled as
 statements.
+
+## Amendment: one list of the files, the headings and the rule files
+
+- **Date**: 2026-11-02
+
+The survey of the whole repository found the text files listed by suffix twice, in
+`documents.py` and `paths.py`, with a third by file name, so that `.cpp`, `.tsv`,
+`.gitignore` and the hooks went unread for Japanese or a broken link; the committable files
+listed twice; a section found by its number in two ways, one taking `4.2` for `4.2.1`; and
+the rule files listed in `commit_msg_check.py` apart from AGENTS.md's list. The owner
+decided, on 2026-11-02, that each be one: `paths.text_files`, every committable file that
+is UTF-8 with no NUL; `documents.section`, a number followed by a dot or a space; and
+`project.RULE_FILES`, which the hook reads and `documents.py` holds every path AGENTS.md
+names to. Shown to fire: a rule file left out of the list failed `documents.py`.

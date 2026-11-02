@@ -14,10 +14,12 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use crate::error::VdbError;
+use crate::field::local_index;
 use crate::field::{Field, Stored};
 use crate::meta::{Bounds, GridMeta, SDF_KEY};
 use crate::topology::{LeafNumber, TileNumber, Topology};
 use crate::tree::{Coord, TileLevel};
+use crate::tree::{LEAF_LOG2, LOWER_DIM_LOG2, LOWER_SPAN_LOG2, UPPER_DIM_LOG2};
 pub use crate::vdb_read::{VdbField, VdbFile, VdbGrid, from_bytes, read};
 
 /// The file's magic number, an `i64`.
@@ -98,7 +100,7 @@ impl VdbEntry {
             for x in 0..8 {
                 for y in 0..8 {
                     for z in 0..8 {
-                        values[x + 8 * y + 64 * z].put(&mut buffers);
+                        values[local_index([x, y, z])].put(&mut buffers);
                     }
                 }
             }
@@ -173,7 +175,7 @@ impl Nodes {
         let mut nodes = Self { root_tiles: BTreeMap::new(), uppers: BTreeMap::new() };
         for n in t.leaf_numbers() {
             let o = t.leaf_origin(n)?;
-            nodes.lower(o).leaves.insert(place(o, 3, 4), n);
+            nodes.lower(o).leaves.insert(place(o, LEAF_LOG2, LOWER_DIM_LOG2), n);
         }
         for n in t.tile_numbers() {
             let (level, o) = t.tile(n)?;
@@ -182,10 +184,10 @@ impl Nodes {
                     nodes.root_tiles.insert(o, n);
                 }
                 TileLevel::Upper => {
-                    nodes.upper(o).tiles.insert(place(o, 7, 5), n);
+                    nodes.upper(o).tiles.insert(place(o, LOWER_SPAN_LOG2, UPPER_DIM_LOG2), n);
                 }
                 TileLevel::Lower => {
-                    nodes.lower(o).tiles.insert(place(o, 3, 4), n);
+                    nodes.lower(o).tiles.insert(place(o, LEAF_LOG2, LOWER_DIM_LOG2), n);
                 }
             }
         }
@@ -197,7 +199,7 @@ impl Nodes {
     }
 
     fn lower(&mut self, v: Coord) -> &mut Lower {
-        self.upper(v).lowers.entry(place(v, 7, 5)).or_default()
+        self.upper(v).lowers.entry(place(v, LOWER_SPAN_LOG2, UPPER_DIM_LOG2)).or_default()
     }
 
     /// The leaves in the order the file holds them.
@@ -212,7 +214,7 @@ impl Nodes {
 /// A voxel's place in a node whose children have edge 2^`child` and which is 2^`log`
 /// places a side, z fastest (docs/formats.md §9.4).
 fn place(v: Coord, child: u32, log: u32) -> usize {
-    // Lossless: brodo's targets have pointers of at least 32 bits (`TARGETS`).
+    // Lossless: brodo builds for 64-bit targets alone (`lib.rs`).
     let [x, y, z] = v.map(|c| ((c.cast_unsigned() >> child) & ((1 << log) - 1)) as usize);
     (x << (2 * log)) | (y << log) | z
 }

@@ -12,6 +12,7 @@ use crate::error::{FieldError, FreezeError};
 use crate::field::{Field, Stored};
 use crate::topology::{Topology, morton};
 use crate::tree::{Coord, TileLevel};
+use crate::tree::{LEAF_LOG2, LOWER_DIM_LOG2, LOWER_SPAN_LOG2, UPPER_DIM_LOG2};
 
 #[cfg(target_endian = "big")]
 compile_error!("the frozen layout stores values little-endian, as brodo's targets are");
@@ -211,7 +212,10 @@ fn link_children(
             seen[u] = true;
             uppers[u].first_child = U32::new(to_u32(i)?);
         }
-        set(&mut uppers[u].children, place(local(*k, 7, 5), 5));
+        set(
+            &mut uppers[u].children,
+            place(local(*k, LOWER_SPAN_LOG2, UPPER_DIM_LOG2), UPPER_DIM_LOG2),
+        );
     }
     let mut seen = vec![false; lowers.len()];
     for (n, o) in leaves.iter().enumerate() {
@@ -220,7 +224,7 @@ fn link_children(
             seen[l] = true;
             lowers[l].first_child = U32::new(to_u32(n)?);
         }
-        set(&mut lowers[l].children, place(local(*o, 3, 4), 4));
+        set(&mut lowers[l].children, place(local(*o, LEAF_LOG2, LOWER_DIM_LOG2), LOWER_DIM_LOG2));
     }
     Ok(())
 }
@@ -242,6 +246,7 @@ fn roots(
     let mut root_tiles = 0_u32..;
     let entry = |(key, (kind, index)): (Coord, (u32, u32)),
                  tiles: &mut std::ops::RangeFrom<u32>| {
+        // An unbounded range always gives the next number: the fallback is never taken.
         let index = if kind == ROOT_TILE { tiles.next().unwrap_or(index) } else { index };
         RootEntry {
             key: key.map(I32::new),
@@ -272,12 +277,14 @@ fn tile_order(
         let mut here: Vec<(usize, usize, u32)> = Vec::new();
         for ((_, o), n) in numbered().filter(|((l, _), _)| *l == level) {
             let (node, p) = match level {
-                TileLevel::Upper => {
-                    (upper_no[&origin(*o, TileLevel::Root)], place(local(*o, 7, 5), 5))
-                }
-                TileLevel::Lower | TileLevel::Root => {
-                    (lower_no[&origin(*o, TileLevel::Upper)], place(local(*o, 3, 4), 4))
-                }
+                TileLevel::Upper => (
+                    upper_no[&origin(*o, TileLevel::Root)],
+                    place(local(*o, LOWER_SPAN_LOG2, UPPER_DIM_LOG2), UPPER_DIM_LOG2),
+                ),
+                TileLevel::Lower | TileLevel::Root => (
+                    lower_no[&origin(*o, TileLevel::Upper)],
+                    place(local(*o, LEAF_LOG2, LOWER_DIM_LOG2), LOWER_DIM_LOG2),
+                ),
             };
             here.push((node, p, n));
         }
