@@ -16,7 +16,8 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   Rust do (ADR-0002, ADR-0003, ADR-0034), and the tests' builders and tolerances shared
   and derived. Its one breaking change kept a PATCH by the owner's exception to TESTING.md
   V2.
-- **Next**: the units §2's "After P7" lists, in its order, each once the owner approves it.
+- **Next**: P8 (§2), its units in their order, each once the owner approves it; then
+  P9, 1.0 on crates.io.
 
 ## 2. Milestones
 
@@ -387,54 +388,7 @@ as a proposal for a unit of its own.
 - [x] A version only if code changed, 0.8.1 by the owner's choice; TESTING.md V2 raises
       PATCH for a fix, so whether a refactoring counts as one is put to the owner then
 
-Then, as units of their own after the review, in this order, each started once the owner
-approves it; the estimates are an agent's working time, the gate, the mutation run of what
-changed and the benchmarks besides (2026-11-02):
-
-1. `limit` bounding what `vdb::from_bytes` and `vdb::read` make, below; first, since the
-   command of 2 reads `.vdb` files as untrusted input and should read them within a limit
-   (about half a day)
-2. A command to look inside brodo's files, below (about a day, after its ADR)
-3. README.md's "Looking inside" section, below (about half a day, the viewers installed)
-4. B-023 and B-022 together, below, since both raise a format version (about a day's
-   spike, then two to three days)
-5. Reading a region of an archive from only its chunks' bytes, below, left to later
-
-- [ ] `limit` bounding what `vdb::from_bytes` and `vdb::read` make, as `archive` does, a
-      unit of its own after the review, since it changes public items (the owner,
-      2026-11-02; ADR-0047); the fuzz target `vdb` then passes a limit, as `archive`'s does,
-      since without one reading makes up to about 637 bytes for each byte read (ADR-0047)
-- [ ] A command to look inside brodo's files, for someone who receives a cache file, an
-      archive or a `.vdb` and writes no Rust; `piatto` stays held (B-021), so it uses no
-      GPU and no GUI (the owner, 2026-11-02):
-      - [ ] An ADR, its options put to the owner with a recommendation each: where it lives,
-            a crate of its own or a program in an existing one (ARCHITECTURE.md §2,
-            `project.py`'s `APPLICATIONS` and `LAYERS`); whether its arguments are parsed by
-            a crate, approved under CODING.md Rule 20 and measured by Rules 12 and 13 if so;
-            its input, every file read as untrusted through the fuzzed readers and within a
-            limit (`UNTRUSTED_INPUT`); its output, where it writes and what it refuses to
-            overwrite (CODING.md L2); its tests, golden files; and which of brodo's features,
-            `archive`, `vdb` and `slice-png`, it is built with
-      - [ ] `info`: each grid's name, value type, bounds, count of active voxels, least and
-            greatest value, and metadata
-      - [ ] `slice`: an axis and a position, the slice written as PNG (`slice-png`)
-      - [ ] `convert`: a cache file or an archive to `.vdb` or VTK
-      - [ ] Tests on the golden files, each subcommand's output held to a committed one
-- [ ] README.md's "Looking inside" section: `.vdb` opened in Blender and Houdini, VTK in
-      ParaView, and the command of the unit above; only what was opened and seen, each
-      with the version it was seen in, by a script run headless where the viewer has one
-      (Blender's Python, ParaView's `pvpython`), the viewers installed first with the
-      owner's approval, none being on this machine (2026-11-02)
-- [ ] B-023 and B-022 (§3), the owner's order (2026-11-02):
-      - [ ] B-023's spike: Hermite data's crossings held only on the edges that hold one,
-            its memory and writing time measured against the dense fields' on spheres of
-            radius 200 and 1500 voxels, the answer an ADR
-      - [ ] Hermite data's format version raised if the spike keeps it sparse; the frozen
-            layout's and the cache profile's raised with B-022's checks; each reading the
-            version before it and writing it on request (ADR-0038), docs/formats.md and the
-            golden files with them
-- [ ] Reading a region of an archive from only the bytes of the chunks it needs, the file
-      not read whole (left to later by the human, 2026-10-29; ADR-0016)
+Then P8 and P9, below, in that order (the owner, 2026-11-03; ADR-0011).
 
 ### 0.8.2 — the ad hoc made principled
 
@@ -507,6 +461,93 @@ Tests:
       not use fails `dead_code`; proptest drawing in place of a hand-made sequence where it
       can
 
+### P8 — Looking inside, and the formats settled
+
+Set by the owner on 2026-11-03 (ADR-0011): the units left after P7's review, closed as
+0.9.0. Each is started once the owner approves it; the estimates are an agent's working
+time, the gate, the mutation run of what changed and the benchmarks besides (2026-11-02):
+
+1. `limit` bounding what `vdb::from_bytes` and `vdb::read` make; first, since the command
+   of 2 reads `.vdb` files as untrusted input and should read them within a limit (about
+   half a day)
+2. A command to look inside brodo's files (about a day, after its ADR)
+3. README.md's "Looking inside" section (about half a day, the viewers installed)
+4. B-023 and B-022 together, since both raise a format version (about a day's spike, then
+   two to three days)
+
+- [ ] `limit` bounding what `vdb::from_bytes` and `vdb::read` make, as `archive` does, a
+      unit of its own after the review, since it changes public items (the owner,
+      2026-11-02; ADR-0047); the fuzz target `vdb` then passes a limit, as `archive`'s does,
+      since without one reading makes up to about 637 bytes for each byte read (ADR-0047)
+- [ ] A command to look inside brodo's files, for someone who receives a cache file, an
+      archive or a `.vdb` and writes no Rust; `piatto` stays held (B-021), so it uses no
+      GPU and no GUI (the owner, 2026-11-02):
+      - [ ] An ADR, its options put to the owner with a recommendation each: where it lives,
+            a crate of its own or a program in an existing one (ARCHITECTURE.md §2,
+            `project.py`'s `APPLICATIONS` and `LAYERS`); whether its arguments are parsed by
+            a crate, approved under CODING.md Rule 20 and measured by Rules 12 and 13 if so;
+            its input, every file read as untrusted through the fuzzed readers and within a
+            limit (`UNTRUSTED_INPUT`); its output, where it writes and what it refuses to
+            overwrite (CODING.md L2); its tests, golden files; and which of brodo's features,
+            `archive`, `vdb` and `slice-png`, it is built with
+      - [ ] `info`: each grid's name, value type, bounds, count of active voxels, least and
+            greatest value, and metadata
+      - [ ] `slice`: an axis and a position, the slice written as PNG (`slice-png`)
+      - [ ] `convert`: a cache file or an archive to `.vdb` or VTK
+      - [ ] Tests on the golden files, each subcommand's output held to a committed one
+- [ ] README.md's "Looking inside" section: `.vdb` opened in Blender and Houdini, VTK in
+      ParaView, and the command of the unit above; only what was opened and seen, each
+      with the version it was seen in, by a script run headless where the viewer has one
+      (Blender's Python, ParaView's `pvpython`), the viewers installed first with the
+      owner's approval, none being on this machine (2026-11-02)
+- [ ] B-023 and B-022 (§3), the owner's order (2026-11-02):
+      - [ ] B-023's spike: Hermite data's crossings held only on the edges that hold one,
+            its memory and writing time measured against the dense fields' on spheres of
+            radius 200 and 1500 voxels, the answer an ADR
+      - [ ] Hermite data's format version raised if the spike keeps it sparse; the frozen
+            layout's and the cache profile's raised with B-022's checks; each reading the
+            version before it and writing it on request (ADR-0038), docs/formats.md and the
+            golden files with them
+- [ ] The closing checks the owner chooses by P8's content (ADR-0033)
+- [ ] Version 0.9.0 (TESTING.md V2–V4)
+- [ ] **Accepted when** `vdb::read` refuses a file that would make more than `limit`
+      bytes, the command's subcommands match their golden files, README.md's section shows
+      only what was opened and seen, and the formats B-023 and B-022 raise read the
+      version before them
+
+### P9 — 1.0 on crates.io
+
+Set by the owner on 2026-11-03 (ADR-0011): brodo and colino first published to crates.io,
+as 1.0.0. Each step is started once the owner approves it; publishing cannot be undone,
+since crates.io yanks a version but never deletes it.
+
+- [ ] B-018 and B-019 revisited, as their rows say (§3)
+- [ ] The public API reviewed for what would break a user after 1.0: each public enum and
+      error `#[non_exhaustive]` or not, each public trait sealed or not, the public errors'
+      `Clone` and `PartialEq` (After P7's review), each change a proposal to the owner
+- [ ] Patents and licences judged again by the owner, for registration on crates.io
+      (ADR-0007)
+- [ ] The rules for versions after 1.0, with their ADRs (AGENTS.md, "Changing the
+      rules"): TESTING.md V1's `0.MINOR.PATCH` and V2's breaking MINOR, a breaking change
+      raising MAJOR; V4 publishing each release to crates.io; ADR-0040's pinned tag;
+      ARCHITECTURE.md §7's "Before 1.0"; `rust-version`'s rise, a MINOR or a MAJOR
+- [ ] Packaging: `publish` set; each crate's keywords naming its function (sparse volume,
+      VDB, SDF, level set, voxel) and its categories; colino's dependency on brodo by
+      version as well as path; what each package holds, listed by `cargo package --list`;
+      `cargo publish --dry-run` of each; docs.rs's features set; both names unregistered
+      (checked 2026-10-16 and 2026-11-03)
+- [ ] The closing checks the owner chooses by P9's content (ADR-0033)
+- [ ] 1.0 decided by the owner, in an ADR (TESTING.md V5); version 1.0.0 set and tagged,
+      then brodo published, then colino, each with the owner's approval
+- [ ] **Accepted when** both crates are on crates.io at 1.0.0, docs.rs builds their
+      reference, and a new crate depending on them by version alone builds and runs each
+      README's example
+
+### Later
+
+- [ ] Reading a region of an archive from only the bytes of the chunks it needs, the file
+      not read whole (left to later by the human, 2026-10-29; ADR-0016)
+
 ## 3. Open questions and spikes
 
 Each question is answered by a spike's measurement and an ADR, never in passing by an
@@ -570,9 +611,6 @@ No spike is running.
 - The API reference is not hosted: the crates are not on crates.io, so docs.rs holds
   none, and a reader builds it with `cargo doc` (README.md). Hosting it, on GitHub Pages
   from each release tag, is the owner's to decide.
-- Before registering on crates.io: `publish`, and each crate's description and keywords
-  naming its function (sparse volume, VDB, SDF, level set, voxel). Both names were found
-  unregistered on 2026-10-16, per the design.
 - Requests from users. Held until one asks: merging into a root tile (ADR-0014); a public
   way to read a bare frozen buffer, a file of its own, into an aligned buffer, which only
   tests now do (P5's review, S1, 2026-10-27); a bound on a conversion's leaves, refused
