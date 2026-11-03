@@ -1,0 +1,60 @@
+kind: OpenVDB file
+grids: 4
+skipped: "vec"
+skipped: "half"
+skipped: "sdf_instance"
+
+grid 0: "sdf"
+  type: f32
+  unit: "unstated"
+  voxel size: 1 1 1
+  transform: 1 0 0 -0.5 | 0 1 0 -0.5 | 0 0 1 -0.5
+  bounds: 8 0 0 to 23 15 23
+  leaves: 7
+  tiles: 0
+  voxels: 3584, 3584 in leaves and 0 in tiles
+  background: 2
+  least: -2
+  greatest: 2
+  metadata: "class" = "level set"
+
+grid 1: "dsdf"
+  type: f64
+  unit: "unstated"
+  voxel size: 1 1 1
+  transform: 1 0 0 -0.5 | 0 1 0 -0.5 | 0 0 1 -0.5
+  bounds: 8 0 0 to 23 15 23
+  leaves: 7
+  tiles: 0
+  voxels: 3584, 3584 in leaves and 0 in tiles
+  background: 2
+  least: -2
+  greatest: 2
+  metadata: "class" = "level set"
+
+grid 2: "fog"
+  type: f64
+  unit: "unstated"
+  voxel size: 0.5 0.5 0.5
+  transform: 0.5 0 0 0.75 | 0 0.5 0 -2.25 | 0 0 0.5 3.25
+  bounds: 0 0 -8 to 8191 4095 4095
+  leaves: 3
+  tiles: 9
+  voxels: 68719482368, 1536 in leaves and 68719480832 in tiles
+  background: 0
+  least: 0
+  greatest: 1.000000000004
+  metadata: "class" = "fog volume"
+
+grid 3: "inactive"
+  type: f32
+  unit: "unstated"
+  voxel size: 0.5 0.25 2
+  transform: 0.5 0 0 -0.25 | 0 0.25 0 -0.125 | 0 0 2 -1
+  bounds: 0 0 0 to 4095 8191 4095
+  leaves: 4
+  tiles: 3
+  voxels: 68721576448, 2048 in leaves and 68721574400 in tiles
+  background: 2
+  least: -4
+  greatest: 237.5

@@ -16,7 +16,7 @@ publish = false
 # Every dependency, internal or external, is declared here once and inherited by
 # `name.workspace = true` (CODING.md Rule 20).
 [workspace.dependencies]
-brodo = { path = "crates/brodo" }
+brodo = { path = "crates/brodo", default-features = false }
 colino = { path = "crates/colino" }
 lz4_flex = { version = "0.14.0", default-features = false, features = ["std", "safe-encode", "safe-decode", "checked-decode"] }
 memmap2 = "0.9.11"

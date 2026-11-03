@@ -1,0 +1,16 @@
+kind: cache file
+grids: 1
+
+grid 0: "g\u{1b}[2J"
+  type: f32
+  unit: "m\nkind: fake"
+  voxel size: 1 1 1
+  transform: 1 0 0 0 | 0 1 0 0 | 0 0 1 0
+  bounds: 0 0 0 to 7 7 7
+  leaves: 1
+  tiles: 0
+  voxels: 512, 512 in leaves and 0 in tiles
+  background: 0.5
+  least: 0.5
+  greatest: 0.5
+  metadata: "key\u{7}" = "line\r\n  least: 0\u{202e}"

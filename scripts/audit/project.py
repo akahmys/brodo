@@ -8,6 +8,7 @@ Changing this file is changing a rule (AGENTS.md, "Changing the rules").
 LAYERS = [
     "brodo",
     "colino",
+    "mestolo",
 ]
 
 # Tooling may depend on anything, and nothing may depend on it (Rule 11).
@@ -15,7 +16,7 @@ TOOLS = ["xtask"]
 
 # Application crates: they may print (Rule 18) and use `anyhow` or `String` errors (Rule 8).
 # `xtask` is always one.
-APPLICATIONS = []
+APPLICATIONS = ["mestolo"]
 
 # Modules that parse untrusted bytes (a file, a mesh), as directories or files under
 # `crates/<crate>/src/`. Indexing and slicing are banned in them (Rule 3), and their crate

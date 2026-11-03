@@ -1,0 +1,29 @@
+kind: cache file
+grids: 2
+
+grid 0: "density"
+  type: f32
+  unit: "mm"
+  voxel size: 0.5 0.5 0.25
+  transform: 0.5 0 0 -12.5 | 0 0.5 0 0 | 0 0 0.25 0
+  bounds: -8 0 0 to 4103 12287 4095
+  leaves: 2
+  tiles: 2
+  voxels: 68719478272, 1024 in leaves and 68719477248 in tiles
+  background: -1
+  least: 0.5
+  greatest: 1025.5
+  metadata: "source" = "test"
+
+grid 1: "velocity"
+  type: [f32; 3]
+  unit: "mm"
+  voxel size: 0.5 0.5 0.25
+  transform: 0.5 0 0 -12.5 | 0 0.5 0 0 | 0 0 0.25 0
+  bounds: -8 0 0 to 4103 12287 4095
+  leaves: 2
+  tiles: 2
+  voxels: 68719478272, 1024 in leaves and 68719477248 in tiles
+  background: [0 0 0]
+  least: [0 1 -1]
+  greatest: [1025 1 -1]

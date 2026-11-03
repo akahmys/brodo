@@ -18,6 +18,7 @@ own and knows nothing of its users.
 | `colino` | converting and checking outside shapes | flood fill, connected components, Euler characteristic |
 | a producer of Hermite data, such as one building from analytic shapes, and a reader building cut cells | writing and reading signs and edge crossings without knowing each other | the Hermite data format (§4.9) |
 | a developer or agent checking a change | seeing a field | a slice as PNG, a field for ParaView (§6.1) |
+| someone who receives a grid file and writes no Rust | seeing what it holds, a slice of it, or it converted for another tool | `mestolo` (§6.3) |
 | a process inspecting grids | viewing a grid file as an external program | `piatto`'s program, if built (§6.2) |
 | an application with its own interface | showing grids inside it | `piatto`'s drawing library, if built (§6.2) |
 
@@ -37,6 +38,7 @@ a discretisation, its user's.
 | `brodo` | The sparse tree, `Topology`, `Field<T>`, `Grid<T>`, topology editing and `Remap`, `LeafManifest`, `ValueAccessor`, leaf-parallel updates and gather, topology analysis, `GridView`, the file profiles, the Hermite data format, OpenVDB files, checking output (slice PNG, VTK) |
 | `colino` | Meshes to narrow-band SDFs on brodo's tree, and the topology report |
 | `piatto` | A viewer of cache-profile files, as a library and a thin windowed program; built only when needed (ADR-0018) |
+| `mestolo` | A command that looks inside brodo's files: what they hold, a slice as PNG, a conversion to `.vdb` or `.vtu` (ADR-0050) |
 
 The dependency order between crates is CODING.md Rule 11, listed in
 `scripts/audit/project.py`.
@@ -58,7 +60,7 @@ The dependency order between crates is CODING.md Rule 11, listed in
 ├── docs/logo/                   # the logo, light and dark, and the icons, as SVG and PNG
 ├── scripts/audit/               # the audit, and project.py, its settings
 ├── scripts/hooks/               # git and Claude Code hooks
-├── crates/brodo/, crates/colino/, crates/piatto/ (if built)
+├── crates/brodo/, crates/colino/, crates/mestolo/, crates/piatto/ (if built)
 ├── xtask/                       # project tooling, when there is any
 ├── spikes/                      # throwaway prototypes, never in the build
 ├── fuzz/                        # cargo-fuzz targets, outside the workspace (ADR-0006)
@@ -457,6 +459,42 @@ it would follow:
   recorded as a question on the frozen layout.
 - Not in it: an application's own interface (§1), and fields' own kinds of drawing (stream
   lines and the like), for now.
+
+### 6.3 `mestolo`
+
+A program, `mestolo`, and the library it is a thin user of, in an application crate of its
+own (ADR-0050), for someone who receives a cache file, an archive or a `.vdb` and writes no
+Rust. It uses no GPU and no window.
+
+- **Input**: a file's kind is told by its first bytes; a bare frozen grid and any other
+  file are refused by name. Every file is read whole through brodo's readers, under a
+  limit of 4 GiB that `--limit` changes, which bounds the file and what reading makes as
+  each reader's does (§4.7); a cache file is read, not mapped. A cache file's or an
+  archive's grids are then thawed, their leaves and tiles counted first against the same
+  limit, a leaf its values' bytes and 1024 more, a tile 256; their nodes, not countable
+  before, make about twice the bytes they take in the file (`spikes/thawmemory/`,
+  2026-11-03; ADR-0050). A `.vdb`'s grids take the unit `unstated`, OpenVDB stating
+  none, and its grids brodo does not read are listed as skipped.
+- **`info`** writes to standard output, one fact a line, each grid's indented under its
+  name: its value type, unit, voxel size, transform, the bounds of its leaves and tiles,
+  their counts, the voxels they cover, all and those in leaves and in tiles, its
+  background, the least and greatest of each component over its leaf voxels and tiles, a
+  NaN never among them and of equal values the first in leaf order, then tile order, and
+  its free pairs. Every string the file holds, a name, the unit and each pair's key and
+  value, is written quoted and escaped as Rust's `{:?}` escapes it, so that none moves a
+  terminal or makes a line; an error naming one escapes it too.
+- **`slice`** draws a plane of a scalar grid as PNG by §6.1's slice, across the grid's
+  bounds in the plane's two other axes, refusing an image above 2²⁶ pixels. A level set,
+  by brodo's `sdf.version` or OpenVDB's `class` of `level set`, takes the diverging map
+  saturated at its background's magnitude; another grid the sequential map from its least
+  value to its greatest.
+- **`convert`** writes, by the output's name, every grid or the one `--grid` names as
+  `.vdb` (§4.7), refusing a grid of a type it does not hold by name, or one grid as `.vtu`
+  (§6.1).
+- **Output**: a file at the output's path is refused before the input is read, unless
+  `--force` is given; a file is written to a hidden file beside it and renamed over it. A
+  command line refused exits with status 2, a command failing with 1, its error on
+  standard error.
 
 ## 7. Compatibility
 

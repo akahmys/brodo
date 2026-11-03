@@ -1,0 +1,18 @@
+[package]
+name = "mestolo"
+description = "A command that looks inside brodo's files: what a cache file, an archive or a .vdb holds, a slice of a grid as PNG, and grids converted to .vdb or .vtu"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+readme = "README.md"
+
+[dependencies]
+# Every reader and writer it uses, and not `mmap`: a file received is read, never mapped
+# (ADR-0050).
+brodo = { workspace = true, features = ["archive", "vdb", "slice-png", "vtk"] }
+thiserror.workspace = true
+
+[lints]
+workspace = true

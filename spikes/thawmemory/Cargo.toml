@@ -1,0 +1,17 @@
+# Throwaway spike for the memory mestolo's thawing makes (ADR-0050). Never imported by
+# `crates/` (PLANNING.md §3); its own workspace, so cargo does not look for it in the one
+# above.
+[package]
+name = "thawmemory-spike"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+brodo = { path = "../../crates/brodo", default-features = false }
+
+[profile.release]
+debug = false
+
+[workspace]
+members = ["."]

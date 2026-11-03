@@ -17,6 +17,9 @@ fields, and find out whether the voxelisation changed the shape's topology.
 - **[colino](crates/colino/README.md)**: reads STL, OBJ and 3MF meshes and converts them
   to narrow-band signed distance fields and Hermite data on brodo's tree, with a report of
   the holes, cavities, thin walls and narrow gaps the conversion may have closed or opened.
+- **[mestolo](crates/mestolo/README.md)**: a command that shows what a cache file, an
+  archive or a `.vdb` holds, draws a slice of a grid as PNG, and converts grids to `.vdb`
+  or `.vtu`, for someone who writes no Rust.
 
 Each crate's README has an example that runs as a test.
 

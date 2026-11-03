@@ -8,11 +8,11 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: P8's first unit (§2): `vdb::from_bytes` and `vdb::read` count each leaf, tile
-  and node they make against their limit and refuse more before making it (ADR-0047),
-  the fuzz target `vdb` passing a limit; unreleased.
-- **Next**: P8's command, `mestolo`, built as ADR-0050 states; then the rest of P8, and
-  P9, 1.0 on crates.io.
+- **Done**: P8's command, `mestolo`, an application crate (ADR-0050): `info`, `slice` and
+  `convert` on cache files, archives and `.vdb`s, held to golden files; and before it the
+  bound on what reading a `.vdb` makes (ADR-0047); unreleased.
+- **Next**: P8's README section "Looking inside", the viewers installed with the owner's
+  approval; then B-023 and B-022, and P9, 1.0 on crates.io.
 
 ## 2. Milestones
 
@@ -480,11 +480,12 @@ time, the gate, the mutation run of what changed and the benchmarks besides (202
       - [x] An ADR, its options put to the owner with a recommendation each: `mestolo`, an
             application crate of its own, its arguments parsed with `std`, its output
             refusing a file already there but by `--force` (the owner, 2026-11-03; ADR-0050)
-      - [ ] `info`: each grid's name, value type, bounds, count of active voxels, least and
+      - [x] `info`: each grid's name, value type, bounds, count of active voxels, least and
             greatest value, and metadata
-      - [ ] `slice`: an axis and a position, the slice written as PNG (`slice-png`)
-      - [ ] `convert`: a cache file or an archive to `.vdb` or VTK
-      - [ ] Tests on the golden files, each subcommand's output held to a committed one
+      - [x] `slice`: an axis and a position, the slice written as PNG (`slice-png`)
+      - [x] `convert`: a cache file or an archive to `.vdb` or VTK, and a `.vdb` too
+      - [x] Tests on the golden files, each subcommand's output held to a committed one
+            (`crates/mestolo/tests/commands.rs`, 2026-11-03)
 - [ ] README.md's "Looking inside" section: `.vdb` opened in Blender and Houdini, VTK in
       ParaView, and the command of the unit above; only what was opened and seen, each
       with the version it was seen in, by a script run headless where the viewer has one

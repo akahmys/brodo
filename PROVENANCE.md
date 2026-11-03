@@ -78,3 +78,12 @@ copyright notice (`grep -rniE 'copyright|spdx|licen[cs]e' crates/*/src` finds no
 | `crates/colino/src/thin.rs` | ARCHITECTURE.md §5.2, ADR-0028; Cabiddu and Attene (2017), *Epsilon-shapes*, Computers & Graphics 66, §2.2, for the shape diameter function of Shapira et al. as a ray from a surface point along its inverted normal; union-find, as textbook material; brodo's Euler characteristic and labelling for the check | the topology report's third layer: walls thinner, and gaps narrower, than two voxels, each checked by its box's invariants at h and at h/2 |
 | `crates/colino/src/threemf.rs` | ARCHITECTURE.md §5.1, ADR-0026; the 3MF Core Specification 1.4.0 (3MF Consortium, 2025), its matrix figure included | reading 3MF packages |
 | `crates/colino/src/winding.rs` | ARCHITECTURE.md §5.1, ADR-0027; Jacobson 2013, equations 5 and 6 (van Oosterom and Strackee's solid angle); Barill 2018, Algorithm 1, equations 18 to 29 and appendices A and B | the generalised winding number, exact and by the far-field approximation |
+| `crates/mestolo/src/lib.rs` | none | crate root: the usage, and each command run |
+| `crates/mestolo/src/main.rs` | none | the program: its arguments run, its error and exit status |
+| `crates/mestolo/src/args.rs` | ARCHITECTURE.md §6.3, ADR-0050 only | the command line parsed with `std` |
+| `crates/mestolo/src/error.rs` | none | the crate's error type |
+| `crates/mestolo/src/load.rs` | ARCHITECTURE.md §6.3, ADR-0050; docs/formats.md §2, §3, §8 and §9.1 for each file's first bytes | a file's kind told and its grids read through brodo's readers |
+| `crates/mestolo/src/info.rs` | ARCHITECTURE.md §6.3, ADR-0050 only | what a file holds, as text |
+| `crates/mestolo/src/draw.rs` | ARCHITECTURE.md §6.1, §6.3, ADR-0050; docs/formats.md §9 for OpenVDB's `class` of `level set` | a plane of a scalar grid drawn as PNG |
+| `crates/mestolo/src/convert.rs` | ARCHITECTURE.md §6.3, ADR-0050 only | grids written as `.vdb` or one as `.vtu` |
+| `crates/mestolo/src/output.rs` | ARCHITECTURE.md §6.3, ADR-0050 only | an output refused if there, or written whole by a rename |

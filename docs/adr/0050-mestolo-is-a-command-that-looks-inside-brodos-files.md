@@ -1,6 +1,6 @@
 # ADR-0050: `mestolo` is a command that looks inside brodo's files
 
-- **Status**: Accepted
+- **Status**: Amended
 - **Date**: 2026-11-03
 
 ## Context
@@ -51,3 +51,36 @@ and a test list, as the audit asks of every crate. `convert` writes `.vdb` for `
 `f64` grids only, as brodo's writer does, and refuses the others by name. Whether mestolo
 is published to crates.io with brodo and colino, and at which version, is P9's (ROADMAP.md
 §2).
+
+The crate landed the same day: `scripts/audit/project.py` lists it in `LAYERS` and
+`APPLICATIONS`, and the workspace's `brodo` dependency takes no default features, so that
+mestolo leaves `mmap` out, colino asking for it as before.
+
+## Amendment: what the limit bounds, strings escaped, and the voxels counted
+
+- **Date**: 2026-11-03
+
+The owner's review of the crate, before its first commit, found three things:
+
+- **Strings from a file**: `info` quoted and escaped grid names, but wrote the unit and
+  each metadata key and value as they were, so that a control character could move the
+  terminal or make a line of the fixed form. Every string read from a file is now
+  written quoted and escaped as Rust's `{:?}` escapes it; brodo's errors already wrote
+  each such string so, and mestolo's do too.
+- **What `--limit` bounds**: its usage said it bounded what reading makes, but a cache
+  file's or an archive's grids were then thawed outside it. The spike
+  `spikes/thawmemory/` measured thawing: a tile about 139 bytes, a leaf of `f32` about
+  2 381, and a node about twice the bytes it takes in the file. The choice was to count
+  what can be counted, rather than only say what is not: each grid's leaves and tiles are
+  counted from its view before it is thawed, a leaf its values' bytes and 1 024 more, a
+  tile 256, as ADR-0047 counts a `.vdb`'s, and more than `--limit` is refused. Nodes,
+  which `GridView` does not count, are not, and make about twice the file's bytes; the
+  file is within the limit too. A count of nodes from brodo's public API is a proposal
+  for P9's review of it.
+- **Active voxels**: the line counted the voxels tiles cover with those of leaves,
+  without saying so. It is now `voxels: N, L in leaves and T in tiles`.
+
+The same review's mutation run found the slice's size, its colour map and the extremes'
+ties untested; the first two are functions of their own with unit tests, and of equal
+extremes, 0 and −0, the first in leaf order, then tile order, is written.
+
