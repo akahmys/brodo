@@ -11,8 +11,8 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
 - **Done**: P8's first unit (§2): `vdb::from_bytes` and `vdb::read` count each leaf, tile
   and node they make against their limit and refuse more before making it (ADR-0047),
   the fuzz target `vdb` passing a limit; unreleased.
-- **Next**: P8's command to look inside brodo's files, its ADR first, once the owner
-  approves it; then the rest of P8, and P9, 1.0 on crates.io.
+- **Next**: P8's command, `mestolo`, built as ADR-0050 states; then the rest of P8, and
+  P9, 1.0 on crates.io.
 
 ## 2. Milestones
 
@@ -477,14 +477,9 @@ time, the gate, the mutation run of what changed and the benchmarks besides (202
 - [ ] A command to look inside brodo's files, for someone who receives a cache file, an
       archive or a `.vdb` and writes no Rust; `piatto` stays held (B-021), so it uses no
       GPU and no GUI (the owner, 2026-11-02):
-      - [ ] An ADR, its options put to the owner with a recommendation each: where it lives,
-            a crate of its own or a program in an existing one (ARCHITECTURE.md §2,
-            `project.py`'s `APPLICATIONS` and `LAYERS`); whether its arguments are parsed by
-            a crate, approved under CODING.md Rule 20 and measured by Rules 12 and 13 if so;
-            its input, every file read as untrusted through the fuzzed readers and within a
-            limit (`UNTRUSTED_INPUT`); its output, where it writes and what it refuses to
-            overwrite (CODING.md L2); its tests, golden files; and which of brodo's features,
-            `archive`, `vdb` and `slice-png`, it is built with
+      - [x] An ADR, its options put to the owner with a recommendation each: `mestolo`, an
+            application crate of its own, its arguments parsed with `std`, its output
+            refusing a file already there but by `--force` (the owner, 2026-11-03; ADR-0050)
       - [ ] `info`: each grid's name, value type, bounds, count of active voxels, least and
             greatest value, and metadata
       - [ ] `slice`: an axis and a position, the slice written as PNG (`slice-png`)

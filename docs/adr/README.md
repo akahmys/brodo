@@ -79,3 +79,4 @@ A record is `Proposed` until the human accepts it.
 | [0047](0047-how-brodo-reads-vdb-files.md) | How brodo reads `.vdb` files |
 | [0048](0048-where-files-go-is-checked.md) | Where files go at the root and where scripts lie is checked |
 | [0049](0049-code-is-not-taken-from-outside-and-an-issue-is-a-report.md) | Code is not taken from outside, and an issue is a report |
+| [0050](0050-mestolo-is-a-command-that-looks-inside-brodos-files.md) | `mestolo` is a command that looks inside brodo's files |
