@@ -42,6 +42,30 @@ colino = { git = "https://github.com/akahmys/brodo", tag = "v0.8.2" }
   to 0.8.2) is meant only to fix. [CHANGELOG.md](CHANGELOG.md) lists what each release
   changes and anything it breaks.
 
+## Looking inside
+
+A cache file, an archive or a `.vdb` can be looked at without writing Rust:
+
+```bash
+cargo install --git https://github.com/akahmys/brodo mestolo
+mestolo info grids.cache                           # its grids, bounds, values, metadata
+mestolo slice grids.cache --grid sdf --axis z --at 0 -o z0.png
+mestolo convert grids.cache -o grids.vdb           # every f32 and f64 grid
+mestolo convert grids.cache --grid sdf -o sdf.vtu  # one grid, for ParaView
+```
+
+What was checked, and what other tools' documentation says:
+
+- **`.vdb`**: brodo's files are read back by OpenVDB 14.0.0's own tools with every value
+  the same (ADR-0046). Blender imports `.vdb` files as volume objects, from the Add menu
+  or by dragging them in, and Houdini reads and writes them, as their manuals state;
+  neither has been tried with brodo's files.
+- **`.vtu`**: brodo's files are read back by VTK's Python (ARCHITECTURE.md §6.1).
+  ParaView reads VTK's XML unstructured grids, as its reference manual states; it has not
+  been tried with brodo's files.
+
+[crates/mestolo/README.md](crates/mestolo/README.md) has the rest of mestolo's options.
+
 ## Documentation
 
 - The API reference, built from the code with every feature and opened in a browser

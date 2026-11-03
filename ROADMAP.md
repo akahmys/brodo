@@ -8,11 +8,12 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: P8's command, `mestolo`, an application crate (ADR-0050): `info`, `slice` and
-  `convert` on cache files, archives and `.vdb`s, held to golden files; and before it the
-  bound on what reading a `.vdb` makes (ADR-0047); unreleased.
-- **Next**: P8's README section "Looking inside", the viewers installed with the owner's
-  approval; then B-023 and B-022, and P9, 1.0 on crates.io.
+- **Done**: P8's README section "Looking inside": mestolo's commands, and what brodo's
+  checks read back apart from what Blender's, Houdini's and ParaView's documentation says
+  they read; before it `mestolo` (ADR-0050) and the bound on what reading a `.vdb` makes
+  (ADR-0047); unreleased.
+- **Next**: P8's B-023 spike, then B-023 and B-022, which close P8 as 0.9.0; then P9, 1.0
+  on crates.io.
 
 ## 2. Milestones
 
@@ -466,7 +467,7 @@ time, the gate, the mutation run of what changed and the benchmarks besides (202
    of 2 reads `.vdb` files as untrusted input and should read them within a limit (about
    half a day)
 2. A command to look inside brodo's files (about a day, after its ADR)
-3. README.md's "Looking inside" section (about half a day, the viewers installed)
+3. README.md's "Looking inside" section (about an hour, from the viewers' documentation)
 4. B-023 and B-022 together, since both raise a format version (about a day's spike, then
    two to three days)
 
@@ -486,11 +487,11 @@ time, the gate, the mutation run of what changed and the benchmarks besides (202
       - [x] `convert`: a cache file or an archive to `.vdb` or VTK, and a `.vdb` too
       - [x] Tests on the golden files, each subcommand's output held to a committed one
             (`crates/mestolo/tests/commands.rs`, 2026-11-03)
-- [ ] README.md's "Looking inside" section: `.vdb` opened in Blender and Houdini, VTK in
-      ParaView, and the command of the unit above; only what was opened and seen, each
-      with the version it was seen in, by a script run headless where the viewer has one
-      (Blender's Python, ParaView's `pvpython`), the viewers installed first with the
-      owner's approval, none being on this machine (2026-11-02)
+- [x] README.md's "Looking inside" section: the command of the unit above, what brodo's
+      checks have read back, and what Blender's, Houdini's and ParaView's documentation
+      says they read, said apart from what was tried; the viewers not installed nor tried,
+      the owner choosing on 2026-11-03 their documentation over installing them, as
+      AGENTS.md's "Hierarchy of truth" allows for a claim outside the repository
 - [ ] B-023 and B-022 (§3), the owner's order (2026-11-02):
       - [ ] B-023's spike: Hermite data's crossings held only on the edges that hold one,
             its memory and writing time measured against the dense fields' on spheres of
