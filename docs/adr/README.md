@@ -81,3 +81,4 @@ A record is `Proposed` until the human accepts it.
 | [0049](0049-code-is-not-taken-from-outside-and-an-issue-is-a-report.md) | Code is not taken from outside, and an issue is a report |
 | [0050](0050-mestolo-is-a-command-that-looks-inside-brodos-files.md) | `mestolo` is a command that looks inside brodo's files |
 | [0051](0051-hermite-data-holds-its-crossings-sparsely.md) | Hermite data holds its crossings sparsely |
+| [0052](0052-version-2-of-the-frozen-layout-checks-every-writer-rule.md) | Version 2 of the frozen layout and the cache profile checks every writer rule |

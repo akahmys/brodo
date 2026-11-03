@@ -158,6 +158,30 @@ A reader that walks the whole tree from the root table, to rebuild it or to list
 leaves and tiles, also refuses a buffer in which the walk reaches a node, a leaf or a tile
 value twice, or reaches no leaf the leaf count holds.
 
+### 2.7 Version 2
+
+The same bytes as version 1, with version `u32` 2 in the header, and every rule a writer
+keeps checked by a reader (ADR-0052). A reader refuses a buffer of version 2, before
+reading any value, unless §2.5's rules 1 to 6 hold, version 2 in rule 2's place, and:
+
+7. the header's padding, the background's bytes beyond its size, and each root entry's and
+   node's padding are zero;
+8. each section starts at the block right after the one before ends, the first at block
+   3, and the buffer ends at the last section's block boundary;
+9. root tiles take tile places 0, 1, … in table order, and upper nodes are numbered 0, 1,
+   … in table order;
+10. upper nodes and lower nodes are each in ascending Morton key of their origins, an
+    origin being, for an upper node, its root entry's key, and for a lower node its upper
+    node's origin and its place;
+11. in node order, each node with children has first child equal to the children counted
+    in the nodes before it, and each with tiles has first tile equal to the tile places
+    taken before it, root tiles first; a node with none of either holds 0; the last
+    upper node's children end at the lower node count, the last lower node's at the leaf
+    count, and the last node's tiles at the tile count.
+
+Rules 9 and 11 together give every node, leaf and tile value exactly one place that
+reaches it, so that §2.6's walk is needed no more at version 2: each is reached once.
+
 ## 3. The cache profile, format version 1
 
 Grids with their metadata in one file (ARCHITECTURE.md §4.7). Media type
@@ -218,6 +242,38 @@ A reader refuses a file, before answering anything, unless:
 6. the last grid's buffer ends where the file ends, or, with no grid, the header does.
 
 The bounds are not checked against the grid.
+
+### 3.5 Version 2
+
+A cache file of version 2 holds, beside grids, **entries of bytes**: a name, free pairs,
+and bytes the profile does not read, for a format built on it such as Hermite data's
+version 2 (§4.3, ADR-0051). Its header is version 1's with version `u32` 2, its grids'
+frozen buffers are of version 2 (§2.7), and its directory entry is:
+
+| Byte | Field |
+| :--- | :--- |
+| 0 | metadata offset, `u32` blocks |
+| 4 | metadata length, `u32` bytes |
+| 8 | payload offset, `u32` blocks |
+| 12 | payload length, `u32` blocks |
+| 16 | value type, `u32` code, §1.1, for a grid; 0 for bytes |
+| 20 | kind, `u32`: 0 a grid, 1 bytes |
+| 24 | unused, 8 bytes, zero |
+
+A grid's payload is its frozen buffer, its metadata §3.3's. An entry of bytes has as
+metadata its name, a string; its byte length, `u64`, its payload's blocks × 32 less fewer
+than 32; and its free pairs, as §3.3 ends. Its payload is its bytes, zero-padded to a
+block. Parts follow one another as at version 1, payload where the frozen
+buffer was.
+
+A reader refuses a file of version 2 unless §3.4's rules hold, reading payload for frozen
+buffer and version 2 for 1, and:
+
+7. each entry's kind is 0 or 1; an entry of bytes' value type is 0, its byte length within
+   its last block, its padding zero, and its metadata as above, keys strictly ascending,
+   with no byte left over;
+8. each grid's bounds are those its leaves and tiles cover, by §2.4's tree, an empty one
+   with none.
 
 ## 4. Hermite data, version 1
 
@@ -281,6 +337,37 @@ Rules 8 and 10 hold that only a leaf point owns an edge whose ends differ. Rule 
 what §2.5 leaves unchecked, nodes shared between entries, so that checking a set costs what
 its bytes hold (ADR-0038).
 
+### 4.3 Version 2
+
+A set of version 2 holds its crossings only on the edges that hold one (ADR-0051), in a
+cache file of version 2 (§3.5): its sign grid, as at version 1 with `hermite.version` = `2`
+and `hermite.field` = `sign`, the group table in its free pairs; and one entry of bytes,
+`hermite.field` = `crossings`, with `hermite.version` and `hermite.set` as the sign grid's
+and no other key beginning `hermite.`. The set's leaves are its sign grid's, in its order
+(§2: the leaves' Morton order). The entry's bytes are:
+
+| Part | Size, bytes | Holds |
+| :--- | :--- | :--- |
+| masks | 192 a leaf | per leaf in order, per axis x, y, z: 8 `u64` words, place p at bit p mod 64 of word p div 64, set where point p's edge along the axis holds a crossing; p is the point's index in the leaf, x + 8y + 64z |
+| crossings | 20 each | in leaf order, then axis, then place: fraction `f32`, normal 3 × `f32`, group `u32` |
+
+The bytes end with the last crossing. The crossing of an edge is found by counting the
+bits set before its own in the masks before it; a reader may keep where each leaf's start.
+
+A reader refuses a set of version 2 unless §4.2's rules 1 to 11 hold, read for its sign
+grid alone and with these for rules 1, 3, 5, 6 and 9:
+
+1. the sign grid and one entry of bytes have `hermite.version` 2 and the set's name, the
+   grid's field `sign` of type `u8`, the entry's `crossings`;
+3. the entry's byte length is 192 × the sign grid's leaves + 20 × the masks' bits set;
+5. and 6. the signs' background and every tile's sign are as at version 1; tiles and the
+   background hold no crossing, which the bytes have no place for;
+9. for every leaf point v and axis a, with w = v + â and the signs where §2.4 finds them:
+   the mask's bit is set exactly when v and w differ in sign, and then the crossing's
+   fraction lies in [0, 1], its normal's length, worked in `f64`, is within 10⁻⁶ of 1,
+   its component along a is not negative when v is inside and not positive when v is
+   outside, and its group is 0 or an id the table names.
+
 ## 5. The narrow-band SDF convention, version 1
 
 A grid of `f32` is an SDF written to this convention when its free pairs hold
@@ -301,7 +388,9 @@ samples shifted by −h/2.
 Each format carries its own version: the frozen layout in its header, the cache profile in
 its header, the archive profile in its header, Hermite data and the SDF convention in free
 pairs; which older versions a release reads is TESTING.md V6's (ADR-0038). Every format is
-at version 1, the first.
+at version 1, the first. Version 2 of the frozen layout, the cache and archive profiles and
+Hermite data (§2.7, §3.5, §4.3, §8.7) is stated before brodo writes it (ADR-0051,
+ADR-0052); until a release writes it, brodo writes and reads version 1 alone.
 
 Within a version only two changes are made, each recorded in CHANGELOG.md: a value type
 code (§1.1) or an archive's value encoding code (§8.5) added, which a reader that does not
@@ -455,6 +544,29 @@ meet the box (ADR-0016). It refuses a file, before answering anything, unless:
 A chunk it does not decompress is not checked to decompress, nor are its values: a file
 that a whole read (§8.4) refuses may answer a region. It answers a voxel within the box as
 the frozen buffer does, and refuses any other, though the chunks it holds may cover it.
+
+### 8.7 Version 2
+
+An archive of version 2 is read back as the cache file of version 2 (§3.5) of the same
+entries. Its header is version 1's with version `u32` 2, and its directory entry is §8.2's
+with these words:
+
+| Byte | Field |
+| :--- | :--- |
+| 0 | metadata offset, `u32` blocks |
+| 4 | metadata length, `u32` bytes |
+| 8 | chunk table offset, `u32` blocks |
+| 12 | chunk count, `u32` |
+| 16 | payload length, `u32` blocks |
+| 20 | value type, `u32` code, §1.1, for a grid; 0 for bytes |
+| 24 | value encoding, `u32` code, §8.5, for a grid; 0 for bytes |
+| 28 | kind, `u32`: 0 a grid, 1 bytes |
+
+An entry's metadata is the cache file's (§3.3, §3.5). A grid's chunks are cut as §8.3 says; an entry of
+bytes' payload is cut every 512 × 512 bytes, its last chunk the rest. A reader refuses an
+archive of version 2 unless §8.4's rules hold, version 2 for 1 and payload for frozen
+buffer, an entry of bytes holding encoding 0, and the cache file made passes §3.5.
+§8.6's region is read from grids alone.
 
 ## 9. OpenVDB files
 
