@@ -168,19 +168,21 @@ reading any value, unless §2.5's rules 1 to 6 hold, version 2 in rule 2's place
    node's padding are zero;
 8. each section starts at the block right after the one before ends, the first at block
    3, and the buffer ends at the last section's block boundary;
-9. root tiles take tile places 0, 1, … in table order, and upper nodes are numbered 0, 1,
-   … in table order;
-10. upper nodes and lower nodes are each in ascending Morton key of their origins, an
-    origin being, for an upper node, its root entry's key, and for a lower node its upper
-    node's origin and its place;
-11. in node order, each node with children has first child equal to the children counted
-    in the nodes before it, and each with tiles has first tile equal to the tile places
-    taken before it, root tiles first; a node with none of either holds 0; the last
-    upper node's children end at the lower node count, the last lower node's at the leaf
-    count, and the last node's tiles at the tile count.
+9. root tiles take tile places 0, 1, … in table order, and each upper node is named by
+   exactly one root entry;
+10. upper nodes are in ascending Morton key of their origins, the keys of the root entries
+    naming them;
+11. every node holds a child or a tile; in node order, each node with children has first
+    child equal to the children of the nodes before it, and each with tiles has first tile
+    equal to the tile places taken before it, root tiles first; a node with no children
+    holds 0 as first child, one with no tiles 0 as first tile; the upper nodes' children
+    add up to the lower node count, the lower nodes' to the leaf count, and the root
+    tiles and nodes' tiles to the tile count.
 
 Rules 9 and 11 together give every node, leaf and tile value exactly one place that
-reaches it, so that §2.6's walk is needed no more at version 2: each is reached once.
+reaches it, so that §2.6's walk is needed no more at version 2: each is reached once. A
+lower node's origin is its upper node's and its place, and a leaf's its lower node's and
+its place, so rules 10 and 11 put both in Morton order as version 1's writer does.
 
 ## 3. The cache profile, format version 1
 
@@ -415,6 +417,9 @@ The golden files in `crates/brodo/tests/data/`, written by brodo's Format-tier t
 | `archive_v1.bin` | an archive of the same two grids as `cache_v1.bin` |
 | `archive_v1_quantised.bin` | an archive of the same two grids, the first in binary16, the second in 8 bits |
 | `hermite_v1.bin` | a cache file holding one Hermite set, `golden`, on one leaf, with two named groups |
+| `cache_v2.bin` | `cache_v1.bin`'s grids at version 2, an entry of bytes, `readme`, between them |
+| `archive_v2.bin` | an archive of version 2 of the same entries as `cache_v2.bin` |
+| `hermite_v2.bin` | `hermite_v1.bin`'s set at version 2: its sign grid and its entry of crossings |
 
 ## 8. The archive profile, format version 1
 

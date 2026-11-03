@@ -3,8 +3,11 @@
 //! bytes: it is listed in `UNTRUSTED_INPUT`, indexes nothing (CODING.md Rule 3), checks the
 //! whole file before it answers, and is fuzzed (TESTING.md T6).
 //!
-//! Format version 1's bytes are in `docs/formats.md` §3, which this code follows.
+//! The bytes are in `docs/formats.md` §3, which this code follows: version 2, written, holds
+//! entries of bytes beside grids and has its bounds checked (§3.5, ADR-0051, ADR-0052);
+//! version 1 is read, and written on request (TESTING.md V6).
 
+use std::collections::BTreeMap;
 use std::io::Read;
 use std::path::Path;
 
@@ -19,16 +22,26 @@ use crate::view::GridView;
 
 /// "BRDC", read as a little-endian `u32`.
 const MAGIC: u32 = u32::from_le_bytes(*b"BRDC");
-/// The format version this build writes and reads (ADR-0016).
-const VERSION: u32 = 1;
+/// The format version this build writes, and reads with the one before it (ADR-0038).
+pub(crate) const VERSION: u32 = 2;
+/// The version before it, read, and written on request (TESTING.md V6).
+pub(crate) const VERSION_1: u32 = 1;
+/// A directory entry's kinds at version 2 (docs/formats.md §3.5).
+pub(crate) const KIND_GRID: u32 = 0;
+pub(crate) const KIND_BYTES: u32 = 1;
 
-/// A grid ready to be written: its metadata, bounds, value type and frozen buffer.
+/// An entry ready to be written: a grid, with its metadata, bounds, value type and frozen
+/// buffer; or, at version 2, an entry of bytes, with its name and free pairs.
 #[derive(Debug, Clone)]
 pub struct CacheEntry {
-    pub(crate) meta: GridMeta,
-    pub(crate) bounds: Bounds,
-    pub(crate) value_type: u32,
-    pub(crate) frozen: FrozenGrid,
+    pub(crate) payload: Payload,
+}
+
+/// What an entry holds.
+#[derive(Debug, Clone)]
+pub(crate) enum Payload {
+    Grid { meta: GridMeta, bounds: Bounds, value_type: u32, frozen: FrozenGrid },
+    Bytes { name: String, extra: BTreeMap<String, String>, bytes: Vec<u8> },
 }
 
 impl CacheEntry {
@@ -51,12 +64,108 @@ impl CacheEntry {
     ) -> Result<Self, CacheError> {
         meta.check()?;
         Ok(Self {
-            meta: meta.clone(),
-            bounds: Bounds::of(t)?,
-            value_type: T::TYPE_CODE,
-            frozen: freeze(t, f)?,
+            payload: Payload::Grid {
+                meta: meta.clone(),
+                bounds: Bounds::of(t)?,
+                value_type: T::TYPE_CODE,
+                frozen: freeze(t, f)?,
+            },
         })
     }
+
+    /// An entry of bytes, named, with free pairs, which a file of version 2 holds beside its
+    /// grids for a format built on it (docs/formats.md §3.5); the pairs may hold no key
+    /// beginning `hermite.`, as `new`'s may not.
+    pub fn bytes(
+        name: &str,
+        extra: BTreeMap<String, String>,
+        bytes: Vec<u8>,
+    ) -> Result<Self, CacheError> {
+        if let Some(key) = extra.keys().find(|k| k.starts_with(crate::hermite::PREFIX)) {
+            return Err(CacheError::ReservedKey(key.clone()));
+        }
+        Ok(Self::bytes_with_reserved_keys(name, extra, bytes))
+    }
+
+    /// As `bytes`, the pairs free to hold keys beginning `hermite.`: for a Hermite set's own
+    /// entry, or a file made on purpose to break its format, as a test of a reader.
+    pub fn bytes_with_reserved_keys(
+        name: &str,
+        extra: BTreeMap<String, String>,
+        bytes: Vec<u8>,
+    ) -> Self {
+        Self { payload: Payload::Bytes { name: name.to_owned(), extra, bytes } }
+    }
+
+    /// The entry as a file of `version` places it: its metadata as stored, and its part.
+    pub(crate) fn part(&self, version: u32) -> Result<(Vec<u8>, Part), CacheError> {
+        let (meta, value_type, kind, len) = match &self.payload {
+            Payload::Grid { meta, bounds, value_type, frozen } => {
+                (encode_meta(meta, *bounds)?, *value_type, KIND_GRID, frozen.as_bytes().len())
+            }
+            Payload::Bytes { .. } if version == VERSION_1 => {
+                return Err(CacheError::BytesAtVersion1);
+            }
+            Payload::Bytes { name, extra, bytes } => {
+                (encode_bytes_meta(name, bytes.len(), extra)?, 0, KIND_BYTES, bytes.len())
+            }
+        };
+        let kind = if version == VERSION { kind } else { 0 };
+        let part =
+            Part { meta_len: meta.len(), grid_blocks: len.div_ceil(BLOCK), value_type, kind };
+        Ok((meta, part))
+    }
+
+    /// Writes the entry's payload to `out` as a file of `version` holds it: a grid's frozen
+    /// buffer, its header's version that of the file (docs/formats.md §2.7), or bytes,
+    /// zero-padded to a block. The bytes written.
+    pub(crate) fn write_payload(
+        &self,
+        version: u32,
+        out: &mut impl std::io::Write,
+    ) -> std::io::Result<usize> {
+        match &self.payload {
+            Payload::Grid { frozen, .. } => {
+                let bytes = frozen.as_bytes();
+                let (header, rest) = bytes.split_at(BLOCK.min(bytes.len()));
+                let mut header = header.to_vec();
+                if let Some(word) = header.get_mut(4..8) {
+                    word.copy_from_slice(&version.to_le_bytes());
+                }
+                out.write_all(&header)?;
+                out.write_all(rest)?;
+                Ok(bytes.len())
+            }
+            Payload::Bytes { bytes, .. } => {
+                let padded = bytes.len().next_multiple_of(BLOCK);
+                out.write_all(bytes)?;
+                out.write_all(&vec![0; padded - bytes.len()])?;
+                Ok(padded)
+            }
+        }
+    }
+}
+
+/// An entry of bytes' metadata as stored: its name, its byte length, its free pairs.
+pub(crate) fn encode_bytes_meta(
+    name: &str,
+    len: usize,
+    extra: &BTreeMap<String, String>,
+) -> Result<Vec<u8>, CacheError> {
+    let mut out = Vec::new();
+    put_str(&mut out, name)?;
+    out.extend_from_slice(&u64::try_from(len).map_err(|_| CacheError::TooLarge)?.to_le_bytes());
+    put_pairs(&mut out, extra)?;
+    Ok(out)
+}
+
+fn put_pairs(out: &mut Vec<u8>, extra: &BTreeMap<String, String>) -> Result<(), CacheError> {
+    put_u32(out, u32_of(extra.len())?);
+    for (k, v) in extra {
+        put_str(out, k)?;
+        put_str(out, v)?;
+    }
+    Ok(())
 }
 
 pub(crate) fn u32_of(n: usize) -> Result<u32, CacheError> {
@@ -90,18 +199,20 @@ pub(crate) fn encode_meta(m: &GridMeta, b: Bounds) -> Result<Vec<u8>, CacheError
     for c in corners.iter().flatten() {
         out.extend_from_slice(&c.to_le_bytes());
     }
-    put_u32(&mut out, u32_of(m.extra.len())?);
-    for (k, v) in &m.extra {
-        put_str(&mut out, k)?;
-        put_str(&mut out, v)?;
-    }
+    put_pairs(&mut out, &m.extra)?;
     Ok(out)
 }
 
-/// The bytes of a cache file holding `entries`, in order.
+/// The bytes of a cache file of version 2 holding `entries`, in order.
 pub fn to_bytes(entries: &[CacheEntry]) -> Result<Vec<u8>, CacheError> {
+    to_bytes_version(entries, VERSION)
+}
+
+/// The bytes of a cache file of version `version`, 2 or, on request, 1, which holds grids
+/// alone and refuses an entry of bytes (TESTING.md V6).
+pub fn to_bytes_version(entries: &[CacheEntry], version: u32) -> Result<Vec<u8>, CacheError> {
     let mut out = Vec::new();
-    emit(entries, &mut out)?;
+    emit(entries, version, &mut out)?;
     Ok(out)
 }
 
@@ -116,19 +227,20 @@ pub(crate) fn pad_to(
     out.write_all(&vec![0; zeros])
 }
 
-/// A grid as the cache file places it: its metadata's length in bytes, its frozen buffer's
-/// in blocks, and its value type.
+/// An entry as the cache file places it: its metadata's length in bytes, its payload's in
+/// blocks, its value type and its kind.
 pub(crate) struct Part {
     pub(crate) meta_len: usize,
     pub(crate) grid_blocks: usize,
     pub(crate) value_type: u32,
+    pub(crate) kind: u32,
 }
 
-/// The header and directory of a cache file of `parts`, and the block each grid's frozen
-/// buffer starts at; each metadata starts at the block after the part before it.
-pub(crate) fn head(parts: &[Part]) -> Result<(Vec<u8>, Vec<usize>), CacheError> {
+/// The header and directory of a cache file of `version` and `parts`, and the block each
+/// payload starts at; each metadata starts at the block after the part before it.
+pub(crate) fn head(parts: &[Part], version: u32) -> Result<(Vec<u8>, Vec<usize>), CacheError> {
     let mut head = Vec::new();
-    for x in [MAGIC, VERSION, u32_of(parts.len())?, 0, 0, 0, 0, 0] {
+    for x in [MAGIC, version, u32_of(parts.len())?, 0, 0, 0, 0, 0] {
         put_u32(&mut head, x);
     }
     let mut at = 1 + parts.len();
@@ -142,7 +254,7 @@ pub(crate) fn head(parts: &[Part]) -> Result<(Vec<u8>, Vec<usize>), CacheError> 
             u32_of(grid_at)?,
             u32_of(p.grid_blocks)?,
             p.value_type,
-            0,
+            p.kind,
             0,
             0,
         ] {
@@ -154,30 +266,26 @@ pub(crate) fn head(parts: &[Part]) -> Result<(Vec<u8>, Vec<usize>), CacheError> 
     Ok((head, places))
 }
 
-/// Writes the file holding `entries` to `out`, part by part, so that no copy of the whole
-/// is made.
-fn emit(entries: &[CacheEntry], out: &mut impl std::io::Write) -> Result<(), CacheError> {
-    let metas =
-        entries.iter().map(|e| encode_meta(&e.meta, e.bounds)).collect::<Result<Vec<_>, _>>()?;
-    let parts: Vec<_> = entries
-        .iter()
-        .zip(&metas)
-        .map(|(e, m)| Part {
-            meta_len: m.len(),
-            grid_blocks: e.frozen.as_bytes().len() / BLOCK,
-            value_type: e.value_type,
-        })
-        .collect();
-    let (head, places) = head(&parts)?;
+/// Writes the file of `version` holding `entries` to `out`, part by part.
+fn emit(
+    entries: &[CacheEntry],
+    version: u32,
+    out: &mut impl std::io::Write,
+) -> Result<(), CacheError> {
+    if version != VERSION && version != VERSION_1 {
+        return Err(CacheError::UnsupportedVersion(version));
+    }
+    let (metas, parts): (Vec<_>, Vec<_>) =
+        entries.iter().map(|e| e.part(version)).collect::<Result<Vec<_>, _>>()?.into_iter().unzip();
+    let (head, places) = head(&parts, version)?;
     out.write_all(&head)?;
     let mut written = head.len();
-    // Each metadata starts where the part before it ends, the head or a grid, at a block.
-    for ((e, m), grid_at) in entries.iter().zip(&metas).zip(places) {
+    // Each metadata starts where the part before it ends, the head or a payload, at a block.
+    for ((e, m), at) in entries.iter().zip(&metas).zip(places) {
         out.write_all(m)?;
         written += m.len();
-        pad_to(out, grid_at * BLOCK, &mut written)?;
-        out.write_all(e.frozen.as_bytes())?;
-        written += e.frozen.as_bytes().len();
+        pad_to(out, at * BLOCK, &mut written)?;
+        written += e.write_payload(version, out)?;
     }
     Ok(())
 }
@@ -192,7 +300,13 @@ static WRITES: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(
 /// write that fails leaves the old one. The directory must be writable; a process killed
 /// while writing may leave the hidden file behind.
 pub fn write(path: &Path, entries: &[CacheEntry]) -> Result<(), CacheError> {
-    replace(path, |out| emit(entries, out))
+    write_version(path, entries, VERSION)
+}
+
+/// Writes a cache file of version `version`, as `write` does and as `to_bytes_version`
+/// states.
+pub fn write_version(path: &Path, entries: &[CacheEntry], version: u32) -> Result<(), CacheError> {
+    replace(path, |out| emit(entries, version, out))
 }
 
 /// Writes the bytes `emit` gives to a hidden file beside `path` and renames it over
@@ -313,6 +427,27 @@ pub(crate) fn decode_meta(bytes: &[u8]) -> Result<(GridMeta, Bounds), CacheError
     Ok((meta, bounds))
 }
 
+/// One entry of bytes of a read file.
+#[derive(Debug, Clone)]
+pub(crate) struct BytesIndex {
+    name: String,
+    extra: BTreeMap<String, String>,
+    /// The bytes' range in the file, padding left out.
+    range: std::ops::Range<usize>,
+}
+
+/// An entry of bytes a cache file holds beside its grids (docs/formats.md §3.5).
+#[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
+pub struct BytesEntry<'a> {
+    /// Its name.
+    pub name: &'a str,
+    /// Its free pairs.
+    pub extra: &'a BTreeMap<String, String>,
+    /// Its bytes.
+    pub bytes: &'a [u8],
+}
+
 /// One grid of a read file.
 #[derive(Debug, Clone)]
 pub(crate) struct Entry {
@@ -327,7 +462,15 @@ pub(crate) struct Entry {
 #[derive(Debug)]
 pub struct CacheFile {
     pub(crate) storage: Storage,
+    pub(crate) index: Index,
+}
+
+/// What a file holds, found by checking it whole.
+#[derive(Debug, Clone)]
+pub(crate) struct Index {
+    pub(crate) version: u32,
     pub(crate) grids: Vec<Entry>,
+    pub(crate) bytes: Vec<BytesIndex>,
 }
 
 /// Where a read file's bytes are: copied into an aligned buffer, or mapped.
@@ -348,16 +491,21 @@ impl Storage {
     }
 }
 
-/// Checks a grid's frozen buffer with the type its directory names.
-fn check_grid(bytes: &[u8], value_type: u32) -> Result<(), FormatError> {
-    struct Check<'a>(&'a [u8]);
+/// Checks a grid's frozen buffer with the type its directory names, of the file's version;
+/// at version 2, the bounds its leaves and tiles cover.
+fn check_grid(bytes: &[u8], value_type: u32, version: u32) -> Result<Option<Bounds>, FormatError> {
+    struct Check<'a>(&'a [u8], u32);
     impl ForType for Check<'_> {
-        type Out = Result<(), FormatError>;
+        type Out = Result<Option<Bounds>, FormatError>;
         fn run<T: Stored>(self) -> Self::Out {
-            GridView::<T>::new(self.0).map(|_| ())
+            let view = GridView::<T>::new(self.0)?;
+            if view.version() != self.1 {
+                return Err(FormatError::UnsupportedVersion(view.version()));
+            }
+            if self.1 == VERSION_1 { Ok(None) } else { view.bounds().map(Some) }
         }
     }
-    with_type(value_type, Check(bytes))
+    with_type(value_type, Check(bytes, version))
         .unwrap_or_else(|found| Err(FormatError::UnknownValueType(found)))
 }
 
@@ -384,70 +532,134 @@ pub(crate) fn range(
     Ok(start..end)
 }
 
-/// Reads the header block: the magic number, this build's format version, and unused
-/// words of zero. Returns the grid count.
-fn header(c: &mut Cursor<'_>) -> Result<u32, CacheError> {
+/// Reads the header block: the magic number, a format version this build reads, and unused
+/// words of zero. Returns the version and the entry count.
+fn header(c: &mut Cursor<'_>) -> Result<(u32, u32), CacheError> {
     let magic = c.u32()?;
     if magic != MAGIC {
         return Err(CacheError::BadMagic(magic));
     }
     let version = c.u32()?;
-    if version != VERSION {
+    if version != VERSION && version != VERSION_1 {
         return Err(CacheError::UnsupportedVersion(version));
     }
     let count = c.u32()?;
     if !zero(c.take(BLOCK - 12)?) {
         return Err(CacheError::Inconsistent("header"));
     }
-    Ok(count)
+    Ok((version, count))
 }
 
-/// Checks a cache file's bytes whole: header, directory, every grid's metadata and frozen
-/// buffer, each where the writer puts it, with no gap, padding of zeros, and nothing after
-/// the last grid (ADR-0016). The bytes start on a 32-byte boundary.
-pub(crate) fn index(all: &[u8]) -> Result<Vec<Entry>, CacheError> {
+/// An entry of bytes' metadata: its name, its byte length and its free pairs, in the bytes
+/// brodo writes for them.
+fn decode_bytes_meta(bytes: &[u8]) -> Result<(String, u64, BTreeMap<String, String>), CacheError> {
+    let mut c = Cursor { rest: bytes, what: "metadata" };
+    let name = c.string()?;
+    let len = <[u8; 8]>::try_from(c.take(8)?).map_err(|_| CacheError::Truncated("metadata"))?;
+    let len = u64::from_le_bytes(len);
+    let mut extra = BTreeMap::new();
+    for _ in 0..c.u32()? {
+        let (k, v) = (c.string()?, c.string()?);
+        if extra.insert(k, v).is_some() {
+            return Err(CacheError::Inconsistent("metadata's keys"));
+        }
+    }
+    let len_usize = usize::try_from(len).map_err(|_| CacheError::TooLarge)?;
+    if !c.rest.is_empty() || encode_bytes_meta(&name, len_usize, &extra)? != bytes {
+        return Err(CacheError::Inconsistent("metadata"));
+    }
+    Ok((name, len, extra))
+}
+
+/// Checks a cache file's bytes whole: header, directory, every entry's metadata and
+/// payload, each where the writer puts it, with no gap, padding of zeros, and nothing after
+/// the last (ADR-0016, docs/formats.md §3.4 and §3.5). The bytes start on a 32-byte
+/// boundary.
+pub(crate) fn index(all: &[u8]) -> Result<Index, CacheError> {
     if all.as_ptr().align_offset(BLOCK) != 0 {
         return Err(CacheError::Inconsistent("alignment"));
     }
     let mut c = Cursor { rest: all, what: "header" };
-    let count = header(&mut c)?;
+    let (version, count) = header(&mut c)?;
     c.what = "directory";
     let mut after = usize::try_from(count)
         .ok()
         .and_then(|n| n.checked_add(1))
         .and_then(|n| n.checked_mul(BLOCK))
         .ok_or(CacheError::Truncated("directory"))?;
-    let mut grids = Vec::new();
-    for index in 0..count {
-        let [meta_at, meta_len, grid_at, grid_blocks, value_type, r0, r1, r2] =
-            [(); 8].map(|()| c.u32());
-        if [r0?, r1?, r2?] != [0; 3] {
+    let mut index = Index { version, grids: Vec::new(), bytes: Vec::new() };
+    for place in 0..count {
+        let [meta_at, meta_len, at, blocks, value_type, kind, r1, r2] = [(); 8].map(|()| c.u32());
+        let kind = kind?;
+        let kind_ok = kind == KIND_GRID || (version == VERSION && kind == KIND_BYTES);
+        if [r1?, r2?] != [0; 2] || !kind_ok {
             return Err(CacheError::Inconsistent("directory"));
         }
         let meta_len =
             usize::try_from(meta_len?).map_err(|_| CacheError::Inconsistent("directory"))?;
         let meta = range(meta_at?, meta_len, after, all.len(), "metadata")?;
-        let grid_len = usize::try_from(grid_blocks?)
+        let len = usize::try_from(blocks?)
             .ok()
             .and_then(|b| b.checked_mul(BLOCK))
             .ok_or(CacheError::Inconsistent("directory"))?;
-        let grid = range(grid_at?, grid_len, meta.end.next_multiple_of(BLOCK), all.len(), "grid")?;
-        if !zero(all.get(meta.end..grid.start).ok_or(CacheError::Truncated("metadata"))?) {
+        let payload = range(at?, len, meta.end.next_multiple_of(BLOCK), all.len(), "grid")?;
+        if !zero(all.get(meta.end..payload.start).ok_or(CacheError::Truncated("metadata"))?) {
             return Err(CacheError::Inconsistent("padding"));
         }
-        let (meta, bounds) =
-            decode_meta(all.get(meta.clone()).ok_or(CacheError::Truncated("metadata"))?)?;
-        let value_type = value_type?;
-        let index = usize::try_from(index).map_err(|_| CacheError::TooLarge)?;
-        check_grid(all.get(grid.clone()).ok_or(CacheError::Truncated("grid"))?, value_type)
-            .map_err(|error| CacheError::Grid { index, error })?;
-        after = grid.end;
-        grids.push(Entry { meta, bounds, value_type, grid });
+        let meta = all.get(meta).ok_or(CacheError::Truncated("metadata"))?;
+        after = payload.end;
+        if kind == KIND_BYTES {
+            index.bytes.push(bytes_entry(all, meta, payload, value_type?)?);
+            continue;
+        }
+        let place = usize::try_from(place).map_err(|_| CacheError::TooLarge)?;
+        index.grids.push(grid_entry(all, meta, payload, value_type?, version, place)?);
     }
     if after != all.len() {
         return Err(CacheError::Inconsistent("end"));
     }
-    Ok(grids)
+    Ok(index)
+}
+
+/// The grid at `payload`, the entry at `place` in the directory, its metadata `meta`, checked
+/// as a file of `version` states (docs/formats.md §3.4, rules 4 and 5, and §3.5, rule 8).
+fn grid_entry(
+    all: &[u8],
+    meta: &[u8],
+    payload: std::ops::Range<usize>,
+    value_type: u32,
+    version: u32,
+    place: usize,
+) -> Result<Entry, CacheError> {
+    let (meta, bounds) = decode_meta(meta)?;
+    let grid = all.get(payload.clone()).ok_or(CacheError::Truncated("grid"))?;
+    let found = check_grid(grid, value_type, version)
+        .map_err(|error| CacheError::Grid { index: place, error })?;
+    if found.is_some_and(|b| b != bounds) {
+        return Err(CacheError::Inconsistent("bounds"));
+    }
+    Ok(Entry { meta, bounds, value_type, grid: payload })
+}
+
+/// An entry of bytes at `payload`, checked as docs/formats.md §3.5, rule 7, states.
+fn bytes_entry(
+    all: &[u8],
+    meta: &[u8],
+    payload: std::ops::Range<usize>,
+    value_type: u32,
+) -> Result<BytesIndex, CacheError> {
+    let (name, len, extra) = decode_bytes_meta(meta)?;
+    let len = usize::try_from(len).map_err(|_| CacheError::TooLarge)?;
+    let blocks = payload.len();
+    let within = len <= blocks && blocks - len < BLOCK;
+    if value_type != 0 || !within {
+        return Err(CacheError::Inconsistent("entry of bytes"));
+    }
+    let end = payload.start + len;
+    if !zero(all.get(end..payload.end).ok_or(CacheError::Truncated("entry of bytes"))?) {
+        return Err(CacheError::Inconsistent("padding"));
+    }
+    Ok(BytesIndex { name, extra, range: payload.start..end })
 }
 
 pub(crate) fn zero(bytes: &[u8]) -> bool {
@@ -533,8 +745,8 @@ impl CacheFile {
         }
         whole_blocks(read)?;
         blocks.truncate(filled / BLOCK);
-        let grids = index(blocks.as_bytes())?;
-        Ok(Self { storage: Storage::Copied(blocks), grids })
+        let index = index(blocks.as_bytes())?;
+        Ok(Self { storage: Storage::Copied(blocks), index })
     }
 
     /// Checks bytes whole as a cache file, copying them to an aligned buffer, as
@@ -543,17 +755,37 @@ impl CacheFile {
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, CacheError> {
         whole_blocks(u64::try_from(bytes.len()).unwrap_or(u64::MAX))?;
         let blocks = aligned(bytes);
-        let grids = index(blocks.as_bytes())?;
-        Ok(Self { storage: Storage::Copied(blocks), grids })
+        let index = index(blocks.as_bytes())?;
+        Ok(Self { storage: Storage::Copied(blocks), index })
     }
 
     fn entry(&self, i: usize) -> Result<&Entry, CacheError> {
-        self.grids.get(i).ok_or(CacheError::NoGrid(i))
+        self.index.grids.get(i).ok_or(CacheError::NoGrid(i))
     }
 
-    /// The number of grids.
+    /// The file's format version: 2, or 1 (docs/formats.md §3, §3.5).
+    pub fn version(&self) -> u32 {
+        self.index.version
+    }
+
+    /// The number of grids; an entry of bytes is not one, and grids are numbered among
+    /// themselves, in the file's order.
     pub fn grid_count(&self) -> usize {
-        self.grids.len()
+        self.index.grids.len()
+    }
+
+    /// The entries of bytes, in the file's order; a file of version 1 holds none.
+    pub fn bytes_entries(&self) -> Vec<BytesEntry<'_>> {
+        let all = self.storage.bytes();
+        self.index
+            .bytes
+            .iter()
+            .map(|b| BytesEntry {
+                name: &b.name,
+                extra: &b.extra,
+                bytes: all.get(b.range.clone()).unwrap_or_default(),
+            })
+            .collect()
     }
 
     /// A grid's metadata.
@@ -561,10 +793,10 @@ impl CacheFile {
         Ok(&self.entry(i)?.meta)
     }
 
-    /// The bounds the file states for a grid: its writer's box of the voxels its leaves and
-    /// tiles cover, not checked against the grid (docs/formats.md §3.4), so a file from
-    /// another writer may state others. `Bounds::of` on the grid's thawed topology gives
-    /// the true ones.
+    /// The bounds the file states for a grid: the box of the voxels its leaves and tiles
+    /// cover, checked against them in a file of version 2 (docs/formats.md §3.5); in one of
+    /// version 1 not checked (§3.4), so that a file from another writer may state others,
+    /// and `Bounds::of` on the grid's thawed topology gives the true ones.
     pub fn bounds(&self, i: usize) -> Result<Bounds, CacheError> {
         Ok(self.entry(i)?.bounds)
     }

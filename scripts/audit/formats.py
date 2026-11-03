@@ -85,13 +85,24 @@ def below(mask, p):
     return n + bin(mask[p // 32] & ((1 << (p % 32)) - 1)).count("1")
 
 
+def morton(c):
+    """§1.2: the Morton key of an origin."""
+    out = 0
+    for axis, x in enumerate(c):
+        x = (x & 0xFFFFFFFF) ^ 0x80000000
+        for i in range(32):
+            out |= ((x >> i) & 1) << (3 * i + axis)
+    return out
+
+
 class Grid:
-    """A frozen buffer, §2, checked as §2.5 says."""
+    """A frozen buffer, §2, checked as §2.5 says, and at version 2 as §2.7 says."""
 
     def __init__(self, b, value_type=None):
         need(len(b) % BLOCK == 0 and len(b) >= 96, "length")
         need(b[0:4] == b"BRDG", "magic")
-        need(u32(b, 4) == 1, "version")
+        self.version = u32(b, 4)
+        need(self.version in (1, 2), "version")
         code, size = u32(b, 8), u32(b, 12)
         need(code in TYPES and TYPES[code][0] == size, "value type")
         need(value_type is None or code == value_type, "value type")
@@ -126,6 +137,59 @@ class Grid:
             self.roots.append((key, kind, index))
         self.uppers = [self.node(u + UPPER_NODE * i, 1024, nl) for i in range(nu)]
         self.lowers = [self.node(lo + LOWER_NODE * i, 128, self.nleaves) for i in range(nl)]
+        if self.version == 2:
+            self.writer_rules(counts, offsets, entry, (r, u, lo))
+
+    def writer_rules(self, counts, offsets, entry, at):
+        """§2.7 rules 7 to 11."""
+        b, (r, u, lo) = self.b, at
+        zero = lambda x: x == b"\0" * len(x)
+        need(zero(b[84:96]) and zero(b[60 + self.size : 84]), "padding")
+        need(all(zero(b[r + 32 * i + 20 : r + 32 * i + 32]) for i in range(counts[0])), "padding")
+        need(all(zero(b[u + UPPER_NODE * i + 8200 : u + UPPER_NODE * (i + 1)]) for i in range(counts[1])), "padding")
+        need(all(zero(b[lo + LOWER_NODE * i + 1032 : lo + LOWER_NODE * (i + 1)]) for i in range(counts[2])), "padding")
+        block = 3
+        for count, offset, e in zip(counts, offsets, entry):
+            need(offset == block, "section place")
+            block += -(-count * e // BLOCK)
+        need(u32(b, 56) == block, "blocks")
+        root_tiles = [index for _, kind, index in self.roots if kind == 0]
+        need(root_tiles == list(range(len(root_tiles))), "root tile places")
+        named = {}
+        for key, kind, index in self.roots:
+            if kind == 1:
+                need(index not in named, "upper node named twice")
+                named[index] = key
+        need(sorted(named) == list(range(len(self.uppers))), "upper node unnamed")
+        keys = [morton(named[i]) for i in range(len(self.uppers))]
+        need(all(a < c for a, c in zip(keys, keys[1:])), "upper node order")
+        ones = lambda m: sum(bin(w).count("1") for w in m)
+        tiles, lowers, leaves = len(root_tiles), 0, 0
+        for nodes, count_of in ((self.uppers, "lowers"), (self.lowers, "leaves")):
+            for children, ntiles, first_child, first_tile in nodes:
+                nc, nt = ones(children), ones(ntiles)
+                need(nc + nt > 0, "empty node")
+                done = lowers if count_of == "lowers" else leaves
+                need(first_child == (done if nc else 0), "first child")
+                need(first_tile == (tiles if nt else 0), "first tile")
+                if count_of == "lowers":
+                    lowers += nc
+                else:
+                    leaves += nc
+                tiles += nt
+        need(lowers == len(self.lowers) and leaves == self.nleaves, "children count")
+        need(tiles == self.ntiles, "tile count")
+
+    def bounds(self):
+        """The box of the voxels the leaves and tiles cover, or None."""
+        leaves, tiles = self.regions()
+        cubes = [(o, 8) for o in leaves if o is not None]
+        cubes += [(o, 1 << LEVEL_EDGE_LOG2[level]) for level, o, _ in tiles]
+        if not cubes:
+            return None
+        lo = [min(o[k] for o, _ in cubes) for k in range(3)]
+        hi = [max(o[k] + e - 1 for o, e in cubes) for k in range(3)]
+        return lo + hi
 
     def node(self, at, words, nchildren):
         b = self.b
@@ -295,19 +359,35 @@ def metadata(b):
     return m
 
 
-def cache(b):
-    """§3, checked as §3.4 says: a list of (metadata, grid)."""
+def bytes_metadata(b):
+    """§3.5: an entry of bytes' metadata: its name, its byte length and its pairs."""
+    c = Cursor(b)
+    m = {"name": c.string(), "length": struct.unpack("<Q", c.take(8))[0]}
+    pairs = []
+    for _ in range(c.u32()):
+        pairs.append((c.string(), c.string()))
+    need(all(a[0] < z[0] for a, z in zip(pairs, pairs[1:])), "key order")
+    need(c.at == len(b), "metadata length")
+    m["pairs"] = pairs
+    return m
+
+
+def cache(b, entries=None):
+    """§3, checked as §3.4 and §3.5 say: a list of (metadata, grid); each entry of bytes,
+    (metadata, bytes), is added to `entries`."""
     need(len(b) % BLOCK == 0, "length")
     need(len(b) >= BLOCK and b[0:4] == b"BRDC", "magic")
-    need(u32(b, 4) == 1, "version")
+    version = u32(b, 4)
+    need(version in (1, 2), "version")
     count = u32(b, 8)
     need(b[12:32] == b"\0" * 20, "header")
     after, out = (count + 1) * BLOCK, []
     for i in range(count):
         d = 32 * (1 + i)
         need(d + 32 <= len(b), "directory")
-        meta_at, meta_len, grid_at, grid_blocks, code = (u32(b, d + 4 * k) for k in range(5))
-        need(b[d + 20 : d + 32] == b"\0" * 12, "directory")
+        meta_at, meta_len, grid_at, grid_blocks, code, kind = (u32(b, d + 4 * k) for k in range(6))
+        need(b[d + 24 : d + 32] == b"\0" * 8, "directory")
+        need(kind == 0 or (version == 2 and kind == 1), "directory")
         start = meta_at * BLOCK
         need(start == after and start + meta_len <= len(b), "metadata place")
         meta_end = start + meta_len
@@ -315,10 +395,21 @@ def cache(b):
         grid_end = grid_start + grid_blocks * BLOCK
         need(grid_at * BLOCK == grid_start and grid_end <= len(b), "grid place")
         need(b[meta_end:grid_start] == b"\0" * (grid_start - meta_end), "padding")
+        after = grid_end
+        if kind == 1:
+            m = bytes_metadata(b[start:meta_end])
+            n = m["length"]
+            need(code == 0 and n <= grid_end - grid_start < n + BLOCK, "entry of bytes")
+            need(b[grid_start + n : grid_end] == b"\0" * (grid_end - grid_start - n), "padding")
+            if entries is not None:
+                entries.append((m, b[grid_start : grid_start + n]))
+            continue
         m = metadata(b[start:meta_end])
         need(code in TYPES, "value type")
-        out.append((m, Grid(b[grid_start:grid_end], code)))
-        after = grid_end
+        g = Grid(b[grid_start:grid_end], code)
+        need(g.version == version, "grid version")
+        need(version == 1 or m["bounds"] == g.bounds(), "bounds")
+        out.append((m, g))
     need(after == len(b), "end")
     return out
 
@@ -410,15 +501,16 @@ def parse(b):
     in blocks and its bytes."""
     need(len(b) % BLOCK == 0, "length")
     need(len(b) >= BLOCK and b[0:4] == b"BRDA", "magic")
-    need(u32(b, 4) == 1, "version")
+    version = u32(b, 4)
+    need(version in (1, 2), "version")
     count = u32(b, 8)
     need(u32(b, 12) == 1 and u32(b, 16) == 512 and b[20:32] == b"\0" * 12, "header")
     after, grids = (count + 1) * BLOCK, []
     need(after <= len(b), "directory")
     for i in range(count):
         d = 32 * (1 + i)
-        meta_at, meta_len, table_at, chunks, grid_blocks, code, encoding = (u32(b, d + 4 * k) for k in range(7))
-        need(b[d + 28 : d + 32] == b"\0" * 4, "directory")
+        meta_at, meta_len, table_at, chunks, grid_blocks, code, encoding, kind = (u32(b, d + 4 * k) for k in range(8))
+        need(kind == 0 or (version == 2 and kind == 1 and code == 0 and encoding == 0), "directory")
         need(encoding in (0, 1, 2), "encoding")
         need(encoding == 0 or code in FLOATING, "directory")
         comps = FLOATING[code][2] if encoding == 2 else 0
@@ -440,10 +532,10 @@ def parse(b):
         for (_, a), (z, _) in zip(parts, parts[1:] + [(end, end)]):
             need(b[a:z] == b"\0" * (z - a), "padding")
         meta = b[parts[0][0] : parts[0][1]]
-        grids.append((meta, grid_blocks, code, encoding, ranges, listed))
+        grids.append((meta, grid_blocks, code, encoding, ranges, listed, kind))
         after = end
     need(after == len(b), "end")
-    return grids
+    return version, grids
 
 
 def leaf_chunk(c, raw, code, encoding, ranges):
@@ -454,17 +546,26 @@ def leaf_chunk(c, raw, code, encoding, ranges):
     return restore(encoding, code, ranges, lz4(c, raw * BLOCK // size * {1: 2, 2: 1}[encoding]))
 
 
-def archive(b):
-    """§8, checked as §8.4 says: the cache file it decompresses into, and the chunks' lengths."""
-    grids = parse(b)
+def archive(b, entries=None):
+    """§8, checked as §8.4 and §8.7 say: the cache file it decompresses into, and the
+    chunks' lengths."""
+    version, grids = parse(b)
     count = len(grids)
-    # The cache file of the same grids, §3, its frozen buffers decompressed: each first
-    # chunk, its header telling how the grid is cut, then the others, leaf values restored.
-    head, body, at = [b"BRDC", struct.pack("<II", 1, count), b"\0" * 20], [], 1 + count
-    for meta, grid_blocks, code, encoding, ranges, listed in grids:
+    # The cache file of the same entries, §3, its frozen buffers decompressed: each first
+    # chunk, its header telling how the grid is cut, then the others, leaf values restored;
+    # an entry of bytes's chunks each as it is, every 512 × 512 bytes but the last (§8.7).
+    head, body, at = [b"BRDC", struct.pack("<II", version, count), b"\0" * 20], [], 1 + count
+    for meta, grid_blocks, code, encoding, ranges, listed, kind in grids:
         grid_at = at + -(-len(meta) // BLOCK)
-        head.append(struct.pack("<5I", at, len(meta), grid_at, grid_blocks, code) + b"\0" * 12)
+        head.append(struct.pack("<6I", at, len(meta), grid_at, grid_blocks, code, kind) + b"\0" * 8)
         body.append(meta + b"\0" * (-len(meta) % BLOCK))
+        if kind == 1:
+            step = 512 * 512 // BLOCK
+            sizes = [min(step, grid_blocks - s) for s in range(0, grid_blocks, step)]
+            need([r for r, _ in listed] == sizes, "chunks")
+            body.extend(lz4(c, raw * BLOCK) for raw, c in listed)
+            at = grid_at + grid_blocks
+            continue
         first = lz4(listed[0][1], listed[0][0] * BLOCK) if listed else b""
         pieces = cuts(first, grid_blocks)
         need([r for r, _ in pieces] == [r for r, _ in listed] and not pieces[0][1], "chunks")
@@ -472,15 +573,16 @@ def archive(b):
         for (raw, c), (_, leaf) in list(zip(listed, pieces))[1:]:
             body.append(leaf_chunk(c, raw, code, encoding, ranges) if leaf else lz4(c, raw * BLOCK))
         at = grid_at + grid_blocks
-    return cache(b"".join(head + body))
+    return cache(b"".join(head + body), entries)
 
 
 def region(b, index, lo, hi):
     """§8.6: grid `index`'s region, the box of voxels `lo` to `hi`, checked as §8.6 says: the
     grid, holding the chunks read, the others zero, and the leaves meeting the box."""
-    grids = parse(b)
+    _, entries = parse(b)
+    grids = [e for e in entries if e[6] == 0]
     need(index < len(grids), "no grid")
-    meta, grid_blocks, code, encoding, ranges, listed = grids[index]
+    meta, grid_blocks, code, encoding, ranges, listed, _ = grids[index]
     metadata(meta)
     need(listed, "chunks")
     first = lz4(listed[0][1], listed[0][0] * BLOCK)
@@ -635,14 +737,57 @@ def group_table(pairs):
     return [b""] + names if names else []
 
 
-def hermite(grids, name):
-    """§4.2: checks the set `name`; returns its group table."""
+def hermite_v2(grids, entries, name):
+    """§4.3: the set `name`'s sign grid and metadata, and its crossings: a function from a
+    leaf, an axis and a place to a crossing, or none."""
+    signs, crossings = [], []
+    for m, g in grids:
+        pairs = dict(m["pairs"])
+        if pairs.get(b"hermite.set") == name:
+            need(pairs.get(b"hermite.field") == b"sign", "hermite field")
+            signs.append((m, g))
+    for m, data in entries:
+        pairs = dict(m["pairs"])
+        if pairs.get(b"hermite.set") == name:
+            need(pairs.get(b"hermite.field") == b"crossings", "hermite field")
+            ours = {b"hermite.version", b"hermite.set", b"hermite.field"}
+            need(all(not k.startswith(b"hermite.") or k in ours for k in pairs), "hermite key")
+            crossings.append(data)
+    need(len(signs) == 1 and len(crossings) == 1, "hermite missing")
+    (sm, s), data = signs[0], crossings[0]
+    need(s.code == FIELD_TYPES["sign"], "hermite type")
+    masks, starts = [], [0]
+    for n in range(s.nleaves):
+        words = struct.unpack_from("<24Q", data, 192 * n) if 192 * (n + 1) <= len(data) else None
+        need(words is not None, "crossings length")
+        masks.append(words)
+        starts.append(starts[-1] + sum(bin(w).count("1") for w in words))
+    need(len(data) == 192 * s.nleaves + 20 * starts[-1], "crossings length")
+
+    def crossing(n, axis, i):
+        words = masks[n]
+        if not (words[8 * axis + i // 64] >> (i % 64)) & 1:
+            return None
+        before = sum(bin(w).count("1") for w in words[: 8 * axis + i // 64])
+        before += bin(words[8 * axis + i // 64] & ((1 << (i % 64)) - 1)).count("1")
+        at = 192 * s.nleaves + 20 * (starts[n] + before)
+        return data[at : at + 4], data[at + 4 : at + 16], struct.unpack_from("<I", data, at + 16)[0]
+
+    return sm, s, crossing
+
+
+def hermite(grids, name, entries=()):
+    """§4.2 and §4.3: checks the set `name`; returns its group table."""
+    versions = {dict(m["pairs"]).get(b"hermite.version") for m, _ in list(grids) + list(entries)
+                if dict(m["pairs"]).get(b"hermite.set") == name}
+    need(len(versions) == 1 and versions <= {b"1", b"2"}, "hermite version")
+    if versions == {b"2"}:
+        return hermite_check(*hermite_v2(grids, entries, name), None)
     found = {}
     for m, g in grids:
         pairs = dict(m["pairs"])
         if pairs.get(b"hermite.set") != name:
             continue
-        need(pairs.get(b"hermite.version") == b"1", "hermite version")
         field = pairs.get(b"hermite.field", b"").decode()
         need(field in FIELDS and field not in found, "hermite field")
         need(g.code == FIELD_TYPES[field.split(".")[-1]], "hermite type")
@@ -654,9 +799,16 @@ def hermite(grids, name):
         same = (m["voxel_size"], m["transform"], m["unit"])
         need(same == (sm["voxel_size"], sm["transform"], sm["unit"]), "hermite metadata")
         need(g.tree == s.tree, "hermite topology")
+    axes = [tuple(found[f"{a}.{f}"][1] for f in ("fraction", "normal", "group")) for a in "xyz"]
+    return hermite_check(sm, s, None, axes)
+
+
+def hermite_check(sm, s, sparse, axes=None):
+    """§4.2 rules 4 to 11 on a set's sign grid `s` and its crossings: `sparse`, a function
+    from a leaf, an axis and a place to a crossing or none, at version 2; or, at version 1,
+    `axes`, each axis's three dense grids."""
     names = group_table(sm["pairs"])
     groups = max(len(names), 1)
-    axes = [tuple(found[f"{a}.{f}"][1] for f in ("fraction", "normal", "group")) for a in "xyz"]
 
     def crossing(axis, get):
         f, n, g = axes[axis]
@@ -664,13 +816,13 @@ def hermite(grids, name):
 
     sign = lambda v: s.get(v)[0]
     need(s.background == b"\0", "sign background")
-    for a in range(3):
+    for a in range(3 if axes else 0):
         need(crossing(a, lambda g: g.background) == NO_CROSSING, "crossing background")
     leaves, tiles = s.regions()
     need(None not in leaves, "leaf unreached")
     for _, _, t in tiles:
         need(s.tile(t)[0] <= 1, "tile sign")
-        for a in range(3):
+        for a in range(3 if axes else 0):
             need(crossing(a, lambda g: g.tile(t)) == NO_CROSSING, "tile crossing")
     for n in range(s.nleaves):
         need(all(x <= 1 for x in s.leaf(n)), "leaf sign")
@@ -692,7 +844,10 @@ def hermite(grids, name):
             here = sign(v)
             for a in range(3):
                 w = [v[k] + unit[a][k] for k in range(3)]
-                c = crossing(a, lambda g: g.leaf(n)[i * g.size : (i + 1) * g.size])
+                if axes:
+                    c = crossing(a, lambda g: g.leaf(n)[i * g.size : (i + 1) * g.size])
+                else:
+                    c = sparse(n, a, i) or NO_CROSSING
                 if sign(w) == here:
                     need(c == NO_CROSSING, "crossing where signs agree")
                 else:
@@ -749,15 +904,16 @@ def read(path, brief, b=None, box=None):
         print("end")
         return
     try:
+        entries = []
         if b[0:4] == b"BRDG":
             grids, sets = [(None, Grid(b))], []
         else:
-            grids = archive(b) if b[0:4] == b"BRDA" else cache(b)
+            grids = archive(b, entries) if b[0:4] == b"BRDA" else cache(b, entries)
             sets = sorted({dict(m["pairs"]).get(b"hermite.set") for m, _ in grids} - {None})
         verdicts = []
         for name in sets:
             try:
-                verdicts.append(f"hermite {name.hex()} ok " + " ".join(n.hex() or "-" for n in hermite(grids, name)))
+                verdicts.append(f"hermite {name.hex()} ok " + " ".join(n.hex() or "-" for n in hermite(grids, name, entries)))
             except (Refused, struct.error, IndexError, ZeroDivisionError) as e:
                 verdicts.append(f"hermite {name.hex()} refused {e}")
     except (Refused, struct.error, IndexError) as e:

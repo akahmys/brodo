@@ -8,10 +8,12 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: version 2 of the frozen layout, the cache and archive profiles and Hermite
-  data stated in docs/formats.md before the code (ADR-0051, ADR-0052); unreleased.
-- **Next**: version 2 in the code, read and written, version 1 read and written on
-  request; then P8's closing checks and 0.9.0.
+- **Done**: P8's last unit: version 2 of the frozen layout, the cache and archive
+  profiles and Hermite data, every writer rule checked, entries of bytes, and Hermite
+  data's crossings held sparsely (ADR-0051, ADR-0052); version 1 read and written on
+  request; unreleased.
+- **Next**: P8's closing checks, chosen by the owner (ADR-0033), and 0.9.0; then P9, 1.0
+  on crates.io.
 
 ## 2. Milestones
 
@@ -490,7 +492,7 @@ time, the gate, the mutation run of what changed and the benchmarks besides (202
       says they read, said apart from what was tried; the viewers not installed nor tried,
       the owner choosing on 2026-11-03 their documentation over installing them, as
       AGENTS.md's "Hierarchy of truth" allows for a claim outside the repository
-- [ ] B-023 (ADR-0051) and B-022 (ADR-0052), the owner's order (2026-11-02):
+- [x] B-023 (ADR-0051) and B-022 (ADR-0052), the owner's order (2026-11-02):
       - [x] B-023's spike: Hermite data's crossings held only on the edges that hold one,
             its memory and writing time measured against the dense fields' on spheres of
             radius 200, 600 and 1500 voxels (`spikes/hermitesparse/`, 2026-11-03): sparse,
@@ -500,10 +502,11 @@ time, the gate, the mutation run of what changed and the benchmarks besides (202
       - [x] Version 2 of the frozen layout, the cache and archive profiles and Hermite data
             stated in docs/formats.md §2.7, §3.5, §4.3 and §8.7 before the code, B-022's
             checks all taken (the owner, 2026-11-03; ADR-0052)
-      - [ ] Hermite data's format version raised if the spike keeps it sparse; the frozen
-            layout's and the cache profile's raised with B-022's checks; each reading the
-            version before it and writing it on request (ADR-0038), docs/formats.md and the
-            golden files with them
+      - [x] Hermite data's format version raised, its crossings held sparsely; the frozen
+            layout's, the cache profile's and the archive profile's raised with B-022's
+            checks; each reading the version before it and writing it on request
+            (ADR-0038), `formats.py` reading version 2 and its golden files joining §7's
+            (2026-11-03)
 - [ ] The closing checks the owner chooses by P8's content (ADR-0033)
 - [ ] Version 0.9.0 (TESTING.md V2–V4)
 - [ ] **Accepted when** `vdb::read` refuses a file that would make more than `limit`

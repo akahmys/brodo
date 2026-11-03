@@ -10,7 +10,7 @@
 
 use std::collections::BTreeMap;
 
-use brodo::cache::{CacheEntry, CacheFile, to_bytes, write};
+use brodo::cache::{CacheEntry, CacheFile, to_bytes, to_bytes_version, write};
 use brodo::error::{CacheError, FormatError, MetaError};
 use brodo::field::{Field, Stored, Value};
 use brodo::meta::{Bounds, GridMeta};
@@ -132,21 +132,53 @@ fn metadata_needs_a_unit_and_finite_sizes() {
 }
 
 /// The grids of the committed file.
-fn golden() -> Vec<u8> {
+/// The committed file's grids: two, `f32` and `[f32; 3]`, on leaves and a tile.
+fn golden_entries() -> Vec<CacheEntry> {
     let t = build(
         &[[-1, 0, 0], [4096, 7, 9]],
         &[(TileLevel::Lower, [8, 8, 8]), (TileLevel::Root, [0, 8192, 0])],
     );
     let f = numbered(&t, -1.0_f32, |k| k as f32 + 0.5);
     let g = numbered(&t, [0.0_f32; 3], |k| [k as f32, 1.0, -1.0]);
-    let entries = [
+    vec![
         CacheEntry::new(&meta("density", &[("source", "test")]), &t, &f).unwrap(),
         CacheEntry::new(&meta("velocity", &[]), &t, &g).unwrap(),
-    ];
-    to_bytes(&entries).unwrap()
+    ]
+}
+
+/// The committed file's bytes at version 1, written on request.
+fn golden() -> Vec<u8> {
+    to_bytes_version(&golden_entries(), 1).unwrap()
 }
 
 const GOLDEN: &[u8] = include_bytes!("data/cache_v1.bin");
+const GOLDEN_2: &[u8] = include_bytes!("data/cache_v2.bin");
+
+/// The committed file of version 2: the same grids, and an entry of bytes between them.
+fn golden_entries_v2() -> Vec<CacheEntry> {
+    let mut e = golden_entries();
+    let extra = BTreeMap::from([("kind".to_owned(), "notes".to_owned())]);
+    e.insert(1, CacheEntry::bytes("readme", extra, b"brodo, 2026".to_vec()).unwrap());
+    e
+}
+
+/// Version 2 keeps its bytes: its grids' frozen buffers of layout version 2, an entry of
+/// bytes in its place in the directory, its bytes read back (docs/formats.md §3.5).
+#[test]
+fn format_version_2_keeps_its_bytes() {
+    let bytes = to_bytes(&golden_entries_v2()).unwrap();
+    assert!(bytes == GOLDEN_2, "the bytes of cache format version 2 changed; raise the version");
+    let file = CacheFile::from_bytes(GOLDEN_2).unwrap();
+    assert_eq!((file.version(), file.grid_count()), (2, 2));
+    let entries = file.bytes_entries();
+    assert_eq!(entries.len(), 1);
+    assert_eq!((entries[0].name, entries[0].bytes), ("readme", &b"brodo, 2026"[..]));
+    assert_eq!(entries[0].extra.get("kind").map(String::as_str), Some("notes"));
+    assert_eq!(file.meta(1).unwrap().name, "velocity");
+    assert!(matches!(to_bytes_version(&golden_entries_v2(), 1), Err(CacheError::BytesAtVersion1)));
+    let one = CacheFile::from_bytes(GOLDEN).unwrap();
+    assert_eq!((one.version(), one.bytes_entries().len()), (1, 0));
+}
 
 /// A file is replaced whole, not written in place (G1 of P5's review): a handle opened on
 /// the old file reads the old bytes after a new file is written over it, and nothing is
@@ -290,7 +322,12 @@ fn each_check_refuses_its_damage() {
     let g = golden();
     let read = |b: &[u8]| CacheFile::from_bytes(b).map(|_| ());
     assert!(matches!(read(&with_word(&g, 0, 9)), Err(CacheError::BadMagic(9))));
-    assert!(matches!(read(&with_word(&g, 1, 2)), Err(CacheError::UnsupportedVersion(2))));
+    assert!(matches!(read(&with_word(&g, 1, 3)), Err(CacheError::UnsupportedVersion(3))));
+    // A file of version 2 whose grids' frozen buffers are of version 1.
+    assert!(matches!(
+        read(&with_word(&g, 1, 2)),
+        Err(CacheError::Grid { index: 0, error: FormatError::UnsupportedVersion(1) })
+    ));
     assert!(matches!(read(&g[..g.len() - 32]), Err(CacheError::Truncated("grid"))));
     assert!(matches!(read(&g[..g.len() - 1]), Err(CacheError::Inconsistent("length"))));
     // Directory of grid 0 is words 8..16: metadata at, length, grid at, blocks, type.

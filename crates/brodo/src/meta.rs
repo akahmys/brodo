@@ -87,15 +87,18 @@ impl Bounds {
             let (level, o) = t.tile(n)?;
             cubes.push((o, level.edge() - 1));
         }
-        Ok(cubes.into_iter().fold(Bounds::Empty, |b, (o, e)| {
-            let far = o.map(|c| c + e);
-            match b {
-                Bounds::Empty => Bounds::Box { min: o, max: far },
-                Bounds::Box { min, max } => Bounds::Box {
-                    min: [0, 1, 2].map(|k| min[k].min(o[k])),
-                    max: [0, 1, 2].map(|k| max[k].max(far[k])),
-                },
-            }
-        }))
+        Ok(cubes.into_iter().fold(Bounds::Empty, |b, (o, e)| b.with_cube(o, e)))
+    }
+
+    /// These bounds grown to hold the cube at `o` of edge `e` + 1.
+    pub(crate) fn with_cube(self, o: Coord, e: i32) -> Bounds {
+        let far = o.map(|c| c + e);
+        match self {
+            Bounds::Empty => Bounds::Box { min: o, max: far },
+            Bounds::Box { min, max } => Bounds::Box {
+                min: [0, 1, 2].map(|k| min[k].min(o[k])),
+                max: [0, 1, 2].map(|k| max[k].max(far[k])),
+            },
+        }
     }
 }

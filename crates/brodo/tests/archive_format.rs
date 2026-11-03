@@ -7,8 +7,8 @@
 #![cfg(feature = "archive")]
 
 use brodo::archive::{
-    Encoding, from_bytes, read, read_region, region_from_bytes, to_bytes, to_bytes_with, write,
-    write_with,
+    Encoding, from_bytes, read, read_region, region_from_bytes, to_bytes, to_bytes_version,
+    to_bytes_with, write, write_with,
 };
 use brodo::cache::{self, CacheEntry, CacheFile};
 use brodo::error::{CacheError, FormatError};
@@ -70,6 +70,38 @@ fn golden_entries() -> Vec<CacheEntry> {
 }
 
 const GOLDEN: &[u8] = include_bytes!("data/archive_v1.bin");
+const GOLDEN_2: &[u8] = include_bytes!("data/archive_v2.bin");
+
+/// An archive of version 2 keeps its bytes, holds an entry of bytes cut every 256 KiB, and
+/// reads back as the cache file of the same entries (docs/formats.md §8.7); one of more
+/// than a chunk is cut so too.
+#[test]
+fn format_version_2_keeps_its_bytes() {
+    let mut e = golden_entries();
+    let extra = std::collections::BTreeMap::from([("kind".to_owned(), "notes".to_owned())]);
+    e.insert(1, CacheEntry::bytes("readme", extra, b"brodo, 2026".to_vec()).unwrap());
+    let bytes = to_bytes(&e).unwrap();
+    assert!(bytes == GOLDEN_2, "the bytes of archive format version 2 changed; raise the version");
+    let file = from_bytes(GOLDEN_2, u64::MAX).unwrap();
+    let cached = CacheFile::from_bytes(&cache::to_bytes(&e).unwrap()).unwrap();
+    assert_eq!((file.version(), file.grid_count()), (cached.version(), cached.grid_count()));
+    assert!(file.bytes_entries()[0].bytes == b"brodo, 2026");
+    assert_eq!(file.bytes_entries()[0].name, cached.bytes_entries()[0].name);
+    for i in 0..2 {
+        assert_eq!(file.meta(i).unwrap(), cached.meta(i).unwrap());
+    }
+    let large: Vec<u8> = (0..600_000_u32).map(|i| (i % 251) as u8).collect();
+    let big = [CacheEntry::bytes("large", Default::default(), large.clone()).unwrap()];
+    let read = from_bytes(&to_bytes(&big).unwrap(), u64::MAX).unwrap();
+    assert!(read.bytes_entries()[0].bytes == large.as_slice());
+    let word = |b: &[u8], at: usize| u32::from_le_bytes(b[at..at + 4].try_into().unwrap());
+    let packed = to_bytes(&big).unwrap();
+    assert_eq!(word(&packed, 44), 3, "chunks of 8192, 8192 and the rest");
+    let encoded = to_bytes_with(&[(&big[0], Encoding::Binary16)]);
+    assert!(matches!(encoded, Err(CacheError::NotQuantised { index: 0, value_type: 0 })));
+    let one = to_bytes_version(&[(&e[1], Encoding::Exact)], 1);
+    assert!(matches!(one, Err(CacheError::BytesAtVersion1)));
+}
 const QUANTISED: &[u8] = include_bytes!("data/archive_v1_quantised.bin");
 
 /// How far a binary16 value restores from x (docs/formats.md §8.5): 2⁻¹¹ × |x| + 2⁻²⁵.
@@ -151,7 +183,9 @@ fn the_same_grids_give_the_same_bytes_whatever_the_threads() {
 
 #[test]
 fn format_version_1_keeps_its_bytes_and_a_file_round_trips() {
-    let bytes = to_bytes(&golden_entries()).unwrap();
+    let e = golden_entries();
+    let bytes =
+        to_bytes_version(&e.iter().map(|g| (g, Encoding::Exact)).collect::<Vec<_>>(), 1).unwrap();
     assert_eq!(bytes.len(), GOLDEN.len(), "length");
     assert!(
         bytes == GOLDEN,
@@ -276,7 +310,7 @@ fn each_check_refuses_its_damage() {
     let read = |b: &[u8]| from_bytes(b, u64::MAX).map(|_| ());
     let cache_file = cache::to_bytes(&golden_entries()).unwrap();
     assert!(matches!(read(&cache_file), Err(CacheError::BadMagic(_))));
-    assert!(matches!(read(&with_word(&g, 1, 2)), Err(CacheError::UnsupportedVersion(2))));
+    assert!(matches!(read(&with_word(&g, 1, 3)), Err(CacheError::UnsupportedVersion(3))));
     assert!(matches!(read(&with_word(&g, 3, 2)), Err(CacheError::Inconsistent("header"))));
     assert!(matches!(read(&with_word(&g, 4, 256)), Err(CacheError::Inconsistent("header"))));
     assert!(matches!(read(&with_word(&g, 5, 1)), Err(CacheError::Inconsistent("header"))));
@@ -372,13 +406,13 @@ proptest! {
 #[test]
 fn quantised_values_keep_their_bytes_and_read_back_within_their_bounds() {
     let e = golden_entries();
-    let bytes = to_bytes_with(&quantised(&e)).unwrap();
+    let bytes = to_bytes_version(&quantised(&e), 1).unwrap();
     assert!(bytes == QUANTISED, "the bytes of a quantised archive changed (TESTING.md V6)");
     assert!(bytes.len() < GOLDEN.len(), "quantised is smaller");
     let path = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("archive_v1_q.brda");
     let _absent = std::fs::remove_file(&path);
     write_with(&path, &quantised(&e)).unwrap();
-    assert_eq!(std::fs::read(&path).unwrap(), bytes);
+    assert!(std::fs::read(&path).unwrap() == to_bytes_with(&quantised(&e)).unwrap());
     let file = read(&path, u64::MAX).unwrap();
     let exact = CacheFile::from_bytes(&cache::to_bytes(&e).unwrap()).unwrap();
     let t = build(

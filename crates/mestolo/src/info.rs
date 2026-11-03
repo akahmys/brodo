@@ -88,6 +88,9 @@ pub fn write(loaded: &Loaded, out: &mut impl Write) -> Result<(), MestoloError> 
     for name in &loaded.skipped {
         writeln!(out, "skipped: {name:?}")?;
     }
+    for (name, len) in &loaded.bytes {
+        writeln!(out, "bytes: {name:?}, {len} bytes")?;
+    }
     for (i, g) in loaded.grids.iter().enumerate() {
         writeln!(out)?;
         writeln!(out, "grid {i}: {:?}", g.meta.name)?;

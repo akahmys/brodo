@@ -268,6 +268,13 @@ fn golden() -> FrozenGrid {
     freeze(&t, &f).unwrap()
 }
 
+/// `bytes` with the layout version word set to `version`.
+fn at_version(bytes: &[u8], version: u32) -> Vec<u8> {
+    let mut out = bytes.to_vec();
+    out[4..8].copy_from_slice(&version.to_le_bytes());
+    out
+}
+
 const GOLDEN: &[u8] = include_bytes!("data/frozen_v1_f32.bin");
 
 /// The committed grid's values as `[f64; 3]`, every word of each nonzero, the background's
@@ -299,6 +306,11 @@ const GOLDEN_VECTORS: &[u8] = include_bytes!("data/frozen_v1_f64x3.bin");
 fn a_grid_of_f64_vectors_keeps_its_bytes() {
     let (t, g) = golden_vectors();
     let frozen = freeze(&t, &g).unwrap();
+    assert!(
+        frozen.as_bytes() == at_version(GOLDEN_VECTORS, 2),
+        "the bytes of [f64; 3] grids changed"
+    );
+    let frozen = frozen.with_version(1).unwrap();
     assert!(frozen.as_bytes() == GOLDEN_VECTORS, "the bytes of [f64; 3] grids changed");
     let copy = aligned(GOLDEN_VECTORS);
     let view = GridView::<[f64; 3]>::new(copy.as_bytes()).unwrap();
@@ -317,9 +329,13 @@ fn a_grid_of_f64_vectors_keeps_its_bytes() {
     assert!(![0.0, 2.0, 3.0_f64].same_bits(&[-0.0, 2.0, 3.0]));
 }
 
+/// Version 2's bytes are version 1's with the version word 2 (docs/formats.md §2.7): the
+/// golden file of version 1 holds both, and version 1 is still written on request.
 #[test]
 fn layout_version_1_keeps_its_bytes() {
-    let g = golden();
+    assert!(golden().as_bytes() == at_version(GOLDEN, 2), "the bytes of layout version 2 changed");
+    assert_eq!(golden().version(), 2);
+    let g = golden().with_version(1).unwrap();
     assert_eq!(g.as_bytes().len(), GOLDEN.len(), "length");
     assert!(
         g.as_bytes() == GOLDEN,
@@ -382,7 +398,9 @@ fn each_check_refuses_its_damage() {
     let read = |b: &[u8]| GridView::<f32>::new(b).map(|_| ());
     // Header words: magic, version, type, size, counts[5], offsets[5], blocks, background.
     assert_eq!(read(with_word(0, 7).as_bytes()), Err(FormatError::BadMagic(7)));
-    assert_eq!(read(with_word(1, 2).as_bytes()), Err(FormatError::UnsupportedVersion(2)));
+    assert_eq!(read(with_word(1, 3).as_bytes()), Err(FormatError::UnsupportedVersion(3)));
+    assert_eq!(read(with_word(1, 0).as_bytes()), Err(FormatError::UnsupportedVersion(0)));
+    assert!(matches!(golden().with_version(3), Err(brodo::error::FreezeError::Version(3))));
     assert_eq!(
         read(with_word(2, 2).as_bytes()),
         Err(FormatError::WrongValueType { expected: 1, found: 2 })

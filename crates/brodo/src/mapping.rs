@@ -34,7 +34,7 @@ impl CacheFile {
         // `unsafe`, to keep the file unchanged while the mapping lives (`# Safety` above),
         // and the bytes are checked whole as untrusted input before anything reads them.
         let map = unsafe { Mmap::map(&file) }?;
-        let grids = index(&map)?;
-        Ok(CacheFile { storage: Storage::Mapped(map), grids })
+        let index = index(&map)?;
+        Ok(CacheFile { storage: Storage::Mapped(map), index })
     }
 }

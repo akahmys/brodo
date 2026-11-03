@@ -3,17 +3,19 @@
 //! the surface crosses it, its normal there and its group (Ju et al. 2002).
 //!
 //! Point v lies at the corner of voxel v, the image of v under the grid's transform. It owns
-//! its +x, +y and +z edges. A set is ten fields on one topology: the signs, 1 inside and 0
-//! outside, and per axis a fraction, a normal and a group for the edges points own. An edge
-//! has a crossing exactly when the stored signs of its ends differ, those of tiles and the
+//! its +x, +y and +z edges. A set is a sign field on a topology, 1 inside and 0 outside,
+//! and the crossings, held only on the edges that hold one (ADR-0051). An edge has a
+//! crossing exactly when the stored signs of its ends differ, those of tiles and the
 //! background included; its owner is then a leaf point. Its fraction is the crossing's place
 //! from the edge's lower end, in [0, 1]; its normal a unit vector whose component along the
 //! edge, where not zero, points from the inside end to the outside end; its group an id the
-//! set's table names. An edge with no crossing, every tile and the background hold
-//! `NO_CROSSING`, compared by bits; the signs' background is 0.
+//! set's table names. The signs' background is 0.
 //!
-//! In a cache file, `GridMeta::extra` tells a set's grids apart and holds the group table,
-//! as `docs/formats.md` §4 states, which this code follows.
+//! In a cache file, `GridMeta::extra` tells a set's entries apart and holds the group table,
+//! as `docs/formats.md` §4 states, which this code follows: at version 2, the sign grid and
+//! an entry of bytes holding the crossings (§4.3); at version 1, read and written on
+//! request, ten dense fields, an edge with no crossing, every tile and the background
+//! holding `NO_CROSSING` (§4.1).
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -22,13 +24,17 @@ use crate::error::{FormatError, HermiteError, Rule};
 use crate::field::local_index;
 use crate::field::{Field, LEAF_VOXELS, Value};
 use crate::meta::GridMeta;
-use crate::topology::{Location, Topology};
+use crate::topology::{LeafNumber, Location, Topology};
 use crate::tree::{Coord, TileLevel};
 use crate::view::{GridView, ViewLocation};
 
-/// The format's version, in each grid's `hermite.version`.
-pub const VERSION: &str = "1";
-/// The ten fields of a set, in the order `Hermite::entries` writes them.
+/// The format's version, in each entry's `hermite.version`.
+pub const VERSION: &str = "2";
+/// The version before it, read, and written on request (TESTING.md V6).
+pub const VERSION_1: &str = "1";
+/// The field of a set's entry of bytes holding its crossings, at version 2.
+pub const CROSSINGS: &str = "crossings";
+/// The ten fields of a set at version 1, in the order `Hermite::entries_v1` writes them.
 pub const FIELDS: [&str; 10] = [
     "sign",
     "x.fraction",
@@ -47,9 +53,13 @@ pub const FIELDS: [&str; 10] = [
 /// that sixteen times over, so that a producer rounding once more, as a normal averaged
 /// then rounded does, is still read.
 pub const NORMAL_TOLERANCE: f64 = 1e-6;
-/// The fraction, normal and group of an edge with no crossing, of a tile and of the
-/// background.
+/// The fraction, normal and group a dense field of version 1 holds for an edge with no
+/// crossing, a tile and the background.
 pub const NO_CROSSING: (f32, [f32; 3], u32) = (-1.0, [0.0; 3], 0);
+/// Bytes a leaf's masks take in a set's entry of bytes: 8 `u64` words an axis.
+const MASK_BYTES: usize = 3 * 8 * 8;
+/// Bytes a crossing takes there: a fraction, three normal components and a group.
+const CROSSING_BYTES: usize = 20;
 
 const KEY_VERSION: &str = "hermite.version";
 const KEY_SET: &str = "hermite.set";
@@ -58,43 +68,185 @@ const KEY_GROUP: &str = "hermite.group.";
 /// The keys a Hermite set's grids hold, written by `Hermite::entries` alone.
 pub(crate) const PREFIX: &str = "hermite.";
 
-/// The crossings on one axis's edges.
-#[derive(Debug, Clone)]
-pub struct Crossings {
-    /// Each crossing's place from the edge's lower end, in [0, 1].
-    pub fraction: Field<f32>,
-    /// The surface's unit normal at each crossing.
-    pub normal: Field<[f32; 3]>,
-    /// Each crossing's group.
-    pub group: Field<u32>,
+/// A crossing: where the surface crosses an edge, its normal there and its group.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Crossing {
+    /// The crossing's place from the edge's lower end, in [0, 1].
+    pub fraction: f32,
+    /// The surface's unit normal there.
+    pub normal: [f32; 3],
+    /// Its group.
+    pub group: u32,
 }
+
+impl Crossing {
+    fn tuple(self) -> (f32, [f32; 3], u32) {
+        (self.fraction, self.normal, self.group)
+    }
+}
+
+/// A set's crossings, held only on the edges that hold one: per leaf and axis a mask of the
+/// points whose edge holds one, and the crossings in leaf, axis and place order
+/// (docs/formats.md §4.3). A place is a point's index in its leaf, x + 8y + 64z.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Crossings {
+    stamp: u64,
+    masks: Vec<[[u64; 8]; 3]>,
+    /// Where each leaf's crossings start, and after the last leaf where they end.
+    starts: Vec<u32>,
+    items: Vec<Crossing>,
+}
+
+/// Builds a set's crossings leaf by leaf, in leaf number order (`Crossings::builder`).
+#[derive(Debug, Clone)]
+pub struct CrossingsBuilder {
+    leaves: usize,
+    built: Crossings,
+}
+
+/// The bits set in `masks` before place `place` of `axis`, and whether its own is set.
+fn rank(masks: &[[u64; 8]; 3], axis: usize, place: usize) -> Option<(u32, bool)> {
+    let own = masks.get(axis)?;
+    let word = *own.get(place / 64)?;
+    let ones = |w: &[u64]| w.iter().map(|x| x.count_ones()).sum::<u32>();
+    let before = masks.iter().take(axis).map(|m| ones(m)).sum::<u32>()
+        + ones(own.get(..place / 64)?)
+        + (word & ((1_u64 << (place % 64)) - 1)).count_ones();
+    Some((before, word >> (place % 64) & 1 == 1))
+}
+
+impl Crossings {
+    /// A builder of the crossings of a set on `t`.
+    pub fn builder(t: &Topology) -> CrossingsBuilder {
+        CrossingsBuilder {
+            leaves: t.leaf_count(),
+            built: Crossings {
+                stamp: t.stamp(),
+                masks: Vec::with_capacity(t.leaf_count()),
+                starts: vec![0],
+                items: Vec::new(),
+            },
+        }
+    }
+
+    /// The crossing on the edge along `axis`, 0 to 2 for x to z, of leaf `leaf`'s point at
+    /// `place`, if the edge holds one.
+    pub fn get(&self, leaf: LeafNumber, axis: usize, place: usize) -> Option<Crossing> {
+        let n = usize::try_from(leaf.get()).ok()?;
+        let (before, set) = rank(self.masks.get(n)?, axis, place)?;
+        let at = self.starts.get(n)?.checked_add(before)?;
+        set.then(|| self.items.get(usize::try_from(at).ok()?).copied()).flatten()
+    }
+
+    /// The number of crossings.
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+
+    /// Whether no edge holds a crossing.
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+
+    fn belongs_to(&self, t: &Topology) -> bool {
+        self.stamp == t.stamp() && self.masks.len() == t.leaf_count()
+    }
+
+    /// The bytes of a set's entry of crossings (docs/formats.md §4.3).
+    fn to_bytes(&self) -> Vec<u8> {
+        let mut out = Vec::with_capacity(self.masks.len() * MASK_BYTES + self.items.len() * 20);
+        for w in self.masks.iter().flatten().flatten() {
+            out.extend_from_slice(&w.to_le_bytes());
+        }
+        for c in &self.items {
+            out.extend_from_slice(&c.fraction.to_le_bytes());
+            for x in c.normal {
+                out.extend_from_slice(&x.to_le_bytes());
+            }
+            out.extend_from_slice(&c.group.to_le_bytes());
+        }
+        out
+    }
+}
+
+impl CrossingsBuilder {
+    /// Leaf `n`'s crossings, on each axis x, y and z as pairs of a place below 512 and a
+    /// crossing, places strictly ascending. Leaves are given in number order, each once;
+    /// another order, a place out of range or out of order is refused.
+    pub fn leaf(
+        &mut self,
+        n: LeafNumber,
+        axes: [&[(usize, Crossing)]; 3],
+    ) -> Result<(), HermiteError> {
+        let b = &mut self.built;
+        if usize::try_from(n.get()).ok() != Some(b.masks.len()) || b.masks.len() >= self.leaves {
+            return Err(HermiteError::Build("a leaf out of number order"));
+        }
+        // Every place checked before any crossing is kept, so that a leaf refused leaves
+        // the builder as it was.
+        let mut masks = [[0_u64; 8]; 3];
+        for (mask, crossings) in masks.iter_mut().zip(axes) {
+            let mut last = None;
+            for (place, _) in crossings {
+                let word = mask.get_mut(place / 64).ok_or(HermiteError::Build("a place"))?;
+                if last.is_some_and(|l| l >= *place) {
+                    return Err(HermiteError::Build("places out of order"));
+                }
+                last = Some(*place);
+                *word |= 1 << (place % 64);
+            }
+        }
+        b.items.extend(axes.iter().flat_map(|a| a.iter().map(|(_, c)| *c)));
+        b.masks.push(masks);
+        let end = u32::try_from(b.items.len()).map_err(|_| HermiteError::Build("a count"))?;
+        b.starts.push(end);
+        Ok(())
+    }
+
+    /// The crossings, once every leaf is given.
+    pub fn build(self) -> Result<Crossings, HermiteError> {
+        if self.built.masks.len() != self.leaves {
+            return Err(HermiteError::Build("a leaf left out"));
+        }
+        Ok(self.built)
+    }
+}
+
+/// One axis's crossings as dense fields: fractions, normals and groups (`Hermite::expand`).
+pub type Expanded = (Field<f32>, Field<[f32; 3]>, Field<u32>);
 
 /// A set of Hermite data on one topology, checked whole when made.
 #[derive(Debug, Clone)]
 pub struct Hermite {
     topology: Topology,
     signs: Field<u8>,
-    axes: [Crossings; 3],
+    crossings: Crossings,
     group_names: Vec<String>,
 }
 
-/// One axis's crossings, read in place from a cache file.
+/// One axis's dense fields, read in place from a cache file of version 1.
 #[derive(Debug, Clone, Copy)]
-pub struct CrossingsView<'a> {
-    /// Each crossing's place from the edge's lower end.
-    pub fraction: GridView<'a, f32>,
-    /// The surface's unit normal at each crossing.
-    pub normal: GridView<'a, [f32; 3]>,
-    /// Each crossing's group.
-    pub group: GridView<'a, u32>,
+struct DenseAxis<'a> {
+    fraction: GridView<'a, f32>,
+    normal: GridView<'a, [f32; 3]>,
+    group: GridView<'a, u32>,
+}
+
+/// A set's crossings read in place: an entry of bytes at version 2, its leaves' starts
+/// worked out from their masks; or ten dense fields at version 1.
+#[derive(Debug, Clone)]
+enum ViewCrossings<'a> {
+    Sparse { masks: &'a [u8], items: &'a [u8], starts: Vec<u32> },
+    Dense(Box<[DenseAxis<'a>; 3]>),
 }
 
 /// A set read in place from a cache file, checked whole when found.
 #[derive(Debug, Clone)]
 pub struct HermiteView<'a> {
     signs: GridView<'a, u8>,
-    axes: [CrossingsView<'a>; 3],
+    crossings: ViewCrossings<'a>,
     group_names: Vec<String>,
+    version: &'static str,
 }
 
 /// The unit step along an axis.
@@ -140,10 +292,6 @@ fn check_names(names: &[String]) -> Result<(), HermiteError> {
     Ok(())
 }
 
-/// One axis's fractions, normals and groups over a leaf.
-type LeafCrossings<'a> =
-    (&'a [f32; LEAF_VOXELS], &'a [[f32; 3]; LEAF_VOXELS], &'a [u32; LEAF_VOXELS]);
-
 /// What the check reads, from a set made in memory or read from a file.
 trait Source {
     fn leaves(&self) -> Result<Vec<Coord>, HermiteError>;
@@ -154,7 +302,14 @@ trait Source {
     fn holds_node(&self, level: TileLevel, v: Coord) -> Result<bool, HermiteError>;
     fn sign_at(&self, v: Coord) -> Result<u8, HermiteError>;
     fn sign_leaf(&self, n: u32) -> Result<&[u8; LEAF_VOXELS], HermiteError>;
-    fn crossing_leaf(&self, axis: usize, n: u32) -> Result<LeafCrossings<'_>, HermiteError>;
+    /// The crossing on the edge along `axis` of leaf `n`'s point at `place`, or
+    /// `NO_CROSSING` where it holds none: a dense field's value, or a sparse set's.
+    fn crossing(
+        &self,
+        axis: usize,
+        n: u32,
+        place: usize,
+    ) -> Result<(f32, [f32; 3], u32), HermiteError>;
     fn sign_tile(&self, t: u32) -> Result<u8, HermiteError>;
     fn crossing_tile(&self, axis: usize, t: u32) -> Result<(f32, [f32; 3], u32), HermiteError>;
     fn backgrounds(&self) -> (u8, [(f32, [f32; 3], u32); 3]);
@@ -255,13 +410,10 @@ fn check_leaf(s: &impl Source, n: u32, origin: Coord, groups: usize) -> Result<(
         s.sign_at(v)
     };
     for axis in 0..3 {
-        let (fractions, normals, groups_of) = s.crossing_leaf(axis, n)?;
         let e = step(axis);
-        for (i, ((sign, fraction), (normal, group))) in
-            signs.iter().zip(fractions).zip(normals.iter().zip(groups_of)).enumerate()
-        {
+        for (i, sign) in signs.iter().enumerate() {
             let v = voxel(origin, i);
-            let crossing = (*fraction, *normal, *group);
+            let crossing = s.crossing(axis, n, i)?;
             let beyond = match neighbour(v, e, true) {
                 Some(w) => sign_of(w)?,
                 None => 0,
@@ -409,57 +561,53 @@ impl Source for Owned<'_> {
         Ok(self.0.signs.leaf(&self.0.topology, crate::topology::LeafNumber(n))?)
     }
 
-    fn crossing_leaf(&self, axis: usize, n: u32) -> Result<LeafCrossings<'_>, HermiteError> {
-        let (t, n) = (&self.0.topology, crate::topology::LeafNumber(n));
-        let c = self.0.axes.get(axis).ok_or(HermiteError::Missing("an axis"))?;
-        Ok((c.fraction.leaf(t, n)?, c.normal.leaf(t, n)?, c.group.leaf(t, n)?))
+    fn crossing(
+        &self,
+        axis: usize,
+        n: u32,
+        place: usize,
+    ) -> Result<(f32, [f32; 3], u32), HermiteError> {
+        Ok(self.0.crossings.get(LeafNumber(n), axis, place).map_or(NO_CROSSING, Crossing::tuple))
     }
 
     fn sign_tile(&self, t: u32) -> Result<u8, HermiteError> {
         Ok(self.0.signs.tile_value_at(t)?)
     }
 
-    fn crossing_tile(&self, axis: usize, t: u32) -> Result<(f32, [f32; 3], u32), HermiteError> {
-        let c = self.0.axes.get(axis).ok_or(HermiteError::Missing("an axis"))?;
-        Ok((c.fraction.tile_value_at(t)?, c.normal.tile_value_at(t)?, c.group.tile_value_at(t)?))
+    fn crossing_tile(&self, _: usize, _: u32) -> Result<(f32, [f32; 3], u32), HermiteError> {
+        Ok(NO_CROSSING)
     }
 
     fn backgrounds(&self) -> (u8, [(f32, [f32; 3], u32); 3]) {
-        let bg =
-            |c: &Crossings| (c.fraction.background(), c.normal.background(), c.group.background());
-        (self.0.signs.background(), self.0.axes.each_ref().map(bg))
+        (self.0.signs.background(), [NO_CROSSING; 3])
     }
 }
 
 impl Hermite {
-    /// A set of `signs` and the crossings on each axis, x, y and z, all on `topology`, with
-    /// the group table `group_names`, indexed by id; refused unless it keeps to the format.
-    /// A refused set's parts are dropped, not handed back: a caller who would mend them
-    /// clones them first.
+    /// A set of `signs` and `crossings`, both on `topology`, with the group table
+    /// `group_names`, indexed by id; refused unless it keeps to the format. A refused set's
+    /// parts are dropped, not handed back: a caller who would mend them clones them first.
     pub fn new(
         topology: Topology,
         signs: Field<u8>,
-        axes: [Crossings; 3],
+        crossings: Crossings,
         group_names: Vec<String>,
     ) -> Result<Hermite, HermiteError> {
-        let mut belongs = vec![signs.belongs_to(&topology)];
-        for c in &axes {
-            belongs.push(c.fraction.belongs_to(&topology));
-            belongs.push(c.normal.belongs_to(&topology));
-            belongs.push(c.group.belongs_to(&topology));
+        if signs.belongs_to(&topology).is_err() {
+            return Err(HermiteError::OtherTopology("sign"));
         }
-        if let Some((name, _)) = FIELDS.iter().zip(&belongs).find(|(_, r)| r.is_err()) {
-            return Err(HermiteError::OtherTopology(name));
+        if !crossings.belongs_to(&topology) {
+            return Err(HermiteError::OtherTopology(CROSSINGS));
         }
         // `[""]` names group 0 alone, as an empty table does; it is kept empty, as a file
         // reads it back.
         let group_names = if group_names == [""] { Vec::new() } else { group_names };
-        let set = Hermite { topology, signs, axes, group_names };
+        let set = Hermite { topology, signs, crossings, group_names };
         check(&Owned(&set), &set.group_names)?;
         Ok(set)
     }
 
-    /// The topology every field is on.
+    /// The topology the signs are on.
     pub fn topology(&self) -> &Topology {
         &self.topology
     }
@@ -469,9 +617,9 @@ impl Hermite {
         &self.signs
     }
 
-    /// The crossings on the x, y and z edges.
-    pub fn axes(&self) -> &[Crossings; 3] {
-        &self.axes
+    /// The crossings.
+    pub fn crossings(&self) -> &Crossings {
+        &self.crossings
     }
 
     /// Each group's name, by id; empty, every group is 0.
@@ -479,45 +627,99 @@ impl Hermite {
         &self.group_names
     }
 
-    /// The ten cache entries of the set named `set`, in the order of `FIELDS`, each with
-    /// `meta` and the keys that tell it apart; `meta` may hold no key beginning `hermite.`,
-    /// nor state the SDF convention (`SDF_KEY`).
-    pub fn entries(&self, set: &str, meta: &GridMeta) -> Result<Vec<CacheEntry>, HermiteError> {
+    /// The crossings on the edges along `axis`, 0 to 2 for x to z, as three dense fields on
+    /// the set's topology, an edge with none, every tile and the background holding
+    /// `NO_CROSSING`: for a tool that shows grids, and the fields of version 1.
+    pub fn expand(&self, axis: usize) -> Result<Expanded, HermiteError> {
+        let t = &self.topology;
+        let (f, n, g) = NO_CROSSING;
+        let (mut fraction, mut normal, mut group) =
+            (Field::new(t, f), Field::new(t, n), Field::new(t, g));
+        for leaf in t.leaf_numbers() {
+            let fs = fraction.leaf_mut(t, leaf)?;
+            for (place, v) in fs.iter_mut().enumerate() {
+                if let Some(c) = self.crossings.get(leaf, axis, place) {
+                    *v = c.fraction;
+                }
+            }
+            let ns = normal.leaf_mut(t, leaf)?;
+            for (place, v) in ns.iter_mut().enumerate() {
+                if let Some(c) = self.crossings.get(leaf, axis, place) {
+                    *v = c.normal;
+                }
+            }
+            let gs = group.leaf_mut(t, leaf)?;
+            for (place, v) in gs.iter_mut().enumerate() {
+                if let Some(c) = self.crossings.get(leaf, axis, place) {
+                    *v = c.group;
+                }
+            }
+        }
+        Ok((fraction, normal, group))
+    }
+
+    /// `meta` with the keys of the set named `set`, version `version`, for field `field`;
+    /// refused if `meta` holds a key beginning `hermite.` or states the SDF convention.
+    fn keyed(
+        meta: &GridMeta,
+        set: &str,
+        version: &str,
+        field: &str,
+    ) -> Result<GridMeta, HermiteError> {
         if let Some(key) = meta.extra.keys().find(|k| k.starts_with(PREFIX)) {
             return Err(HermiteError::ReservedKey(key.clone()));
         }
         if meta.extra.contains_key(crate::meta::SDF_KEY) {
             return Err(HermiteError::ClaimsSdf);
         }
-        let keyed = |field: &str| {
-            let mut m = meta.clone();
-            m.extra.insert(KEY_VERSION.to_owned(), VERSION.to_owned());
-            m.extra.insert(KEY_SET.to_owned(), set.to_owned());
-            m.extra.insert(KEY_FIELD.to_owned(), field.to_owned());
-            m
-        };
-        let mut sign_meta = keyed("sign");
+        let mut m = meta.clone();
+        m.extra.insert(KEY_VERSION.to_owned(), version.to_owned());
+        m.extra.insert(KEY_SET.to_owned(), set.to_owned());
+        m.extra.insert(KEY_FIELD.to_owned(), field.to_owned());
+        Ok(m)
+    }
+
+    /// The sign grid's entry, with the group table, of version `version`.
+    fn sign_entry(
+        &self,
+        set: &str,
+        meta: &GridMeta,
+        version: &str,
+    ) -> Result<CacheEntry, HermiteError> {
+        let mut sign_meta = Self::keyed(meta, set, version, "sign")?;
         for (id, name) in self.group_names.iter().enumerate().skip(1) {
             sign_meta.extra.insert(format!("{KEY_GROUP}{id}"), name.clone());
         }
+        Ok(CacheEntry::with_reserved_keys(&sign_meta, &self.topology, &self.signs)?)
+    }
+
+    /// The cache entries of the set named `set`, at version 2: its sign grid, with `meta`,
+    /// and its entry of bytes holding the crossings, named as `meta` is (docs/formats.md
+    /// §4.3), for a cache file of version 2. `meta` may hold no key beginning `hermite.`,
+    /// nor state the SDF convention (`SDF_KEY`).
+    pub fn entries(&self, set: &str, meta: &GridMeta) -> Result<Vec<CacheEntry>, HermiteError> {
+        let sign = self.sign_entry(set, meta, VERSION)?;
+        let mut extra = BTreeMap::new();
+        extra.insert(KEY_VERSION.to_owned(), VERSION.to_owned());
+        extra.insert(KEY_SET.to_owned(), set.to_owned());
+        extra.insert(KEY_FIELD.to_owned(), CROSSINGS.to_owned());
+        let bytes =
+            CacheEntry::bytes_with_reserved_keys(&meta.name, extra, self.crossings.to_bytes());
+        Ok(vec![sign, bytes])
+    }
+
+    /// The ten cache entries of the set named `set` at version 1, written on request for a
+    /// cache file of version 1 (TESTING.md V6), in the order of `FIELDS`, each with `meta`
+    /// and the keys that tell it apart; `meta` as `entries` takes it.
+    pub fn entries_v1(&self, set: &str, meta: &GridMeta) -> Result<Vec<CacheEntry>, HermiteError> {
         let t = &self.topology;
-        let mut out = vec![CacheEntry::with_reserved_keys(&sign_meta, t, &self.signs)?];
-        for (axis, c) in ["x", "y", "z"].iter().zip(&self.axes) {
-            out.push(CacheEntry::with_reserved_keys(
-                &keyed(&format!("{axis}.fraction")),
-                t,
-                &c.fraction,
-            )?);
-            out.push(CacheEntry::with_reserved_keys(
-                &keyed(&format!("{axis}.normal")),
-                t,
-                &c.normal,
-            )?);
-            out.push(CacheEntry::with_reserved_keys(
-                &keyed(&format!("{axis}.group")),
-                t,
-                &c.group,
-            )?);
+        let mut out = vec![self.sign_entry(set, meta, VERSION_1)?];
+        for (axis, name) in ["x", "y", "z"].iter().enumerate() {
+            let (fraction, normal, group) = self.expand(axis)?;
+            let m = |field: &str| Self::keyed(meta, set, VERSION_1, &format!("{name}.{field}"));
+            out.push(CacheEntry::with_reserved_keys(&m("fraction")?, t, &fraction)?);
+            out.push(CacheEntry::with_reserved_keys(&m("normal")?, t, &normal)?);
+            out.push(CacheEntry::with_reserved_keys(&m("group")?, t, &group)?);
         }
         Ok(out)
     }
@@ -554,9 +756,25 @@ impl Source for Viewed<'_, '_> {
         Ok(self.set.signs.leaf(n)?)
     }
 
-    fn crossing_leaf(&self, axis: usize, n: u32) -> Result<LeafCrossings<'_>, HermiteError> {
-        let c = self.set.axes.get(axis).ok_or(HermiteError::Missing("an axis"))?;
-        Ok((c.fraction.leaf(n)?, c.normal.leaf(n)?, c.group.leaf(n)?))
+    fn crossing(
+        &self,
+        axis: usize,
+        n: u32,
+        place: usize,
+    ) -> Result<(f32, [f32; 3], u32), HermiteError> {
+        let lost = || HermiteError::Format(FormatError::Inconsistent("leaf value"));
+        match &self.set.crossings {
+            ViewCrossings::Sparse { masks, items, starts } => {
+                Ok(sparse_crossing(masks, items, starts, n, axis, place)?.unwrap_or(NO_CROSSING))
+            }
+            ViewCrossings::Dense(axes) => {
+                let c = axes.get(axis).ok_or(HermiteError::Missing("an axis"))?;
+                let f = c.fraction.leaf(n)?.get(place).copied().ok_or_else(lost)?;
+                let v = c.normal.leaf(n)?.get(place).copied().ok_or_else(lost)?;
+                let g = c.group.leaf(n)?.get(place).copied().ok_or_else(lost)?;
+                Ok((f, v, g))
+            }
+        }
     }
 
     fn sign_tile(&self, t: u32) -> Result<u8, HermiteError> {
@@ -564,16 +782,86 @@ impl Source for Viewed<'_, '_> {
     }
 
     fn crossing_tile(&self, axis: usize, t: u32) -> Result<(f32, [f32; 3], u32), HermiteError> {
-        let c = self.set.axes.get(axis).ok_or(HermiteError::Missing("an axis"))?;
-        Ok((c.fraction.tile_value(t)?, c.normal.tile_value(t)?, c.group.tile_value(t)?))
+        match &self.set.crossings {
+            ViewCrossings::Sparse { .. } => Ok(NO_CROSSING),
+            ViewCrossings::Dense(axes) => {
+                let c = axes.get(axis).ok_or(HermiteError::Missing("an axis"))?;
+                Ok((c.fraction.tile_value(t)?, c.normal.tile_value(t)?, c.group.tile_value(t)?))
+            }
+        }
     }
 
     fn backgrounds(&self) -> (u8, [(f32, [f32; 3], u32); 3]) {
-        let bg = |c: &CrossingsView<'_>| {
-            (c.fraction.background(), c.normal.background(), c.group.background())
+        let crossings = match &self.set.crossings {
+            ViewCrossings::Sparse { .. } => [NO_CROSSING; 3],
+            ViewCrossings::Dense(axes) => axes
+                .each_ref()
+                .map(|c| (c.fraction.background(), c.normal.background(), c.group.background())),
         };
-        (self.set.signs.background(), self.set.axes.each_ref().map(bg))
+        (self.set.signs.background(), crossings)
     }
+}
+
+/// Leaf `n`'s masks in a set's entry of bytes.
+fn leaf_masks(masks: &[u8], n: u32) -> Option<[[u64; 8]; 3]> {
+    let at = usize::try_from(n).ok()?.checked_mul(MASK_BYTES)?;
+    let bytes = masks.get(at..at.checked_add(MASK_BYTES)?)?;
+    let mut out = [[0_u64; 8]; 3];
+    for (w, b) in out.iter_mut().flatten().zip(bytes.as_chunks::<8>().0) {
+        *w = u64::from_le_bytes(*b);
+    }
+    Some(out)
+}
+
+/// The crossing an entry of bytes holds on leaf `n`'s point at `place` and edge along
+/// `axis`, if its mask's bit is set.
+fn sparse_crossing(
+    masks: &[u8],
+    items: &[u8],
+    starts: &[u32],
+    n: u32,
+    axis: usize,
+    place: usize,
+) -> Result<Option<(f32, [f32; 3], u32)>, HermiteError> {
+    let lost = || HermiteError::OtherTopology(CROSSINGS);
+    let m = leaf_masks(masks, n).ok_or_else(lost)?;
+    let (before, set) = rank(&m, axis, place).ok_or_else(lost)?;
+    if !set {
+        return Ok(None);
+    }
+    let k = starts.get(usize::try_from(n).map_err(|_| lost())?).ok_or_else(lost)?;
+    let at = usize::try_from(k.checked_add(before).ok_or_else(lost)?).map_err(|_| lost())?;
+    let at = at.checked_mul(CROSSING_BYTES).ok_or_else(lost)?;
+    let b = items.get(at..at.checked_add(CROSSING_BYTES).ok_or_else(lost)?).ok_or_else(lost)?;
+    let mut words = b.as_chunks::<4>().0.iter().copied();
+    let mut next = || words.next().ok_or_else(lost);
+    let fraction = f32::from_le_bytes(next()?);
+    let normal =
+        [f32::from_le_bytes(next()?), f32::from_le_bytes(next()?), f32::from_le_bytes(next()?)];
+    Ok(Some((fraction, normal, u32::from_le_bytes(next()?))))
+}
+
+/// An entry of crossings checked against `leaves` leaves (docs/formats.md §4.3, rule 3): its
+/// masks and its crossings, and where each leaf's start.
+fn sparse(bytes: &[u8], leaves: usize) -> Result<ViewCrossings<'_>, HermiteError> {
+    let lost = || HermiteError::OtherTopology(CROSSINGS);
+    let (masks, items) = bytes
+        .split_at_checked(leaves.checked_mul(MASK_BYTES).ok_or_else(lost)?)
+        .ok_or_else(lost)?;
+    let mut starts = Vec::with_capacity(leaves.saturating_add(1));
+    let mut total = 0_u32;
+    starts.push(total);
+    for leaf in masks.as_chunks::<MASK_BYTES>().0 {
+        let ones: u32 =
+            leaf.as_chunks::<8>().0.iter().map(|w| u64::from_le_bytes(*w).count_ones()).sum();
+        total = total.checked_add(ones).ok_or_else(lost)?;
+        starts.push(total);
+    }
+    let expected = usize::try_from(total).ok().and_then(|n| n.checked_mul(CROSSING_BYTES));
+    if expected != Some(items.len()) {
+        return Err(lost());
+    }
+    Ok(ViewCrossings::Sparse { masks, items, starts })
 }
 
 /// The group table in a sign grid's `extra`: ids from 1 with no gap.
@@ -600,17 +888,39 @@ fn group_table(meta: &GridMeta) -> Result<Vec<String>, HermiteError> {
     Ok(names)
 }
 
-/// The places in `file` of the set's ten grids, in the order of `FIELDS`.
+/// The version of the set named `set` in `file`: every entry of it, grid or bytes, states
+/// the same.
+fn version_of(file: &CacheFile, set: &str) -> Result<&'static str, HermiteError> {
+    let mut found: Option<String> = None;
+    let grids = (0..file.grid_count()).map(|i| file.meta(i).map(|m| &m.extra));
+    let bytes = file.bytes_entries();
+    for extra in
+        grids.collect::<Result<Vec<_>, _>>()?.into_iter().chain(bytes.iter().map(|b| b.extra))
+    {
+        if extra.get(KEY_SET).map(String::as_str) != Some(set) {
+            continue;
+        }
+        let v = extra.get(KEY_VERSION).cloned().unwrap_or_default();
+        if found.as_ref().is_some_and(|f| *f != v) {
+            return Err(HermiteError::Version(v));
+        }
+        found = Some(v);
+    }
+    match found.as_deref() {
+        Some(VERSION) => Ok(VERSION),
+        Some(VERSION_1) => Ok(VERSION_1),
+        Some(other) => Err(HermiteError::Version(other.to_owned())),
+        None => Err(HermiteError::Missing("sign")),
+    }
+}
+
+/// The places in `file` of the set's ten grids of version 1, in the order of `FIELDS`.
 fn grids_of(file: &CacheFile, set: &str) -> Result<Vec<usize>, HermiteError> {
     let mut found: [Option<usize>; 10] = [None; 10];
     for i in 0..file.grid_count() {
         let meta = file.meta(i)?;
         if meta.extra.get(KEY_SET).map(String::as_str) != Some(set) {
             continue;
-        }
-        let version = meta.extra.get(KEY_VERSION).cloned().unwrap_or_default();
-        if version != VERSION {
-            return Err(HermiteError::Version(version));
         }
         let field = meta.extra.get(KEY_FIELD).cloned().unwrap_or_default();
         let place = FIELDS.iter().zip(found.iter_mut()).find(|(f, _)| **f == field);
@@ -627,11 +937,70 @@ fn grids_of(file: &CacheFile, set: &str) -> Result<Vec<usize>, HermiteError> {
 }
 
 impl<'a> HermiteView<'a> {
-    /// The set named `set` in `file`, its ten grids found by their keys and checked whole:
-    /// the format's version, metadata that agree, one topology, and the values, as
-    /// docs/formats.md §4.2 states; of several broken rules, which is named is not
+    /// The set named `set` in `file`, its entries found by their keys and checked whole, as
+    /// docs/formats.md §4.2 and §4.3 state: at version 2 its sign grid and its entry of
+    /// crossings, at version 1 its ten grids; of several broken rules, which is named is not
     /// promised.
     pub fn find(file: &'a CacheFile, set: &str) -> Result<HermiteView<'a>, HermiteError> {
+        let view = if version_of(file, set)? == VERSION_1 {
+            Self::find_v1(file, set)?
+        } else {
+            Self::find_v2(file, set)?
+        };
+        let regions = view.signs.regions()?;
+        check(&Viewed { set: &view, regions }, &view.group_names)?;
+        Ok(view)
+    }
+
+    /// A set of version 2: one sign grid, one entry of crossings, no other key of the
+    /// format's on the entry (§4.3, rule 1).
+    fn find_v2(file: &'a CacheFile, set: &str) -> Result<HermiteView<'a>, HermiteError> {
+        let mut sign = None;
+        for i in 0..file.grid_count() {
+            let extra = &file.meta(i)?.extra;
+            if extra.get(KEY_SET).map(String::as_str) != Some(set) {
+                continue;
+            }
+            let field = extra.get(KEY_FIELD).cloned().unwrap_or_default();
+            if field != "sign" {
+                return Err(HermiteError::UnknownField(field));
+            }
+            if sign.replace(i).is_some() {
+                return Err(HermiteError::Twice("sign"));
+            }
+        }
+        let sign = sign.ok_or(HermiteError::Missing("sign"))?;
+        let mut crossings = None;
+        for b in file.bytes_entries() {
+            if b.extra.get(KEY_SET).map(String::as_str) != Some(set) {
+                continue;
+            }
+            let field = b.extra.get(KEY_FIELD).cloned().unwrap_or_default();
+            if field != CROSSINGS {
+                return Err(HermiteError::UnknownField(field));
+            }
+            let ours = [KEY_VERSION, KEY_SET, KEY_FIELD];
+            if let Some(k) =
+                b.extra.keys().find(|k| k.starts_with(PREFIX) && !ours.contains(&k.as_str()))
+            {
+                return Err(HermiteError::ReservedKey(k.clone()));
+            }
+            if crossings.replace(b.bytes).is_some() {
+                return Err(HermiteError::Twice(CROSSINGS));
+            }
+        }
+        let crossings = crossings.ok_or(HermiteError::Missing(CROSSINGS))?;
+        let signs: GridView<'a, u8> = file.view(sign)?;
+        Ok(HermiteView {
+            crossings: sparse(crossings, signs.leaf_count())?,
+            signs,
+            group_names: group_table(file.meta(sign)?)?,
+            version: VERSION,
+        })
+    }
+
+    /// A set of version 1: ten grids that agree in their metadata and topology (§4.2).
+    fn find_v1(file: &'a CacheFile, set: &str) -> Result<HermiteView<'a>, HermiteError> {
         let at = grids_of(file, set)?;
         let [sign_at, x @ ..] = at.as_slice() else { return Err(HermiteError::Missing("sign")) };
         let sign_meta = file.meta(*sign_at)?;
@@ -650,30 +1019,31 @@ impl<'a> HermiteView<'a> {
         let [xf, xn, xg, yf, yn, yg, zf, zn, zg] = x else {
             return Err(HermiteError::Missing("an axis"));
         };
-        let crossings = |f: usize, n: usize, g: usize| -> Result<CrossingsView<'a>, HermiteError> {
-            Ok(CrossingsView {
-                fraction: file.view(f)?,
-                normal: file.view(n)?,
-                group: file.view(g)?,
-            })
+        let dense = |f: usize, n: usize, g: usize| -> Result<DenseAxis<'a>, HermiteError> {
+            Ok(DenseAxis { fraction: file.view(f)?, normal: file.view(n)?, group: file.view(g)? })
         };
-        let set = HermiteView {
-            signs: file.view(*sign_at)?,
-            axes: [crossings(*xf, *xn, *xg)?, crossings(*yf, *yn, *yg)?, crossings(*zf, *zn, *zg)?],
-            group_names,
-        };
+        let signs: GridView<'a, u8> = file.view(*sign_at)?;
+        let axes = [dense(*xf, *xn, *xg)?, dense(*yf, *yn, *yg)?, dense(*zf, *zn, *zg)?];
         let mut same = Vec::with_capacity(9);
-        for c in &set.axes {
-            same.push(set.signs.same_topology(&c.fraction));
-            same.push(set.signs.same_topology(&c.normal));
-            same.push(set.signs.same_topology(&c.group));
+        for c in &axes {
+            same.push(signs.same_topology(&c.fraction));
+            same.push(signs.same_topology(&c.normal));
+            same.push(signs.same_topology(&c.group));
         }
         if let Some((name, _)) = FIELDS.iter().skip(1).zip(&same).find(|(_, same)| !**same) {
             return Err(HermiteError::OtherTopology(name));
         }
-        let regions = set.signs.regions()?;
-        check(&Viewed { set: &set, regions }, &set.group_names)?;
-        Ok(set)
+        Ok(HermiteView {
+            signs,
+            crossings: ViewCrossings::Dense(Box::new(axes)),
+            group_names,
+            version: VERSION_1,
+        })
+    }
+
+    /// The set's format version: `VERSION`, or `VERSION_1`.
+    pub fn version(&self) -> &'static str {
+        self.version
     }
 
     /// The signs, 1 inside, 0 outside.
@@ -681,9 +1051,19 @@ impl<'a> HermiteView<'a> {
         &self.signs
     }
 
-    /// The crossings on the x, y and z edges.
-    pub fn axes(&self) -> &[CrossingsView<'a>; 3] {
-        &self.axes
+    /// The crossing on the edge along `axis`, 0 to 2 for x to z, of leaf `leaf`'s point at
+    /// `place` (x + 8y + 64z), if the edge holds one.
+    pub fn crossing(
+        &self,
+        leaf: u32,
+        axis: usize,
+        place: usize,
+    ) -> Result<Option<Crossing>, HermiteError> {
+        let c = Viewed { set: self, regions: crate::view::Regions::default() }
+            .crossing(axis, leaf, place)?;
+        let none =
+            c.0.same_bits(&NO_CROSSING.0) && c.1.same_bits(&NO_CROSSING.1) && c.2 == NO_CROSSING.2;
+        Ok((!none).then_some(Crossing { fraction: c.0, normal: c.1, group: c.2 }))
     }
 
     /// Each group's name, by id; empty, every group is 0.

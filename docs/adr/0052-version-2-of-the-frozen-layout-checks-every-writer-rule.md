@@ -25,9 +25,9 @@ docs/formats.md §2.7, §3.5, §4.3 and §8.7 state version 2 as proposed here.
 The owner chose, on 2026-11-03, the first option of each point, as proposed.
 
 - **a. What a version 2 reader checks**: (1) every rule its writer keeps: §2.7's rules 7 to
-  11, padding zero, sections with no gap, root tiles and upper nodes numbered in table
-  order, nodes in Morton order, and each node's first child and first tile the count
-  before it. Rule 11 gives every node, leaf and tile value one place that reaches it, so
+  11, padding zero, sections with no gap, root tiles numbered in table order and each
+  upper node named once, nodes in Morton order, and each node's first child and first
+  tile the count before it. Rule 11 gives every node, leaf and tile value one place that reaches it, so
   that §2.6's walk is needed no more, and checking costs one pass over the nodes. (2) The
   structural rules alone, 8 to 11, padding left unchecked: a reader still refuses what
   would be read wrong, but a file's padding could carry data no reader sees.

@@ -22,6 +22,21 @@ use colino::hermite::{Produced, hermite};
 use colino::mesh::Mesh;
 use colino::winding::Accuracy;
 
+/// One axis's crossings as dense fields, `NO_CROSSING` where an edge holds none.
+struct Dense {
+    fraction: brodo::field::Field<f32>,
+    normal: brodo::field::Field<[f32; 3]>,
+    group: brodo::field::Field<u32>,
+}
+
+/// A set's crossings on x, y and z, each expanded into dense fields (`Hermite::expand`).
+fn axes(set: &brodo::hermite::Hermite) -> [Dense; 3] {
+    [0, 1, 2].map(|axis| {
+        let (fraction, normal, group) = set.expand(axis).unwrap();
+        Dense { fraction, normal, group }
+    })
+}
+
 /// How far a stored fraction may be from the exact one: `f32` rounding of a value below 1,
 /// and the reference's own `f64` arithmetic.
 const FRACTION_TOLERANCE: f64 = 1.5e-7;
@@ -146,9 +161,10 @@ fn a_turned_cube_crosses_each_edge_where_its_faces_plane_does() {
     assert_eq!(p.unhit, 0);
     let (set, t) = (&p.set, p.set.topology());
     let (mut compared, mut skipped) = (0, 0);
+    let dense = axes(set);
     for n in t.leaf_numbers() {
         let voxels: Vec<_> = t.leaf_voxels(n).unwrap().collect();
-        for (axis, c) in set.axes().iter().enumerate() {
+        for (axis, c) in dense.iter().enumerate() {
             let (fractions, normals) =
                 (c.fraction.leaf(t, n).unwrap(), c.normal.leaf(t, n).unwrap());
             let groups = c.group.leaf(t, n).unwrap();
@@ -196,17 +212,20 @@ fn every_crossed_edge_of_a_torus_is_hit() {
     let p = made(&m, &Options::new(1.0).with_accuracy(Accuracy::Exact));
     assert_eq!(p.unhit, 0);
     let t = p.set.topology();
-    let crossed: usize = t
-        .leaf_numbers()
-        .flat_map(|n| p.set.axes().iter().map(move |c| (n, c)))
+    let crossed = p.set.crossings().len();
+    let dense: usize = axes(&p.set)
+        .iter()
+        .flat_map(|c| t.leaf_numbers().map(move |n| (n, c)))
         .map(|(n, c)| c.fraction.leaf(t, n).unwrap().iter().filter(|f| **f >= 0.0).count())
         .sum();
+    assert_eq!(crossed, dense, "the crossings held are those the dense fields hold");
     assert!(crossed > 5_000, "{crossed} crossed edges");
     // A lattice point on the mesh is inside, and an edge it is the inside end of crosses
     // exactly there.
     let bvh = colino::bvh::Bvh::new(&m).unwrap();
     let on_mesh = |v: [i32; 3]| bvh.nearest(v.map(f64::from)).is_some_and(|(d, _)| d == 0.0);
     let (mut on, mut upper) = (0, 0);
+    let dense = axes(&p.set);
     for n in t.leaf_numbers() {
         let voxels: Vec<_> = t.leaf_voxels(n).unwrap().collect();
         for (i, v) in voxels.iter().enumerate() {
@@ -215,13 +234,13 @@ fn every_crossed_edge_of_a_torus_is_hit() {
             }
             on += 1;
             assert_eq!(p.set.signs().value_at(t, *v).unwrap(), 1, "{v:?}");
-            for c in p.set.axes() {
+            for c in &dense {
                 let f = c.fraction.leaf(t, n).unwrap()[i];
                 assert!(f <= 0.0, "{v:?}: {f}");
             }
             // The edge into it from an outside point below crosses exactly at its upper end
             // (W7 of P5's review).
-            for (k, c) in p.set.axes().iter().enumerate() {
+            for (k, c) in dense.iter().enumerate() {
                 let mut u = *v;
                 u[k] -= 1;
                 let Location::Leaf(m) = t.locate(u) else { continue };
@@ -306,7 +325,7 @@ fn the_crossing_nearest_the_inside_end_and_the_lowest_triangle_are_kept() {
         }
     };
     let i = t.leaf_voxels(n).unwrap().position(|w| w == v).unwrap();
-    let x = &p.set.axes()[0];
+    let x = &axes(&p.set)[0];
     assert_eq!(p.set.signs().value_at(t, v).unwrap(), 1);
     assert!((f64::from(x.fraction.leaf(t, n).unwrap()[i]) - 0.05).abs() <= FRACTION_TOLERANCE);
     assert_eq!(x.group.leaf(t, n).unwrap()[i], 3);
@@ -331,9 +350,10 @@ fn an_unhit_edge_takes_the_triangle_with_area_nearest_it() {
         m.triangles.iter().map(|t| t.map(|i| m.vertices[i as usize])).collect();
     let t = p.set.topology();
     let mut checked = 0;
+    let dense = axes(&p.set);
     for n in t.leaf_numbers() {
         let voxels: Vec<_> = t.leaf_voxels(n).unwrap().collect();
-        for (axis, c) in p.set.axes().iter().enumerate() {
+        for (axis, c) in dense.iter().enumerate() {
             for (i, v) in voxels.iter().enumerate() {
                 let f = c.fraction.leaf(t, n).unwrap()[i];
                 if f < 0.0 {
@@ -386,9 +406,10 @@ fn a_triangle_turned_in_still_gives_normals_pointing_out() {
     let p = p.unwrap();
     let t = p.set.topology();
     let mut turned = 0;
+    let dense = axes(&p.set);
     for n in t.leaf_numbers() {
         let voxels: Vec<_> = t.leaf_voxels(n).unwrap().collect();
-        for (axis, c) in p.set.axes().iter().enumerate() {
+        for (axis, c) in dense.iter().enumerate() {
             for (i, v) in voxels.iter().enumerate() {
                 if c.group.leaf(t, n).unwrap()[i] != 1 || c.fraction.leaf(t, n).unwrap()[i] < 0.0 {
                     continue;
@@ -471,8 +492,9 @@ fn a_triangle_with_no_area_never_gives_an_unhit_edge_its_data() {
     let (with_area, _) = corners.split_at(corners.len() - 1);
     let t = p.set.topology();
     let mut nearer = 0;
+    let dense = axes(&p.set);
     for n in t.leaf_numbers() {
-        for (axis, c) in p.set.axes().iter().enumerate() {
+        for (axis, c) in dense.iter().enumerate() {
             for (i, v) in t.leaf_voxels(n).unwrap().enumerate() {
                 if c.fraction.leaf(t, n).unwrap()[i] < 0.0 {
                     continue;
@@ -510,7 +532,7 @@ fn of_an_edge_whose_lower_end_is_outside_the_crossing_nearest_its_upper_end_is_k
     assert_eq!(p.set.signs().value_at(t, v).unwrap(), 0);
     assert_eq!(p.set.signs().value_at(t, [-4, 0, 0]).unwrap(), 1);
     let (n, i) = place(t, v);
-    let x = &p.set.axes()[0];
+    let x = &axes(&p.set)[0];
     assert!((f64::from(x.fraction.leaf(t, n).unwrap()[i]) - 0.8).abs() <= FRACTION_TOLERANCE);
     assert_eq!(x.group.leaf(t, n).unwrap()[i], 3);
     assert_eq!(
@@ -529,7 +551,7 @@ fn a_normal_perpendicular_to_its_edge_keeps_its_triangle_s_side() {
     let o = Options::new(1.0).with_accuracy(Accuracy::Exact);
     let p = made(&m, &o);
     let t = p.set.topology();
-    let x = &p.set.axes()[0];
+    let x = &axes(&p.set)[0];
     // Into it, from outside, and out of it, from inside.
     for (v, inside) in [([0, 1, 0], 0), ([2, 1, 0], 1)] {
         assert_eq!(p.set.signs().value_at(t, v).unwrap(), inside, "{v:?}");
@@ -589,7 +611,7 @@ fn an_edge_to_beyond_the_range_crosses_where_the_mesh_does() {
     c.meta.transform[0][3] = -f64::from(i32::MAX);
     let p = hermite(&m, &c).unwrap();
     assert_eq!(p.unhit, 0);
-    let (t, x) = (p.set.topology(), &p.set.axes()[0]);
+    let (t, x) = (p.set.topology(), &axes(&p.set)[0]);
     let half = x.fraction.value_at(t, [i32::MAX, 3, 3]).unwrap();
     assert!((f64::from(half) - 0.5).abs() <= FRACTION_TOLERANCE, "{half}");
 }
@@ -692,7 +714,7 @@ fn a_crossing_at_an_end_on_the_mesh_takes_that_ends_face() {
     let v = [2, 0, 3];
     let brodo::topology::Location::Leaf(n) = t.locate(v) else { panic!("no leaf at {v:?}") };
     let i = t.leaf_voxels(n).unwrap().position(|w| w == v).unwrap();
-    let x = &p.set.axes()[0];
+    let x = &axes(&p.set)[0];
     assert_eq!(p.set.signs().value_at(t, v).unwrap(), 1);
     assert_eq!(x.fraction.leaf(t, n).unwrap()[i].to_bits(), 0.0_f32.to_bits());
     assert_eq!(

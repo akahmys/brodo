@@ -68,6 +68,7 @@ fn freeze_error(e: &FreezeError) -> &'static str {
         FreezeError::Field(..) => "Field",
         FreezeError::Tree(..) => "Tree",
         FreezeError::TooLarge => "TooLarge",
+        FreezeError::Version(..) => "Version",
         _ => "later",
     }
 }
@@ -118,6 +119,7 @@ fn cache_error(e: &CacheError) -> &'static str {
         CacheError::UnknownEncoding(..) => "UnknownEncoding",
         CacheError::NotQuantised { .. } => "NotQuantised",
         CacheError::Unrepresentable(..) => "Unrepresentable",
+        CacheError::BytesAtVersion1 => "BytesAtVersion1",
         _ => "later",
     }
 }
@@ -152,6 +154,7 @@ fn hermite_error(e: &HermiteError) -> &'static str {
         HermiteError::BadGroupKey(..) => "BadGroupKey",
         HermiteError::ReservedKey(..) => "ReservedKey",
         HermiteError::ClaimsSdf => "ClaimsSdf",
+        HermiteError::Build(..) => "Build",
         _ => "later",
     }
 }

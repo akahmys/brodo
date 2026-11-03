@@ -103,6 +103,8 @@ pub struct Loaded {
     pub grids: Vec<Grid>,
     /// The names of a `.vdb`'s grids brodo does not read (`brodo::vdb::VdbFile::skipped`).
     pub skipped: Vec<String>,
+    /// A cache file's or an archive's entries of bytes, each its name and length.
+    pub bytes: Vec<(String, usize)>,
 }
 
 impl Loaded {
@@ -162,7 +164,8 @@ fn from_cache(file: CacheFile, kind: Kind, limit: u64) -> Result<Loaded, Mestolo
         };
         grids.push(Grid { meta: file.meta(i)?.clone(), topology, values });
     }
-    Ok(Loaded { kind, grids, skipped: Vec::new() })
+    let bytes = file.bytes_entries().iter().map(|b| (b.name.to_owned(), b.bytes.len())).collect();
+    Ok(Loaded { kind, grids, skipped: Vec::new(), bytes })
 }
 
 /// Grid `i` thawed, once its leaves and tiles are counted within `budget`.
@@ -188,7 +191,8 @@ fn thaw<T: Stored>(
 
 fn from_vdb(path: &Path, limit: u64) -> Result<Loaded, MestoloError> {
     let file = brodo::vdb::read(path, VDB_UNIT, limit)?;
-    let mut loaded = Loaded { kind: Kind::Vdb, grids: Vec::new(), skipped: file.skipped };
+    let mut loaded =
+        Loaded { kind: Kind::Vdb, grids: Vec::new(), skipped: file.skipped, bytes: Vec::new() };
     for g in file.grids {
         // `VdbField` is `#[non_exhaustive]`: a type brodo adds is listed as skipped.
         let values = match g.field {

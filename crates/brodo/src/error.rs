@@ -116,6 +116,9 @@ pub enum FreezeError {
     /// leaves of `f32` (docs/formats.md §2).
     #[error("the grid is too large for the frozen layout")]
     TooLarge,
+    /// A layout version this build does not write: it writes 2, and 1 on request.
+    #[error("layout version {0} is not written by this build")]
+    Version(u32),
 }
 
 /// Why bytes were refused as a frozen grid (ARCHITECTURE.md §4.6).
@@ -264,6 +267,10 @@ pub enum CacheError {
     /// Hermite data.
     #[error("the metadata holds the key {0:?}, which Hermite data reserves")]
     ReservedKey(String),
+    /// An entry of bytes asked to be written at version 1, which holds grids alone
+    /// (docs/formats.md §3.5).
+    #[error("an entry of bytes is not written at format version 1")]
+    BytesAtVersion1,
 }
 
 /// Which rule of the Hermite data format a set breaks (ADR-0032).
@@ -344,6 +351,10 @@ pub enum HermiteError {
     /// written with it would be taken for an SDF.
     #[error("the metadata states the SDF convention, which a Hermite set does not keep")]
     ClaimsSdf,
+    /// A set's crossings were built out of the builder's order: leaves in number order,
+    /// each once, places below 512 and ascending on each axis (`CrossingsBuilder`).
+    #[error("the crossings were built with {0}")]
+    Build(&'static str),
 }
 
 /// Why a slice could not be drawn or encoded (ARCHITECTURE.md §6.1).

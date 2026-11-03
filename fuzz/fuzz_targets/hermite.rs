@@ -1,7 +1,7 @@
 //! Fuzzes `HermiteView::find`, the reader of Hermite data in a cache file
 //! (`crates/brodo/src/hermite.rs`), for every set a file names and for one it does not, and
-//! the reads of each set it finds, its signs and every axis's fractions, normals and groups:
-//! no input may panic (TESTING.md T6).
+//! the reads of each set it finds, its signs and the crossings of its first and last leaves'
+//! first and last points on every axis, of either version: no input may panic (TESTING.md T6).
 
 #![no_main]
 
@@ -32,10 +32,13 @@ fuzz_target!(|data: &[u8]| {
         for set in sets {
             if let Ok(view) = HermiteView::find(&file, &set) {
                 exercise(view.signs());
-                for axis in view.axes() {
-                    exercise(&axis.fraction);
-                    exercise(&axis.normal);
-                    exercise(&axis.group);
+                let count = u32::try_from(view.signs().leaf_count()).unwrap_or(u32::MAX);
+                for n in [0, count.saturating_sub(1), count] {
+                    for axis in 0..4 {
+                        for place in [0, 511, 512] {
+                            let _crossing = view.crossing(n, axis, place);
+                        }
+                    }
                 }
                 let _names = view.group_names().len();
             }

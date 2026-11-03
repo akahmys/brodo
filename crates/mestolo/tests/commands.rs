@@ -59,6 +59,9 @@ fn info_writes_what_a_cache_file_an_archive_and_a_vdb_hold() {
     let archive = INFO_CACHE.replacen("kind: cache file", "kind: archive", 1);
     assert_eq!(info("archive_v1.bin"), archive);
     assert_eq!(info("vdb_by14_v225.bin"), INFO_VDB);
+    // Version 2: the same grids, an entry of bytes listed by its name and length.
+    let v2 = INFO_CACHE.replacen("grids: 2\n", "grids: 2\nbytes: \"readme\", 11 bytes\n", 1);
+    assert_eq!(info("cache_v2.bin"), v2);
 }
 
 #[test]

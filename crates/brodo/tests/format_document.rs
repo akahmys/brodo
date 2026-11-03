@@ -21,11 +21,15 @@ const GOLDEN: &[&str] = &[
     "frozen_v1_f32.bin",
     "frozen_v1_f64x3.bin",
     "cache_v1.bin",
+    "cache_v2.bin",
     "hermite_v1.bin",
+    "hermite_v2.bin",
     #[cfg(feature = "archive")]
     "archive_v1.bin",
     #[cfg(feature = "archive")]
     "archive_v1_quantised.bin",
+    #[cfg(feature = "archive")]
+    "archive_v2.bin",
 ];
 
 /// A cache file as the crates read the bytes: a cache file's, or an archive's decompressed.
@@ -502,7 +506,9 @@ fn archive_with_a_shared_leaf() -> Vec<u8> {
     let t = e.commit().unwrap().0;
     let meta = GridMeta::new("g", [1.0; 3], "mm").unwrap();
     let entry = CacheEntry::new(&meta, &t, &Field::new(&t, 1.0_f32)).unwrap();
-    let bytes = brodo::archive::to_bytes(&[entry]).unwrap();
+    // Version 1, whose reader leaves a shared leaf to a region's walk (§2.7 refuses it at 2).
+    let exact = [(&entry, brodo::archive::Encoding::Exact)];
+    let bytes = brodo::archive::to_bytes_version(&exact, 1).unwrap();
     let word = |b: &[u8], at: usize| u32::from_le_bytes(b[at..at + 4].try_into().unwrap()) as usize;
     let (table, chunks) = (word(&bytes, 40) * 32, word(&bytes, 44));
     assert_eq!(chunks, 2, "the nodes, then the leaves");

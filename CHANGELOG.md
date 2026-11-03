@@ -6,6 +6,28 @@ are recorded here when they change (V6).
 
 ## Unreleased
 
+Format versions (TESTING.md V6): the frozen layout, the cache profile, the archive profile
+and Hermite data are each at version 2, written; version 1 of each is read, and written on
+request. A reader of an earlier release refuses a file of version 2 (docs/formats.md §2.7,
+§3.5, §4.3, §8.7; ADR-0051, ADR-0052).
+
+- `freeze`, `cache::to_bytes`, `cache::write`, `archive::to_bytes` and the archive's other
+  writers write version 2. Version 1 is written by `FrozenGrid::with_version(1)`,
+  `cache::to_bytes_version`, `cache::write_version`, `archive::to_bytes_version` and
+  `archive::write_version`.
+- A version 2 reader refuses what version 1 took: nonzero padding or background bytes
+  beyond the value's size, a gap between sections, nodes out of Morton order, a node with
+  no child or tile, a first child or tile other than the count before it, and a cache
+  file's bounds other than its grid's.
+- `Hermite` holds its crossings sparsely. `Crossings` is now that sparse type, built by
+  `Crossings::builder`, its three dense fields gone; `Hermite::new` takes it in place of
+  the three axes; `Hermite::axes` and `HermiteView::axes` are gone, and `CrossingsView`
+  with them, for `Hermite::crossings`, `Hermite::expand` and `HermiteView::crossing`.
+  `Hermite::entries` writes version 2, a sign grid and an entry of bytes;
+  `Hermite::entries_v1` writes the ten grids of version 1. `hermite::VERSION` is `"2"`.
+- `CacheError::Grid`'s and `CacheError::Decompress`'s `index` is the entry's place in the
+  directory, entries of bytes counted.
+
 - `vdb::from_bytes` takes a `limit`, as `archive::from_bytes` does: a caller passes a
   third argument. With `vdb::read`'s, it bounds what reading makes, counted as
   ARCHITECTURE.md §4.7 states, and more is refused as `VdbError::FileTooLarge`; a file

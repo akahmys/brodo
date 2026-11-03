@@ -22,7 +22,7 @@
 
 use brodo::error::{FieldError, Rule};
 use brodo::field::{Field, LEAF_VOXELS};
-use brodo::hermite::{Crossings, Hermite, NO_CROSSING};
+use brodo::hermite::{Crossing, Crossings, Hermite};
 use brodo::meta::{GridMeta, SDF_KEY};
 use brodo::parallel::{par_reduce, par_update};
 use brodo::topology::{LeafNumber, Topology};
@@ -121,8 +121,8 @@ pub fn hermite(mesh: &Mesh, c: &Converted) -> Result<Produced, HermiteError> {
         unhit += missed;
         axes.push(crossings);
     }
-    let [x, y, z]: [Crossings; 3] = axes.try_into().map_err(|_| HermiteError::Transform)?;
-    let set = Hermite::new(t.clone(), signs, [x, y, z], mesh.group_names.clone()).map_err(|e| {
+    let crossings = gathered(t, &axes)?;
+    let set = Hermite::new(t.clone(), signs, crossings, mesh.group_names.clone()).map_err(|e| {
         if let brodo::error::HermiteError::Violation { at: Some(at), rule: Rule::Owner, .. } = e {
             HermiteError::SignOutsideBand(at)
         } else {
@@ -134,6 +134,27 @@ pub fn hermite(mesh: &Mesh, c: &Converted) -> Result<Produced, HermiteError> {
     meta.extra.remove(SDF_KEY);
     Ok(Produced { set, meta, unhit })
 }
+
+/// Each axis's crossings, in leaf and place order, built into a set's crossings leaf by leaf.
+fn gathered(t: &Topology, axes: &[Vec<Placed>]) -> Result<Crossings, HermiteError> {
+    let mut b = Crossings::builder(t);
+    let mut rest: Vec<&[Placed]> = axes.iter().map(Vec::as_slice).collect();
+    for n in t.leaf_numbers() {
+        let mut lists: [Vec<(usize, Crossing)>; 3] = Default::default();
+        for (list, axis) in lists.iter_mut().zip(rest.iter_mut()) {
+            let here = axis.iter().take_while(|(m, _, _)| *m == n).count();
+            let (mine, after) = axis.split_at(here);
+            list.extend(mine.iter().map(|(_, i, c)| (*i, *c)));
+            *axis = after;
+        }
+        let [x, y, z] = &lists;
+        b.leaf(n, [x, y, z]).map_err(HermiteError::Format)?;
+    }
+    b.build().map_err(HermiteError::Format)
+}
+
+/// A crossing on a leaf point's edge: the leaf, the point's index in it, and the crossing.
+type Placed = (LeafNumber, usize, Crossing);
 
 /// The triangle with area holding `p`, the lowest-numbered of those at distance 0, if `p`
 /// is on one: a triangle with none has no normal to give.
@@ -163,7 +184,8 @@ fn signs(
     Ok(signs)
 }
 
-/// The crossings on one axis's edges, and how many came from no hit.
+/// The crossings on one axis's edges, in leaf and place order, and how many came from no
+/// hit.
 fn crossings(
     mesh: &Mesh,
     t: &Topology,
@@ -171,7 +193,7 @@ fn crossings(
     bvh: &Bvh,
     signs: &Field<u8>,
     axis: usize,
-) -> Result<(Crossings, u64), HermiteError> {
+) -> Result<(Vec<Placed>, u64), HermiteError> {
     // Each leaf's crossed edges, by voxel index, in leaf order: crossings are few beside the
     // leaves' voxels, so none is kept for an edge with none.
     let leaf = |n: LeafNumber, lower: &[u8; LEAF_VOXELS]| -> Result<Vec<_>, FieldError> {
@@ -195,16 +217,13 @@ fn crossings(
         }
         Ok(out)
     };
-    let found = par_reduce(t, signs, Ok(Vec::new()), leaf, |all, mine| {
+    let mut found = par_reduce(t, signs, Ok(Vec::new()), leaf, |all, mine| {
         let (mut all, mine) = (all?, mine?);
         all.extend(mine);
         Ok::<_, FieldError>(all)
     })??;
-    let mut c = Crossings {
-        fraction: Field::new(t, NO_CROSSING.0),
-        normal: Field::new(t, NO_CROSSING.1),
-        group: Field::new(t, NO_CROSSING.2),
-    };
+    found.sort_unstable_by_key(|(n, i, _)| (*n, *i));
+    let mut c = Vec::with_capacity(found.len());
     let mut unhit = 0_u64;
     for (n, i, f) in found {
         let inside = signs.leaf(t, n)?.get(i).copied().unwrap_or(0);
@@ -216,11 +235,9 @@ fn crossings(
         }
         unhit += u64::from(!f.hit);
         #[expect(clippy::cast_possible_truncation, reason = "stored as f32 (ADR-0030)")]
-        {
-            c.fraction.leaf_mut(t, n)?[i] = f.fraction as f32;
-            c.normal.leaf_mut(t, n)?[i] = m.map(|x| x as f32);
-        }
-        c.group.leaf_mut(t, n)?[i] = mesh.group(usize::try_from(f.triangle).unwrap_or(usize::MAX));
+        let (fraction, normal) = (f.fraction as f32, m.map(|x| x as f32));
+        let group = mesh.group(usize::try_from(f.triangle).unwrap_or(usize::MAX));
+        c.push((n, i, Crossing { fraction, normal, group }));
     }
     Ok((c, unhit))
 }

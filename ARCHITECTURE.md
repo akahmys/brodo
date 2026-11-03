@@ -209,15 +209,20 @@ fastest. A neighbour beyond the `i32` coordinate range is the background.
   between nodes is a number within its section: a node's first child and first tile, the
   rest found from its masks. Every structure is 32-byte aligned, little-endian, and laid out
   in `u32` words.
-- Layout version 1: a header, the root table, upper nodes, lower nodes, leaf values and
-  tile values, in that order; its bytes are in [docs/formats.md](docs/formats.md) §2.
+- Layout version 2, written, and version 1, read and written on request: a header, the
+  root table, upper nodes, lower nodes, leaf values and tile values, in that order; its
+  bytes are in [docs/formats.md](docs/formats.md) §2. The two differ in the header's
+  version alone (`FrozenGrid::with_version`); a reader of version 2 checks every rule its
+  writer keeps (§2.7, ADR-0052).
 - A node's masks number its children's places in Morton order, so that its children,
   being consecutive in that order, are found as its first child's number plus the set bits
   below the place; no list of child numbers is stored. Tile values follow the same rule.
 - A view is made only from a buffer it has checked whole: alignment, magic number,
   version, value type, every section within the buffer, and every node's children and
-  tiles within their sections. It accepts the layout versions ADR-0038 keeps, version 1
-  alone so far; any other is a typed error naming it.
+  tiles within their sections; at version 2 also padding, sections with no gap, nodes in
+  Morton order, and each node's first child and first tile, so that every node, leaf and
+  tile value is reached from one place. It accepts versions 2 and 1 (ADR-0038); any other
+  is a typed error naming it.
 - A view thaws into an owned `Topology` and `Field<T>` (`GridView::thaw`), or into a field
   on a topology holding its leaves and tiles (`thaw_on`), by walking its nodes once and
   refusing a node, a leaf or a tile value reached twice, and a leaf never reached; the
@@ -232,21 +237,26 @@ fastest. A neighbour beyond the `i32` coordinate range is the background.
 | **cache** | passing between processes, replaying frame caches | the `GridView` buffer, uncompressed | memory mapping, no copy |
 | **archive** | storing, shipping | metadata, topology and value blocks in chunks of 512 leaves, each compressed by `lz4_flex`'s block format (ADR-0016) | decompressing chunks, in parallel, into a `GridView` (one copy) |
 
-- A cache file holds a header (magic number, format version, grid count) and, per grid, its
+- A cache file holds a header (magic number, format version, entry count) and, per grid, its
   name, value type, voxel size and unit, affine transform, bounding box and free
-  key-value metadata, the topology and the values; a bare frozen buffer, a file of its own,
-  holds one grid's header, topology and values (docs/formats.md §2).
+  key-value metadata, the topology and the values; at version 2 also entries of bytes,
+  each a name, free pairs and bytes the profile does not read, for a format built on it,
+  Hermite data's crossings among them (`CacheEntry::bytes`, `CacheFile::bytes_entries`). A
+  bare frozen buffer, a file of its own, holds one grid's header, topology and values
+  (docs/formats.md §2).
 - A grid's metadata is a `GridMeta`, apart from `Grid<T>`, so that any topology and field
   can be written: a name, a voxel size per axis, a unit, a 3×4 affine transform from voxel
   to world coordinates, and free string pairs. The unit is a non-empty UTF-8 string brodo
   does not interpret; the voxel size and unit are always present. The bounding box is
   worked out from the topology when a file is written; a grid with no leaf or tile has an
   empty one, a variant of its own.
-- The cache profile, format version 1: a header, a directory, then each grid's metadata
-  and frozen buffer (§4.6) on block boundaries; its bytes are in
-  [docs/formats.md](docs/formats.md) §3. A reader checks the whole file, every grid's
-  buffer included, before it answers, as docs/formats.md §3.4 states; a buffer is checked
-  as §2.5 states, which leaves some of its writer's rules unchecked (ADR-0016, ADR-0038).
+- The cache profile, format version 2 written, and 1 read and written on request
+  (`cache::to_bytes_version`): a header, a directory, then each entry's metadata and
+  payload, a grid's frozen buffer (§4.6) of the same version, on block boundaries; its
+  bytes are in [docs/formats.md](docs/formats.md) §3. A reader checks the whole file,
+  every grid's buffer included, before it answers, as docs/formats.md §3.4 and §3.5
+  state; at version 2 a grid's bounds are checked against its leaves and tiles, at
+  version 1 they are not (ADR-0016, ADR-0038, ADR-0052).
 - A cache file is written whole: to a hidden file beside it, flushed and renamed over it,
   so that a reader, a mapping process among them, sees the old file or the new one; the
   directory must be writable, and a process killed while writing may leave the hidden
@@ -256,9 +266,9 @@ fastest. A neighbour beyond the `i32` coordinate range is the background.
   `mmap`); both go through one parser. Mapping is brodo's only unsafe code, in one module
   (ADR-0008); `CacheFile::map` is an `unsafe fn`, its caller promising that the file stays
   unchanged while it is mapped.
-- The archive profile, format version 1, under the feature `archive`, opted into: a
-  header, a directory, then each grid's metadata, its chunk table and its chunks on block
-  boundaries; its bytes are in [docs/formats.md](docs/formats.md) §8. A reader
+- The archive profile, format version 2 written, and 1 read and written on request, under
+  the feature `archive`, opted into: a header, a directory, then each entry's metadata,
+  its chunk table and its chunks on block boundaries, an entry of bytes cut every 256 KiB; its bytes are in [docs/formats.md](docs/formats.md) §8. A reader
   decompresses the chunks in parallel into the cache file of the same grids and checks it
   as a cache file, so that an archive is read as a `CacheFile` (`archive::read`); it also
   checks the rest docs/formats.md §8.4 states, how each grid is cut into chunks among it,
@@ -302,7 +312,7 @@ a type of a user's own. Frozen grids and cache files hold only `Stored` types, a
 trait over `Value` that brodo implements for `f32`, `f64`, `u8`, `u32`, `[f32; 3]` and
 `[f64; 3]`, each named by a type code brodo assigns (docs/formats.md §1.1, ADR-0029).
 
-### 4.9 Hermite data (ADR-0032)
+### 4.9 Hermite data (ADR-0032, ADR-0051)
 
 A format any producer writes and any reader reads without knowing the producer: a sign at
 each lattice point and, on each edge whose ends differ, where a surface crosses it, its
@@ -312,24 +322,28 @@ are in ADR-0030.
 - Lattice: point v at the corner of voxel v, the image of v under the grid's transform,
   the sampling lattice of an SDF on the same topology shifted by −h/2. Point v owns its
   +x, +y and +z edges.
-- A set, `brodo::hermite::Hermite`, is ten fields on one topology: signs (`u8`, 1 inside,
-  0 outside), and per axis a fraction (`f32`), a normal (`[f32; 3]`) and a group (`u32`),
-  with a table naming each group, group 0 `""`.
+- A set, `brodo::hermite::Hermite`, is a sign field on a topology (`u8`, 1 inside, 0
+  outside) and its crossings, held only on the edges that hold one (`Crossings`): per
+  leaf and axis a mask of the points whose edge holds one, and each crossing's fraction
+  (`f32`), normal (`[f32; 3]`) and group (`u32`), with a table naming each group, group 0
+  `""`. A producer builds the crossings leaf by leaf (`Crossings::builder`); a tool that
+  shows grids takes one axis's as dense fields (`Hermite::expand`).
 - An edge has a crossing exactly when the stored signs of its ends differ, tiles' and the
   background's included; its owner is then a leaf point. The fraction is the crossing's
   place from the edge's lower end, in [0, 1]; the normal is of unit length within 1e-6,
-  its component along the edge, where not zero, pointing from the inside end outward. An
-  edge with no crossing, every tile and the background hold fraction −1, normal zero and
-  group 0, by bits; the signs' background is 0.
+  its component along the edge, where not zero, pointing from the inside end outward; the
+  signs' background is 0.
 - A set is checked whole when made and when read; a broken rule is a typed error naming
   the point, the axis and the rule. Of several broken rules, which is named is not
   promised.
-- In a cache file, a set is ten grids told apart by keys in `GridMeta::extra`, the sign
-  grid holding the group table ([docs/formats.md](docs/formats.md) §4). A reader reads a
-  set as ten `GridView`s, without a copy, the shared topology checked by comparing their
-  root tables and node sections and their counts of leaves and tiles, and the sign grid's
-  nodes walked from its root table, each reached once and every leaf reached
-  (docs/formats.md §4.2, rules 3 and 11).
+- In a cache file of version 2, a set is its sign grid and an entry of bytes holding its
+  crossings, told apart by keys in their free pairs, the sign grid holding the group table
+  ([docs/formats.md](docs/formats.md) §4.3); a set of version 1, ten dense grids, an edge
+  with no crossing, every tile and the background holding fraction −1, normal zero and
+  group 0 (§4.1), is read, and written on request (`Hermite::entries_v1`). A reader reads
+  a set in place, without a copy, the sign grid's nodes walked from its root table, each
+  reached once and every leaf reached, and an entry's masks held to the sign grid's
+  leaves (§4.2, §4.3).
 - A producer's own information, such as edges it found no surface for, is not in the
   format; it reports it beside the set.
 
@@ -475,8 +489,8 @@ Rust. It uses no GPU and no window.
   before, make about twice the bytes they take in the file (`spikes/thawmemory/`,
   2026-11-03; ADR-0050). A `.vdb`'s grids take the unit `unstated`, OpenVDB stating
   none, and its grids brodo does not read are listed as skipped.
-- **`info`** writes to standard output, one fact a line, each grid's indented under its
-  name: its value type, unit, voxel size, transform, the bounds of its leaves and tiles,
+- **`info`** writes to standard output, one fact a line, a cache file's or an archive's
+  entries of bytes by name and length, then each grid's facts indented under its name: its value type, unit, voxel size, transform, the bounds of its leaves and tiles,
   their counts, the voxels they cover, all and those in leaves and in tiles, its
   background, the least and greatest of each component over its leaf voxels and tiles, a
   NaN never among them and of equal values the first in leaf order, then tile order, and

@@ -39,16 +39,16 @@ copyright notice (`grep -rniE 'copyright|spdx|licen[cs]e' crates/*/src` finds no
 | :--- | :--- | :--- |
 | `crates/brodo/src/accessor.rs` | ARCHITECTURE.md §4.4, ADR-0015 only | value accessors: reads and leaf-only writes from a cached path |
 | `crates/brodo/src/analysis.rs` | ARCHITECTURE.md §4.5, ADR-0013 only; union-find and breadth-first search as textbook material | connected-component labelling and flood fill on the sparse tree |
-| `crates/brodo/src/archive.rs` | ARCHITECTURE.md §4.7, ADR-0016; the LZ4 project's `lz4_Block_format.md`, for the block format docs/formats.md §8.3 names | the archive profile: writing grids in compressed chunks and reading them back as a cache file, or one grid's region of them |
+| `crates/brodo/src/archive.rs` | ARCHITECTURE.md §4.7, ADR-0016, ADR-0051, ADR-0052; the LZ4 project's `lz4_Block_format.md`, for the block format docs/formats.md §8.3 names | the archive profile: writing grids in compressed chunks and reading them back as a cache file, or one grid's region of them |
 | `crates/brodo/src/quantise.rs` | docs/formats.md §8.5, ADR-0016; IEEE 754-2019 §3.6, for binary16's format and §4.3.3, for rounding to nearest, ties to even | an archive's quantised leaf values: binary16, byte-shuffled, and 8 bits over a range |
-| `crates/brodo/src/cache.rs` | ARCHITECTURE.md §4.7, ADR-0016 only | the cache profile: writing and checking a file of grids with their metadata |
+| `crates/brodo/src/cache.rs` | ARCHITECTURE.md §4.7, ADR-0016, ADR-0051, ADR-0052 only | the cache profile: writing and checking a file of grids with their metadata |
 | `crates/brodo/src/error.rs` | none | the crate's error types |
 | `crates/brodo/src/euler.rs` | ARCHITECTURE.md §4.5, ADR-0024; the Euler–Poincaré formula over a voxel complex as stated by Sánchez-Cruz et al. (2013, J. Appl. Res. Technol. 11(1), 65–78); a sum over 2×2×2 neighbourhoods as ImageJ Ops' documentation of `EulerCharacteristic26N` describes it | the Euler characteristic of the voxels meeting a condition, under 6- or 26-connectivity |
-| `crates/brodo/src/frozen.rs` | ARCHITECTURE.md §4.6, ADR-0016 only | the frozen layout, version 1, and `freeze` |
+| `crates/brodo/src/frozen.rs` | ARCHITECTURE.md §4.6, ADR-0016, ADR-0052 only | the frozen layout, version 1, and `freeze` |
 | `crates/brodo/src/gather.rs` | ARCHITECTURE.md §4.4, ADR-0015 only | the gather of a leaf and one, two or three ghost layers |
 | `crates/brodo/src/field.rs` | ARCHITECTURE.md §4.2, ADR-0014 only | fields: the open `Value` trait and the sealed `Stored` one, values by leaf and tile number, the stamp check, the remap and merge rules |
 | `crates/brodo/src/grid.rs` | ARCHITECTURE.md §4.2, ADR-0014 only | a grid: one topology and one field, edited in one step |
-| `crates/brodo/src/hermite.rs` | ARCHITECTURE.md §4.9, ADR-0032; Ju, Losasso, Schaefer and Warren (2002), *Dual Contouring of Hermite Data*, for Hermite data as signs on a lattice and a crossing and normal on each edge whose ends differ | the Hermite data format: a set of ten fields, its check, its cache entries and its reading in place |
+| `crates/brodo/src/hermite.rs` | ARCHITECTURE.md §4.9, ADR-0032, ADR-0051; Ju, Losasso, Schaefer and Warren (2002), *Dual Contouring of Hermite Data*, for Hermite data as signs on a lattice and a crossing and normal on each edge whose ends differ | the Hermite data format: a set of ten fields, its check, its cache entries and its reading in place |
 | `crates/brodo/src/lib.rs` | none | crate root |
 | `crates/brodo/src/manifest.rs` | ARCHITECTURE.md §4.3, ADR-0014 only | the leaf manifest: 26 directions and each leaf's neighbours |
 | `crates/brodo/src/mapping.rs` | ARCHITECTURE.md §4.7, ADR-0008 only | mapping a file read-only: brodo's one unsafe operation |
@@ -56,7 +56,7 @@ copyright notice (`grep -rniE 'copyright|spdx|licen[cs]e' crates/*/src` finds no
 | `crates/brodo/src/morphology.rs` | ARCHITECTURE.md §4.5, ADR-0025 only; dilation and erosion by a structuring element as textbook material | dilation and erosion of a topology on whole leaves, and of values by a max or min filter |
 | `crates/brodo/src/parallel.rs` | ARCHITECTURE.md §4.4, ADR-0015 only | the leaf-parallel update and the fixed-order reduction |
 | `crates/brodo/src/topology.rs` | ARCHITECTURE.md §4.2, ADR-0014 only; Morton order as bit interleaving | topologies: stamps, Morton numbering, the editor, `Remap` |
-| `crates/brodo/src/view.rs` | ARCHITECTURE.md §4.6, ADR-0016, ADR-0032 only | `GridView`: checking a frozen grid whole, or its nodes without its leaf values, reading it in place, and walking its leaves and tiles |
+| `crates/brodo/src/view.rs` | ARCHITECTURE.md §4.6, ADR-0016, ADR-0032, ADR-0052 only | `GridView`: checking a frozen grid whole, or its nodes without its leaf values, reading it in place, and walking its leaves and tiles |
 | `crates/brodo/src/slice.rs` | ARCHITECTURE.md §6.1, ADR-0018 only | a slice of a scalar field drawn and encoded as PNG |
 | `crates/brodo/src/vdb.rs` | ARCHITECTURE.md §4.7, ADR-0045, ADR-0046, ADR-0047; docs/formats.md §9, from OpenVDB `v14.0.0`'s files listed above, read and not copied; `spikes/vdb/` | grids of `f32` and `f64` written as OpenVDB's `.vdb` file at file version 225, and `vdb_read.rs`'s reader re-exported |
 | `crates/brodo/src/vdb_read.rs` | ARCHITECTURE.md §4.7, ADR-0047; docs/formats.md §9.7 and §9.8, from OpenVDB `v14.0.0`'s `io/Compression.h`, read and not copied, and OpenVDB's output in `spikes/vdbread/`; c-blosc's public `README_CHUNK_FORMAT.rst`, for a Blosc chunk; the LZ4 project's `lz4_Block_format.md`, its blocks decoded by `lz4_flex` | the float and double grids of OpenVDB files at file version 224 or 225 read, uncompressed, with active-mask or with Blosc's LZ4 |
