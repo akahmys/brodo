@@ -64,6 +64,18 @@ fn nth(first: U32, mask: &[U32], p: usize, what: &'static str) -> Result<u32, Fo
     first.get().checked_add(count_before(mask, p)).ok_or(lost(what))
 }
 
+/// The places set in a mask, in ascending order.
+fn set_places(mask: &[U32]) -> impl Iterator<Item = usize> + '_ {
+    mask.iter().enumerate().flat_map(|(i, w)| {
+        let mut bits = w.get();
+        std::iter::from_fn(move || {
+            let b = bits.trailing_zeros();
+            bits &= bits.wrapping_sub(1);
+            (b < 32).then_some(i * 32 + b as usize)
+        })
+    })
+}
+
 fn ones(mask: &[U32]) -> u32 {
     mask.iter().map(|w| w.get().count_ones()).sum()
 }
@@ -363,12 +375,33 @@ impl<'a, T: Stored> GridView<'a, T> {
         self.version
     }
 
-    /// The bounds the view's leaves and tiles cover, by a walk of its nodes.
+    /// The bounds the view's leaves and tiles cover, by a walk of its nodes' set places
+    /// alone, each node's children numbered from its first in place order.
     pub(crate) fn bounds(&self) -> Result<crate::meta::Bounds, FormatError> {
-        let r = self.regions()?;
-        let cubes = r.leaves.iter().map(|o| (*o, (1 << LEAF_LOG2) - 1));
-        let tiles = r.tiles.iter().map(|(level, o, _)| (*o, level.edge() - 1));
-        Ok(cubes.chain(tiles).fold(crate::meta::Bounds::Empty, |b, (o, e)| b.with_cube(o, e)))
+        let mut b = crate::meta::Bounds::Empty;
+        for e in self.roots {
+            let key = e.key.map(|k| k.get());
+            if e.kind.get() == ROOT_TILE {
+                b = b.with_cube(key, TileLevel::Root.edge() - 1);
+                continue;
+            }
+            let u = self.uppers.get(e.index.get() as usize).ok_or(lost("root"))?;
+            let at = |p| offset(key, unplace(p, 5), TileLevel::Upper.edge_log2());
+            for p in set_places(&u.tiles) {
+                b = b.with_cube(at(p), TileLevel::Upper.edge() - 1);
+            }
+            for (n, p) in (u.first_child.get() as usize..).zip(set_places(&u.children)) {
+                let l = self.lowers.get(n).ok_or(lost("upper node"))?;
+                let at = |q| offset(at(p), unplace(q, 4), TileLevel::Lower.edge_log2());
+                for q in set_places(&l.tiles) {
+                    b = b.with_cube(at(q), TileLevel::Lower.edge() - 1);
+                }
+                for q in set_places(&l.children) {
+                    b = b.with_cube(at(q), (1 << LEAF_LOG2) - 1);
+                }
+            }
+        }
+        Ok(b)
     }
 
     /// The number of leaves.

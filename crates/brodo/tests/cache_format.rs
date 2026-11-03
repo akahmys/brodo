@@ -180,6 +180,26 @@ fn format_version_2_keeps_its_bytes() {
     assert_eq!((one.version(), one.bytes_entries().len()), (1, 0));
 }
 
+/// An entry of bytes is padded to the next block and no further (docs/formats.md §3.5): its
+/// length stated a block short of its payload is refused, a byte short is read.
+#[test]
+fn an_entry_of_bytes_padded_a_whole_block_is_refused() {
+    let file =
+        to_bytes(&[CacheEntry::bytes("zeros", BTreeMap::new(), vec![0; 64]).unwrap()]).unwrap();
+    let name = file.windows(5).position(|w| w == b"zeros").unwrap();
+    let at = name + file[name..].windows(8).position(|w| w == 64u64.to_le_bytes()).unwrap();
+    let with_length = |n: u64| {
+        let mut out = file.clone();
+        out[at..at + 8].copy_from_slice(&n.to_le_bytes());
+        out
+    };
+    assert_eq!(CacheFile::from_bytes(&with_length(33)).unwrap().bytes_entries()[0].bytes.len(), 33);
+    assert!(matches!(
+        CacheFile::from_bytes(&with_length(32)),
+        Err(CacheError::Inconsistent("entry of bytes"))
+    ));
+}
+
 /// A file is replaced whole, not written in place (G1 of P5's review): a handle opened on
 /// the old file reads the old bytes after a new file is written over it, and nothing is
 /// left beside it; a write that cannot finish leaves the old file.

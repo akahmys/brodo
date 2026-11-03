@@ -288,3 +288,18 @@ commit before P7, `11e13a6`, benchmarked in turn with P7's, twice each, read 3.4
 amendment above records, 3.08 ms against 3.69 ms. The owner had the item recorded again,
 the cause still not measured: `--record leaf_parallel_update_x32` at a one-minute load of
 1.20 gave 3 398 084 ns.
+
+## Amendment: the cache map recorded again at P8's close
+
+- **Date**: 2026-11-03
+
+P8's closing run found the cache and archive reads of version 2 slower than their
+baselines: `cache_map_x256` by 2770 %, `cache_read_x16` by 240 %, and the archive's reads
+by 66 to 98 %, `3954ed5` having landed without a benchmark, as T10 asks. Each read of
+version 2 checks the grid's bounds against its leaves and tiles (ADR-0052, b), which the
+first reader found by walking every place of every node. Walking only the places set, the
+reads came back within their baselines, `cache_map_x256` aside, at +103 and +104 %: a map
+of the benchmark's grid, 2606 leaves, took 16.6 µs at version 1 and 31 µs at version 2,
+17.3 µs with the bounds left unchecked, so the check costs about 5 ns a leaf. The owner
+had the item recorded again as the cost of that check: `--record cache_map_x256`, the
+one-minute load 1.73 just after it, gave 7 724 166 ns.

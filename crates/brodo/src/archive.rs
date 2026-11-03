@@ -945,11 +945,14 @@ mod tests {
         let file = from_bytes(&to_bytes(&e).unwrap(), u64::MAX).unwrap();
         assert!(file.storage.bytes() == crate::cache::to_bytes(&e).unwrap().as_slice());
         let leaves = 16 * 4 * 1100;
-        let frozen = |g: &CacheEntry| match &g.payload {
-            Payload::Grid { frozen, .. } => frozen.as_bytes().to_vec(),
-            Payload::Bytes { .. } => panic!("a grid"),
-        };
-        let starts: Vec<Vec<_>> = e.iter().map(|g| cuts(&frozen(g)).unwrap()).collect();
+        // The frozen buffer itself, aligned as the header needs; a copy may not be.
+        fn frozen(g: &CacheEntry) -> &[u8] {
+            match &g.payload {
+                Payload::Grid { frozen, .. } => frozen.as_bytes(),
+                Payload::Bytes { .. } => panic!("a grid"),
+            }
+        }
+        let starts: Vec<Vec<_>> = e.iter().map(|g| cuts(frozen(g)).unwrap()).collect();
         assert_eq!(starts[0].len(), 5, "the nodes, three chunks of leaves and the tiles");
         let flags: Vec<_> = starts[0].iter().map(|(_, leaf)| *leaf).collect();
         assert_eq!(flags, [false, true, true, true, false]);
