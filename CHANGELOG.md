@@ -4,6 +4,13 @@ Each version, newest first, with the milestones it closed and every change that 
 user (TESTING.md V2, V3). Format versions of the `GridView` layout and the file profiles
 are recorded here when they change (V6).
 
+## Unreleased
+
+- `vdb::from_bytes` takes a `limit`, as `archive::from_bytes` does: a caller passes a
+  third argument. With `vdb::read`'s, it bounds what reading makes, counted as
+  ARCHITECTURE.md §4.7 states, and more is refused as `VdbError::FileTooLarge`; a file
+  `vdb::read` took at a limit of its length may now need a larger one (ADR-0047).
+
 ## 0.8.2 (2026-11-02)
 
 Closes no milestone: what a survey of the whole repository found fixed by patch rather

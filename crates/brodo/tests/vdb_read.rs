@@ -99,7 +99,8 @@ fn listing_expected(text: &str) -> Listing {
 }
 
 fn same_listing(bytes: &[u8], expect: &str) {
-    let (got, want) = (listing_of(&from_bytes(bytes, "m").unwrap()), listing_expected(expect));
+    let (got, want) =
+        (listing_of(&from_bytes(bytes, "m", u64::MAX).unwrap()), listing_expected(expect));
     assert_eq!(got.1, want.1, "skipped");
     assert_eq!(got.0.keys().collect::<Vec<_>>(), want.0.keys().collect::<Vec<_>>(), "grids");
     for (name, lines) in &want.0 {
@@ -158,7 +159,7 @@ fn round_trip<T: VdbValue + PartialEq + std::fmt::Debug>(
     f: &Field<T>,
 ) -> VdbFile {
     let bytes = to_bytes(&[VdbEntry::new(m, t, f).unwrap()]).unwrap();
-    from_bytes(&bytes, "mm").unwrap()
+    from_bytes(&bytes, "mm", u64::MAX).unwrap()
 }
 
 #[test]
@@ -197,20 +198,23 @@ fn zip_another_version_and_a_longer_file_are_refused() {
     let mut zip = BY14.to_vec();
     let at = first_body(&zip);
     zip[at] |= 1;
-    assert!(matches!(from_bytes(&zip, "m"), Err(VdbError::Unsupported("zip compression"))));
+    assert!(matches!(
+        from_bytes(&zip, "m", u64::MAX),
+        Err(VdbError::Unsupported("zip compression"))
+    ));
     let mut old = BY14.to_vec();
     old[8] = 223;
-    assert!(matches!(from_bytes(&old, "m"), Err(VdbError::Version(223))));
+    assert!(matches!(from_bytes(&old, "m", u64::MAX), Err(VdbError::Version(223))));
     let mut longer = BY14.to_vec();
     longer.push(0);
-    assert!(matches!(from_bytes(&longer, "m"), Err(VdbError::Malformed("file's end"))));
+    assert!(matches!(from_bytes(&longer, "m", u64::MAX), Err(VdbError::Malformed("file's end"))));
 }
 
 #[test]
 fn every_truncation_is_refused() {
     for len in (0..BY14.len()).step_by(997) {
         assert!(
-            matches!(from_bytes(&BY14[..len], "m"), Err(VdbError::Malformed(_))),
+            matches!(from_bytes(&BY14[..len], "m", u64::MAX), Err(VdbError::Malformed(_))),
             "{len} bytes read"
         );
     }
@@ -219,12 +223,64 @@ fn every_truncation_is_refused() {
 #[test]
 fn a_file_above_the_limit_is_refused_before_it_is_read() {
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/vdb_by14_v225.bin");
-    let limit = BY14.len() as u64 - 1;
-    assert!(matches!(read(&path, "m", limit), Err(VdbError::FileTooLarge { .. })));
-    assert_eq!(
-        listing_of(&read(&path, "m", limit + 1).unwrap()),
-        listing_of(&from_bytes(BY14, "m").unwrap())
-    );
+    let (length, file) = (BY14.len() as u64, from_bytes(BY14, "m", u64::MAX).unwrap());
+    let refused = read(&path, "m", length - 1);
+    assert!(matches!(refused, Err(VdbError::FileTooLarge { length: l, .. }) if l == length));
+    let limit = length.max(charged(&file));
+    assert_eq!(listing_of(&read(&path, "m", limit).unwrap()), listing_of(&file));
+}
+
+/// What reading a file counts against its limit, as ARCHITECTURE.md §4.7 states: each leaf
+/// twice its values' bytes and 1024 more, each tile kept 256, each lower node 2560 and each
+/// upper node 18 432; a grid skipped nothing.
+fn charged(file: &VdbFile) -> u64 {
+    let mut total = 0;
+    for g in &file.grids {
+        let t = &g.topology;
+        let size = if let VdbField::F64(_) = &g.field { 8 } else { 4 };
+        let floor = |o: [i32; 3], span: i32| o.map(|c| c.div_euclid(span) * span);
+        let (mut lowers, mut uppers) = (BTreeSet::new(), BTreeSet::new());
+        for n in t.leaf_numbers() {
+            let o = t.leaf_origin(n).unwrap();
+            lowers.insert(floor(o, 128));
+            uppers.insert(floor(o, 4096));
+        }
+        for n in t.tile_numbers() {
+            let (level, o) = t.tile(n).unwrap();
+            if level == TileLevel::Lower {
+                lowers.insert(floor(o, 128));
+            }
+            if level != TileLevel::Root {
+                uppers.insert(floor(o, 4096));
+            }
+        }
+        total += t.leaf_numbers().count() as u64 * (2 * 512 * size + 1024)
+            + t.tile_numbers().count() as u64 * 256
+            + lowers.len() as u64 * 2560
+            + uppers.len() as u64 * 18_432;
+    }
+    total
+}
+
+/// A file is read under a limit of what it is counted to make, and refused under one byte
+/// less, before it makes more: files OpenVDB wrote, compressed and not, and one brodo wrote
+/// with a leaf, a tile and a node at every level.
+#[test]
+fn what_reading_makes_is_bounded_by_the_limit() {
+    let (_, _, written) = written_file();
+    for bytes in [BY12, BY14, NONE, written.as_slice()] {
+        let need = charged(&from_bytes(bytes, "m", u64::MAX).unwrap());
+        let refused = from_bytes(bytes, "m", need - 1);
+        assert!(
+            matches!(refused, Err(VdbError::FileTooLarge { length, limit })
+                if limit == need - 1 && length > limit && length <= need),
+            "{refused:?}"
+        );
+        assert_eq!(
+            listing_of(&from_bytes(bytes, "m", need).unwrap()),
+            listing_of(&from_bytes(bytes, "m", u64::MAX).unwrap())
+        );
+    }
 }
 
 /// A file longer than the limit is refused by the bytes read, whatever length it reports:
@@ -321,7 +377,7 @@ fn splice(bytes: &[u8], range: std::ops::Range<usize>, with: &[u8]) -> Vec<u8> {
 }
 
 fn malformed(bytes: &[u8]) -> &'static str {
-    match from_bytes(bytes, "m") {
+    match from_bytes(bytes, "m", u64::MAX) {
         Err(VdbError::Malformed(what)) => what,
         other => panic!("not refused as malformed: {:?}", other.map(|f| f.skipped)),
     }
@@ -355,7 +411,7 @@ fn a_file_below_the_limit_is_read() {
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/vdb_by14_v225.bin");
     assert_eq!(
         listing_of(&read(&path, "m", u64::MAX).unwrap()),
-        listing_of(&from_bytes(BY14, "m").unwrap())
+        listing_of(&from_bytes(BY14, "m", u64::MAX).unwrap())
     );
 }
 
@@ -381,7 +437,7 @@ fn an_inactive_root_tile_of_another_value_is_kept() {
     let (t, f, mut bytes) = written_file();
     let (_, active) = root_tile(&t, &f, &bytes);
     bytes[active] = 0;
-    let file = from_bytes(&bytes, "mm").unwrap();
+    let file = from_bytes(&bytes, "mm", u64::MAX).unwrap();
     let VdbField::F64(g) = &file.grids[0].field else { panic!("not a double grid") };
     assert_eq!(
         lines_of(&file.grids[0].meta, &file.grids[0].topology, g),
@@ -412,7 +468,7 @@ fn an_instance_of_a_double_grid_is_skipped() {
     let (_, at) = descriptors(&bytes)[0].clone();
     let mut b = splice(&bytes, at..at, b"x");
     b[at - 4..at].copy_from_slice(&1_u32.to_le_bytes());
-    let file = from_bytes(&b, "mm").unwrap();
+    let file = from_bytes(&b, "mm", u64::MAX).unwrap();
     assert!(file.grids.is_empty());
     assert_eq!(file.skipped, ["g"]);
 }
@@ -431,7 +487,7 @@ fn indicators_openvdb_does_not_write_here_read_as_section_9_8_says() {
     assert_eq!(fog[buffers + 64], 0);
     fog[buffers + 64] = 1;
     let negated = |bytes: &[u8]| {
-        let file = from_bytes(bytes, "m").unwrap();
+        let file = from_bytes(bytes, "m", u64::MAX).unwrap();
         let g = file.grids.iter().find(|g| g.meta.name == "fog").unwrap();
         let VdbField::F64(f) = &g.field else { panic!("not a double grid") };
         let t = &g.topology;
@@ -537,7 +593,7 @@ fn blosc_chunks_beyond_section_9_8_are_refused() {
     let mut long = BY14.to_vec();
     long[p + 20..p + 24].copy_from_slice(&(u32::try_from(n).unwrap() + 1).to_le_bytes());
     assert_eq!(malformed(&long), "Blosc chunk");
-    let unsupported = |c: Vec<u8>| match from_bytes(&stored_as(p, n, &counted(&c)), "m") {
+    let unsupported = |c: Vec<u8>| match from_bytes(&stored_as(p, n, &counted(&c)), "m", u64::MAX) {
         Err(VdbError::Unsupported(what)) => what,
         other => panic!("not refused as unsupported: {:?}", other.map(|f| f.skipped)),
     };

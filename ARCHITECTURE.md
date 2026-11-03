@@ -283,9 +283,13 @@ fastest. A neighbour beyond the `i32` coordinate range is the background.
   name, transform, voxel size, string metadata and a unit the caller gives; every leaf
   voxel's value, active or not, and each tile that is active or whose value's bits differ
   from the background's. Other grids, half-float and instanced ones among them, are
-  skipped and their names returned; a file §9.7 does not take is refused. The limit `vdb::read` takes bounds
-  the file's length, not what reading makes, which is a multiple of that length but of
-  hundreds for a file of tiles alone (ADR-0047's amendment of 2026-11-02).
+  skipped and their names returned; a file §9.7 does not take is refused. The limit
+  `vdb::from_bytes` and `vdb::read` take bounds what reading makes, besides the file's bytes,
+  counted before it is made: a leaf twice its values' bytes and 1024 more, a tile kept 256,
+  a lower node 2560 and an upper node 18 432; a grid skipped nothing. `vdb::read`'s limit
+  bounds the file's length too. What a file makes stays within its count, its least margin
+  on upper nodes, where 617 MB was made against 696 MB counted (`spikes/vdbmemory/`'s
+  cases, measured 2026-11-03; ADR-0047).
 
 ### 4.8 Value types
 

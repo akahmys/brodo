@@ -87,3 +87,21 @@ The owner decided, on 2026-11-02, as proposed: the multiple is stated now, in
 ARCHITECTURE.md §4.7, and `limit` bounding what `vdb::from_bytes` and `vdb::read` make, as
 `archive` does, is a unit of its own after the review of the whole repository, since it
 changes public items (ROADMAP.md §2, "After P7").
+
+## Amendment: the limit counts what reading makes
+
+- **Date**: 2026-11-03
+
+What reading makes could not be bounded as `archive` bounds it, by the bytes of the cache
+file of the same grids: a cache file holds 32 768 tiles in one upper node of 8224 bytes,
+where reading made about 160 bytes a tile (measured 2026-11-03, the cases of
+`spikes/vdbmemory/` with an `f32` leaf case and node cases added). The owner chose, on
+2026-11-03, to count each thing as it is read, at what it makes at most, against the limit,
+refusing before it is made. `vdb::from_bytes` takes the limit, as `archive::from_bytes`
+does, and the fuzz target `vdb` passes one.
+
+The counts were set from the measurement: a leaf twice its values' bytes, the reader's map
+and the field holding them, and 1024 more; a tile 256, against about 160 made; a node its
+two masks twice, the editor's tree and the one it commits, and room for the rest, 2560 a
+lower node and 18 432 an upper node. Each case made less than it was counted, beside the
+file's bytes, the least margin on upper nodes, 617 MB made against 696 MB counted.

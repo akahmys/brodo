@@ -4,9 +4,8 @@
 //! (CODING.md Rule 3), and is fuzzed (TESTING.md T6).
 //!
 //! The bytes are in `docs/formats.md` §9, which this code follows, §9.7 and §9.8 for what a
-//! reader takes beyond what brodo writes. The memory it makes is a multiple of the file's
-//! length, every node's values and every leaf coming from bytes of their own, but of
-//! hundreds (ARCHITECTURE.md §4.7).
+//! reader takes beyond what brodo writes. What it makes is counted against its limit before
+//! it is made, each leaf, tile and node at what it holds at most (ARCHITECTURE.md §4.7).
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
@@ -40,6 +39,12 @@ const UPPER_CHILD: u32 = LOWER_SPAN_LOG2;
 const LOWER_CHILD: u32 = LEAF_LOG2;
 /// The edge of the root's tiles and upper nodes.
 const ROOT_EDGE: i32 = 1 << UPPER_SPAN_LOG2;
+/// What a tile kept, a lower node and an upper node are counted to make (ARCHITECTURE.md
+/// §4.7): a node's two masks twice, in the editor's tree and the one it commits, and room
+/// for the rest; a tile at the most measured, about 160 bytes, rounded up (2026-11-03).
+const TILE: u64 = 256;
+const LOWER_NODE: u64 = 2 * 1024 + 512;
+const UPPER_NODE: u64 = 2 * 8192 + 2048;
 
 /// A grid's values, of the type its file states.
 #[derive(Debug, Clone)]
@@ -76,9 +81,10 @@ pub struct VdbFile {
 
 /// Reads an OpenVDB file's bytes whole, as docs/formats.md §9.7 states, refusing a file
 /// that breaks it; of several broken rules, which is named is not promised. OpenVDB states
-/// no unit, so `unit` is every grid's. What it makes in memory is not bounded but by a
-/// multiple of hundreds of the bytes' length (ARCHITECTURE.md §4.7).
-pub fn from_bytes(bytes: &[u8], unit: &str) -> Result<VdbFile, VdbError> {
+/// no unit, so `unit` is every grid's. The leaves, tiles and nodes it makes are counted as
+/// ARCHITECTURE.md §4.7 states, and more than `limit` bytes is refused before it is made.
+pub fn from_bytes(bytes: &[u8], unit: &str, limit: u64) -> Result<VdbFile, VdbError> {
+    let mut budget = Budget { left: limit, limit };
     let mut c = Cursor { bytes, at: 0 };
     let count = header(&mut c)?;
     let mut file = VdbFile { grids: Vec::new(), skipped: Vec::new() };
@@ -86,11 +92,11 @@ pub fn from_bytes(bytes: &[u8], unit: &str) -> Result<VdbFile, VdbError> {
         let d = descriptor(&mut c)?;
         let read = match d.kind.as_slice() {
             b"Tree_float_5_4_3" if d.instance.is_empty() => {
-                let (meta, topology, f) = grid::<f32>(bytes, &d, unit)?;
+                let (meta, topology, f) = grid::<f32>(bytes, &d, unit, &mut budget)?;
                 Some(VdbGrid { meta, topology, field: VdbField::F32(f) })
             }
             b"Tree_double_5_4_3" if d.instance.is_empty() => {
-                let (meta, topology, f) = grid::<f64>(bytes, &d, unit)?;
+                let (meta, topology, f) = grid::<f64>(bytes, &d, unit, &mut budget)?;
                 Some(VdbGrid { meta, topology, field: VdbField::F64(f) })
             }
             _ => None,
@@ -107,17 +113,20 @@ pub fn from_bytes(bytes: &[u8], unit: &str) -> Result<VdbFile, VdbError> {
     Ok(file)
 }
 
-/// Reads an OpenVDB file of at most `limit` bytes, as `from_bytes` does: a longer file is
-/// refused by its length before any of it is read, or by the bytes read where its length
-/// says less than it holds. `limit` does not bound what reading makes (ARCHITECTURE.md §4.7).
+/// Reads an OpenVDB file of at most `limit` bytes, making at most `limit` bytes more, as
+/// `from_bytes` does: a longer file is refused by its length before any of it is read, or by
+/// the bytes read where its length says less than it holds.
 pub fn read(path: &Path, unit: &str, limit: u64) -> Result<VdbFile, VdbError> {
     let bytes = read_within(path, limit, |length, limit| VdbError::FileTooLarge { length, limit })?;
-    from_bytes(&bytes, unit)
+    from_bytes(&bytes, unit, limit)
 }
 
 /// A value type read: its bytes, its negation and its bits.
 trait Scalar: VdbValue + std::ops::Neg<Output = Self> {
     const SIZE: usize;
+    /// What a leaf is counted to make (ARCHITECTURE.md §4.7): its values twice, in the
+    /// reader's map and the field, and 1024 bytes for its mask, origin and numbers.
+    const LEAF: u64;
 
     fn get(bytes: &[u8]) -> Option<Self>;
 
@@ -127,6 +136,7 @@ trait Scalar: VdbValue + std::ops::Neg<Output = Self> {
 
 impl Scalar for f32 {
     const SIZE: usize = 4;
+    const LEAF: u64 = 2 * 512 * 4 + 1024;
 
     fn get(bytes: &[u8]) -> Option<Self> {
         Some(Self::from_le_bytes(bytes.try_into().ok()?))
@@ -139,6 +149,7 @@ impl Scalar for f32 {
 
 impl Scalar for f64 {
     const SIZE: usize = 8;
+    const LEAF: u64 = 2 * 512 * 8 + 1024;
 
     fn get(bytes: &[u8]) -> Option<Self> {
         Some(Self::from_le_bytes(bytes.try_into().ok()?))
@@ -146,6 +157,22 @@ impl Scalar for f64 {
 
     fn same(self, other: Self) -> bool {
         self.to_bits() == other.to_bits()
+    }
+}
+
+/// What reading may still make of its limit.
+struct Budget {
+    left: u64,
+    limit: u64,
+}
+
+impl Budget {
+    /// `n` bytes more, refused if they pass the limit.
+    fn take(&mut self, n: u64) -> Result<(), VdbError> {
+        let length = (self.limit - self.left).saturating_add(n);
+        self.left =
+            self.left.checked_sub(n).ok_or(VdbError::FileTooLarge { length, limit: self.limit })?;
+        Ok(())
     }
 }
 
@@ -275,6 +302,7 @@ fn grid<T: Scalar>(
     bytes: &[u8],
     d: &Descriptor,
     unit: &str,
+    budget: &mut Budget,
 ) -> Result<(GridMeta, Topology, Field<T>), VdbError> {
     let mut c = Cursor { bytes, at: d.start };
     if d.buffers < d.start || d.end < d.buffers {
@@ -293,7 +321,7 @@ fn grid<T: Scalar>(
     meta.transform = transform;
     meta.extra = extra;
     meta.check()?;
-    let (background, mut tree, leaves) = topology::<T>(&mut c, flags)?;
+    let (background, mut tree, leaves) = topology::<T>(&mut c, flags, budget)?;
     if c.at != d.buffers {
         return Err(VdbError::Malformed("topology's end"));
     }
@@ -430,6 +458,7 @@ type LeafMask = (Coord, Vec<u64>);
 fn topology<T: Scalar>(
     c: &mut Cursor<'_>,
     flags: u32,
+    budget: &mut Budget,
 ) -> Result<(T, Tree<T>, Vec<LeafMask>), VdbError> {
     if c.i32("buffer count")? != 1 {
         return Err(VdbError::Malformed("buffer count"));
@@ -448,13 +477,15 @@ fn topology<T: Scalar>(
             _ => return Err(VdbError::Malformed("root tile")),
         };
         if active || !value.same(background) {
+            budget.take(TILE)?;
             tree.tiles.insert((TileLevel::Root, o), value);
         }
     }
     let node = Node { flags, background };
     for _ in 0..uppers {
         let o = root_origin(c, &mut origins)?;
-        node.upper(c, o, &mut tree, &mut leaves)?;
+        budget.take(UPPER_NODE)?;
+        node.upper(c, o, &mut tree, &mut leaves, budget)?;
     }
     Ok((background, tree, leaves))
 }
@@ -466,6 +497,14 @@ fn root_origin(c: &mut Cursor<'_>, seen: &mut BTreeSet<Coord>) -> Result<Coord, 
         return Err(VdbError::Malformed("root's origin"));
     }
     Ok(o)
+}
+
+/// A node's level: log₂ of its side in places, of a child's edge, and its tiles' level.
+#[derive(Clone, Copy)]
+struct Level {
+    log: u32,
+    child: u32,
+    level: TileLevel,
 }
 
 /// What every node of a grid reads its values with.
@@ -482,9 +521,12 @@ impl<T: Scalar> Node<T> {
         origin: Coord,
         tree: &mut Tree<T>,
         leaves: &mut Vec<LeafMask>,
+        budget: &mut Budget,
     ) -> Result<(), VdbError> {
-        for o in self.places(c, origin, UPPER_LOG, UPPER_CHILD, TileLevel::Upper, tree)? {
-            for lo in self.places(c, o, LOWER_LOG, LOWER_CHILD, TileLevel::Lower, tree)? {
+        let upper = Level { log: UPPER_LOG, child: UPPER_CHILD, level: TileLevel::Upper };
+        let lower = Level { log: LOWER_LOG, child: LOWER_CHILD, level: TileLevel::Lower };
+        for o in self.places(c, origin, &upper, LOWER_NODE, tree, budget)? {
+            for lo in self.places(c, o, &lower, T::LEAF, tree, budget)? {
                 leaves.push((lo, c.mask(512, "leaf mask")?));
             }
         }
@@ -492,16 +534,17 @@ impl<T: Scalar> Node<T> {
     }
 
     /// A node's masks and values (docs/formats.md §9.5): its tiles kept into `tree`, and its
-    /// children's origins returned in place order.
+    /// children's origins returned in place order, each child counted at `charge`.
     fn places(
         &self,
         c: &mut Cursor<'_>,
         origin: Coord,
-        log: u32,
-        child: u32,
-        level: TileLevel,
+        at: &Level,
+        charge: u64,
         tree: &mut Tree<T>,
+        budget: &mut Budget,
     ) -> Result<Vec<Coord>, VdbError> {
+        let Level { log, child, level } = *at;
         let n = 1_usize << (3 * log);
         let children = c.mask(n, "child mask")?;
         let active = c.mask(n, "value mask")?;
@@ -510,8 +553,10 @@ impl<T: Scalar> Node<T> {
         for (p, v) in values.into_iter().enumerate() {
             let o = place_origin(origin, p, log, child)?;
             if bit(&children, p) {
+                budget.take(charge)?;
                 out.push(o);
             } else if bit(&active, p) || !v.same(self.background) {
+                budget.take(TILE)?;
                 tree.tiles.insert((level, o), v);
             }
         }

@@ -8,16 +8,11 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: 0.8.2 (§2), what a survey of the whole repository found fixed by patch
-  rather than at its cause, made principled: a triangle's nearest point by its largest
-  angle and scaled (ADR-0027), a crossing at an end on the mesh, and every margin of the
-  tree derived from its rounding (ADR-0030), a merge's rule at every level of a tile, a
-  slice's contour across tiles (ADR-0018), the guards and checks reading as the shell and
-  Rust do (ADR-0002, ADR-0003, ADR-0034), and the tests' builders and tolerances shared
-  and derived. Its one breaking change kept a PATCH by the owner's exception to TESTING.md
-  V2.
-- **Next**: P8 (§2), its units in their order, each once the owner approves it; then
-  P9, 1.0 on crates.io.
+- **Done**: P8's first unit (§2): `vdb::from_bytes` and `vdb::read` count each leaf, tile
+  and node they make against their limit and refuse more before making it (ADR-0047),
+  the fuzz target `vdb` passing a limit; unreleased.
+- **Next**: P8's command to look inside brodo's files, its ADR first, once the owner
+  approves it; then the rest of P8, and P9, 1.0 on crates.io.
 
 ## 2. Milestones
 
@@ -475,10 +470,10 @@ time, the gate, the mutation run of what changed and the benchmarks besides (202
 4. B-023 and B-022 together, since both raise a format version (about a day's spike, then
    two to three days)
 
-- [ ] `limit` bounding what `vdb::from_bytes` and `vdb::read` make, as `archive` does, a
-      unit of its own after the review, since it changes public items (the owner,
-      2026-11-02; ADR-0047); the fuzz target `vdb` then passes a limit, as `archive`'s does,
-      since without one reading makes up to about 637 bytes for each byte read (ADR-0047)
+- [x] `limit` bounding what `vdb::from_bytes` and `vdb::read` make, each leaf, tile and
+      node counted as it is read at what it makes at most, since a cache file's bytes do
+      not bound a tile's memory (the owner, 2026-11-03; ADR-0047); the fuzz target `vdb`
+      passing a limit, as `archive`'s does
 - [ ] A command to look inside brodo's files, for someone who receives a cache file, an
       archive or a `.vdb` and writes no Rust; `piatto` stays held (B-021), so it uses no
       GPU and no GUI (the owner, 2026-11-02):

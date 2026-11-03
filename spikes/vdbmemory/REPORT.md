@@ -55,3 +55,23 @@ held twice, in the reader's map and in the field.
 What `vdb::read` makes is a multiple of the file's length, as its module says, but of
 about 640: a 16 MB file can make about 10 GB, which `limit` does not stop. The owner's
 decision is in ADR-0047's amendment of 2026-11-02.
+
+## Measured again: what a limit counts
+
+Measured on 2026-11-03 with rustc 1.98.1 on the same machine, against brodo with the
+counting reader of ADR-0047's amendment of that day, read under no limit. Three cases
+were added to `gen.py`: `fleaves`, the leaves as `f32`; `lowers`, one upper node of n lower
+nodes; `uppers`, n upper nodes of one lower node each; every lower node holding one active
+tile. What was made is the peak less the file's bytes and the 1 982 464 of a file of no
+upper node; what was counted is ARCHITECTURE.md §4.7's.
+
+| Case | n | File (bytes) | Peak resident (bytes) | Made (MB) | Counted (MB) |
+| :--- | ---: | ---: | ---: | ---: | ---: |
+| tiles | 64 | 525 659 | 327 729 152 | 325.2 | 538.0 |
+| dtiles | 64 | 525 920 | 338 935 808 | 336.4 | 538.0 |
+| leaves | 262 144 | 33 890 669 | 2 299 183 104 | 2 263.3 | 2 416.1 |
+| fleaves | 262 144 | 33 890 664 | 1 223 393 280 | 1 187.5 | 1 342.4 |
+| lowers | 32 768 | 33 726 760 | 109 084 672 | 73.4 | 92.3 |
+| uppers | 32 768 | 302 579 995 | 921 485 312 | 616.9 | 696.3 |
+
+Each case made less than it was counted; the least margin is the upper nodes', 11 %.

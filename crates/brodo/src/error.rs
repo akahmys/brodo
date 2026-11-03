@@ -404,10 +404,12 @@ pub enum VdbError {
     /// The file breaks docs/formats.md §9.7 or §9.8 at the part named.
     #[error("the file is malformed at its {0}")]
     Malformed(&'static str),
-    /// The file is longer than the limit it was read under.
-    #[error("the file is {length} bytes, above the limit of {limit}")]
+    /// The file is longer than the limit it was read under, and was not read beyond it, or
+    /// its grids would make more than it, and were not (ARCHITECTURE.md §4.7).
+    #[error("the file holds or makes {length} bytes or more, more than the limit of {limit}")]
     FileTooLarge {
-        /// The file's length, or the bytes read past the limit.
+        /// The file's length, or the bytes read past the limit, or what its grids were
+        /// counted to make when the count passed the limit.
         length: u64,
         /// The limit.
         limit: u64,
