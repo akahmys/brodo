@@ -8,12 +8,11 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: P8's README section "Looking inside": mestolo's commands, and what brodo's
-  checks read back apart from what Blender's, Houdini's and ParaView's documentation says
-  they read; before it `mestolo` (ADR-0050) and the bound on what reading a `.vdb` makes
-  (ADR-0047); unreleased.
-- **Next**: P8's B-023 spike, then B-023 and B-022, which close P8 as 0.9.0; then P9, 1.0
-  on crates.io.
+- **Done**: B-023's spike: Hermite data held sparsely took 15 to 17 times less memory and
+  about 19 times fewer bytes, a sphere of radius 1500 voxels in 3.6 GB; the owner chose
+  its layout and place (ADR-0051); unreleased.
+- **Next**: P8's last unit, B-023 and B-022 together: docs/formats.md first, then the
+  cache, archive and Hermite formats' version 2; then P8's closing checks and 0.9.0.
 
 ## 2. Milestones
 
@@ -492,10 +491,13 @@ time, the gate, the mutation run of what changed and the benchmarks besides (202
       says they read, said apart from what was tried; the viewers not installed nor tried,
       the owner choosing on 2026-11-03 their documentation over installing them, as
       AGENTS.md's "Hierarchy of truth" allows for a claim outside the repository
-- [ ] B-023 and B-022 (§3), the owner's order (2026-11-02):
-      - [ ] B-023's spike: Hermite data's crossings held only on the edges that hold one,
+- [ ] B-023 (ADR-0051) and B-022 (§3), the owner's order (2026-11-02):
+      - [x] B-023's spike: Hermite data's crossings held only on the edges that hold one,
             its memory and writing time measured against the dense fields' on spheres of
-            radius 200 and 1500 voxels, the answer an ADR
+            radius 200, 600 and 1500 voxels (`spikes/hermitesparse/`, 2026-11-03): sparse,
+            a mask a leaf and axis and the crossings packed, the signs a `u8` field, in an
+            entry of named bytes the cache profile's version 2 gains (the owner,
+            2026-11-03; ADR-0051)
       - [ ] Hermite data's format version raised if the spike keeps it sparse; the frozen
             layout's and the cache profile's raised with B-022's checks; each reading the
             version before it and writing it on request (ADR-0038), docs/formats.md and the
@@ -547,7 +549,6 @@ implementation (PLANNING.md §2).
 
 | # | Question | Proposal so far |
 | :--- | :--- | :--- |
-| B-023 | Does Hermite data hold its crossings sparsely, only on the edges that hold one, rather than nine dense fields over every leaf? | Not yet: found by P5's review (M2): the fields take about 61 bytes a voxel and writing them about three times as much, so that a sphere of radius 1500 voxels does not fit in 32 GB, read against a measurement of 613 MB at radius 200 (2026-10-26). It changes the Hermite format, so it waits for a spike and a version raised (ADR-0038); the owner set it aside for P5 (2026-10-27) |
 | B-022 | Does a later version of the frozen layout and the cache profile check what version 1's readers leave unchecked: padding and the background's bytes beyond its size, the order of nodes, whether every node and leaf is reached, and a cache file's bounds against its grid (docs/formats.md §2.5, §3.4)? | Not yet: found writing the format document (ADR-0037); each check a reader adds refuses files version 1 accepts, so it waits for a version raised for another reason (ADR-0038). Now for `GridView::new` and the cache reader alone: the Hermite reader and thawing refuse nodes reached twice and leaves never reached at version 1 (ADR-0038's amendment of 2026-10-27, ADR-0042). For the links, one pass would do: each node's `first_child` and `first_tile`, where it has children or tiles, the end of the previous such node's, the last end the count, so that no child is shared or unreached |
 
 Questions decided "not now", each revisited only when what it names happens:
