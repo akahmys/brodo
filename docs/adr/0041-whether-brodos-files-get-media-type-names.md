@@ -31,3 +31,14 @@ the repository to be public, as the vendor tree is for public products.
 
 Under (2) or (3), a Hermite set, being a cache file with keyed grids (ADR-0032), is named
 apart only as a hint: a reader still checks it as a cache file first.
+
+## Amendment: version 2's names, and the archive's
+
+- **Date**: 2026-11-04
+
+Version 2 of the cache and archive profiles and of Hermite data (ADR-0051, ADR-0052),
+written since 0.9.0, went unnamed: docs/formats.md stated each name with `version=1`
+alone. The owner decided, on 2026-11-04, that each is stated with `version=2` in its
+version 2's section, §3.5, §4.3 and §8.7, the names unchanged. The archive's,
+`application/vnd.brodo.archive`, stated in §8 since the archive profile was built
+(ADR-0016), is a third name of this decision, held as the other two.

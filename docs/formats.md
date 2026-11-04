@@ -249,7 +249,8 @@ The bounds are not checked against the grid.
 
 A cache file of version 2 holds, beside grids, **entries of bytes**: a name, free pairs,
 and bytes the profile does not read, for a format built on it such as Hermite data's
-version 2 (§4.3, ADR-0051). Its header is version 1's with version `u32` 2, its grids'
+version 2 (§4.3, ADR-0051). Media type `application/vnd.brodo.cache; version=2`, stated
+and not registered (ADR-0041). Its header is version 1's with version `u32` 2, its grids'
 frozen buffers are of version 2 (§2.7), and its directory entry is:
 
 | Byte | Field |
@@ -342,8 +343,10 @@ its bytes hold (ADR-0038).
 ### 4.3 Version 2
 
 A set of version 2 holds its crossings only on the edges that hold one (ADR-0051), in a
-cache file of version 2 (§3.5): its sign grid, as at version 1 with `hermite.version` = `2`
-and `hermite.field` = `sign`, the group table in its free pairs; and one entry of bytes,
+cache file of version 2 (§3.5); media type `application/vnd.brodo.hermite; version=2` for
+a cache file holding one, stated and not registered (ADR-0041). It holds its sign grid, as
+at version 1 with `hermite.version` = `2` and `hermite.field` = `sign`, the group table in
+its free pairs; and one entry of bytes,
 `hermite.field` = `crossings`, with `hermite.version` and `hermite.set` as the sign grid's
 and no other key beginning `hermite.`. The set's leaves are its sign grid's, in its order
 (§2: the leaves' Morton order). The entry's bytes are:
@@ -389,10 +392,10 @@ samples shifted by −h/2.
 
 Each format carries its own version: the frozen layout in its header, the cache profile in
 its header, the archive profile in its header, Hermite data and the SDF convention in free
-pairs; which older versions a release reads is TESTING.md V6's (ADR-0038). Every format is
-at version 1, the first. Version 2 of the frozen layout, the cache and archive profiles and
-Hermite data (§2.7, §3.5, §4.3, §8.7) is stated before brodo writes it (ADR-0051,
-ADR-0052); until a release writes it, brodo writes and reads version 1 alone.
+pairs; which older versions a release reads is TESTING.md V6's (ADR-0038). The frozen
+layout, the cache and archive profiles and Hermite data are at version 2 (§2.7, §3.5, §4.3,
+§8.7; ADR-0051, ADR-0052), which brodo writes; it reads version 1 of each too, and writes
+it on request. The SDF convention is at version 1, the first.
 
 Within a version only two changes are made, each recorded in CHANGELOG.md: a value type
 code (§1.1) or an archive's value encoding code (§8.5) added, which a reader that does not
@@ -553,7 +556,8 @@ the frozen buffer does, and refuses any other, though the chunks it holds may co
 ### 8.7 Version 2
 
 An archive of version 2 is read back as the cache file of version 2 (§3.5) of the same
-entries. Its header is version 1's with version `u32` 2, and its directory entry is §8.2's
+entries. Media type `application/vnd.brodo.archive; version=2`, stated and not registered
+(ADR-0041). Its header is version 1's with version `u32` 2, and its directory entry is §8.2's
 with these words:
 
 | Byte | Field |

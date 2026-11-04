@@ -8,11 +8,10 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: P8 released as 0.9.0: `mestolo`, the limit on reading a `.vdb`, and version
-  2 of the frozen layout, the cache and archive profiles and Hermite data; its closing
-  checks all five, and T10 and T13 added from its retrospective (ADR-0019, ADR-0037).
-- **Next**: a review for what P9 does not record and 1.0 needs, asked by the owner
-  (2026-11-04); then P9, 1.0 on crates.io.
+- **Done**: P9's first units: B-018 and B-019 kept, patents and licences judged unchanged
+  (ADR-0007), and version 2's media types stated (ADR-0041).
+- **Next**: golden files of version 2's bare frozen buffers; then the gate on macOS and
+  Windows, and the rest of P9 in the order put to the owner (2026-11-04).
 
 ## 2. Milestones
 
@@ -568,8 +567,9 @@ since crates.io yanks a version but never deletes it.
 - [ ] A way to report a vulnerability privately, decided by the owner before anything is
       published (2026-11-04), since brodo reads untrusted files (TESTING.md T6): a
       `SECURITY.md`, and GitHub's private vulnerability reporting, a setting the owner makes
-- [ ] Version 2's media types stated in docs/formats.md §3.5, §4.3 and §8.7, `version=2`
-      beside version 1's, and ADR-0041 amended (the owner, 2026-11-04)
+- [x] Version 2's media types stated in docs/formats.md §3.5, §4.3 and §8.7, `version=2`
+      beside version 1's, and ADR-0041 amended (the owner, 2026-11-04); §6's versions with
+      them, version 2 written since 0.9.0
 - [ ] A check that a release after 1.0 breaks no public API its version does not allow,
       asked by the owner (2026-11-04): cargo-semver-checks, which compares the API's
       rustdoc JSON with a baseline's, a published version or a tag, every feature on, is
