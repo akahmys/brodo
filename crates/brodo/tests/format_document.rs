@@ -20,6 +20,8 @@ use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 const GOLDEN: &[&str] = &[
     "frozen_v1_f32.bin",
     "frozen_v1_f64x3.bin",
+    "frozen_v2_f32.bin",
+    "frozen_v2_f64x3.bin",
     "cache_v1.bin",
     "cache_v2.bin",
     "hermite_v1.bin",

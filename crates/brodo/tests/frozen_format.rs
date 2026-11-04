@@ -276,6 +276,7 @@ fn at_version(bytes: &[u8], version: u32) -> Vec<u8> {
 }
 
 const GOLDEN: &[u8] = include_bytes!("data/frozen_v1_f32.bin");
+const GOLDEN_2: &[u8] = include_bytes!("data/frozen_v2_f32.bin");
 
 /// The committed grid's values as `[f64; 3]`, every word of each nonzero, the background's
 /// included, so that its six words of the header are all written.
@@ -298,6 +299,7 @@ fn golden_vectors() -> (Topology, Field<[f64; 3]>) {
 }
 
 const GOLDEN_VECTORS: &[u8] = include_bytes!("data/frozen_v1_f64x3.bin");
+const GOLDEN_VECTORS_2: &[u8] = include_bytes!("data/frozen_v2_f64x3.bin");
 
 /// `[f64; 3]` came after layout version 1 without changing it (ADR-0029): its header holds a
 /// background of six words, all of them written, and every other type's bytes are as
@@ -307,7 +309,7 @@ fn a_grid_of_f64_vectors_keeps_its_bytes() {
     let (t, g) = golden_vectors();
     let frozen = freeze(&t, &g).unwrap();
     assert!(
-        frozen.as_bytes() == at_version(GOLDEN_VECTORS, 2),
+        frozen.as_bytes() == GOLDEN_VECTORS_2 && GOLDEN_VECTORS_2 == at_version(GOLDEN_VECTORS, 2),
         "the bytes of [f64; 3] grids changed"
     );
     let frozen = frozen.with_version(1).unwrap();
@@ -329,11 +331,12 @@ fn a_grid_of_f64_vectors_keeps_its_bytes() {
     assert!(![0.0, 2.0, 3.0_f64].same_bits(&[-0.0, 2.0, 3.0]));
 }
 
-/// Version 2's bytes are version 1's with the version word 2 (docs/formats.md §2.7): the
-/// golden file of version 1 holds both, and version 1 is still written on request.
+/// Version 2's bytes are version 1's with the version word 2 (docs/formats.md §2.7): each
+/// has its golden file, and version 1 is still written on request.
 #[test]
 fn layout_version_1_keeps_its_bytes() {
-    assert!(golden().as_bytes() == at_version(GOLDEN, 2), "the bytes of layout version 2 changed");
+    assert!(golden().as_bytes() == GOLDEN_2, "the bytes of layout version 2 changed");
+    assert!(GOLDEN_2 == at_version(GOLDEN, 2), "version 2's bytes are not version 1's");
     assert_eq!(golden().version(), 2);
     let g = golden().with_version(1).unwrap();
     assert_eq!(g.as_bytes().len(), GOLDEN.len(), "length");

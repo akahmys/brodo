@@ -9,9 +9,10 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
 - **Done**: P9's first units: B-018 and B-019 kept, patents and licences judged unchanged
-  (ADR-0007), and version 2's media types stated (ADR-0041).
-- **Next**: golden files of version 2's bare frozen buffers; then the gate on macOS and
-  Windows, and the rest of P9 in the order put to the owner (2026-11-04).
+  (ADR-0007), version 2's media types stated (ADR-0041), and golden files of version 2's
+  bare frozen buffers written.
+- **Next**: the gate on macOS and Windows, and the rest of P9 in the order put to the
+  owner (2026-11-04).
 
 ## 2. Milestones
 
@@ -577,10 +578,11 @@ since crates.io yanks a version but never deletes it.
       a field's or argument's type changed, generics and lifetimes, and what only some
       features show, so review stays; its version is pinned to one that reads the pinned
       toolchain's rustdoc JSON; it reads a library, not `mestolo`'s command line
-- [ ] Golden files of version 2's bare frozen buffers, `f32` and three `f64` as version
+- [x] Golden files of version 2's bare frozen buffers, `f32` and three `f64` as version
       1's (docs/formats.md §7), held by the Format tests, so that the fuzz round's seeds
       of `grid_view` come from `tests/data/` as TESTING.md T6 says; P8's were made by hand
-      from version 1's (the owner, 2026-11-04)
+      from version 1's (the owner, 2026-11-04); `frozen_v2_f32.bin` and `frozen_v2_f64x3.bin`,
+      written 2026-11-05
 - [ ] The closing checks the owner chooses by P9's content (ADR-0033), the mutation run
       among them, of the code P8 checked only by mutants applied by hand (the owner,
       2026-11-04)

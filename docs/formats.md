@@ -65,7 +65,7 @@ bit 3i, 3i + 1 and 3i + 2.
 ## 2. The frozen layout, version 1
 
 One buffer holding one grid, read in place (ARCHITECTURE.md §4.6). A bare frozen buffer is
-also a file of its own, as the golden files `frozen_v1_*.bin` are.
+also a file of its own, as the golden files `frozen_v*_*.bin` are.
 
 | Section | At | Entry size, bytes | Order |
 | :--- | :--- | :--- | :--- |
@@ -416,6 +416,8 @@ The golden files in `crates/brodo/tests/data/`, written by brodo's Format-tier t
 | :--- | :--- |
 | `frozen_v1_f32.bin` | a bare frozen buffer of `f32`: leaves, and a tile at each level |
 | `frozen_v1_f64x3.bin` | a bare frozen buffer of three `f64`, the same tree |
+| `frozen_v2_f32.bin` | `frozen_v1_f32.bin`'s grid at layout version 2 |
+| `frozen_v2_f64x3.bin` | `frozen_v1_f64x3.bin`'s grid at layout version 2 |
 | `cache_v1.bin` | a cache file of two grids, `f32` and three `f32`, with bounds and a free pair |
 | `archive_v1.bin` | an archive of the same two grids as `cache_v1.bin` |
 | `archive_v1_quantised.bin` | an archive of the same two grids, the first in binary16, the second in 8 bits |
