@@ -534,7 +534,7 @@ time, the gate, the mutation run of what changed and the benchmarks besides (202
 ### P9 — 1.0 on crates.io
 
 Set by the owner on 2026-11-03 (ADR-0011): brodo and colino first published to crates.io,
-as 1.0.0. Each step is started once the owner approves it; publishing cannot be undone,
+as 1.0.0, and mestolo with them (the owner, 2026-11-04). Each step is started once the owner approves it; publishing cannot be undone,
 since crates.io yanks a version but never deletes it.
 
 - [ ] B-018 and B-019 revisited, as their rows say (§3)
@@ -556,12 +556,38 @@ since crates.io yanks a version but never deletes it.
       version as well as path; what each package holds, listed by `cargo package --list`;
       `cargo publish --dry-run` of each; docs.rs's features set; both names unregistered
       (checked 2026-10-16 and 2026-11-03)
-- [ ] The closing checks the owner chooses by P9's content (ADR-0033)
+- [ ] mestolo published as well, installed by `cargo install mestolo` (the owner,
+      2026-11-04): its name checked unregistered, its dependency on brodo by version as
+      well as path, and what its command line and output promise from 1.0 stated where
+      they are held
+- [ ] The gate's tests run on macOS and Windows as well as Linux in CI (the owner,
+      2026-11-04), the `mmap` feature, paths and `mestolo`'s refusal of a file already
+      there among what Windows has not run; README.md states what brodo builds for, the
+      64-bit, little-endian targets `lib.rs` and `frozen.rs` hold it to
+- [ ] A way to report a vulnerability privately, decided by the owner before anything is
+      published (2026-11-04), since brodo reads untrusted files (TESTING.md T6): a
+      `SECURITY.md`, and GitHub's private vulnerability reporting, a setting the owner makes
+- [ ] Version 2's media types stated in docs/formats.md §3.5, §4.3 and §8.7, `version=2`
+      beside version 1's, and ADR-0041 amended (the owner, 2026-11-04)
+- [ ] A check that a release after 1.0 breaks no public API its version does not allow,
+      asked by the owner (2026-11-04): cargo-semver-checks, which compares the API's
+      rustdoc JSON with a baseline's, a published version or a tag, every feature on, is
+      an agent's reading of its documentation (2026-11-04), measured by nothing; it misses
+      a field's or argument's type changed, generics and lifetimes, and what only some
+      features show, so review stays; its version is pinned to one that reads the pinned
+      toolchain's rustdoc JSON; it reads a library, not `mestolo`'s command line
+- [ ] Golden files of version 2's bare frozen buffers, `f32` and three `f64` as version
+      1's (docs/formats.md §7), held by the Format tests, so that the fuzz round's seeds
+      of `grid_view` come from `tests/data/` as TESTING.md T6 says; P8's were made by hand
+      from version 1's (the owner, 2026-11-04)
+- [ ] The closing checks the owner chooses by P9's content (ADR-0033), the mutation run
+      among them, of the code P8 checked only by mutants applied by hand (the owner,
+      2026-11-04)
 - [ ] 1.0 decided by the owner, in an ADR (TESTING.md V5); version 1.0.0 set and tagged,
-      then brodo published, then colino, each with the owner's approval
-- [ ] **Accepted when** both crates are on crates.io at 1.0.0, docs.rs builds their
-      reference, and a new crate depending on them by version alone builds and runs each
-      README's example
+      then brodo published, then colino, then mestolo, each with the owner's approval
+- [ ] **Accepted when** the three crates are on crates.io at 1.0.0, docs.rs builds the
+      libraries' reference, a new crate depending on them by version alone builds and runs
+      each README's example, and `cargo install mestolo` installs the command
 
 ### Later
 
