@@ -457,6 +457,11 @@ fn each_link_check_refuses_its_damage() {
     // An upper node's number, and a root tile's, one past the last.
     assert_eq!(read(&with_words(&[(root(0, 4), 3)])), lost("root"));
     assert_eq!(read(&with_words(&[(root(2, 4), 3)])), lost("root"));
+    // A root tile's number the count of tiles, in version 1, whose readers keep none of
+    // version 2's rules on the order of tiles.
+    let tiles = u32::try_from(GridView::<f32>::new(golden().as_bytes()).unwrap().tile_count());
+    let past = with_words(&[(root(2, 4), tiles.unwrap())]);
+    assert_eq!(read(&aligned(&at_version(past.as_bytes(), 1))), lost("root"));
     // Upper node 1's children run one past the lower nodes; its tiles one past the tiles.
     assert_eq!(read(&with_words(&[(upper(1, 2048), 3)])), lost("upper node"));
     assert_eq!(read(&with_words(&[(upper(1, 2049), 3)])), lost("upper node"));

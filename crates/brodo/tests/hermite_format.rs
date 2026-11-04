@@ -538,6 +538,8 @@ fn the_builder_refuses_crossings_out_of_its_order() {
     }
     let built = b.build().unwrap();
     assert_eq!(built.len(), 3);
+    assert!(!built.is_empty());
+    assert!(Crossings::builder(&Topology::new()).build().unwrap().is_empty());
     assert_eq!(built.get(n[0], 0, 511), Some(c));
     assert_eq!(built.get(n[0], 2, 7), Some(c));
     assert_eq!(built.get(n[0], 2, 6), None);

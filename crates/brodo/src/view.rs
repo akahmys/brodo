@@ -64,15 +64,17 @@ fn nth(first: U32, mask: &[U32], p: usize, what: &'static str) -> Result<u32, Fo
     first.get().checked_add(count_before(mask, p)).ok_or(lost(what))
 }
 
-/// The places set in a mask, in ascending order.
+/// The places set in a mask, in ascending order: as many from each word as it has bits set,
+/// so that the walk ends however a word is read.
 fn set_places(mask: &[U32]) -> impl Iterator<Item = usize> + '_ {
     mask.iter().enumerate().flat_map(|(i, w)| {
         let mut bits = w.get();
-        std::iter::from_fn(move || {
+        std::iter::repeat_with(move || {
             let b = bits.trailing_zeros();
             bits &= bits.wrapping_sub(1);
-            (b < 32).then_some(i * 32 + b as usize)
+            i * 32 + b as usize
         })
+        .take(w.get().count_ones() as usize)
     })
 }
 
