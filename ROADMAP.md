@@ -10,10 +10,9 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
 
 - **Done**: P9's first units: B-018 and B-019 kept, patents and licences judged unchanged
   (ADR-0007), version 2's media types stated (ADR-0041), golden files of version 2's
-  bare frozen buffers written, and a job of `audit.yml` running the tests on macOS and
-  Windows (ADR-0034).
-- **Next**: its first run read, and what fails on either fixed; then the reserved prefix
-  of metadata keys, and the rest of P9 in the order put to the owner (2026-11-04).
+  bare frozen buffers written, and the tests run on macOS and Windows (ADR-0034).
+- **Next**: the reserved prefix of metadata keys, and the rest of P9 in the order put to
+  the owner (2026-11-04).
 
 ## 2. Milestones
 
@@ -562,11 +561,12 @@ since crates.io yanks a version but never deletes it.
       2026-11-04): its name checked unregistered, its dependency on brodo by version as
       well as path, and what its command line and output promise from 1.0 stated where
       they are held
-- [ ] The gate's tests run on macOS and Windows as well as Linux in CI (the owner,
+- [x] The gate's tests run on macOS and Windows as well as Linux in CI (the owner,
       2026-11-04), the `mmap` feature, paths and `mestolo`'s refusal of a file already
       there among what Windows has not run; README.md states what brodo builds for, the
       64-bit, little-endian targets `lib.rs` and `frozen.rs` hold it to; the `platforms`
-  job of `audit.yml` (ADR-0034, 2026-11-05)
+  job of `audit.yml` (ADR-0034), whose first run, on 18a7c3c, passed 407 tests on macOS
+  and 404 on Windows, the three that need `mkfifo` not built there (2026-11-05)
 - [ ] A way to report a vulnerability privately, decided by the owner before anything is
       published (2026-11-04), since brodo reads untrusted files (TESTING.md T6): a
       `SECURITY.md`, and GitHub's private vulnerability reporting, a setting the owner makes
