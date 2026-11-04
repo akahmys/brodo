@@ -130,3 +130,12 @@ every string of a call's input, matches a name after a `/`, or a `:` or `=` join
 a `::` of C++ aside, and runs on WebSearch and every MCP tool as well. Shown to fire: of 14
 calls, the old guard missed 4 it should block and the new one none, passing the 5 it should
 pass, a tagged release and the project's documentation site among them.
+
+## Amendment: registration on crates.io
+
+- **Date**: 2026-11-04
+
+Before brodo, colino and mestolo are registered on crates.io (ROADMAP.md, P9), the owner
+judged patents and licences again, as the amendment on publication asked, and decided, on
+2026-11-04, that the judgement is unchanged. No new search was made; the question is asked
+again on the other events that amendment names.

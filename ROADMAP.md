@@ -537,7 +537,8 @@ Set by the owner on 2026-11-03 (ADR-0011): brodo and colino first published to c
 as 1.0.0, and mestolo with them (the owner, 2026-11-04). Each step is started once the owner approves it; publishing cannot be undone,
 since crates.io yanks a version but never deletes it.
 
-- [ ] B-018 and B-019 revisited, as their rows say (§3)
+- [x] B-018 and B-019 revisited, as their rows say (§3): neither taken now (the owner,
+      2026-11-04)
 - [ ] The public API reviewed for what would break a user after 1.0: each public enum and
       error `#[non_exhaustive]` or not, each public trait sealed or not, the public errors'
       `Clone` and `PartialEq` (After P7's review), each change a proposal to the owner
@@ -545,8 +546,8 @@ since crates.io yanks a version but never deletes it.
       profile after 1.0, such as `brodo.`, `hermite.` kept as it is, so that each later
       one is not a breaking change to `CacheEntry::new` and `CacheEntry::bytes`, which
       refuse only `hermite.` now (the owner, 2026-11-04; its ADR)
-- [ ] Patents and licences judged again by the owner, for registration on crates.io
-      (ADR-0007)
+- [x] Patents and licences judged again by the owner, for registration on crates.io:
+      unchanged (2026-11-04; ADR-0007)
 - [ ] The rules for versions after 1.0, with their ADRs (AGENTS.md, "Changing the
       rules"): TESTING.md V1's `0.MINOR.PATCH` and V2's breaking MINOR, a breaking change
       raising MAJOR; V4 publishing each release to crates.io; ADR-0040's pinned tag;
@@ -606,10 +607,10 @@ Questions decided "not now", each revisited only when what it names happens:
 
 | # | Question | Decision |
 | :--- | :--- | :--- |
-| B-019 | Does `colino` move to a repository of its own? | Not now (owner, 2026-10-23; ADR-0012 keeps two crates in one repository): changes span both, as P3's Hermite format and producer did, and before 1.0 a split would turn each into two releases, duplicate the rules and their audit, and take colino's tests out of brodo's gate. Revisited when brodo's API and formats settle (1.0), both are on crates.io, colino needs what brodo's rules forbid, or others maintain it. Publishing does not split them: both crates are published from this repository (owner, 2026-10-29). A split waits for colino needing what brodo's rules forbid, or for others maintaining it, and is then a milestone of its own that gives colino its own rules, audit and CI (owner, 2026-10-29) |
+| B-019 | Does `colino` move to a repository of its own? | Not now (owner, 2026-10-23; ADR-0012 keeps two crates in one repository): changes span both, as P3's Hermite format and producer did, and before 1.0 a split would turn each into two releases, duplicate the rules and their audit, and take colino's tests out of brodo's gate. Revisited when brodo's API and formats settle (1.0), both are on crates.io, colino needs what brodo's rules forbid, or others maintain it. Publishing does not split them: both crates are published from this repository (owner, 2026-10-29). A split waits for colino needing what brodo's rules forbid, or for others maintaining it, and is then a milestone of its own that gives colino its own rules, audit and CI (owner, 2026-10-29). Kept before 1.0 (owner, 2026-11-04) |
 | B-021 | Does brodo build `piatto`? | Not now (owner, 2026-10-24; ADR-0018): no user has asked for a viewer, the slice as PNG and VTK for ParaView serve checking, `.vdb` from P7 would open in common tools, and a GPU, window and GUI stack is costly. Revisited when a user asks for a viewer or for drawing to embed, or grids too large for VTK and `.vdb` must be looked at |
 | B-013 | Which crates handle `piatto`'s window, input and GUI parts? | Left with B-021: `winit` and `egui`, to be measured against Rules 12 and 13 if `piatto` is built (ADR-0018) |
-| B-018 | Does model checking with Kani join the closing checks? | Not now (owner, 2026-10-23, kept 2026-11-02): it fits only integer bit work and `view.rs`'s small helpers, already fuzzed and mutation-tested, and cannot reach rayon or the memory mapping; this milestone's defects were numeric and in design claims. Revisited by a spike if Miri-unreachable unsafe code grows, an integer coordinate bug escapes the tests, or before 1.0 |
+| B-018 | Does model checking with Kani join the closing checks? | Not now (owner, 2026-10-23, kept 2026-11-02 and before 1.0 on 2026-11-04): it fits only integer bit work and `view.rs`'s small helpers, already fuzzed and mutation-tested, and cannot reach rayon or the memory mapping; this milestone's defects were numeric and in design claims. Revisited by a spike if Miri-unreachable unsafe code grows, an integer coordinate bug escapes the tests, or before 1.0 |
 
 Questions answered, each by its spike and ADR:
 
