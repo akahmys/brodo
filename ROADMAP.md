@@ -8,12 +8,11 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: P8's last unit: version 2 of the frozen layout, the cache and archive
-  profiles and Hermite data, every writer rule checked, entries of bytes, and Hermite
-  data's crossings held sparsely (ADR-0051, ADR-0052); version 1 read and written on
-  request; unreleased.
-- **Next**: P8's closing checks, chosen by the owner (ADR-0033), and 0.9.0; then P9, 1.0
-  on crates.io.
+- **Done**: P8's closing checks, all five: a retrospective, whose two proposals wait on
+  the owner; a fuzz round and a Miri run, no finding; the benchmarks, the cache map
+  recorded again; and the mutation run, its missed mutants killed or excluded (ADR-0019,
+  ADR-0023).
+- **Next**: version 0.9.0 (TESTING.md V2–V4); then P9, 1.0 on crates.io.
 
 ## 2. Milestones
 
@@ -475,7 +474,7 @@ time, the gate, the mutation run of what changed and the benchmarks besides (202
       node counted as it is read at what it makes at most, since a cache file's bytes do
       not bound a tile's memory (the owner, 2026-11-03; ADR-0047); the fuzz target `vdb`
       passing a limit, as `archive`'s does
-- [ ] A command to look inside brodo's files, for someone who receives a cache file, an
+- [x] A command to look inside brodo's files, for someone who receives a cache file, an
       archive or a `.vdb` and writes no Rust; `piatto` stays held (B-021), so it uses no
       GPU and no GUI (the owner, 2026-11-02):
       - [x] An ADR, its options put to the owner with a recommendation each: `mestolo`, an
@@ -507,7 +506,25 @@ time, the gate, the mutation run of what changed and the benchmarks besides (202
             checks; each reading the version before it and writing it on request
             (ADR-0038), `formats.py` reading version 2 and its golden files joining §7's
             (2026-11-03)
-- [ ] The closing checks the owner chooses by P8's content (ADR-0033)
+- [x] The closing checks the owner chooses by P8's content (ADR-0033), all five (the
+      owner, 2026-11-03):
+      - [x] Retrospective and refactoring: no duplication worth merging found; two
+            proposals put to the owner, undecided: a reader check docs/formats.md gains
+            held by `formats.py` to the golden files already there in the same commit,
+            and TESTING.md T10's benchmarks checked mechanically (2026-11-04)
+      - [x] Fuzz round, version 2's golden files among the seeds: eight targets, 900 s
+            each, no finding (2026-11-03)
+      - [x] Miri run: every `miri_*` test passes; the same warning from `crossbeam-epoch`
+            0.9.21 under Tree Borrows (ADR-0015, 2026-11-03)
+      - [x] Benchmarks, every feature: version 2's bounds check, over every place, made
+            the cache map 28 times slower, and is now over the set places alone;
+            `cache_map_x256`, still about twice as slow, recorded again (ADR-0019,
+            2026-11-03); every item within its baseline after `ad37aab` (2026-11-04)
+      - [x] Mutation run (ADR-0023): the run on `1599360` (GitHub Actions run
+            41713041735) missed 9, and 3 timed out after the patient run's 1800 s; the
+            walk the 3 made endless rewritten, 3 missed killed by tests (`ad37aab`), each
+            mutant applied by hand, and 6 excluded (`caf012d`); not run again
+            (2026-11-04)
 - [ ] Version 0.9.0 (TESTING.md V2–V4)
 - [ ] **Accepted when** `vdb::read` refuses a file that would make more than `limit`
       bytes, the command's subcommands match their golden files, README.md's section shows
@@ -524,6 +541,10 @@ since crates.io yanks a version but never deletes it.
 - [ ] The public API reviewed for what would break a user after 1.0: each public enum and
       error `#[non_exhaustive]` or not, each public trait sealed or not, the public errors'
       `Clone` and `PartialEq` (After P7's review), each change a proposal to the owner
+- [ ] One prefix of metadata keys reserved for the formats brodo builds on the cache
+      profile after 1.0, such as `brodo.`, `hermite.` kept as it is, so that each later
+      one is not a breaking change to `CacheEntry::new` and `CacheEntry::bytes`, which
+      refuse only `hermite.` now (the owner, 2026-11-04; its ADR)
 - [ ] Patents and licences judged again by the owner, for registration on crates.io
       (ADR-0007)
 - [ ] The rules for versions after 1.0, with their ADRs (AGENTS.md, "Changing the
@@ -631,7 +652,21 @@ No spike is running.
     (`spikes/ghost/REPORT.md`, ADR-0015).
   - Asked, not requested: grids of several resolutions with a defined relation between
     coarse and fine voxels. The design does not decide it: a cache file holds several
-    grids, each with its own affine transform, and nothing relates their voxels.
+    grids, each with its own affine transform, and nothing relates their voxels. The owner
+    expects it to be requested, a finer grid where a coarse one is not enough (2026-11-04);
+    when it is, a spike and an ADR decide it, on a narrow-band SDF among its cases. An
+    agent's reading of the design (2026-11-04), measured by nothing: levels of ordinary
+    grids, each half the voxel size of the one above, a fine grid refining whole leaves,
+    since a leaf has no per-voxel active state. Open: whether a coarse grid keeps its
+    leaves under a fine one, since without them a sparse fine level reads its background
+    where a coarse tile held the inside, the SDF's sign wrong; how a level is placed at
+    voxel corners or centres, the second's offset not exact in `f64`; a band of coarser
+    leaves round each level, so that a gather meets one level only; ghost values from a
+    coarser level, which need interpolation, a solver's choice (AGENTS.md S4); an edit
+    that moves leaves between levels at once; coarse tiles under fine leaves; fine
+    coordinates within `i32`; and the check of a set of levels read as untrusted, its
+    cost, its limit and its fuzz target (TESTING.md T6). Whether it is within
+    ARCHITECTURE.md §1 is the owner's.
   From a user building cut cells on brodo's grid, received 2026-10-20, answered the same
   day:
   - R11, a group per triangle read from OBJ, STL and 3MF, and Hermite data on the corners
