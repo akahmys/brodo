@@ -46,7 +46,7 @@ grep -E '^echo "\[' scripts/audit/verify_compliance.sh
 | `cargo deny check` | 13 |
 | `scripts/hooks/provenance_guard.py --check`: the local list of forbidden sources exists and names a project | S1 |
 | hooks installed; betterleaks over the tree and the history, personal rules, `scripts/audit/paths.py` (also: each of `OUTPUT_DIRS` git-ignored and in betterleaks' allow-list) | 14, L2 |
-| `cargo test --workspace --all-features`, a crate README's code among the doctests, and `format_document.rs` and `vdb_format.rs` running `scripts/audit/formats.py` | TESTING.md §4; AGENTS.md, crate READMEs; `docs/formats.md` (ADR-0037) |
+| `cargo test --workspace --all-features`, a crate README's code among the doctests, and `format_document.rs` and `vdb_format.rs` running `scripts/audit/formats.py` | TESTING.md §4; AGENTS.md, crate READMEs; `docs/formats.md` and TESTING.md T13 (ADR-0037) |
 | `scripts/audit/tests.py`: every test, with every feature, of each member's library, binaries, tests and examples, and every doctest by its item, is in its `test-list.txt`, and every listed test exists | T2 |
 
 **Two traps the script guards against.** A path in `clippy.toml` that resolves to nothing

@@ -109,3 +109,15 @@ refuses with them a region walking to a leaf two lower nodes share, in an archiv
 while a region reaching it once is read. Shown to fire: without §3.4's check of the
 metadata, with a box met one voxel too far on either side, with a quantised leaf's values
 left unrestored, and without the check of a leaf reached twice, the reader disagreed.
+
+## Amendment: a check added to the reader as it is written
+
+- **Date**: 2026-11-04
+
+P8's retrospective found that docs/formats.md §2.7 stated version 2's rule 9, root tiles
+numbered in table order, wrongly, and that nothing found it until the code was written,
+since the reader gained the rule only with the code. The owner decided, on 2026-11-04,
+that a check the document gains for a reader is added to `formats.py` in the same commit
+(TESTING.md T13), so that the gate holds the golden files already there to it at once;
+that it is added in the same commit nothing checks, since a commit-msg hook asking for the
+reader with every change to the document would ask it of every change of wording too.
