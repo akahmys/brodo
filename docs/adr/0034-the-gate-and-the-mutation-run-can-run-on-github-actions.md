@@ -155,3 +155,18 @@ one fails.
 With the backstop made whole (ADR-0003), `audit.yml` passes the gate the range of commits
 the push brought, `COMMIT_RANGE`, so that each is held to `commit_msg_check.py`; a push
 starting a branch holds its head alone, and a run by hand none.
+
+## Amendment: the tests on macOS and Windows
+
+- **Date**: 2026-11-05
+
+The review after 0.9.0 found the tests run on Linux alone, so that the `mmap` feature,
+paths and `mestolo`'s refusal of a file already there had never run on Windows, nor
+anything on macOS but the owner's machine. The repository is public, and GitHub's macOS and
+Windows standard runners are free for it. The owner decided, on 2026-11-04, that they be
+added, and approved the plan on 2026-11-05: `audit.yml` gains a job, `platforms`, running
+the gate's `cargo test --workspace --all-features` on `macos-15` (arm64) and
+`windows-2025` (x86-64), each to its end whatever the other gives. The rest of the gate
+does not depend on the platform and runs on Linux alone, as do fuzzing, Miri, the mutation
+run and the benchmarks. TESTING.md V4 asks that the commit setting a version pass them all
+before its tag; that it does, nothing checks.

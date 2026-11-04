@@ -69,7 +69,9 @@ break the rule once and watch the step fail (TESTING.md T3).
 
 **On GitHub Actions** (`.github/workflows/audit.yml`, started by each push to `main` and by hand) the gate skips the
 local list of forbidden sources and the personal rules, which stay on the owner's machine,
-and says so; the gate on that machine before every push runs them (ADR-0034).
+and says so; the gate on that machine before every push runs them (ADR-0034). The same
+workflow runs the gate's tests on macOS and Windows, where the rest of the gate, which does
+not depend on the platform, is not run.
 
 **Getting round the hooks.** The audit fails while `core.hooksPath` is not `scripts/hooks`.
 In Claude Code, [`.claude/settings.json`](.claude/settings.json) runs

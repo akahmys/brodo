@@ -138,8 +138,9 @@ listed (ADR-0034).
 | `./scripts/audit/verify_compliance.sh` | ends `=== AUDIT PASSED ===`. It runs the tests as its last step. Run it with no edit in flight |
 | ROADMAP.md §1 | updated (PLANNING.md §1) |
 
-The gate also runs on GitHub Actions after each push to `main` (ADR-0034); the run on the
-owner's machine before the push is the one a change lands on.
+The gate also runs on GitHub Actions after each push to `main` (ADR-0034), and its tests
+on macOS (arm64) and Windows (x86-64) as well; the run on the owner's machine before the
+push is the one a change lands on.
 
 ## 5. Versions
 
@@ -148,6 +149,6 @@ owner's machine before the push is the one a change lands on.
 | **V1** | The version is `0.MINOR.PATCH`, written once, in the workspace `Cargo.toml`; every crate takes `version.workspace = true` | `scripts/audit/workspace.py`, for the inheritance; the form, **nothing** |
 | **V2** | Closing a milestone (ROADMAP.md §2) raises MINOR: P0 gives 0.1.0, P1 0.2.0. A change that only fixes the last version raises PATCH. Between milestones, a small release raising MINOR is cut when a user needs a change before its milestone closes, the gate its only check (ADR-0040). Until 1.0 a MINOR may break the API | nothing |
 | **V3** | CHANGELOG.md has a section per version, newest first, headed `## <version> (<date>)`, with the milestones it closed and every change that breaks a user; its newest is the version `Cargo.toml` states (0.0.0 while there is none). A breaking change is added under `## Unreleased` in the commit that makes it | `scripts/audit/workspace.py` for the version; the entries, **nothing** |
-| **V4** | The commit that sets a version passes the gate (§4) and carries the local tag `v` + the version. Once the tag is pushed, a GitHub release of it is made, titled with the version, its notes the version's CHANGELOG.md section (ADR-0040) | nothing |
+| **V4** | The commit that sets a version passes the gate (§4), and on GitHub Actions the gate and its tests on macOS and Windows (§4), and carries the local tag `v` + the version. Once the tag is pushed, a GitHub release of it is made, titled with the version, its notes the version's CHANGELOG.md section (ADR-0040) | nothing |
 | **V5** | 1.0 is the human's decision, recorded in an ADR | nothing |
 | **V6** | The `GridView` byte layout and each file profile carry a format version of their own, independent of the crate version, raised by any change to the bytes and recorded in CHANGELOG.md with which older versions still read. A release that raises one still reads the version before it, and can write it on request; older ones are refused, the error naming them (ADR-0038) | the Format-tier tests comparing written bytes with the committed files of docs/formats.md §7 |

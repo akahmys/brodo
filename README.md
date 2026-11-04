@@ -34,7 +34,9 @@ brodo = { git = "https://github.com/akahmys/brodo", tag = "v0.9.0" }
 colino = { git = "https://github.com/akahmys/brodo", tag = "v0.9.0" }
 ```
 
-- They need Rust 1.98 or later.
+- They need Rust 1.98 or later, and build for 64-bit, little-endian targets alone, which
+  the frozen layout reads in place. Their tests run on Linux (x86-64), macOS (arm64) and
+  Windows (x86-64) after each push.
 - Pin the same tag in every crate of one program that uses brodo: two different revisions
   build two copies of brodo whose types do not mix. If you need a change before the next
   release, ask for a small release rather than pinning a revision (ADR-0040).

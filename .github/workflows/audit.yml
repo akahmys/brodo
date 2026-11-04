@@ -1,7 +1,8 @@
 # The gate on GitHub Actions (ADR-0034). Started by each push to `main` and by hand; never
 # by a pull request, so that no fork's code runs here. The local list of forbidden sources
 # and the personal rules stay on the owner's machine, so the gate skips those two checks
-# here and says so; the run before a push, on that machine, still holds them.
+# here and says so; the run before a push, on that machine, still holds them. The gate's
+# tests also run on macOS and Windows.
 name: audit
 
 on:
@@ -43,3 +44,19 @@ jobs:
           # none.
           COMMIT_RANGE: ${{ github.event_name == 'push' && format('{0}..{1}', github.event.before, github.sha) || '' }}
         run: ./scripts/audit/verify_compliance.sh
+
+  # The gate's tests on macOS and Windows (ADR-0034): the rest of the gate does not depend
+  # on the platform, and runs on Linux above.
+  platforms:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, windows-2025]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Toolchain
+        run: rustup toolchain install
+      - name: Tests, as the gate runs them
+        run: cargo test --workspace --all-features
