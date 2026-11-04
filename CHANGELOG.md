@@ -4,7 +4,12 @@ Each version, newest first, with the milestones it closed and every change that 
 user (TESTING.md V2, V3). Format versions of the `GridView` layout and the file profiles
 are recorded here when they change (V6).
 
-## Unreleased
+## 0.9.0 (2026-11-04)
+
+Closes P8: `mestolo`, a command that looks inside brodo's files without Rust (`info`,
+`slice`, `convert`; ADR-0050); a limit on what reading a `.vdb` makes (ADR-0047); and
+version 2 of the frozen layout, the cache and archive profiles and Hermite data, its
+crossings held sparsely (ADR-0051, ADR-0052). Every change below breaks a user.
 
 Format versions (TESTING.md V6): the frozen layout, the cache profile, the archive profile
 and Hermite data are each at version 2, written; version 1 of each is read, and written on

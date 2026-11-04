@@ -30,16 +30,16 @@ than a branch or a revision:
 
 ```toml
 [dependencies]
-brodo = { git = "https://github.com/akahmys/brodo", tag = "v0.8.2" }
-colino = { git = "https://github.com/akahmys/brodo", tag = "v0.8.2" }
+brodo = { git = "https://github.com/akahmys/brodo", tag = "v0.9.0" }
+colino = { git = "https://github.com/akahmys/brodo", tag = "v0.9.0" }
 ```
 
 - They need Rust 1.98 or later.
 - Pin the same tag in every crate of one program that uses brodo: two different revisions
   build two copies of brodo whose types do not mix. If you need a change before the next
   release, ask for a small release rather than pinning a revision (ADR-0040).
-- Until 1.0, a minor version (0.8 to 0.9) may break the API, and a patch version (0.8.1
-  to 0.8.2) is meant only to fix. [CHANGELOG.md](CHANGELOG.md) lists what each release
+- Until 1.0, a minor version (0.8 to 0.9) may break the API, and a patch version (0.9.0
+  to 0.9.1) is meant only to fix. [CHANGELOG.md](CHANGELOG.md) lists what each release
   changes and anything it breaks.
 
 ## Looking inside

@@ -8,11 +8,11 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: P8's closing checks, all five: a retrospective, whose two proposals wait on
-  the owner; a fuzz round and a Miri run, no finding; the benchmarks, the cache map
-  recorded again; and the mutation run, its missed mutants killed or excluded (ADR-0019,
-  ADR-0023).
-- **Next**: version 0.9.0 (TESTING.md V2–V4); then P9, 1.0 on crates.io.
+- **Done**: P8 released as 0.9.0: `mestolo`, the limit on reading a `.vdb`, and version
+  2 of the frozen layout, the cache and archive profiles and Hermite data; its closing
+  checks all five, and T10 and T13 added from its retrospective (ADR-0019, ADR-0037).
+- **Next**: a review for what P9 does not record and 1.0 needs, asked by the owner
+  (2026-11-04); then P9, 1.0 on crates.io.
 
 ## 2. Milestones
 
@@ -525,7 +525,7 @@ time, the gate, the mutation run of what changed and the benchmarks besides (202
             walk the 3 made endless rewritten, 3 missed killed by tests (`ad37aab`), each
             mutant applied by hand, and 6 excluded (`caf012d`); not run again
             (2026-11-04)
-- [ ] Version 0.9.0 (TESTING.md V2–V4)
+- [x] Version 0.9.0 (TESTING.md V2–V4, 2026-11-04)
 - [ ] **Accepted when** `vdb::read` refuses a file that would make more than `limit`
       bytes, the command's subcommands match their golden files, README.md's section shows
       only what was opened and seen, and the formats B-023 and B-022 raise read the
