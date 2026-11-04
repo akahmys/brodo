@@ -338,3 +338,20 @@ The human decided, on 2026-11-02, that four mutants of the tree's margins be exc
 query's that still timed out after the patient run's 1800 s, each making the walk a scan
 of every triangle, be excluded as only slower. Seven exclusions no longer matching any
 mutant, their code moved or gone, were removed.
+
+## Amendment: P8's missed mutants
+
+- **Date**: 2026-11-04
+
+The run on `1599360` (2026-11-04, GitHub Actions run 41713041735) reported every mutant and
+missed 9; of the timeouts run again by the patient run, three, each making the walk over a
+mask's places endless, still timed out after 1800 s. A run before it, on `3954ed5`, left
+99 of its 160 shards without a baseline, a test copying a frozen grid into bytes not on a
+block, and was run again once the test borrowed them. The walk now takes from each word as
+many places as it has bits set, and its eight mutants, applied by hand, each fail a test;
+three missed mutants are killed by tests written for them, each shown to fail with its
+mutant applied by hand. The human decided, on 2026-11-04, that the six left, which no test
+can tell from the original, are excluded as `[same]`, each with its reason: a restamp to
+the version a grid holds, a read's room grown as it is for a longer file, a value the
+original returns, a crossing told by its fraction alone, a bound `check_links` already
+holds, and a box's margin narrowed beside its other three.

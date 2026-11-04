@@ -32,6 +32,8 @@ exclude_re = [
     'bvh\.rs:.*: replace < with <= in entry$',
     # As above.
     'bvh\.rs:.*: replace > with >= in entry$',
+    # As above.
+    'bvh\.rs:\d+:33: replace - with \+ in entry$',
     # A smaller margin, or a node passed at an equal bound, prunes more only where distances,
     # or the fractions at which a segment crosses, tie within rounding, where any of the
     # triangles may be found; 160 000 queries agreed with a scan (P5's review, C6).
@@ -283,4 +285,25 @@ exclude_re = [
     'vdb_read\.rs:.*: delete match arm 2 in values$',
     # As above.
     'vdb_read\.rs:.*: delete match arm 4 in values$',
+    # A grid already at the version it is packed at, restamped to that version, gives the
+    # bytes it held.
+    # [same]
+    'archive\.rs:.*: replace match guard frozen\.version\(\) == version with false in pack$',
+    # Room for a block fewer is grown by `fill` as room for a file longer than it reported
+    # is, and the same bytes are read.
+    # [same]
+    'cache\.rs:.*: replace \+ with \* in CacheFile::read$',
+    # A set in memory holds no tile's crossing, and the original returns `NO_CROSSING`,
+    # these values.
+    # [same]
+    'hermite\.rs:.*: replace <impl Source for Owned<.*>>::crossing_tile -> .* with Ok\(\(-1\.0, \[0\.0; 3\], 0\)\)$',
+    # A view is found only once every edge is checked: an edge with no crossing holds
+    # `NO_CROSSING` to the bit, and a crossing's fraction lies in [0, 1], never -1, so the
+    # fraction alone tells them apart.
+    # [same]
+    'hermite\.rs:\d+:43: replace && with \|\| in HermiteView<.*>::crossing$',
+    # `check_links` runs first and holds the root keys strictly ascending, and distinct keys
+    # have distinct Morton codes, so no two upper nodes' are equal here.
+    # [same]
+    'view\.rs:.*: replace < with <= in GridView<.*>::check_order$',
 ]
