@@ -6,6 +6,11 @@
    file states or enforces a rule, the message names an ADR that is staged too.
 3. A test deleted or renamed carries its record (TESTING.md T2): when a line leaves a
    crate's `test-list.txt`, the message names an ADR that is staged too.
+4. A change to the `src/` of a crate with a benchmark states its benchmarks (TESTING.md
+   T10): a line of the message begins `Benchmarks`. In the hook alone, unless the line is
+   `Benchmarks: not on a timed path`, the crate's `out/bench/<crate>/report.tsv` is newer
+   than each of its staged `src/` files and gives every item `ok`: `out/` is not
+   committed, so the audit cannot read it.
 
 The message is read as git keeps it: comment lines aside, and nothing from the scissors
 line on, below which `git commit -v` shows the staged diff.
@@ -19,6 +24,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
+from typing import Optional
 
 # The audit's own lists, so that a commit is held to the same as the repository.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "audit"))
@@ -30,6 +36,10 @@ ADR_FILE = re.compile(r"^docs/adr/(\d{4})-")
 SCISSORS = re.compile(r"^# -+ >8 -+$", re.MULTILINE)
 RULE_FILES = re.compile(RULE_PATTERN)
 TEST_LIST = re.compile(r"^crates/[^/]+/test-list\.txt$")
+SOURCE = re.compile(r"^crates/([^/]+)/src/")
+BENCHMARKS = re.compile(r"^Benchmarks\b", re.MULTILINE)
+UNTIMED = re.compile(r"^Benchmarks: not on a timed path$", re.MULTILINE)
+ROOT = Path(__file__).resolve().parent.parent.parent
 REMOVED = re.compile(r"^-(?!--)", re.MULTILINE)
 # A lint level in Cargo.toml is a rule too, written alone or in a table with its priority.
 LINT_LEVEL = re.compile(
@@ -41,11 +51,26 @@ def git(*args: str) -> str:
     return subprocess.run(["git", *args], capture_output=True, text=True, check=True).stdout
 
 
+def benched(changed: list[str]) -> dict[str, list[str]]:
+    """The crates with a benchmark whose `src/` the change touches, each with its files."""
+    out: dict[str, list[str]] = {}
+    for f in changed:
+        m = SOURCE.match(f)
+        if m and (ROOT / "crates" / m[1] / "benches" / f"{m[1]}.rs").is_file():
+            out.setdefault(m[1], []).append(f)
+    return out
+
+
 def check(message: str, changed: list[str], diff) -> list[str]:
     """What is wrong with a commit's `message`, given the files it `changed` and `diff`, a
     function giving its diff of some paths, as the hook and as the audit see one."""
     if JAPANESE.search(message):
         return ["the message must be in English (AGENTS.md writing rule 6)"]
+    crates = benched(changed)
+    if crates and not BENCHMARKS.search(message):
+        return ["this changes the src/ of " + ", ".join(sorted(crates)) + ", so a line of the "
+                "message must begin \"Benchmarks\" with their result, or be \"Benchmarks: "
+                "not on a timed path\" (TESTING.md T10)"]
     rules = [f for f in changed if RULE_FILES.search(f)]
     if LINT_LEVEL.search(diff("Cargo.toml")):
         rules.append("Cargo.toml (a lint level)")
@@ -61,6 +86,26 @@ def check(message: str, changed: list[str], diff) -> list[str]:
     return []
 
 
+def report(crate: str, files: list[str]) -> Optional[str]:
+    """What is wrong with a crate's last benchmark report, read by the hook: missing, older
+    than one of the staged `files`, or an item not `ok`."""
+    path = ROOT / "out" / "bench" / crate / "report.tsv"
+    if not path.is_file():
+        return f"{crate} has no benchmark report ({path.relative_to(ROOT)})"
+    made = path.stat().st_mtime
+    if any((ROOT / f).is_file() and (ROOT / f).stat().st_mtime > made for f in files):
+        return f"{crate}'s benchmark report is older than its staged src/ files"
+    rows = path.read_text(encoding="utf-8").splitlines()
+    head = rows[0].split("\t") if rows else []
+    if "verdict" not in head:
+        return f"{crate}'s benchmark report has no verdict"
+    at = head.index("verdict")
+    failed = [r.split("\t")[0] for r in rows[1:] if r.split("\t")[at:at + 1] != ["ok"]]
+    if failed:
+        return f"{crate}'s benchmark report fails " + ", ".join(failed)
+    return None
+
+
 def kept(raw: str) -> str:
     """A message as git keeps it: comment lines aside, nothing from the scissors on."""
     raw = SCISSORS.split(raw, maxsplit=1)[0]
@@ -73,7 +118,11 @@ def staged() -> list[str]:
     changed = git("diff", "--cached", "--name-only", "--no-renames").split()
     with open(sys.argv[1], encoding="utf-8") as handle:
         message = kept(handle.read())
-    return check(message, changed, lambda *p: git("diff", "--cached", "-U0", "--", *p))
+    found = check(message, changed, lambda *p: git("diff", "--cached", "-U0", "--", *p))
+    if not found and not UNTIMED.search(message):
+        found = [f"{w} (TESTING.md T10): run cargo bench -p {c} --bench {c} --all-features"
+                 for c, f in sorted(benched(changed).items()) if (w := report(c, f))]
+    return found
 
 
 def committed(commits: list[str]) -> list[str]:

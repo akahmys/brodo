@@ -303,3 +303,16 @@ of the benchmark's grid, 2606 leaves, took 16.6 µs at version 1 and 31 µs at v
 17.3 µs with the bounds left unchecked, so the check costs about 5 ns a leaf. The owner
 had the item recorded again as the cost of that check: `--record cache_map_x256`, the
 one-minute load 1.73 just after it, gave 7 724 166 ns.
+
+## Amendment: the benchmarks of a change checked as it is committed
+
+- **Date**: 2026-11-04
+
+P8's version 2 (`3954ed5`) landed without its benchmarks, T10 held by nothing, and the
+closing benchmarks found the cache map 28 times slower. The owner decided, on 2026-11-04,
+that `commit_msg_check.py` hold it: a commit changing the `src/` of a crate with a
+benchmark has a line beginning `Benchmarks`, checked by the hook and, on the commits a push
+brings, by the audit; and in the hook, unless the line is `Benchmarks: not on a timed path`,
+the crate's last report, `out/bench/<crate>/report.tsv`, is newer than each of its staged
+`src/` files and gives every item `ok`. The audit cannot read the report, which is not
+committed; whether a path is timed, and the machine at rest, nothing checks.

@@ -64,7 +64,7 @@ break the rule once and watch the step fail (TESTING.md T3).
 | Where | Reads |
 | :--- | :--- |
 | `scripts/hooks/pre-commit` | the staged change, and every staged text file through standard input (`leak_input.py`); also runs `paths.py` |
-| `scripts/hooks/commit-msg` | the commit message; `commit_msg_check.py`, reading it up to the scissors line of `git commit -v`, also requires English, CJK punctuation refused, and a staged ADR named for a rule change (AGENTS.md), a lint level in `Cargo.toml` alone or in a table and a rule file renamed away included, or a test removed from a `test-list.txt` (TESTING.md T2) |
+| `scripts/hooks/commit-msg` | the commit message; `commit_msg_check.py`, reading it up to the scissors line of `git commit -v`, also requires English, CJK punctuation refused, and a staged ADR named for a rule change (AGENTS.md), a lint level in `Cargo.toml` alone or in a table and a rule file renamed away included, or a test removed from a `test-list.txt` (TESTING.md T2), and a `Benchmarks` line for a change to the `src/` of a crate with a benchmark, its last report newer than the change and every item `ok` unless the line says the path is not timed (TESTING.md T10) |
 | the audit | the working tree and the whole history, and every text file and blob of either through standard input (`leak_input.py`), and every commit message; with the personal rules also every commit message and author |
 
 **On GitHub Actions** (`.github/workflows/audit.yml`, started by each push to `main` and by hand) the gate skips the
