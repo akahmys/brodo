@@ -12,10 +12,12 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   (ADR-0007), version 2's media types stated (ADR-0041), golden files of version 2's
   bare frozen buffers written, the tests run on macOS and Windows (ADR-0034), keys
   beginning `brodo.` reserved (ADR-0053), the public API reviewed, the survey of designs
-  grown by accretion taken whole (ADR-0054 to ADR-0058), and users' requests taken as
-  issues the owner labels `owner-approved` (ADR-0049, amended 2026-11-05).
-- **Next**: the rest of P9 in the order put to the owner (2026-11-04), the rules for
-  versions after 1.0 first.
+  grown by accretion taken whole (ADR-0054 to ADR-0058), users' requests taken as issues
+  the owner labels `owner-approved` (ADR-0049, amended), P9's retrospective (ADR-0001,
+  ADR-0033, ADR-0035, amended) and T14's survey of what each crate lacks.
+- **Next**: the gaps T14's survey found that 1.0 takes, brodo's core first;
+  then the rest of P9 in the order put to the owner (2026-11-04), the rules for versions
+  after 1.0 first.
 
 ## 2. Milestones
 
@@ -512,9 +514,9 @@ time, the gate, the mutation run of what changed and the benchmarks besides (202
 - [x] The closing checks the owner chooses by P8's content (ADR-0033), all five (the
       owner, 2026-11-03):
       - [x] Retrospective and refactoring: no duplication worth merging found; two
-            proposals put to the owner, undecided: a reader check docs/formats.md gains
-            held by `formats.py` to the golden files already there in the same commit,
-            and TESTING.md T10's benchmarks checked mechanically (2026-11-04)
+            proposals put to the owner, both taken: a reader check docs/formats.md gains
+            added to `formats.py` in the same commit (TESTING.md T13), and T10's
+            benchmarks checked by `commit_msg_check.py` (2026-11-04)
       - [x] Fuzz round, version 2's golden files among the seeds: eight targets, 900 s
             each, no finding (2026-11-03)
       - [x] Miri run: every `miri_*` test passes; the same warning from `crossbeam-epoch`
@@ -569,6 +571,21 @@ since crates.io yanks a version but never deletes it.
       names an issue by number, never a closing keyword, the owner closing it; a
       vulnerability not taken in a public issue (AGENTS.md S5; ADR-0049, amended; the
       owner, 2026-11-05)
+- [x] P9's retrospective, since P8's: ROADMAP.md §1 checked as a unit ends (ADR-0001), no
+      hidden item named by a promise's home or another file's doc comment (ADR-0035), and
+      a survey of what each crate lacks before 1.0 and each MAJOR (TESTING.md T14,
+      ADR-0033); no duplication worth merging (the owner, 2026-11-05)
+- [x] T14's survey before 1.0, by running each crate (2026-11-05): thirteen gaps, those
+      below taken before 1.0 (the owner, 2026-11-05), the rest recorded in §4 as additive
+- [ ] brodo's core: `TopologyEditor::remove_tile`; `Grid::from_parts`, `into_parts` and
+      `replace`, taking a thawed grid and a dilation or erosion; `Grid::edit`'s closure
+      giving the caller's own error; `LeafManifest`'s public `Default` gone
+- [ ] brodo's formats: a cache file's grid names stated not unique; a `.vdb` level set
+      read back with `SDF_KEY`; `CacheEntry::copy` and `copy_bytes`, an entry read written
+      again as it was, its keys beginning `brodo.` kept
+- [ ] mestolo: a slice beyond the grid refused, the `.vdb` writer's refusal naming the
+      grids it cannot write, no arguments exiting 2, and `convert` writing a cache file or
+      an archive (`--as`)
 - [x] One prefix of metadata keys reserved for the formats brodo builds on the cache
       profile after 1.0, such as `brodo.`, `hermite.` kept as it is, so that each later
       one is not a breaking change to `CacheEntry::new` and `CacheEntry::bytes`, which
@@ -689,6 +706,18 @@ No spike is running.
 - The API reference is not hosted: the crates are not on crates.io, so docs.rs holds
   none, and a reader builds it with `cargo doc` (README.md). Hosting it, on GitHub Pages
   from each release tag, is the owner's to decide.
+- Gaps T14's survey found before 1.0 that a later MINOR adds without breaking a user
+  (2026-11-05), held until one is asked for or a milestone takes it: a frozen grid's
+  leaves and tiles walked in place; an archive's grids listed without decompressing them,
+  and any file's grid found by name; an archive grid's value encoding read; `.vdb` grids
+  of `[f32; 3]` and the other stored types; a writer streaming many grids; components'
+  labels read in bulk, with the outside one named; labelling not refused for a few
+  scattered leaves (`TooSpread`); a field put on another topology, and two topologies'
+  union; `Field::set_background`; `LeafNumber`, `TileNumber` and `Offset` built from their
+  numbers; `Field<T>` taken from an `AnyField` by `TryFrom`; colino's `Limits::default`,
+  a `Converted` built from a read grid, and one reader for any mesh format; mestolo's
+  `--version`, help per command, Hermite data and an archive's encodings shown by `info`,
+  more `slice` options, and a `.vdb` written skipping the grids it cannot hold.
 - Requests from users. Held until one asks: merging into a root tile (ADR-0014); a public
   way to read a bare frozen buffer, a file of its own, into an aligned buffer, which only
   tests now do (P5's review, S1, 2026-10-27); a bound on a conversion's leaves, refused

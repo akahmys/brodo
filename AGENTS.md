@@ -50,7 +50,9 @@ A promise to a user, what the code may be held to by a test or an excluded mutan
 (TESTING.md T11, T12), has three homes: ARCHITECTURE.md for behaviour, docs/formats.md for
 bytes, and a public item's rustdoc for its API, what it takes, gives and refuses, each
 fact in one of them and the others linking to it. How the code works, where a module's
-documentation or a private item's tells it, describes the code and promises nothing.
+documentation or a private item's tells it, describes the code and promises nothing. A public item under `#[doc(hidden)]` promises
+nothing either, so no promise's home names it, nor another file's doc comment;
+`scripts/audit/documents.py` checks that.
 
 A crate's README is its documentation's front page, read in by `include_str!` in a
 `#![doc]` attribute of its `lib.rs`, so that its code runs as a doctest in the gate's

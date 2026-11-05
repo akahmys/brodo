@@ -41,7 +41,7 @@ grep -E '^echo "\[' scripts/audit/verify_compliance.sh
 | `cargo fmt --all --check` | 10 |
 | `cargo tree --all-features --edges normal,build` per member and target, searched for `cc`, failing where cargo gives no tree | 12 |
 | test files in `src/`, and, by `scripts/audit/source.py --ignores`, `#[ignore]` reasons, direct or under `cfg_attr`, however their lines break, found in the code and not its strings, in every target | T1 |
-| `scripts/audit/documents.py`, and `cargo doc` with every feature and warnings denied | AGENTS.md writing rules 1, 2, 6, S3, the ADR index, no `CLAUDE.md`, and each crate's README read in; Rule 10 |
+| `scripts/audit/documents.py`, and `cargo doc` with every feature and warnings denied | AGENTS.md writing rules 1, 2, 6, S3, the ADR index, no `CLAUDE.md`, each crate's README read in, and no `#[doc(hidden)]` item named by another file's doc comment, a crate README, ARCHITECTURE.md or docs/formats.md; Rule 10 |
 | `scripts/audit/mutants.py` with no argument: `.cargo/mutants.toml` holds no setting, read by its shape, one `exclude_re = [` list and comments, and each pattern in its `exclude_re` has a comment above it ending in its kind and, for `open` and `unreached`, where, and excludes a mutant | T11 |
 | `cargo deny check` | 13 |
 | `scripts/hooks/provenance_guard.py --check`: the local list of forbidden sources exists and names a project | S1 |
@@ -64,7 +64,7 @@ break the rule once and watch the step fail (TESTING.md T3).
 | Where | Reads |
 | :--- | :--- |
 | `scripts/hooks/pre-commit` | the staged change, and every staged text file through standard input (`leak_input.py`); also runs `paths.py` |
-| `scripts/hooks/commit-msg` | the commit message; `commit_msg_check.py`, reading it up to the scissors line of `git commit -v`, also requires English, CJK punctuation refused, and a staged ADR named for a rule change (AGENTS.md), a lint level in `Cargo.toml` alone or in a table and a rule file renamed away included, or a test removed from a `test-list.txt` (TESTING.md T2), and a `Benchmarks` line for a change to the `src/` of a crate with a benchmark, its last report newer than the change and every item `ok` unless the line says the path is not timed (TESTING.md T10) |
+| `scripts/hooks/commit-msg` | the commit message; `commit_msg_check.py`, reading it up to the scissors line of `git commit -v`, also requires English, CJK punctuation refused, and a staged ADR named for a rule change (AGENTS.md), a lint level in `Cargo.toml` alone or in a table and a rule file renamed away included, or a test removed from a `test-list.txt` (TESTING.md T2), and a `Benchmarks` line for a change to the `src/` of a crate with a benchmark, its last report newer than the change and every item `ok` unless the line says the path is not timed (TESTING.md T10), and ROADMAP.md §1 changed by a commit that adds an ADR or ticks a box (PLANNING.md §1) |
 | the audit | the working tree and the whole history, and every text file and blob of either through standard input (`leak_input.py`), and every commit message; with the personal rules also every commit message and author |
 
 **On GitHub Actions** (`.github/workflows/audit.yml`, started by each push to `main` and by hand) the gate skips the

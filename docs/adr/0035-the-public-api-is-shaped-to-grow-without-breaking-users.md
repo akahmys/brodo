@@ -93,3 +93,16 @@ passed unchanged. With that variant unnamed, clippy's `wildcard_enum_match_arm`,
 workspace's lints and not a user's, refused the brodo test, so a variant added later is
 added to the test's list too, which keeps the first check true.
 
+
+## Amendment: hidden items
+
+- **Date**: 2026-11-05
+
+P9's retrospective found `vdb::from_bytes`'s documentation telling a user to write a grid
+with `CacheEntry::with_reserved_keys`, hidden by ADR-0057, promising nothing; the gate had
+passed, and a survey found it. The owner decided, on 2026-11-05, as proposed: no promise's
+home and no other file's doc comment names an item under `#[doc(hidden)]`, which
+`scripts/audit/documents.py` checks, by name in backquotes, alone or ending a path, in the
+doc comments under `crates/*/src/` but the item's own file's, the crate READMEs,
+ARCHITECTURE.md and docs/formats.md. A hidden module, `mestolo`'s, is not held to it. Run
+first, it found that documentation alone, which now says only to remove the key.

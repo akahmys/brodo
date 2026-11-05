@@ -17,6 +17,10 @@
 8. Crate READMEs (AGENTS.md): every crate in `LAYERS` has a README.md, read in as its
    documentation's front page by `#![doc = include_str!("../README.md")]` in its `lib.rs`,
    so that its code runs as a doctest. What it says, nothing checks.
+9. Hidden items (AGENTS.md): an item under `#[doc(hidden)]` promises nothing, so no other
+   file's doc comment under `crates/*/src/`, no crate README, ARCHITECTURE.md and
+   docs/formats.md name it in backquotes, alone or at the end of a path. A hidden module is
+   not held to this, its own files naming what is in it.
 """
 
 import re
@@ -197,6 +201,29 @@ def readmes() -> list[str]:
     return out
 
 
+# An item under `#[doc(hidden)]`, attributes and doc lines between them: its name.
+HIDDEN = re.compile(
+    r"#\[doc\(hidden\)\]\s*(?:(?:#\[[^\]]*\]|///[^\n]*)\s*)*"
+    r"pub(?:\([^)]*\))?\s+(?:const\s+|unsafe\s+)*(?:fn|struct|enum|trait|type|const|static)\s+(\w+)"
+)
+DOC_LINE = re.compile(r"^\s*//[/!](.*)$", re.MULTILINE)
+PROMISES = ["ARCHITECTURE.md", "docs/formats.md"]
+
+
+def hidden() -> list[str]:
+    sources = sorted((ROOT / "crates").glob("*/src/**/*.rs"))
+    names = {(m[1], f) for f in sources for m in HIDDEN.finditer(f.read_text())}
+    texts = [(f, "\n".join(DOC_LINE.findall(f.read_text()))) for f in sources]
+    texts += [(f, f.read_text()) for f in sorted((ROOT / "crates").glob("*/README.md"))]
+    texts += [(ROOT / p, (ROOT / p).read_text()) for p in PROMISES]
+    out = []
+    for name, home in sorted(names):
+        named = re.compile(r"`(?:[\w:]*::)?" + re.escape(name) + r"(?:\(\))?`")
+        out += [f"  {f.relative_to(ROOT)} names `{name}`, hidden in {home.relative_to(ROOT)}"
+                for f, text in texts if f != home and named.search(text)]
+    return out
+
+
 def main() -> int:
     paths = walk()
     failures = []
@@ -210,6 +237,7 @@ def main() -> int:
         ("instruction files", instruction_files),
         ("provenance", provenance),
         ("crate READMEs", readmes),
+        ("hidden items", hidden),
     )
     for label, check in checks:
         found = check()

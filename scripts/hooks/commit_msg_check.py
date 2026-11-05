@@ -11,6 +11,8 @@
    `Benchmarks: not on a timed path`, the crate's `out/bench/<crate>/report.tsv` is newer
    than each of its staged `src/` files and gives every item `ok`: `out/` is not
    committed, so the audit cannot read it.
+5. A unit of work that ends rewrites the status (PLANNING.md §1): a commit that adds an
+   ADR or ticks a box in ROADMAP.md changes ROADMAP.md §1.
 
 The message is read as git keeps it: comment lines aside, and nothing from the scissors
 line on, below which `git commit -v` shows the staged diff.
@@ -40,6 +42,8 @@ SOURCE = re.compile(r"^crates/([^/]+)/src/")
 BENCHMARKS = re.compile(r"^Benchmarks\b", re.MULTILINE)
 UNTIMED = re.compile(r"^Benchmarks: not on a timed path$", re.MULTILINE)
 ROOT = Path(__file__).resolve().parent.parent.parent
+TICKED = re.compile(r"^\s*- \[x\]", re.MULTILINE)
+STATUS = re.compile(r"^## 1\. .*?(?=^## 2\. )", re.MULTILINE | re.DOTALL)
 REMOVED = re.compile(r"^-(?!--)", re.MULTILINE)
 # A lint level in Cargo.toml is a rule too, written alone or in a table with its priority.
 LINT_LEVEL = re.compile(
@@ -86,6 +90,26 @@ def check(message: str, changed: list[str], diff) -> list[str]:
     return []
 
 
+def status(added: list[str], before: str, after: str) -> Optional[str]:
+    """What is wrong with a commit that ends a unit, given the files it `added` and
+    ROADMAP.md `before` and `after` it: one adding an ADR or ticking a box that leaves
+    ROADMAP.md §1 as it was."""
+    adr = [f for f in added if ADR_FILE.match(f)]
+    ticked = len(TICKED.findall(after)) > len(TICKED.findall(before))
+    if not (adr or ticked):
+        return None
+    if (m := STATUS.search(before)) and (n := STATUS.search(after)) and m[0] != n[0]:
+        return None
+    why = "adds " + ", ".join(adr) if adr else "ticks a box in ROADMAP.md"
+    return f"this {why}, so it ends a unit and must rewrite ROADMAP.md §1 (PLANNING.md §1)"
+
+
+def shown(spec: str) -> str:
+    """A file as `git show` gives it, or nothing where it is not."""
+    run = subprocess.run(["git", "show", spec], capture_output=True, text=True)
+    return run.stdout if run.returncode == 0 else ""
+
+
 def report(crate: str, files: list[str]) -> Optional[str]:
     """What is wrong with a crate's last benchmark report, read by the hook: missing, older
     than one of the staged `files`, or an item not `ok`."""
@@ -119,6 +143,9 @@ def staged() -> list[str]:
     with open(sys.argv[1], encoding="utf-8") as handle:
         message = kept(handle.read())
     found = check(message, changed, lambda *p: git("diff", "--cached", "-U0", "--", *p))
+    added = git("diff", "--cached", "--name-only", "--no-renames", "--diff-filter=A").split()
+    if not found and (w := status(added, shown("HEAD:ROADMAP.md"), shown(":ROADMAP.md"))):
+        found = [w]
     if not found and not UNTIMED.search(message):
         found = [f"{w} (TESTING.md T10): run cargo bench -p {c} --bench {c} --all-features"
                  for c, f in sorted(benched(changed).items()) if (w := report(c, f))]
@@ -135,6 +162,9 @@ def committed(commits: list[str]) -> list[str]:
         changed = git("diff", "--name-only", "--no-renames", base, c).split()
         message = git("log", "-1", "--format=%B", c)
         found = check(message, changed, lambda *p, b=base, c=c: git("diff", "-U0", b, c, "--", *p))
+        added = git("diff", "--name-only", "--no-renames", "--diff-filter=A", base, c).split()
+        if not found and (w := status(added, shown(f"{base}:ROADMAP.md"), shown(f"{c}:ROADMAP.md"))):
+            found = [w]
         out += [f"  {c[:12]}: {f}" for f in found]
     return out
 

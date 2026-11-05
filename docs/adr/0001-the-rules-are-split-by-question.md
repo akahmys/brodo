@@ -174,3 +174,14 @@ decided, on 2026-11-02, that each be one: `paths.text_files`, every committable 
 is UTF-8 with no NUL; `documents.section`, a number followed by a dot or a space; and
 `project.RULE_FILES`, which the hook reads and `documents.py` holds every path AGENTS.md
 names to. Shown to fire: a rule file left out of the list failed `documents.py`.
+
+## Amendment
+
+- **Date**: 2026-11-05
+
+P9's retrospective found ROADMAP.md §1 not rewritten by commits that each ended a unit,
+nothing having checked it. The owner decided, on
+2026-11-05, as proposed: `commit_msg_check.py`, in the hook and the audit, refuses a
+commit that adds an ADR or ticks a box in ROADMAP.md without changing §1. Run on the
+commits since P8's close, it named five: ccc36bf, 637d9cd, 4105baf, 9eec928 and 36b26be; the audit holds it to
+the commits not yet pushed alone, so they stand. Whether §1 is true, nothing checks.

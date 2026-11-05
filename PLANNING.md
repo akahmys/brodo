@@ -13,7 +13,9 @@ A rule here that names no check is held by review alone (ADR-0001).
    (AGENTS.md S5).
 2. **Size** a unit as about one test made to pass.
 3. **End** by overwriting ROADMAP.md §1: what was done, the next step, and every
-   unresolved problem. It is a snapshot, not a log; history is in git.
+   unresolved problem. It is a snapshot, not a log; history is in git. A commit that adds
+   an ADR or ticks a box in ROADMAP.md changes §1, which `commit_msg_check.py` checks in
+   the hook and the audit; whether §1 is true, nothing.
 4. **Stop when stuck.** After three attempts that fail to explain a failure or a mismatch,
    stop. Record in ROADMAP.md §1 what fails, where, by how much, what was tried, and the
    hypothesis. Do not loosen the tolerance or the test (TESTING.md T2).
