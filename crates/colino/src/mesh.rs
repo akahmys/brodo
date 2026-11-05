@@ -68,6 +68,24 @@ impl Limits {
         }
         Ok(())
     }
+
+    /// A file's bytes, of no more than the limit: a longer file is refused by its length
+    /// before any of it is read, or by the bytes read where its length says less than it
+    /// holds, as a device's, a pipe's or a growing file's can; no more than the limit and
+    /// one byte are read.
+    #[cfg(any(feature = "stl", feature = "obj", feature = "threemf"))]
+    pub(crate) fn read_file(
+        &self,
+        path: &std::path::Path,
+    ) -> Result<Vec<u8>, crate::error::ReadError> {
+        use std::io::Read;
+        let file = std::fs::File::open(path)?;
+        self.check_bytes(file.metadata()?.len())?;
+        let mut bytes = Vec::new();
+        file.take(self.bytes.saturating_add(1)).read_to_end(&mut bytes)?;
+        self.check_bytes(u64::try_from(bytes.len()).unwrap_or(u64::MAX))?;
+        Ok(bytes)
+    }
 }
 
 /// Groups as a reader meets them: each name numbered in the order a triangle first takes

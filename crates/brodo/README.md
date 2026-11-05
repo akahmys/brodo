@@ -87,7 +87,7 @@ assert_eq!(euler(&t, &solid, inside, Connectivity::TwentySix)?, 1);
 // Serialised as a cache file's bytes, and read back from a copy of them.
 let meta = GridMeta::new("ball", [0.1; 3], "millimeter")?;
 let bytes = to_bytes(&[CacheEntry::new(&meta, &t, &solid)?])?;
-let file = CacheFile::from_bytes(&bytes)?;
+let file = brodo::cache::from_bytes(&bytes)?;
 assert_eq!(file.meta(0)?.name, "ball");
 assert_eq!(file.view::<u8>(0)?.get([8, 4, 4])?, 1);
 # Ok::<(), Box<dyn std::error::Error>>(())

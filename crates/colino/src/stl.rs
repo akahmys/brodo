@@ -27,14 +27,23 @@
 //! Groups (ADR-0030): in ASCII, each solid is a group, named by its name after `solid`; a
 //! binary file's triangles are all in group 0.
 
+use std::path::Path;
+
 use crate::error::ReadError;
 use crate::mesh::{Grouping, Limits, Mesh};
 
 const HEADER: usize = 80;
 const RECORD: usize = 50;
 
+/// Reads a binary or ASCII STL file at `path`, of no more than `limits.bytes`, as
+/// `from_bytes` reads its bytes: a longer file is refused by its length before any of it is
+/// read, and no more than the limit and one byte are read.
+pub fn read(path: &Path, limits: Limits) -> Result<Mesh, ReadError> {
+    from_bytes(&limits.read_file(path)?, limits)
+}
+
 /// Reads a binary or ASCII STL file's bytes.
-pub fn read(bytes: &[u8], limits: Limits) -> Result<Mesh, ReadError> {
+pub fn from_bytes(bytes: &[u8], limits: Limits) -> Result<Mesh, ReadError> {
     limits.check_bytes(u64::try_from(bytes.len()).unwrap_or(u64::MAX))?;
     match binary_count(bytes) {
         Some(n) => read_binary(bytes, n, limits),

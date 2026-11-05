@@ -251,11 +251,15 @@ fastest. A neighbour beyond the `i32` coordinate range is the background.
   [docs/formats.md](docs/formats.md) §3. A reader checks the whole file, every grid's
   buffer and bounds included, before it answers, as docs/formats.md §3.4 states (ADR-0016,
   ADR-0052); version 1 is not read (ADR-0054).
-- A cache file is written whole: to a hidden file beside it, flushed and renamed over it,
-  so that a reader, a mapping process among them, sees the old file or the new one; the
-  directory must be writable, and a process killed while writing may leave the hidden
-  file behind.
-- A cache file is read by copying it into an aligned buffer (`CacheFile::read`) or by
+- Each format's module reads and writes in one shape (ADR-0055): `from_bytes(bytes, …)`
+  reads bytes and `read(path, …)` a file, the limit last wherever reading makes more than
+  its input; `to_bytes(…)` makes the bytes and `write(path, …)` a file. colino's mesh
+  readers take the same shape (§5).
+- A file brodo writes at a path, a cache file, an archive, a `.vdb`, a `.vtu` or a PNG, is
+  written whole: to a hidden file beside it, flushed and renamed over it, so that a
+  reader, a mapping process among them, sees the old file or the new one; the directory
+  must be writable, and a process killed while writing may leave the hidden file behind.
+- A cache file is read by copying it into an aligned buffer (`cache::read`) or by
   mapping it into memory without a copy (`CacheFile::map`, under the default feature
   `mmap`); both go through one parser. Mapping is brodo's only unsafe code, in one module
   (ADR-0008); `CacheFile::map` is an `unsafe fn`, its caller promising that the file stays
@@ -348,7 +352,8 @@ are in ADR-0030.
 - Input: STL (binary and ASCII), OBJ, 3MF, in that order, each under a default feature a
   user may leave out (`stl`, `obj`, `threemf`; ADR-0036) and read into a `Mesh` of `f64`
   vertices, `u32` triangles, a group per triangle (ADR-0030) and the file's unit, if any,
-  under limits its caller sets (ADR-0026). Badly oriented, holed and degenerate meshes are
+  under limits its caller sets (ADR-0026), from bytes (`from_bytes`) or a file (`read`), as
+  §4.7's readers are shaped (ADR-0055). Badly oriented, holed and degenerate meshes are
   accepted as they are; `Mesh::welded` joins vertices at equal positions, never within a
   tolerance. A 3MF package is read through `rawzip`, `miniz_oxide` and `quick-xml`, its
   model as a stream; the mesh holds every build item placed by its transforms. STEP and
@@ -499,8 +504,9 @@ Rust. It uses no GPU and no window.
 - **`convert`** writes, by the output's name, every grid or the one `--grid` names as
   `.vdb` (§4.7), refusing a grid of a type it does not hold by name, or one grid as `.vtu`
   (§6.1).
-- **Output**: a file at the output's path is refused before the input is read, unless
-  `--force` is given; a file is written to a hidden file beside it and renamed over it. A
+- **Output**: a file at the output's path, or a path naming no file, is refused before the
+  input is read, unless `--force` is given for the first; the file is written by brodo's
+  writers, whole (§4.7). A
   command line refused exits with status 2, a command failing with 1, its error on
   standard error.
 

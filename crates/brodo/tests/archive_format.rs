@@ -97,7 +97,7 @@ fn format_version_2_keeps_its_bytes() {
     let bytes = to_bytes(&e).unwrap();
     assert!(bytes == GOLDEN_2, "the bytes of archive format version 2 changed; raise the version");
     let file = from_bytes(GOLDEN_2, u64::MAX).unwrap();
-    let cached = CacheFile::from_bytes(&cache::to_bytes(&e).unwrap()).unwrap();
+    let cached = brodo::cache::from_bytes(&cache::to_bytes(&e).unwrap()).unwrap();
     assert_eq!((file.version(), file.grid_count()), (cached.version(), cached.grid_count()));
     assert!(file.bytes_entries()[0].bytes == b"brodo, 2026");
     assert_eq!(file.bytes_entries()[0].name, cached.bytes_entries()[0].name);
@@ -172,7 +172,7 @@ fn an_archive_reads_as_the_cache_file_of_the_same_grids() {
         let coords: Vec<Coord> = (0..leaves).map(|i| [8 * i, 0, 8 * (i % 5)]).collect();
         let t = build(&coords, &[(TileLevel::Upper, [0, 4096, 0])]);
         let archived = from_bytes(&to_bytes(&e).unwrap(), u64::MAX).unwrap();
-        let cached = CacheFile::from_bytes(&cache::to_bytes(&e).unwrap()).unwrap();
+        let cached = brodo::cache::from_bytes(&cache::to_bytes(&e).unwrap()).unwrap();
         same(&archived, &cached, &t);
     }
 }
@@ -203,7 +203,7 @@ fn an_archive_of_grids_keeps_its_bytes_and_a_file_round_trips() {
     // A file an earlier run left must not stand in for this one's.
     let _absent = std::fs::remove_file(&path);
     write(&path, &golden_entries()).unwrap();
-    let cached = CacheFile::from_bytes(&cache::to_bytes(&golden_entries()).unwrap()).unwrap();
+    let cached = brodo::cache::from_bytes(&cache::to_bytes(&golden_entries()).unwrap()).unwrap();
     let t = build(
         &[[-1, 0, 0], [4096, 7, 9]],
         &[(TileLevel::Lower, [8, 8, 8]), (TileLevel::Root, [0, 8192, 0])],
@@ -296,7 +296,7 @@ fn an_archive_longer_than_the_limit_is_refused_whatever_length_it_reports() {
     let whole = read_of_a_fifo("archive_longer.fifo", |p| read(p, 1024).map(|_| ()));
     assert!(matches!(whole, Err(CacheError::FileTooLarge { limit: 1024, .. })), "{whole:?}");
     let region = read_of_a_fifo("archive_region_longer.fifo", |p| {
-        read_region(p, 1024, 0, extent).map(|_| ())
+        read_region(p, 0, extent, 1024).map(|_| ())
     });
     assert!(matches!(region, Err(CacheError::FileTooLarge { limit: 1024, .. })), "{region:?}");
     let zero = std::path::Path::new("/dev/zero");
@@ -305,7 +305,7 @@ fn an_archive_longer_than_the_limit_is_refused_whatever_length_it_reports() {
         matches!(zero_whole, Err(CacheError::FileTooLarge { length: 1025, limit: 1024 })),
         "{zero_whole:?}"
     );
-    let zero_region = read_region(zero, 1024, 0, extent).map(|_| ());
+    let zero_region = read_region(zero, 0, extent, 1024).map(|_| ());
     assert!(
         matches!(zero_region, Err(CacheError::FileTooLarge { length: 1025, limit: 1024 })),
         "{zero_region:?}"
@@ -396,7 +396,7 @@ proptest! {
             }
         }
         let extent = Bounds::Box { min: [-16; 3], max: [16; 3] };
-        if let Ok(region) = region_from_bytes(&bytes, 1 << 24, 0, extent)
+        if let Ok(region) = region_from_bytes(&bytes, 0, extent, 1 << 24)
             && let Ok(view) = region.view::<f32>()
         {
             let _read = view.get([0, 0, 0]);
@@ -422,7 +422,7 @@ fn quantised_values_keep_their_bytes_and_read_back_within_their_bounds() {
     write_with(&path, &quantised(&e)).unwrap();
     assert!(std::fs::read(&path).unwrap() == to_bytes_with(&quantised(&e)).unwrap());
     let file = read(&path, u64::MAX).unwrap();
-    let exact = CacheFile::from_bytes(&cache::to_bytes(&e).unwrap()).unwrap();
+    let exact = brodo::cache::from_bytes(&cache::to_bytes(&e).unwrap()).unwrap();
     let t = build(
         &[[-1, 0, 0], [4096, 7, 9]],
         &[(TileLevel::Lower, [8, 8, 8]), (TileLevel::Root, [0, 8192, 0])],
@@ -580,7 +580,7 @@ fn a_region_answers_within_its_box_as_the_whole_grid_does() {
             same_within(&bytes, &whole, &t, min, max);
         }
         let region =
-            region_from_bytes(&bytes, u64::MAX, 1, Bounds::Box { min: [0; 3], max: [9; 3] });
+            region_from_bytes(&bytes, 1, Bounds::Box { min: [0; 3], max: [9; 3] }, u64::MAX);
         let v = region.unwrap();
         assert_eq!(v.value_type(), whole.value_type(1).unwrap());
         let (r, w) = (v.view::<[f64; 3]>().unwrap(), whole.view::<[f64; 3]>(1).unwrap());
@@ -593,16 +593,16 @@ fn a_region_answers_within_its_box_as_the_whole_grid_does() {
     let _absent = std::fs::remove_file(&path);
     write(&path, &e).unwrap();
     let extent = Bounds::Box { min: [0; 3], max: [7; 3] };
-    let r = read_region(&path, u64::MAX, 0, extent).unwrap();
+    let r = read_region(&path, 0, extent, u64::MAX).unwrap();
     assert_eq!(r.view::<f32>().unwrap().leaves().count(), 1);
-    assert!(matches!(read_region(&path, 31, 0, extent), Err(CacheError::FileTooLarge { .. })));
+    assert!(matches!(read_region(&path, 0, extent, 31), Err(CacheError::FileTooLarge { .. })));
 }
 
 /// The region `min` to `max` of grid 0 of `bytes`, whose whole read is `whole` and whose
 /// topology is `t`, answers as `whole` does within it and refuses what lies outside.
 fn same_within(bytes: &[u8], whole: &CacheFile, t: &Topology, min: Coord, max: Coord) {
     let w = whole.view::<f32>(0).unwrap();
-    let region = region_from_bytes(bytes, u64::MAX, 0, Bounds::Box { min, max }).unwrap();
+    let region = region_from_bytes(bytes, 0, Bounds::Box { min, max }, u64::MAX).unwrap();
     assert_eq!(region.meta(), whole.meta(0).unwrap());
     assert_eq!(region.bounds(), whole.bounds(0).unwrap());
     assert_eq!(region.extent(), Bounds::Box { min, max });
@@ -662,9 +662,9 @@ fn a_region_holds_and_checks_only_the_chunks_it_needs() {
     let raw = |k: usize| u64::from(word(&bytes, table + 2 * k)) * 32;
     let near = Bounds::Box { min: [0; 3], max: [7; 3] };
     let held = raw(0) + raw(1) + raw(4);
-    assert!(region_from_bytes(&bytes, held, 0, near).is_ok());
+    assert!(region_from_bytes(&bytes, 0, near, held).is_ok());
     assert!(matches!(
-        region_from_bytes(&bytes, held - 1, 0, near),
+        region_from_bytes(&bytes, 0, near, held - 1),
         Err(CacheError::FileTooLarge { length, .. }) if length == held
     ));
     let mut broken = bytes.clone();
@@ -673,12 +673,12 @@ fn a_region_holds_and_checks_only_the_chunks_it_needs() {
         from_bytes(&broken, u64::MAX),
         Err(CacheError::Decompress { index: 0, chunk: 3 })
     ));
-    let r = region_from_bytes(&broken, u64::MAX, 0, near).unwrap();
+    let r = region_from_bytes(&broken, 0, near, u64::MAX).unwrap();
     assert_eq!(r.view::<f32>().unwrap().get([1, 0, 0]).unwrap().to_bits(), 0.25_f32.to_bits());
     // Leaf 1299, at z = 8 × (1299 mod 5).
     let far = Bounds::Box { min: [8 * 1299, 0, 32], max: [8 * 1299, 0, 32] };
     assert!(matches!(
-        region_from_bytes(&broken, u64::MAX, 0, far),
+        region_from_bytes(&broken, 0, far, u64::MAX),
         Err(CacheError::Decompress { index: 0, chunk: 3 })
     ));
 }
@@ -690,9 +690,9 @@ fn a_region_holds_and_checks_only_the_chunks_it_needs() {
 fn a_region_checks_the_archives_structure() {
     let g = GOLDEN.to_vec();
     let extent = Bounds::Box { min: [0; 3], max: [9; 3] };
-    let region = |b: &[u8]| region_from_bytes(b, u64::MAX, 0, extent).map(|_| ());
+    let region = |b: &[u8]| region_from_bytes(b, 0, extent, u64::MAX).map(|_| ());
     assert!(region(&g).is_ok());
-    assert!(matches!(region_from_bytes(&g, u64::MAX, 2, extent), Err(CacheError::NoGrid(2))));
+    assert!(matches!(region_from_bytes(&g, 2, extent, u64::MAX), Err(CacheError::NoGrid(2))));
     assert!(matches!(
         region(&cache::to_bytes(&golden_entries()).unwrap()),
         Err(CacheError::BadMagic(_))
@@ -709,11 +709,11 @@ fn a_region_checks_the_archives_structure() {
     let mut padded = g.clone();
     padded[table] = 1;
     assert!(matches!(region(&padded), Err(CacheError::Inconsistent("padding"))));
-    let empty = region_from_bytes(&g, u64::MAX, 0, Bounds::Empty).unwrap();
+    let empty = region_from_bytes(&g, 0, Bounds::Empty, u64::MAX).unwrap();
     let view = empty.view::<f32>().unwrap();
     assert_eq!(view.leaves().count(), 0);
     assert_eq!(view.locate([0, 0, 0]), Err(FormatError::OutsideRegion));
-    let full = region_from_bytes(&g, u64::MAX, 0, Bounds::Box { min: [-9; 3], max: [9; 3] });
+    let full = region_from_bytes(&g, 0, Bounds::Box { min: [-9; 3], max: [9; 3] }, u64::MAX);
     let full = full.unwrap();
     let r = full.view::<f32>().unwrap();
     assert_eq!(
@@ -747,10 +747,10 @@ fn a_region_of_a_grid_of_one_chunk_holds_that_chunk_alone() {
     assert_eq!(word(&bytes, 11), 1, "one chunk");
     let held = u64::from(word(&bytes, word(&bytes, 10) as usize * 8)) * 32;
     let extent = Bounds::Box { min: [0; 3], max: [9; 3] };
-    let r = region_from_bytes(&bytes, held, 0, extent).unwrap();
+    let r = region_from_bytes(&bytes, 0, extent, held).unwrap();
     assert_eq!(r.view::<f32>().unwrap().get([1, 2, 3]).unwrap().to_bits(), 2.0_f32.to_bits());
     assert!(matches!(
-        region_from_bytes(&bytes, held - 1, 0, extent),
+        region_from_bytes(&bytes, 0, extent, held - 1),
         Err(CacheError::FileTooLarge { length, .. }) if length == held
     ));
 }

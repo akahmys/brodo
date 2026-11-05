@@ -36,6 +36,7 @@ fn read_error(e: &ReadError) -> &'static str {
         ReadError::RequiredExtension(..) => "RequiredExtension",
         ReadError::NoObject { .. } => "NoObject",
         ReadError::TooLarge { .. } => "TooLarge",
+        ReadError::Io(..) => "Io",
         _ => "later",
     }
 }

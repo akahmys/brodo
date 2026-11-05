@@ -1,9 +1,11 @@
 //! `slice`: a plane of a scalar grid drawn as PNG by brodo's checking output
 //! (ARCHITECTURE.md §6.1), across the grid's bounds in the plane's two other axes.
 
+use std::path::Path;
+
 use brodo::field::Field;
 use brodo::meta::{Bounds, SDF_KEY};
-use brodo::slice::{Axis, ColorMap, Image, Slice, encode_png, render};
+use brodo::slice::{Axis, ColorMap, Image, Slice, render};
 
 use crate::error::MestoloError;
 use crate::info::{Parts, extremes};
@@ -12,8 +14,8 @@ use crate::load::{Grid, Values};
 /// The most pixels a slice is drawn with: 2²⁶, a 256 MiB image of four bytes a pixel.
 pub const MOST_PIXELS: i64 = 1 << 26;
 
-/// Grid `g`'s plane perpendicular to `axis` at `at`, as PNG bytes.
-pub fn slice(g: &Grid, axis: Axis, at: i32) -> Result<Vec<u8>, MestoloError> {
+/// Writes grid `g`'s plane perpendicular to `axis` at `at` as PNG at `path`.
+pub fn slice(g: &Grid, axis: Axis, at: i32, path: &Path) -> Result<(), MestoloError> {
     let image = match &g.values {
         Values::F32(f) => draw(g, f, axis, at)?,
         Values::F64(f) => draw(g, f, axis, at)?,
@@ -23,7 +25,7 @@ pub fn slice(g: &Grid, axis: Axis, at: i32) -> Result<Vec<u8>, MestoloError> {
             return Err(MestoloError::NotScalar(g.values.type_name()));
         }
     };
-    Ok(encode_png(&image)?)
+    Ok(brodo::slice::write(path, &image)?)
 }
 
 fn draw<T>(g: &Grid, f: &Field<T>, axis: Axis, at: i32) -> Result<Image, MestoloError>

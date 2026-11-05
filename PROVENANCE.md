@@ -86,4 +86,4 @@ copyright notice (`grep -rniE 'copyright|spdx|licen[cs]e' crates/*/src` finds no
 | `crates/mestolo/src/info.rs` | ARCHITECTURE.md §6.3, ADR-0050 only | what a file holds, as text |
 | `crates/mestolo/src/draw.rs` | ARCHITECTURE.md §6.1, §6.3, ADR-0050; docs/formats.md §9 for OpenVDB's `class` of `level set` | a plane of a scalar grid drawn as PNG |
 | `crates/mestolo/src/convert.rs` | ARCHITECTURE.md §6.3, ADR-0050 only | grids written as `.vdb` or one as `.vtu` |
-| `crates/mestolo/src/output.rs` | ARCHITECTURE.md §6.3, ADR-0050 only | an output refused if there, or written whole by a rename |
+| `crates/mestolo/src/output.rs` | ARCHITECTURE.md §6.3, ADR-0050 only | an output refused if a file is there or its path names none |

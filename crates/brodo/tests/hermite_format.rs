@@ -546,7 +546,7 @@ fn the_builder_refuses_crossings_out_of_its_order() {
 }
 
 fn file(entries: &[CacheEntry]) -> CacheFile {
-    CacheFile::from_bytes(&to_bytes(entries).unwrap()).unwrap()
+    brodo::cache::from_bytes(&to_bytes(entries).unwrap()).unwrap()
 }
 
 #[test]
@@ -764,7 +764,7 @@ fn format_version_3_keeps_its_bytes() {
         std::fs::write(&path, &bytes).unwrap();
         panic!("the bytes of Hermite format version 3 changed; they are at {}", path.display());
     }
-    let f = CacheFile::from_bytes(GOLDEN).unwrap();
+    let f = brodo::cache::from_bytes(GOLDEN).unwrap();
     let c = HermiteView::find(&f, "golden").unwrap().crossing(0, EdgeAxis::X, 5 + 8 * 3 + 64 * 3);
     let c = c.unwrap();
     let c = c.unwrap();
@@ -776,7 +776,7 @@ fn format_version_3_keeps_its_bytes() {
 #[test]
 fn a_set_of_an_earlier_version_is_refused() {
     for (bytes, version) in EARLIER {
-        let f = CacheFile::from_bytes(bytes).unwrap();
+        let f = brodo::cache::from_bytes(bytes).unwrap();
         assert!(
             matches!(HermiteView::find(&f, "golden"), Err(HermiteError::Version(v)) if v == version)
         );
@@ -841,7 +841,7 @@ fn a_file_decides_as_memory_does() {
         let bytes = to_bytes(&unchecked(&p)).unwrap();
         let in_memory = verdict(p.make());
         assert_eq!(in_memory.is_ok(), taken, "{name}: {in_memory:?}");
-        let f = CacheFile::from_bytes(&bytes).unwrap();
+        let f = brodo::cache::from_bytes(&bytes).unwrap();
         assert_eq!(verdict(HermiteView::find(&f, "u")), in_memory, "{name}");
     }
 }

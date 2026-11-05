@@ -11,7 +11,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use brodo::field::Field;
 use brodo::topology::Topology;
 use brodo::tree::{Coord, TileLevel};
-use brodo::vtk::write_vtu;
+use brodo::vtk::to_bytes;
 use proptest::prelude::*;
 
 /// A file read back: the piece's counts and its arrays' tokens, by `Name` (points as
@@ -103,10 +103,8 @@ proptest! {
         upper in prop::collection::vec(coord(-300..300), 0..2),
     ) {
         let (t, f) = grid(&leaves, &lower, &upper);
-        let mut bytes = Vec::new();
-        write_vtu(&t, &f, "value", &mut bytes).unwrap();
-        let mut again = Vec::new();
-        write_vtu(&t, &f, "value", &mut again).unwrap();
+        let bytes = to_bytes(&t, &f, "value").unwrap();
+        let again = to_bytes(&t, &f, "value").unwrap();
         prop_assert!(bytes == again, "the same input gave different bytes");
         let p = parse(std::str::from_utf8(&bytes).unwrap());
         let cell_count = t.leaf_count() * 512 + t.tile_count();
@@ -212,7 +210,7 @@ fn write_for_vtk(tag: &str, t: &Topology, f: &Field<f32>) {
     let dir =
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../out/vtk/brodo").join(tag);
     std::fs::create_dir_all(&dir).unwrap();
-    write_vtu(t, f, "value", std::fs::File::create(dir.join("sphere.vtu")).unwrap()).unwrap();
+    brodo::vtk::write(&dir.join("sphere.vtu"), t, f, "value").unwrap();
     let mut samples = String::new();
     let mut k = 0;
     for n in t.leaf_numbers() {
@@ -255,8 +253,7 @@ fn vectors_read_back_component_by_component() {
         g.set_tile(&t, n, vector(o)).unwrap();
     }
     assert!(f.leaf(&t, t.leaf_numbers().next().unwrap()).unwrap().iter().any(|x| x.is_nan()));
-    let mut bytes = Vec::new();
-    write_vtu(&t, &g, "velocity", &mut bytes).unwrap();
+    let bytes = to_bytes(&t, &g, "velocity").unwrap();
     let text = std::str::from_utf8(&bytes).unwrap();
     assert!(text.contains("<CellData Vectors=\"velocity\">\n"), "{text}");
     assert!(
@@ -315,6 +312,20 @@ fn write_vectors_for_vtk(tag: &str, t: &Topology) {
     let dir =
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../out/vtk/brodo").join(tag);
     std::fs::create_dir_all(&dir).unwrap();
-    write_vtu(t, &g, "velocity", std::fs::File::create(dir.join("vectors.vtu")).unwrap()).unwrap();
+    brodo::vtk::write(&dir.join("vectors.vtu"), t, &g, "velocity").unwrap();
     std::fs::write(dir.join("vector_samples.txt"), samples).unwrap();
+}
+
+/// `write` puts at its path the bytes `to_bytes` makes, replacing a file there whole; what
+/// `to_bytes` refuses leaves the file as it was.
+#[test]
+fn a_field_written_to_a_path_is_its_bytes() {
+    let (t, f) = grid(&[[0, 0, 0]], &[[8, 0, 0]], &[]);
+    let path = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("written.vtu");
+    std::fs::write(&path, b"an older file").unwrap();
+    brodo::vtk::write(&path, &t, &f, "value").unwrap();
+    assert_eq!(std::fs::read(&path).unwrap(), to_bytes(&t, &f, "value").unwrap());
+    let refused = brodo::vtk::write(&path, &t, &f, "a <name>");
+    assert!(matches!(refused, Err(brodo::error::VtkError::Name(_))), "{refused:?}");
+    assert_eq!(std::fs::read(&path).unwrap(), to_bytes(&t, &f, "value").unwrap());
 }

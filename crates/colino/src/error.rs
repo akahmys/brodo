@@ -1,7 +1,7 @@
 //! The crate's error types.
 
 /// Why a mesh file could not be read.
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum ReadError {
     /// Neither a binary STL, whose length its triangle count gives, nor an ASCII one.
@@ -136,6 +136,9 @@ pub enum ReadError {
         /// The limit given, or `u32::MAX` where a mesh cannot number more.
         limit: u64,
     },
+    /// Reading the file failed.
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
 }
 
 /// Why a mesh could not be worked on.

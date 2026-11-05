@@ -80,7 +80,7 @@ proptest! {
         let entries = [CacheEntry::new(&m, &t, &f).unwrap(), CacheEntry::new(&meta("second", &[("k", "v")]), &t, &g).unwrap()];
         let bytes = to_bytes(&entries).unwrap();
         prop_assert_eq!(&to_bytes(&entries).unwrap(), &bytes, "same grids, same bytes");
-        let file = CacheFile::from_bytes(&bytes).unwrap();
+        let file = brodo::cache::from_bytes(&bytes).unwrap();
         prop_assert_eq!(file.grid_count(), 2);
         prop_assert_eq!(file.meta(0).unwrap(), &m);
         prop_assert_eq!(file.bounds(0).unwrap(), Bounds::of(&t).unwrap());
@@ -130,7 +130,7 @@ fn a_brodo_key_is_written_on_purpose_only() {
     let free = BTreeMap::from([("brodosity".to_owned(), "x".to_owned())]);
     assert!(CacheEntry::bytes("b", free, vec![1]).is_ok());
     let file = to_bytes(&[CacheEntry::bytes_with_reserved_keys("b", extra, vec![1])]).unwrap();
-    let read = CacheFile::from_bytes(&file).unwrap();
+    let read = brodo::cache::from_bytes(&file).unwrap();
     assert_eq!(read.bytes_entries()[0].extra.get("brodo.kind").map(String::as_str), Some("x"));
 }
 
@@ -181,7 +181,7 @@ fn golden_entries_v2() -> Vec<CacheEntry> {
 fn format_version_2_keeps_its_bytes() {
     let bytes = to_bytes(&golden_entries_v2()).unwrap();
     assert!(bytes == GOLDEN_2, "the bytes of cache format version 2 changed; raise the version");
-    let file = CacheFile::from_bytes(GOLDEN_2).unwrap();
+    let file = brodo::cache::from_bytes(GOLDEN_2).unwrap();
     assert_eq!((file.version(), file.grid_count()), (2, 2));
     let entries = file.bytes_entries();
     assert_eq!(entries.len(), 1);
@@ -189,7 +189,7 @@ fn format_version_2_keeps_its_bytes() {
     assert_eq!(entries[0].extra.get("kind").map(String::as_str), Some("notes"));
     assert_eq!(file.meta(1).unwrap().name, "velocity");
     let one = with_word(GOLDEN_2, 1, 1);
-    assert!(matches!(CacheFile::from_bytes(&one), Err(CacheError::UnsupportedVersion(1))));
+    assert!(matches!(brodo::cache::from_bytes(&one), Err(CacheError::UnsupportedVersion(1))));
 }
 
 /// An entry of bytes is padded to the next block and no further (docs/formats.md §3): its
@@ -205,9 +205,12 @@ fn an_entry_of_bytes_padded_a_whole_block_is_refused() {
         out[at..at + 8].copy_from_slice(&n.to_le_bytes());
         out
     };
-    assert_eq!(CacheFile::from_bytes(&with_length(33)).unwrap().bytes_entries()[0].bytes.len(), 33);
+    assert_eq!(
+        brodo::cache::from_bytes(&with_length(33)).unwrap().bytes_entries()[0].bytes.len(),
+        33
+    );
     assert!(matches!(
-        CacheFile::from_bytes(&with_length(32)),
+        brodo::cache::from_bytes(&with_length(32)),
         Err(CacheError::Inconsistent("entry of bytes"))
     ));
 }
@@ -285,7 +288,7 @@ fn a_file_round_trips() {
     let t = build(&[[3, 3, 3]], &[]);
     let f = numbered(&t, 0.0_f64, f64::from);
     write(&path, &[CacheEntry::new(&meta("on disk", &[]), &t, &f).unwrap()]).unwrap();
-    let file = CacheFile::read(&path, u64::MAX).unwrap();
+    let file = brodo::cache::read(&path, u64::MAX).unwrap();
     assert_eq!(
         file.view::<f64>(0).unwrap().get([3, 3, 3]).unwrap().to_bits(),
         f.value_at(&t, [3, 3, 3]).unwrap().to_bits()
@@ -307,10 +310,10 @@ fn word(bytes: &[u8], w: usize) -> u32 {
 fn a_file_of_no_grid_is_its_header() {
     let bytes = to_bytes(&[]).unwrap();
     assert_eq!(bytes.len(), 32);
-    assert_eq!(CacheFile::from_bytes(&bytes).unwrap().grid_count(), 0);
+    assert_eq!(brodo::cache::from_bytes(&bytes).unwrap().grid_count(), 0);
     let mut longer = bytes.clone();
     longer.extend([0; 32]);
-    assert!(matches!(CacheFile::from_bytes(&longer), Err(CacheError::Inconsistent("end"))));
+    assert!(matches!(brodo::cache::from_bytes(&longer), Err(CacheError::Inconsistent("end"))));
 }
 
 /// Bounds that say nothing of a grid are refused (docs/formats.md §3.4, rule 4): an empty
@@ -320,7 +323,7 @@ fn bounds_that_contradict_themselves_are_refused() {
     // Grid 0's metadata: the name "g" and the unit "mm", 8 bytes each, the voxel size and
     // the transform, 120 bytes, then the bounds kind and the six corners.
     let at = |b: &[u8]| usize::try_from(word(b, 8)).unwrap() * 8 + 34;
-    let read = |b: &[u8]| CacheFile::from_bytes(b).map(|_| ());
+    let read = |b: &[u8]| brodo::cache::from_bytes(b).map(|_| ());
     let empty = Topology::new();
     let field = Field::new(&empty, 0.0_f32);
     let bytes = to_bytes(&[CacheEntry::new(&meta("g", &[]), &empty, &field).unwrap()]).unwrap();
@@ -346,7 +349,7 @@ fn bounds_that_contradict_themselves_are_refused() {
 #[test]
 fn each_check_refuses_its_damage() {
     let g = golden();
-    let read = |b: &[u8]| CacheFile::from_bytes(b).map(|_| ());
+    let read = |b: &[u8]| brodo::cache::from_bytes(b).map(|_| ());
     assert!(matches!(read(&with_word(&g, 0, 9)), Err(CacheError::BadMagic(9))));
     assert!(matches!(read(&with_word(&g, 1, 3)), Err(CacheError::UnsupportedVersion(3))));
     assert!(matches!(read(&with_word(&g, 1, 1)), Err(CacheError::UnsupportedVersion(1))));
@@ -395,7 +398,7 @@ fn one(name: &str, extra: &[(&str, &str)], leaves: &[Coord]) -> Vec<u8> {
 #[test]
 fn only_the_bytes_the_writer_puts_are_read() {
     let g = golden();
-    let read = |b: &[u8]| CacheFile::from_bytes(b).map(|_| ());
+    let read = |b: &[u8]| brodo::cache::from_bytes(b).map(|_| ());
     let meta_at = usize::try_from(word(&g, 8)).unwrap() * 32;
     // Nothing after the last grid.
     let mut longer = g.clone();
@@ -458,7 +461,7 @@ proptest! {
         if let Some(c) = cut {
             bytes.truncate(c.index(bytes.len()));
         }
-        if let Ok(file) = CacheFile::from_bytes(&bytes) {
+        if let Ok(file) = brodo::cache::from_bytes(&bytes) {
             for i in 0..file.grid_count() {
                 let _meta = file.meta(i);
                 if let Ok(view) = file.view::<f32>(i) {
@@ -485,7 +488,7 @@ fn a_mapped_file_reads_as_a_copied_one() {
             unsafe { CacheFile::map(&path) }
         }
         .unwrap(),
-        CacheFile::from_bytes(&bytes).unwrap(),
+        brodo::cache::from_bytes(&bytes).unwrap(),
     );
     assert_eq!(mapped.grid_count(), copied.grid_count());
     for i in 0..copied.grid_count() {
@@ -528,7 +531,7 @@ fn a_grid_of_f64_vectors_reads_copied_and_mapped() {
             unsafe { CacheFile::map(&path) }
         }
         .unwrap(),
-        CacheFile::from_bytes(&bytes).unwrap(),
+        brodo::cache::from_bytes(&bytes).unwrap(),
     ] {
         assert_eq!(file.value_type(1).unwrap(), 6);
         assert_eq!(file.meta(1).unwrap(), &meta("velocity", &[("precision", "double")]));
@@ -563,8 +566,8 @@ fn a_file_unfit_to_map_is_refused() {
         },
         Err(CacheError::Truncated("header"))
     ));
-    assert!(matches!(CacheFile::read(&empty, 1024), Err(CacheError::Truncated("header"))));
-    assert!(matches!(CacheFile::from_bytes(&[]), Err(CacheError::Truncated("header"))));
+    assert!(matches!(brodo::cache::read(&empty, 1024), Err(CacheError::Truncated("header"))));
+    assert!(matches!(brodo::cache::from_bytes(&[]), Err(CacheError::Truncated("header"))));
     let odd = tmp("odd.brdc");
     std::fs::write(&odd, [0_u8; 33]).unwrap();
     assert!(matches!(
@@ -622,7 +625,7 @@ fn every_value_type_is_written_and_read_back() {
     let _absent = std::fs::remove_file(&path);
     write(&path, &entries).unwrap();
     assert_eq!(std::fs::read(&path).ok(), Some(to_bytes(&entries).unwrap()));
-    let file = CacheFile::read(&path, u64::MAX).unwrap();
+    let file = brodo::cache::read(&path, u64::MAX).unwrap();
     let codes: Vec<u32> = (0..6).map(|i| file.value_type(i).unwrap()).collect();
     assert_eq!(codes, [1, 2, 3, 4, 5, 6]);
     let (u8s, u32s, f64s) =
@@ -647,9 +650,9 @@ fn a_file_beyond_the_read_limit_is_refused_unread() {
     )
     .unwrap();
     let length = std::fs::metadata(&path).unwrap().len();
-    assert!(CacheFile::read(&path, length).is_ok());
+    assert!(brodo::cache::read(&path, length).is_ok());
     assert!(matches!(
-        CacheFile::read(&path, length - 1),
+        brodo::cache::read(&path, length - 1),
         Err(CacheError::FileTooLarge { length: l, limit }) if l == length && limit == length - 1
     ));
 }
@@ -674,11 +677,11 @@ fn a_file_longer_than_the_limit_is_refused_whatever_length_it_reports() {
             pipe.write_all(&vec![0_u8; 1 << 20]).unwrap_or(());
         })
     };
-    let read = CacheFile::read(&path, 1024);
+    let read = brodo::cache::read(&path, 1024);
     writer.join().unwrap();
     std::fs::remove_file(&path).unwrap_or(());
     assert!(matches!(read, Err(CacheError::FileTooLarge { limit: 1024, .. })), "{read:?}");
-    let zero = CacheFile::read(std::path::Path::new("/dev/zero"), 1024);
+    let zero = brodo::cache::read(std::path::Path::new("/dev/zero"), 1024);
     assert!(
         matches!(zero, Err(CacheError::FileTooLarge { length: 1025, limit: 1024 })),
         "{zero:?}"

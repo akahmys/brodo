@@ -130,7 +130,7 @@ pub fn load(input: &Input) -> Result<Loaded, MestoloError> {
     let mut head = Vec::new();
     std::fs::File::open(path)?.take(8).read_to_end(&mut head)?;
     if head.starts_with(b"BRDC") {
-        from_cache(CacheFile::read(path, input.limit)?, Kind::Cache, input.limit)
+        from_cache(brodo::cache::read(path, input.limit)?, Kind::Cache, input.limit)
     } else if head.starts_with(b"BRDA") {
         from_cache(brodo::archive::read(path, input.limit)?, Kind::Archive, input.limit)
     } else if head == VDB_MAGIC {

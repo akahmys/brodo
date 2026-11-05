@@ -7,6 +7,9 @@
 //! caller's, never inferred, so the same input always gives the same image and the same
 //! PNG bytes.
 
+use std::io::Write;
+use std::path::Path;
+
 use crate::accessor::ValueAccessor;
 use crate::error::SliceError;
 use crate::field::{Field, Value};
@@ -210,9 +213,9 @@ fn on_contour(map: ColorMap, pixels: &[Pixel], i: usize, w: usize) -> bool {
     })
 }
 
-/// Encodes an image as PNG: 8-bit RGBA, with fixed compression and filtering, so that the
+/// An image's bytes as PNG: 8-bit RGBA, with fixed compression and filtering, so that the
 /// same image always gives the same bytes.
-pub fn encode_png(image: &Image) -> Result<Vec<u8>, SliceError> {
+pub fn to_bytes(image: &Image) -> Result<Vec<u8>, SliceError> {
     let mut out = Vec::new();
     let mut encoder = png::Encoder::new(&mut out, image.width, image.height);
     encoder.set_color(png::ColorType::Rgba);
@@ -224,6 +227,14 @@ pub fn encode_png(image: &Image) -> Result<Vec<u8>, SliceError> {
     writer.write_image_data(&image.rgba).map_err(refused)?;
     writer.finish().map_err(refused)?;
     Ok(out)
+}
+
+/// Writes an image as PNG at `path`, the bytes `to_bytes` makes, to a hidden file beside
+/// `path` renamed over it, as `cache::write` writes (ARCHITECTURE.md §4.7). An image the
+/// encoder refuses is refused before the file is made.
+pub fn write(path: &Path, image: &Image) -> Result<(), SliceError> {
+    let bytes = to_bytes(image)?;
+    crate::cache::replace(path, |out| out.write_all(&bytes).map_err(SliceError::Io))
 }
 
 #[cfg(test)]

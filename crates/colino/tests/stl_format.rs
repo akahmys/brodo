@@ -4,10 +4,15 @@
 
 use colino::error::{MeshError, ReadError};
 use colino::mesh::{Limits, Mesh};
-use colino::stl::read;
+use colino::stl::from_bytes;
 use proptest::prelude::*;
 
 const ROOMY: Limits = Limits::new(1 << 20, 1 << 22, 1 << 30);
+
+/// An error's `Debug` text: `ReadError` holds an `io::Error`, and so has no `PartialEq`.
+fn debug(e: impl std::fmt::Debug) -> String {
+    format!("{e:?}")
+}
 
 /// A binary STL of triangles, with a header and, unused by readers, normals of zero.
 fn binary(header: &[u8; 80], triangles: &[[[f32; 3]; 3]]) -> Vec<u8> {
@@ -55,7 +60,7 @@ fn wide(t: &[[[f32; 3]; 3]]) -> Vec<[[f64; 3]; 3]> {
 fn a_tetrahedron_reads_back_and_welds_to_four_vertices() {
     let t = tetrahedron();
     for bytes in [binary(&[b' '; 80], &t), ascii(&wide(&t)).into_bytes()] {
-        let m = read(&bytes, ROOMY).unwrap();
+        let m = from_bytes(&bytes, ROOMY).unwrap();
         assert_eq!(corners(&m), wide(&t));
         assert_eq!(m.vertices.len(), 12);
         assert_eq!(m.unit, None);
@@ -69,7 +74,7 @@ fn a_tetrahedron_reads_back_and_welds_to_four_vertices() {
 fn a_binary_file_beginning_with_solid_is_binary() {
     let mut header = [b' '; 80];
     header[..5].copy_from_slice(b"solid");
-    let m = read(&binary(&header, &tetrahedron()), ROOMY).unwrap();
+    let m = from_bytes(&binary(&header, &tetrahedron()), ROOMY).unwrap();
     assert_eq!(m.triangles.len(), 4);
 }
 
@@ -78,7 +83,7 @@ fn ascii_words_are_read_without_case_normals_optional_solids_several() {
     let text = "SOLID a b\n facet outer loop vertex 0 0 0 Vertex 1 0 0 VERTEX 0 1e0 0 endloop endfacet\n\
                 EndSolid a b\nsolid\nfacet normal 0 0 -1 outer loop vertex 0 0 1 vertex 1 0 1 vertex 0 1 1 \
                 endloop endfacet endsolid";
-    let m = read(text.as_bytes(), ROOMY).unwrap();
+    let m = from_bytes(text.as_bytes(), ROOMY).unwrap();
     assert_eq!(m.triangles.len(), 2);
     assert_eq!(m.vertices[2].map(f64::to_bits), [0.0, 1.0, 0.0].map(f64::to_bits));
 }
@@ -92,13 +97,13 @@ fn each_ascii_solid_is_a_group_and_binary_has_none() {
         "solid part   one\n{facet}{facet}endsolid part one\nsolid\n{facet}endsolid\n\
          solid Lid\n{facet}endsolid\nsolid part one\n{facet}endsolid\nsolid empty\nendsolid\n"
     );
-    let m = read(text.as_bytes(), ROOMY).unwrap();
+    let m = from_bytes(text.as_bytes(), ROOMY).unwrap();
     assert_eq!(m.groups, vec![1, 1, 0, 2, 1]);
     assert_eq!(m.group_names, ["", "part one", "Lid"]);
     assert_eq!(m.check_groups(), Ok(()));
     let mut header = [b' '; 80];
     header[..10].copy_from_slice(b"solid name");
-    let m = read(&binary(&header, &tetrahedron()), ROOMY).unwrap();
+    let m = from_bytes(&binary(&header, &tetrahedron()), ROOMY).unwrap();
     assert!(m.groups.is_empty() && m.group_names.is_empty());
 }
 
@@ -107,95 +112,113 @@ fn each_ascii_solid_is_a_group_and_binary_has_none() {
 #[test]
 fn a_solids_name_is_the_rest_of_its_line() {
     let facet = "facet outer loop vertex 0 0 0 vertex 1 0 0 vertex 0 1 0 endloop endfacet";
-    let names = |text: &str| read(text.as_bytes(), ROOMY).map(|m| m.group_names);
+    let names = |text: &str| from_bytes(text.as_bytes(), ROOMY).map(|m| m.group_names);
     let text = format!(
         "solid my facet part\n{facet}\nendsolid my facet part\nsolid endsolid of it\n{facet}\nendsolid"
     );
     assert_eq!(
-        names(&text),
+        names(&text).map_err(debug),
         Ok(vec![String::new(), "my facet part".into(), "endsolid of it".into()])
     );
     // On one line: the name ends before the triangle, or before the end of the solid.
     assert_eq!(
-        names(&format!("solid a b {facet} endsolid a b")),
+        names(&format!("solid a b {facet} endsolid a b")).map_err(debug),
         Ok(vec![String::new(), "a b".into()])
     );
-    assert_eq!(names("solid empty endsolid").map(|n| n.len()), Ok(0));
+    assert_eq!(names("solid empty endsolid").map(|n| n.len()).map_err(debug), Ok(0));
     // Two solids on one line, and lines ended by a lone `\r`, the old Macintosh ending
     // (the re-review of P5's fixes): each solid reads, its triangle its own.
     let both =
-        |text: &str| read(text.as_bytes(), ROOMY).map(|m| (m.triangles.len(), m.group_names));
+        |text: &str| from_bytes(text.as_bytes(), ROOMY).map(|m| (m.triangles.len(), m.group_names));
     let two = vec![String::new(), "a".into(), "b".into()];
     assert_eq!(
-        both(&format!("solid a {facet} endsolid a solid b {facet} endsolid b")),
+        both(&format!("solid a {facet} endsolid a solid b {facet} endsolid b")).map_err(debug),
         Ok((2, two.clone()))
     );
     assert_eq!(
-        both(&format!("solid a\r{facet}\rendsolid a\rsolid b\r{facet}\rendsolid b\r")),
+        both(&format!("solid a\r{facet}\rendsolid a\rsolid b\r{facet}\rendsolid b\r"))
+            .map_err(debug),
         Ok((2, two.clone()))
     );
     assert_eq!(
-        both(&format!("solid a\r\n{facet}\r\nendsolid a\r\nsolid b\r\n{facet}\r\nendsolid b")),
+        both(&format!("solid a\r\n{facet}\r\nendsolid a\r\nsolid b\r\n{facet}\r\nendsolid b"))
+            .map_err(debug),
         Ok((2, two))
     );
     // A name on the line after solid is not a name.
     assert!(matches!(
-        read(format!("solid\nname\n{facet}\nendsolid").as_bytes(), ROOMY),
+        from_bytes(format!("solid\nname\n{facet}\nendsolid").as_bytes(), ROOMY),
         Err(ReadError::Unexpected { expected: "endsolid", at: 1, .. })
     ));
 }
 
 #[test]
-fn each_damage_is_its_own_error() {
+fn each_damage_to_binary_is_its_own_error() {
     let t = tetrahedron();
     let mut short = binary(&[b' '; 80], &t);
     short.pop();
     assert_eq!(
-        read(&short, ROOMY),
-        Err(ReadError::NotStl("neither the length of a binary file nor 'solid'"))
+        from_bytes(&short, ROOMY).map_err(debug),
+        Err(debug(ReadError::NotStl("neither the length of a binary file nor 'solid'")))
     );
     let mut not_finite = t.clone();
     not_finite[2][1][0] = f32::NAN;
-    assert_eq!(read(&binary(&[b' '; 80], &not_finite), ROOMY), Err(ReadError::NotFinite(2)));
     assert_eq!(
-        read(&binary(&[b' '; 80], &t), Limits::new(3, 100, 1 << 30)),
-        Err(ReadError::TooLarge { what: "triangles", limit: 3 })
+        from_bytes(&binary(&[b' '; 80], &not_finite), ROOMY).map_err(debug),
+        Err(debug(ReadError::NotFinite(2)))
     );
     assert_eq!(
-        read(&binary(&[b' '; 80], &t), Limits::new(100, 11, 1 << 30)),
-        Err(ReadError::TooLarge { what: "vertices", limit: 11 })
+        from_bytes(&binary(&[b' '; 80], &t), Limits::new(3, 100, 1 << 30)).map_err(debug),
+        Err(debug(ReadError::TooLarge { what: "triangles", limit: 3 }))
+    );
+    assert_eq!(
+        from_bytes(&binary(&[b' '; 80], &t), Limits::new(100, 11, 1 << 30)).map_err(debug),
+        Err(debug(ReadError::TooLarge { what: "vertices", limit: 11 }))
     );
     // Exactly at each limit, the file reads.
     let file = binary(&[b' '; 80], &t);
     let exact = Limits::new(4, 12, u64::try_from(file.len()).unwrap());
-    assert_eq!(read(&file, exact).map(|m| m.triangles.len()), Ok(4));
+    assert_eq!(from_bytes(&file, exact).map(|m| m.triangles.len()).map_err(debug), Ok(4));
     let tiny = ROOMY.with_bytes(83);
     assert_eq!(
-        read(&binary(&[b' '; 80], &t), tiny),
-        Err(ReadError::TooLarge { what: "bytes", limit: 83 })
+        from_bytes(&binary(&[b' '; 80], &t), tiny).map_err(debug),
+        Err(debug(ReadError::TooLarge { what: "bytes", limit: 83 }))
     );
+}
+
+#[test]
+fn each_damage_to_ascii_is_its_own_error() {
     let quad = "solid\nfacet outer loop vertex 0 0 0 vertex 1 0 0 vertex 1 1 0 vertex 0 1 0 endloop endfacet endsolid";
-    assert_eq!(read(quad.as_bytes(), ROOMY), Err(ReadError::NotATriangle { at: 3, vertices: 4 }));
+    assert_eq!(
+        from_bytes(quad.as_bytes(), ROOMY).map_err(debug),
+        Err(debug(ReadError::NotATriangle { at: 3, vertices: 4 }))
+    );
     for bad in ["nan", "inf", "1.0.0", "x"] {
         let text = format!(
             "solid facet outer loop vertex 0 0 {bad} vertex 1 0 0 vertex 0 1 0 endloop endfacet endsolid"
         );
         assert_eq!(
-            read(text.as_bytes(), ROOMY),
-            Err(ReadError::BadNumber { at: 7, found: bad.to_owned() })
+            from_bytes(text.as_bytes(), ROOMY).map_err(debug),
+            Err(debug(ReadError::BadNumber { at: 7, found: bad.to_owned() }))
         );
     }
     let cut = "solid facet outer loop vertex 0 0 0 vertex 1 0 0";
     assert!(matches!(
-        read(cut.as_bytes(), ROOMY),
+        from_bytes(cut.as_bytes(), ROOMY),
         Err(ReadError::Unexpected { expected: "endloop", .. })
     ));
     let after = "solid\nendsolid trailing words";
-    assert!(read(after.as_bytes(), ROOMY).is_ok(), "a name may follow endsolid");
+    assert!(from_bytes(after.as_bytes(), ROOMY).is_ok(), "a name may follow endsolid");
     // The words after endsolid, to the end of its line, are its name, whatever they are.
     let named = "solid facet outer loop vertex 0 0 0 vertex 1 0 0 vertex 0 1 0 endloop endfacet endsolid x facet";
-    assert_eq!(read(named.as_bytes(), ROOMY).map(|m| m.triangles.len()), Ok(1));
-    assert_eq!(read(&[b's', b'o', b'l', b'i', b'd', 0xff], ROOMY), Err(ReadError::NotText));
+    assert_eq!(
+        from_bytes(named.as_bytes(), ROOMY).map(|m| m.triangles.len()).map_err(debug),
+        Ok(1)
+    );
+    assert_eq!(
+        from_bytes(&[b's', b'o', b'l', b'i', b'd', 0xff], ROOMY).map_err(debug),
+        Err(debug(ReadError::NotText))
+    );
 }
 
 #[test]
@@ -232,7 +255,7 @@ proptest! {
         as_text in any::<bool>(),
     ) {
         let bytes = if as_text { ascii(&wide(&t)).into_bytes() } else { binary(&[b' '; 80], &t) };
-        let m = read(&bytes, ROOMY).unwrap();
+        let m = from_bytes(&bytes, ROOMY).unwrap();
         let got = corners(&m);
         // Zeros keep their sign through binary and ASCII alike: compare bits.
         let bits = |c: &[[[f64; 3]; 3]]| c.iter().flatten().flatten().map(|x| x.to_bits()).collect::<Vec<_>>();
@@ -260,7 +283,7 @@ proptest! {
             bytes[i] = if as_text { TEXT[usize::from(b) % TEXT.len()] } else { b };
         }
         let keep = cut.map_or(bytes.len(), |c| c.index(bytes.len() + 1));
-        if let Ok(m) = read(&bytes[..keep], ROOMY) {
+        if let Ok(m) = from_bytes(&bytes[..keep], ROOMY) {
             let n = m.vertices.len();
             prop_assert!(m.triangles.iter().flatten().all(|i| usize::try_from(*i).unwrap() < n));
             prop_assert!(m.vertices.iter().flatten().all(|c| c.is_finite()));
@@ -275,9 +298,41 @@ fn an_ascii_file_holds_to_the_triangle_limit() {
     let t: Vec<[[f64; 3]; 3]> = tetrahedron().iter().map(|f| f.map(|p| p.map(f64::from))).collect();
     let text = ascii(&t);
     let limits = |triangles| ROOMY.with_triangles(triangles);
-    assert_eq!(read(text.as_bytes(), limits(4)).map(|m| m.triangles.len()), Ok(4));
     assert_eq!(
-        read(text.as_bytes(), limits(3)),
-        Err(ReadError::TooLarge { what: "triangles", limit: 3 })
+        from_bytes(text.as_bytes(), limits(4)).map(|m| m.triangles.len()).map_err(debug),
+        Ok(4)
     );
+    assert_eq!(
+        from_bytes(text.as_bytes(), limits(3)).map_err(debug),
+        Err(debug(ReadError::TooLarge { what: "triangles", limit: 3 }))
+    );
+}
+
+/// A file at a path reads as its bytes do; one longer than the limit is refused by its
+/// length, and a file not there by the error opening it gave.
+#[test]
+fn a_file_at_a_path_reads_as_its_bytes() {
+    let bytes = binary(&[b' '; 80], &tetrahedron());
+    let path = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("tetrahedron.stl");
+    std::fs::write(&path, &bytes).unwrap();
+    let read = colino::stl::read(&path, ROOMY).unwrap();
+    assert_eq!(corners(&read), corners(&from_bytes(&bytes, ROOMY).unwrap()));
+    let length = u64::try_from(bytes.len()).unwrap();
+    assert!(colino::stl::read(&path, ROOMY.with_bytes(length)).is_ok());
+    let short = colino::stl::read(&path, ROOMY.with_bytes(length - 1));
+    assert!(matches!(short, Err(ReadError::TooLarge { what: "bytes", .. })), "{short:?}");
+    let absent = colino::stl::read(&path.with_extension("absent"), ROOMY);
+    assert!(
+        matches!(&absent, Err(ReadError::Io(e)) if e.kind() == std::io::ErrorKind::NotFound),
+        "{absent:?}"
+    );
+}
+
+/// A file reporting no length, as a device does, is refused by the bytes read: no more
+/// than the limit and one byte are read.
+#[cfg(unix)]
+#[test]
+fn a_device_longer_than_the_limit_is_refused_by_the_bytes_read() {
+    let zero = colino::stl::read(std::path::Path::new("/dev/zero"), ROOMY.with_bytes(1024));
+    assert!(matches!(zero, Err(ReadError::TooLarge { what: "bytes", limit: 1024 })), "{zero:?}");
 }

@@ -50,12 +50,11 @@ pub fn run(command: &Command, out: &mut impl Write) -> Result<(), MestoloError> 
         Command::Slice { input, grid, axis, at, output } => {
             output::check(output)?;
             let loaded = load::load(input)?;
-            output::write(output, &draw::slice(loaded.grid(grid.as_deref())?, *axis, *at)?)
+            draw::slice(loaded.grid(grid.as_deref())?, *axis, *at, &output.path)
         }
         Command::Convert { input, grid, output } => {
             output::check(output)?;
-            let bytes = convert::convert(&load::load(input)?, grid.as_deref(), &output.path)?;
-            output::write(output, &bytes)
+            convert::convert(&load::load(input)?, grid.as_deref(), &output.path)
         }
     }
 }

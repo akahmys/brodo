@@ -288,7 +288,7 @@ exclude_re = [
     # Room for a block fewer is grown by `fill` as room for a file longer than it reported
     # is, and the same bytes are read.
     # [same]
-    'cache\.rs:.*: replace \+ with \* in CacheFile::read$',
+    'cache\.rs:.*: replace \+ with \* in read$',
     # `check_links` runs first and holds the root keys strictly ascending, and distinct keys
     # have distinct Morton codes, so no two upper nodes' are equal here.
     # [same]

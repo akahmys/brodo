@@ -22,7 +22,7 @@ fn exercise<T: Stored>(view: &GridView<'_, T>) {
 }
 
 fuzz_target!(|data: &[u8]| {
-    if let Ok(file) = CacheFile::from_bytes(data) {
+    if let Ok(file) = brodo::cache::from_bytes(data) {
         let mut sets = vec![String::new()];
         for i in 0..file.grid_count() {
             let set = file.meta(i).ok().and_then(|m| m.extra.get("brodo.hermite.set").cloned());

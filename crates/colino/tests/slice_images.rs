@@ -1,7 +1,7 @@
 //! Slices of converted meshes as PNG, for a look (TESTING.md T8): a sphere and a torus
 //! through their middle, the zero contour drawn, tiles hatched, the background grey.
 
-use brodo::slice::{Axis, ColorMap, Slice, encode_png, render};
+use brodo::slice::{Axis, ColorMap, Slice, render};
 use colino::convert::{Options, convert};
 
 mod common;
@@ -23,6 +23,6 @@ fn write_slices_for_a_look() {
         let slice = Slice::new(axis, 0, [-half, -half], [half - 1, half - 1]);
         let image =
             render(&c.topology, &c.field, slice, ColorMap::Diverging { limit: 3.0 }).unwrap();
-        std::fs::write(format!("{dir}/{name}.png"), encode_png(&image).unwrap()).unwrap();
+        brodo::slice::write(std::path::Path::new(&format!("{dir}/{name}.png")), &image).unwrap();
     }
 }

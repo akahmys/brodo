@@ -14,7 +14,7 @@
 use std::error::Error;
 use std::path::{Path, PathBuf};
 
-use brodo::slice::{Axis, ColorMap, Slice, encode_png, render};
+use brodo::slice::{Axis, ColorMap, Slice, render};
 use colino::convert::{Converted, Options, convert};
 use colino::mesh::{Limits, Mesh};
 use colino::report::{Report, report};
@@ -92,14 +92,14 @@ fn write(name: &str, c: &Converted, r: &Report, half: i32) -> Result<(), BoxErro
     let dir = out_dir()?;
     let slice = Slice::new(Axis::Z, 0, [-half, -half], [half - 1, half - 1]);
     let image = render(&c.topology, &c.field, slice, ColorMap::Diverging { limit: 3.0 })?;
-    std::fs::write(dir.join(format!("{name}_z0.png")), encode_png(&image)?)?;
+    brodo::slice::write(&dir.join(format!("{name}_z0.png")), &image)?;
     std::fs::write(dir.join(format!("{name}_report.txt")), format!("{r:#?}\n"))?;
     Ok(())
 }
 
 /// Converts the torus, checks it and writes it.
 fn run() -> Result<(Report, f64), BoxError> {
-    let mesh = colino::obj::read(torus_obj().as_bytes(), LIMITS)?;
+    let mesh = colino::obj::from_bytes(torus_obj().as_bytes(), LIMITS)?;
     let options = Options::new(H).with_unit(Some("millimeter".into()));
     let c = convert(&mesh, &options)?;
     let r = report(&mesh, &c, &[("hole".into(), [0.0; 3]), ("tube".into(), [RING, 0.0, 0.0])])?;
@@ -109,12 +109,11 @@ fn run() -> Result<(Report, f64), BoxError> {
 
 /// A mesh file, read by its extension.
 fn read(path: &Path) -> Result<Mesh, BoxError> {
-    let bytes = std::fs::read(path)?;
     let ext = path.extension().and_then(|e| e.to_str()).map(str::to_ascii_lowercase);
     Ok(match ext.as_deref() {
-        Some("stl") => colino::stl::read(&bytes, LIMITS)?,
-        Some("obj") => colino::obj::read(&bytes, LIMITS)?,
-        Some("3mf") => colino::threemf::read(&bytes, LIMITS)?,
+        Some("stl") => colino::stl::read(path, LIMITS)?,
+        Some("obj") => colino::obj::read(path, LIMITS)?,
+        Some("3mf") => colino::threemf::read(path, LIMITS)?,
         _ => return Err(format!("{}: not .stl, .obj or .3mf", path.display()).into()),
     })
 }

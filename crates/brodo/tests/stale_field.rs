@@ -53,7 +53,12 @@ fn refusals(t: &Topology, f: &Field<f32>) -> Vec<(&'static str, String)> {
     #[cfg(feature = "vdb")]
     out.push(("VdbEntry::new", format!("{:?}", brodo::vdb::VdbEntry::new(&meta, t, f).err())));
     #[cfg(feature = "vtk")]
-    out.push(("write_vtu", format!("{:?}", brodo::vtk::write_vtu(t, f, "g", Vec::new()).err())));
+    {
+        out.push(("vtk::to_bytes", format!("{:?}", brodo::vtk::to_bytes(t, f, "g").err())));
+        // A directory that is not there: the field is refused before the file is made.
+        let path = std::path::Path::new("/nonexistent-directory/g.vtu");
+        out.push(("vtk::write", format!("{:?}", brodo::vtk::write(path, t, f, "g").err())));
+    }
     #[cfg(feature = "slice-png")]
     {
         use brodo::slice::{Axis, ColorMap, Slice, render};

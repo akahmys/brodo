@@ -14,7 +14,7 @@
 use std::error::Error;
 use std::path::Path;
 
-use brodo::slice::{Axis, ColorMap, Slice, encode_png, render};
+use brodo::slice::{Axis, ColorMap, Slice, render};
 use colino::convert::{Options, convert};
 use colino::mesh::Mesh;
 use colino::report::{Report, report};
@@ -88,7 +88,7 @@ fn run(mesh: &Mesh, h: f64, tag: &str) -> Result<Report, BoxError> {
     let (vent, end) = (((middle + 1.0) / h) as i32, ((f64::from(SIDE) * CUBE) / h) as i32 + 4);
     let slice = Slice::new(Axis::Z, vent, [-4, -4], [end, end]);
     let image = render(&c.topology, &c.field, slice, ColorMap::Diverging { limit: 3.0 * h })?;
-    std::fs::write(dir.join(format!("vent_h{tag}.png")), encode_png(&image)?)?;
+    brodo::slice::write(&dir.join(format!("vent_h{tag}.png")), &image)?;
     std::fs::write(dir.join(format!("vent_h{tag}_report.txt")), format!("{r:#?}\n"))?;
     Ok(r)
 }

@@ -7,10 +7,15 @@ mod timed;
 
 use colino::error::ReadError;
 use colino::mesh::{Limits, Mesh};
-use colino::threemf::read;
+use colino::threemf::from_bytes;
 use proptest::prelude::*;
 
 const ROOMY: Limits = Limits::new(1 << 20, 1 << 20, 1 << 26);
+
+/// An error's `Debug` text: `ReadError` holds an `io::Error`, and so has no `PartialEq`.
+fn debug(e: impl std::fmt::Debug) -> String {
+    format!("{e:?}")
+}
 const CORE: &str = "http://schemas.microsoft.com/3dmanufacturing/core/2015/02";
 const RELS: &str = "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">\
     <Relationship Target=\"/3D/3dmodel.model\" Id=\"rel0\" \
@@ -125,7 +130,7 @@ fn tetra() -> (Vec<[f64; 3]>, Vec<[u32; 3]>) {
 }
 
 fn one(build: &str, resources: &str) -> Result<Mesh, ReadError> {
-    read(
+    from_bytes(
         &package(model("", &format!("<resources>{resources}</resources><build>{build}</build>"))),
         ROOMY,
     )
@@ -154,7 +159,7 @@ fn a_tetrahedron_reads_stored_and_deflated() {
         zip(&[rels, part])
     };
     for deflate in [false, true] {
-        let got = read(&pack(deflate), ROOMY).unwrap();
+        let got = from_bytes(&pack(deflate), ROOMY).unwrap();
         assert_eq!(bits(&got.vertices), bits(&v));
         assert_eq!(got.triangles, t);
         assert_eq!(got.unit.as_deref(), Some("millimeter"));
@@ -205,7 +210,7 @@ fn each_object_is_a_group_named_by_its_name_else_its_id() {
 fn units_types_and_extensions_are_read_as_the_format_says() {
     let (v, t) = tetra();
     let tet = |id, kind| mesh_object(id, kind, &v, &t);
-    let inch = read(
+    let inch = from_bytes(
         &package(model(
             "unit=\"inch\"",
             &format!(
@@ -217,7 +222,7 @@ fn units_types_and_extensions_are_read_as_the_format_says() {
     )
     .unwrap();
     assert_eq!(inch.unit.as_deref(), Some("inch"));
-    let bad_unit = read(&package(model("unit=\"furlong\"", "<resources/><build/>")), ROOMY);
+    let bad_unit = from_bytes(&package(model("unit=\"furlong\"", "<resources/><build/>")), ROOMY);
     assert!(matches!(
         bad_unit,
         Err(ReadError::Model { reason: "a unit the format does not name", .. })
@@ -236,22 +241,22 @@ fn units_types_and_extensions_are_read_as_the_format_says() {
             "{kind}"
         );
     }
-    let required = read(
+    let required = from_bytes(
         &package(model("xmlns:p=\"urn:p\" requiredextensions=\"p\"", "<resources/><build/>")),
         ROOMY,
     );
-    assert_eq!(required, Err(ReadError::RequiredExtension("p".into())));
+    assert_eq!(required.map_err(debug), Err(debug(ReadError::RequiredExtension("p".into()))));
     // Extension elements and prefixed attributes, not required, are skipped.
     let ext = format!(
         "<resources><x:thing xmlns:x=\"urn:x\"><vertex x=\"9\"/></x:thing>{}</resources><build><item x:id=\"7\" xmlns:x=\"urn:x\" objectid=\"1\"/></build>",
         tet(1, "model")
     );
-    assert_eq!(read(&package(model("", &ext)), ROOMY).unwrap().triangles.len(), 4);
+    assert_eq!(from_bytes(&package(model("", &ext)), ROOMY).unwrap().triangles.len(), 4);
 }
 
 #[test]
 fn each_break_of_the_xml_is_its_own_error() {
-    let model_error = |text: &str| match read(&package(text.as_bytes().to_vec()), ROOMY) {
+    let model_error = |text: &str| match from_bytes(&package(text.as_bytes().to_vec()), ROOMY) {
         Err(ReadError::Model { reason, .. }) => reason.to_owned(),
         other => format!("{other:?}"),
     };
@@ -270,18 +275,18 @@ fn each_break_of_the_xml_is_its_own_error() {
     assert_eq!(model_error(&format!("{} x", m(""))), "text outside the root element");
     assert_eq!(model_error("<model/>"), "an element in no namespace");
     assert!(matches!(
-        read(&package(m("<metadata name=\"a\" name=\"b\"/>").into_bytes()), ROOMY),
+        from_bytes(&package(m("<metadata name=\"a\" name=\"b\"/>").into_bytes()), ROOMY),
         Err(ReadError::Xml { .. })
     ));
     assert!(matches!(
-        read(&package(m("<resources></build>").into_bytes()), ROOMY),
+        from_bytes(&package(m("<resources></build>").into_bytes()), ROOMY),
         Err(ReadError::Xml { .. })
     ));
 }
 
 #[test]
 fn each_break_of_the_model_is_its_own_error() {
-    let model_error = |text: &str| match read(&package(text.as_bytes().to_vec()), ROOMY) {
+    let model_error = |text: &str| match from_bytes(&package(text.as_bytes().to_vec()), ROOMY) {
         Err(ReadError::Model { reason, .. }) => reason.to_owned(),
         other => format!("{other:?}"),
     };
@@ -314,17 +319,20 @@ fn each_break_of_the_model_is_its_own_error() {
         "a transform that is not 12 finite numbers"
     );
     assert!(
-        matches!(read(&package(m("<widget/>").into_bytes()), ROOMY), Err(ReadError::UnknownElement { name, .. }) if name == "widget")
+        matches!(from_bytes(&package(m("<widget/>").into_bytes()), ROOMY), Err(ReadError::UnknownElement { name, .. }) if name == "widget")
     );
     assert!(matches!(
-        read(&package(m("<build><item objectid=\"4\"/></build>").into_bytes()), ROOMY),
+        from_bytes(&package(m("<build><item objectid=\"4\"/></build>").into_bytes()), ROOMY),
         Err(ReadError::NoObject { id: 4, .. })
     ));
     let later = m(
         "<resources><object id=\"1\"><components><component objectid=\"2\"/></components></object></resources>",
     );
     assert!(
-        matches!(read(&package(later.into_bytes()), ROOMY), Err(ReadError::NoObject { id: 2, .. })),
+        matches!(
+            from_bytes(&package(later.into_bytes()), ROOMY),
+            Err(ReadError::NoObject { id: 2, .. })
+        ),
         "an object defined after"
     );
 }
@@ -363,7 +371,7 @@ fn an_object_naming_itself_as_a_component_is_refused_in_time() {
         let text = m(&format!(
             "<resources><object id=\"1\"><components>{components}</components></object></resources><build><item objectid=\"1\"/></build>"
         ));
-        let read = timed::in_time(move || read(&package(text.into_bytes()), ROOMY));
+        let read = timed::in_time(move || from_bytes(&package(text.into_bytes()), ROOMY));
         assert!(matches!(read, Err(ReadError::NoObject { id: 1, .. })), "{components}: {read:?}");
     }
 }
@@ -372,50 +380,39 @@ fn an_object_naming_itself_as_a_component_is_refused_in_time() {
 fn each_break_of_the_package_is_its_own_error() {
     let m = model("", "<resources/><build/>");
     let rels = |target: &str| RELS.replace("/3D/3dmodel.model", target);
-    let error = |parts: &[Part<'_>]| read(&zip(parts), ROOMY);
-    assert_eq!(read(b"not a zip", ROOMY), Err(ReadError::Package("not a ZIP archive")));
+    let error = |parts: &[Part<'_>]| from_bytes(&zip(parts), ROOMY).map_err(debug);
+    let package = |reason| Err(debug(ReadError::Package(reason)));
+    assert_eq!(from_bytes(b"not a zip", ROOMY).map_err(debug), package("not a ZIP archive"));
     assert_eq!(
         error(&[stored("3D/3dmodel.model", &m)]),
-        Err(ReadError::Package("a part the package names is missing"))
+        package("a part the package names is missing")
     );
     assert_eq!(
         error(&[stored("_rels/.rels", rels("/elsewhere.model").as_bytes())]),
-        Err(ReadError::Package("a part the package names is missing"))
+        package("a part the package names is missing")
     );
     assert_eq!(
         error(&[stored("_rels/.rels", rels("/../x").as_bytes())]),
-        Err(ReadError::Package("a start part's name that is not a plain path"))
+        package("a start part's name that is not a plain path")
     );
     let two = RELS.replace("</Relationships>", "<Relationship Target=\"/a\" Id=\"r1\" Type=\"http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel\"/></Relationships>");
-    assert_eq!(
-        error(&[stored("_rels/.rels", two.as_bytes())]),
-        Err(ReadError::Package("two start parts"))
-    );
+    assert_eq!(error(&[stored("_rels/.rels", two.as_bytes())]), package("two start parts"));
     let none =
         "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"/>";
-    assert_eq!(
-        error(&[stored("_rels/.rels", none.as_bytes())]),
-        Err(ReadError::Package("no start part"))
-    );
+    assert_eq!(error(&[stored("_rels/.rels", none.as_bytes())]), package("no start part"));
     let twice = [
         stored("_rels/.rels", RELS.as_bytes()),
         stored("3D/3dmodel.model", &m),
         stored("3D/3DModel.model", &m),
     ];
-    assert_eq!(error(&twice), Err(ReadError::Package("two parts of one name")));
+    assert_eq!(error(&twice), package("two parts of one name"));
     let rels_part = || stored("_rels/.rels", RELS.as_bytes());
     let bad_crc = Part { crc_off: 1, ..stored("3D/3dmodel.model", &m) };
-    assert_eq!(
-        error(&[rels_part(), bad_crc]),
-        Err(ReadError::Package("a part whose CRC does not match"))
-    );
+    assert_eq!(error(&[rels_part(), bad_crc]), package("a part whose CRC does not match"));
     let long = Part { size_off: 1, ..deflated("3D/3dmodel.model", &m) };
-    assert_eq!(
-        error(&[rels_part(), long]),
-        Err(ReadError::Package("a part that does not expand to its size"))
-    );
+    assert_eq!(error(&[rels_part(), long]), package("a part that does not expand to its size"));
     let bzip = Part { method: 12, ..stored("3D/3dmodel.model", &m) };
-    assert!(matches!(error(&[rels_part(), bzip]), Err(ReadError::Compression(_))));
+    assert!(error(&[rels_part(), bzip]).is_err_and(|e| e.starts_with("Compression")));
 }
 
 #[test]
@@ -428,7 +425,10 @@ fn a_deflated_bomb_stops_at_the_byte_limit() {
     let small = ROOMY.with_bytes(1 << 20);
     let packed = zip(&[rels_part(), deflated("3D/3dmodel.model", &bomb)]);
     assert!(packed.len() < 64 << 10);
-    assert_eq!(read(&packed, small), Err(ReadError::TooLarge { what: "bytes", limit: 1 << 20 }));
+    assert_eq!(
+        from_bytes(&packed, small).map_err(debug),
+        Err(debug(ReadError::TooLarge { what: "bytes", limit: 1 << 20 }))
+    );
 }
 
 #[test]
@@ -447,16 +447,19 @@ fn limits_hold_before_placements_are_expanded() {
         empty.push_str(&format!("<object id=\"{id}\"><components><component objectid=\"{}\"/><component objectid=\"{}\"/></components></object>", id - 1, id - 1));
     }
     let r = one("<item objectid=\"40\"/>", &empty);
-    assert_eq!(r, Err(ReadError::TooLarge { what: "triangles", limit: 1 << 20 }));
+    assert_eq!(
+        r.map_err(debug),
+        Err(debug(ReadError::TooLarge { what: "triangles", limit: 1 << 20 }))
+    );
     let few = ROOMY.with_vertices(3);
-    let r = read(
+    let r = from_bytes(
         &package(model(
             "",
             &format!("<resources>{}</resources><build/>", mesh_object(1, "model", &v, &t)),
         )),
         few,
     );
-    assert_eq!(r, Err(ReadError::TooLarge { what: "vertices", limit: 3 }));
+    assert_eq!(r.map_err(debug), Err(debug(ReadError::TooLarge { what: "vertices", limit: 3 })));
 }
 
 // ---- Generated models, against a reference that places step by step.
@@ -592,7 +595,7 @@ proptest! {
     fn generated_models_place_as_step_by_step_placement_does((objects, items) in models(), deflate in any::<bool>()) {
         let m = write_model(&objects, &items);
         let part = if deflate { deflated("3D/3dmodel.model", &m) } else { stored("3D/3dmodel.model", &m) };
-        let got = read(&zip(&[stored("_rels/.rels", RELS.as_bytes()), part]), ROOMY).unwrap();
+        let got = from_bytes(&zip(&[stored("_rels/.rels", RELS.as_bytes()), part]), ROOMY).unwrap();
         let mut want = Mesh::default();
         for (i, t) in &items {
             place(&objects, *i, &[*t], &mut want);
@@ -626,7 +629,7 @@ proptest! {
                 bytes[i] = b;
             }
         }
-        if let Ok(mesh) = read(&bytes, ROOMY) {
+        if let Ok(mesh) = from_bytes(&bytes, ROOMY) {
             let n = mesh.vertices.len();
             prop_assert!(mesh.triangles.iter().flatten().all(|i| usize::try_from(*i).unwrap() < n));
             prop_assert!(mesh.vertices.iter().flatten().all(|c| c.is_finite()));
@@ -660,8 +663,8 @@ fn what_the_format_allows_is_read() {
         stored("_rels/.rels", thumbnail.as_bytes()),
         stored("3D/3dmodel.model", m.as_bytes()),
     ];
-    let read_back = read(&zip(&parts), ROOMY).map(|m| (bits(&m.vertices), m.triangles));
-    assert_eq!(read_back, Ok((bits(&v), t.clone())));
+    let read_back = from_bytes(&zip(&parts), ROOMY).map(|m| (bits(&m.vertices), m.triangles));
+    assert_eq!(read_back.map_err(debug), Ok((bits(&v), t.clone())));
     // A transform that flattens z: its determinant is zero, so nothing turns over.
     let flat = one(
         "<item objectid=\"1\" transform=\"1 0 0 0 1 0 0 0 0 0 0 0\"/>",
@@ -674,7 +677,7 @@ fn what_the_format_allows_is_read() {
 /// Each break the format forbids that the tests above leave out.
 #[test]
 fn what_the_format_forbids_is_refused() {
-    let model_error = |text: &str| match read(&package(text.as_bytes().to_vec()), ROOMY) {
+    let model_error = |text: &str| match from_bytes(&package(text.as_bytes().to_vec()), ROOMY) {
         Err(ReadError::Model { at, reason }) => Ok((at, reason.to_owned())),
         other => Err(format!("{other:?}")),
     };
@@ -692,8 +695,9 @@ fn what_the_format_forbids_is_refused() {
     assert!(at < u64::try_from(text.find("<object id=\"2\"").unwrap()).unwrap(), "{at}");
     let rels = |target: &str| RELS.replace("/3D/3dmodel.model", target);
     assert_eq!(
-        read(&zip(&[stored("_rels/.rels", rels("/3D//3dmodel.model").as_bytes())]), ROOMY),
-        Err(ReadError::Package("a start part's name that is not a plain path"))
+        from_bytes(&zip(&[stored("_rels/.rels", rels("/3D//3dmodel.model").as_bytes())]), ROOMY)
+            .map_err(debug),
+        Err(debug(ReadError::Package("a start part's name that is not a plain path")))
     );
 }
 
@@ -712,13 +716,16 @@ fn limits_hold_at_their_exact_values() {
         ))
     };
     let exact = ROOMY.with_triangles(4).with_vertices(4);
-    assert_eq!(read(&tetra_model(""), exact).map(|m| m.triangles.len()), Ok(4));
+    assert_eq!(
+        from_bytes(&tetra_model(""), exact).map(|m| m.triangles.len()).map_err(debug),
+        Ok(4)
+    );
     // A second object, never placed, still counts as read.
     let unused = mesh_object(2, "model", &v, &t);
     let six = ROOMY.with_triangles(6).with_vertices(8);
     assert_eq!(
-        read(&tetra_model(&unused), six),
-        Err(ReadError::TooLarge { what: "triangles", limit: 6 })
+        from_bytes(&tetra_model(&unused), six).map_err(debug),
+        Err(debug(ReadError::TooLarge { what: "triangles", limit: 6 }))
     );
     // Four placements of an empty mesh, against a triangle limit of four.
     let empty = "<object id=\"1\"><mesh><vertices/><triangles/></mesh></object>\
@@ -729,9 +736,12 @@ fn limits_hold_at_their_exact_values() {
         &format!("<resources>{empty}</resources><build><item objectid=\"2\"/></build>"),
     ));
     let four = ROOMY.with_triangles(4);
-    assert_eq!(read(&placed, four).map(|m| m.triangles.len()), Ok(0));
+    assert_eq!(from_bytes(&placed, four).map(|m| m.triangles.len()).map_err(debug), Ok(0));
     let three = ROOMY.with_triangles(3);
-    assert!(matches!(read(&placed, three), Err(ReadError::TooLarge { what: "triangles", .. })));
+    assert!(matches!(
+        from_bytes(&placed, three),
+        Err(ReadError::TooLarge { what: "triangles", .. })
+    ));
 }
 
 /// The packages the 3MF fuzz target starts from (TESTING.md §3, ADR-0006): a mesh object,
@@ -763,7 +773,7 @@ fn the_fuzz_seeds_are_committed_and_read() {
     for (name, bytes) in seeds() {
         let committed = std::fs::read(data.join(name)).unwrap();
         assert!(committed == bytes, "{name} differs from the package it is made from");
-        let m = read(&committed, ROOMY).unwrap();
+        let m = from_bytes(&committed, ROOMY).unwrap();
         assert_eq!(m.triangles.len(), 12, "{name}");
     }
 }

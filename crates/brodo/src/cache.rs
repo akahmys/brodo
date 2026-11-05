@@ -689,44 +689,44 @@ fn fill(source: &mut impl Read, blocks: &mut Vec<Block>) -> std::io::Result<usiz
     }
 }
 
+/// Reads and checks a cache file of at most `limit` bytes; a longer one is refused by
+/// its length before any of it is read, and by the bytes read where its length says
+/// less than it holds, as a device's, a pipe's or a growing file's can: no more than
+/// `limit` + 1 bytes are read (ADR-0036). A read interrupted is tried again; another
+/// error ends it as `CacheError::Io`.
+pub fn read(path: &Path, limit: u64) -> Result<CacheFile, CacheError> {
+    let file = std::fs::File::open(path)?;
+    let length = file.metadata()?.len();
+    if length > limit {
+        return Err(CacheError::FileTooLarge { length, limit });
+    }
+    // Read into aligned blocks, so that the file is held once, not copied to align it:
+    // room for the length it reports and a block more, grown should it hold more, as a
+    // device, a pipe or a growing file may, up to the limit and one byte.
+    let room = usize::try_from(length).unwrap_or(0).div_ceil(BLOCK) + 1;
+    let mut blocks = vec![Block::new_zeroed(); room];
+    let filled = fill(&mut file.take(limit.saturating_add(1)), &mut blocks)?;
+    let read = u64::try_from(filled).unwrap_or(u64::MAX);
+    if read > limit {
+        return Err(CacheError::FileTooLarge { length: read, limit });
+    }
+    whole_blocks(read)?;
+    blocks.truncate(filled / BLOCK);
+    let index = index(blocks.as_bytes())?;
+    Ok(CacheFile { storage: Storage::Copied(blocks), index })
+}
+
+/// Checks bytes whole as a cache file, copying them to an aligned buffer, as
+/// docs/formats.md §3.4 states; of several broken rules, which is named is not
+/// promised.
+pub fn from_bytes(bytes: &[u8]) -> Result<CacheFile, CacheError> {
+    whole_blocks(u64::try_from(bytes.len()).unwrap_or(u64::MAX))?;
+    let blocks = aligned(bytes);
+    let index = index(blocks.as_bytes())?;
+    Ok(CacheFile { storage: Storage::Copied(blocks), index })
+}
+
 impl CacheFile {
-    /// Reads and checks a cache file of at most `limit` bytes; a longer one is refused by
-    /// its length before any of it is read, and by the bytes read where its length says
-    /// less than it holds, as a device's, a pipe's or a growing file's can: no more than
-    /// `limit` + 1 bytes are read (ADR-0036). A read interrupted is tried again; another
-    /// error ends it as `CacheError::Io`.
-    pub fn read(path: &Path, limit: u64) -> Result<Self, CacheError> {
-        let file = std::fs::File::open(path)?;
-        let length = file.metadata()?.len();
-        if length > limit {
-            return Err(CacheError::FileTooLarge { length, limit });
-        }
-        // Read into aligned blocks, so that the file is held once, not copied to align it:
-        // room for the length it reports and a block more, grown should it hold more, as a
-        // device, a pipe or a growing file may, up to the limit and one byte.
-        let room = usize::try_from(length).unwrap_or(0).div_ceil(BLOCK) + 1;
-        let mut blocks = vec![Block::new_zeroed(); room];
-        let filled = fill(&mut file.take(limit.saturating_add(1)), &mut blocks)?;
-        let read = u64::try_from(filled).unwrap_or(u64::MAX);
-        if read > limit {
-            return Err(CacheError::FileTooLarge { length: read, limit });
-        }
-        whole_blocks(read)?;
-        blocks.truncate(filled / BLOCK);
-        let index = index(blocks.as_bytes())?;
-        Ok(Self { storage: Storage::Copied(blocks), index })
-    }
-
-    /// Checks bytes whole as a cache file, copying them to an aligned buffer, as
-    /// docs/formats.md §3.4 states; of several broken rules, which is named is not
-    /// promised.
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, CacheError> {
-        whole_blocks(u64::try_from(bytes.len()).unwrap_or(u64::MAX))?;
-        let blocks = aligned(bytes);
-        let index = index(blocks.as_bytes())?;
-        Ok(Self { storage: Storage::Copied(blocks), index })
-    }
-
     fn entry(&self, i: usize) -> Result<&Entry, CacheError> {
         self.index.grids.get(i).ok_or(CacheError::NoGrid(i))
     }
@@ -803,7 +803,7 @@ mod tests {
         }
     }
 
-    /// `CacheFile::read`'s promise, held through the loop it reads with: a read
+    /// `read`'s promise, held through the loop it reads with: a read
     /// interrupted is tried again, another error ends it.
     #[test]
     fn a_read_interrupted_is_tried_again_and_another_error_ends_it() {

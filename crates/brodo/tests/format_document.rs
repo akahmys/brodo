@@ -37,7 +37,7 @@ fn cache_file(bytes: &[u8]) -> Result<CacheFile, brodo::error::CacheError> {
     if bytes.starts_with(b"BRDA") {
         return brodo::archive::from_bytes(bytes, u64::MAX);
     }
-    CacheFile::from_bytes(bytes)
+    brodo::cache::from_bytes(bytes)
 }
 
 /// A 32-byte aligned copy of some bytes, as a file read into memory would be.
@@ -377,7 +377,7 @@ fn crates_region(bytes: &[u8], index: usize, b: [i32; 6]) -> Option<Vec<String>>
         out
     }
     let extent = Bounds::Box { min: [b[0], b[1], b[2]], max: [b[3], b[4], b[5]] };
-    let r = region_from_bytes(bytes, u64::MAX, index, extent).ok()?;
+    let r = region_from_bytes(bytes, index, extent, u64::MAX).ok()?;
     Some(match r.value_type() {
         1 => lines::<f32>(&r, b),
         2 => lines::<f64>(&r, b),

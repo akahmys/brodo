@@ -557,7 +557,8 @@ since crates.io yanks a version but never deletes it.
         leftovers dropped
   - [x] version 1 of the frozen layout and the cache and archive profiles no longer read,
         and docs/formats.md and ARCHITECTURE.md stated at the present versions (ADR-0054)
-  - [ ] the readers' and writers' names and arguments made one shape
+  - [x] the readers' and writers' names and arguments made one shape, colino's mesh
+        readers and mestolo's output with them (ADR-0055)
   - [ ] a value type named by an enum, and a field of any stored type
   - [ ] a cache file's grids reached as its entries of bytes are; the reserved-key writers
         hidden

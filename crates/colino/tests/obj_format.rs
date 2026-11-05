@@ -7,13 +7,18 @@ mod timed;
 
 use colino::error::ReadError;
 use colino::mesh::{Limits, Mesh};
-use colino::obj::read;
+use colino::obj::from_bytes;
 use proptest::prelude::*;
 
 const ROOMY: Limits = Limits::new(1 << 20, 1 << 20, 1 << 30);
 
+/// An error's `Debug` text: `ReadError` holds an `io::Error`, and so has no `PartialEq`.
+fn debug(e: impl std::fmt::Debug) -> String {
+    format!("{e:?}")
+}
+
 fn read_str(s: &str) -> Result<Mesh, ReadError> {
-    read(s.as_bytes(), ROOMY)
+    from_bytes(s.as_bytes(), ROOMY)
 }
 
 #[test]
@@ -110,23 +115,29 @@ fn each_damage_is_its_own_error() {
         ("csh -rm x\n".into(), ReadError::Unsupported { line: 1, word: "csh".into() }),
     ];
     for (text, error) in cases {
-        assert_eq!(read_str(&text), Err(error), "{text:?}");
+        assert_eq!(read_str(&text).map_err(debug), Err(format!("{:?}", error)), "{text:?}");
     }
     // A number may name a vertex further on in the file.
     assert!(read_str("f 1 2 3\nv 0 0 0\nv 1 0 0\nv 0 1 0\n").is_ok());
     let limits = |triangles, vertices| Limits::new(triangles, vertices, 1 << 30);
     let quad = "v 0 0 0\nv 1 0 0\nv 1 1 0\nv 0 1 0\nf 1 2 3 4\n";
     assert_eq!(
-        read(quad.as_bytes(), limits(1, 10)),
-        Err(ReadError::TooLarge { what: "triangles", limit: 1 })
+        from_bytes(quad.as_bytes(), limits(1, 10)).map_err(debug),
+        Err(debug(ReadError::TooLarge { what: "triangles", limit: 1 }))
     );
     assert_eq!(
-        read(quad.as_bytes(), limits(10, 3)),
-        Err(ReadError::TooLarge { what: "vertices", limit: 3 })
+        from_bytes(quad.as_bytes(), limits(10, 3)).map_err(debug),
+        Err(debug(ReadError::TooLarge { what: "vertices", limit: 3 }))
     );
-    assert_eq!(read(&[b'v', b' ', 0xff], ROOMY), Err(ReadError::NotText));
+    assert_eq!(
+        from_bytes(&[b'v', b' ', 0xff], ROOMY).map_err(debug),
+        Err(debug(ReadError::NotText))
+    );
     let tiny = ROOMY.with_bytes(10);
-    assert_eq!(read(quad.as_bytes(), tiny), Err(ReadError::TooLarge { what: "bytes", limit: 10 }));
+    assert_eq!(
+        from_bytes(quad.as_bytes(), tiny).map_err(debug),
+        Err(debug(ReadError::TooLarge { what: "bytes", limit: 10 }))
+    );
 }
 
 fn coordinate() -> impl Strategy<Value = f64> {
@@ -203,7 +214,7 @@ proptest! {
             let i = at.index(bytes.len());
             bytes[i] = TEXT[usize::from(b) % TEXT.len()];
         }
-        if let Ok(m) = read(&bytes, ROOMY) {
+        if let Ok(m) = from_bytes(&bytes, ROOMY) {
             let n = m.vertices.len();
             prop_assert!(m.triangles.iter().flatten().all(|i| usize::try_from(*i).unwrap() < n));
             prop_assert!(m.vertices.iter().flatten().all(|c| c.is_finite()));

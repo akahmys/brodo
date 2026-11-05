@@ -84,3 +84,4 @@ A record is `Proposed` until the human accepts it.
 | [0052](0052-version-2-of-the-frozen-layout-checks-every-writer-rule.md) | Version 2 of the frozen layout and the cache profile checks every writer rule |
 | [0053](0053-metadata-keys-beginning-brodo-are-reserved.md) | Metadata keys beginning `brodo.` are reserved |
 | [0054](0054-version-1-of-the-frozen-layout-cache-and-archive-is-not-read.md) | Version 1 of the frozen layout, the cache and the archive is not read |
+| [0055](0055-every-format-reads-and-writes-in-one-shape.md) | Every format reads and writes in one shape |

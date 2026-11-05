@@ -27,6 +27,7 @@
 //! Per-triangle properties are not read.
 
 use std::collections::BTreeMap;
+use std::path::Path;
 
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
@@ -42,8 +43,15 @@ const RELATIONSHIPS: &str = "http://schemas.openxmlformats.org/package/2006/rela
 const START_PART: &str = "http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel";
 const UNITS: [&str; 6] = ["micron", "millimeter", "centimeter", "inch", "foot", "meter"];
 
+/// Reads a 3MF document at `path`, of no more than `limits.bytes`, as `from_bytes` reads its
+/// bytes: a longer file is refused by its length before any of it is read, and no more
+/// than the limit and one byte are read.
+pub fn read(path: &Path, limits: Limits) -> Result<Mesh, ReadError> {
+    from_bytes(&limits.read_file(path)?, limits)
+}
+
 /// Reads a 3MF document's bytes.
-pub fn read(bytes: &[u8], limits: Limits) -> Result<Mesh, ReadError> {
+pub fn from_bytes(bytes: &[u8], limits: Limits) -> Result<Mesh, ReadError> {
     let archive =
         ZipArchive::from_slice(bytes).map_err(|_| ReadError::Package("not a ZIP archive"))?;
     let parts = index(&archive)?;
@@ -396,7 +404,7 @@ fn number(attrs: &[(String, String)], key: &str, at: u64) -> Result<f64, ReadErr
 
 fn transform(attrs: &[(String, String)], at: u64) -> Result<Transform, ReadError> {
     let Some(text) = attr(attrs, "transform") else { return Ok(IDENTITY) };
-    let bad = ReadError::Model { at, reason: "a transform that is not 12 finite numbers" };
+    let bad = || ReadError::Model { at, reason: "a transform that is not 12 finite numbers" };
     let mut m = IDENTITY;
     let mut words = text.split_ascii_whitespace();
     for x in &mut m {
@@ -404,10 +412,10 @@ fn transform(attrs: &[(String, String)], at: u64) -> Result<Transform, ReadError
             .next()
             .and_then(|w| w.parse::<f64>().ok())
             .filter(|x| x.is_finite())
-            .ok_or(bad.clone())?;
+            .ok_or_else(bad)?;
     }
     if words.next().is_some() {
-        return Err(bad);
+        return Err(bad());
     }
     Ok(m)
 }
@@ -664,9 +672,9 @@ fn place(mesh: &mut Mesh, v: &[[f64; 3]], t: &[[u32; 3]], m: &Transform) -> Resu
         mesh.vertices.push(q);
     }
     let flip = turns_inside_out(m);
-    let too_many = ReadError::TooLarge { what: "vertices", limit: u64::from(u32::MAX) };
+    let too_many = || ReadError::TooLarge { what: "vertices", limit: u64::from(u32::MAX) };
     for [a, b, c] in t {
-        let at = |i: &u32| base.checked_add(*i).ok_or(too_many.clone());
+        let at = |i: &u32| base.checked_add(*i).ok_or_else(too_many);
         let [a, b, c] = [at(a)?, at(b)?, at(c)?];
         mesh.triangles.push(if flip { [a, c, b] } else { [a, b, c] });
     }

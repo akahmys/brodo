@@ -15,7 +15,8 @@
 //! value with an infinite component is refused.
 
 use std::collections::BTreeMap;
-use std::io::{BufWriter, Write};
+use std::io::Write;
+use std::path::Path;
 
 use crate::error::VtkError;
 use crate::field::Field;
@@ -171,20 +172,39 @@ impl<T> Cell<T> {
     }
 }
 
-/// Writes `f` on `t` as one ASCII `.vtu`, its values named `name`.
+/// The bytes of `f` on `t` as one ASCII `.vtu`, its values named `name`.
 ///
-/// `name` is one or more printable ASCII characters or spaces, none of `<>&"'`. A name,
-/// field or value refused, an infinite one among them, writes nothing to `out`.
-pub fn write_vtu<T: VtkValue, W: Write>(
+/// `name` is one or more printable ASCII characters or spaces, none of `<>&"'`; a name,
+/// field or value refused, an infinite one among them, is refused before any byte is made.
+pub fn to_bytes<T: VtkValue>(t: &Topology, f: &Field<T>, name: &str) -> Result<Vec<u8>, VtkError> {
+    let cells = checked(t, f, name)?;
+    let mut out = Vec::new();
+    emit(&cells, name, &mut out)?;
+    Ok(out)
+}
+
+/// Writes `f` on `t` as one ASCII `.vtu` at `path`, its values named `name`, as `to_bytes`
+/// makes it: to a hidden file beside `path` renamed over it, as `cache::write` writes
+/// (ARCHITECTURE.md §4.7). What `to_bytes` refuses is refused before the file is made.
+pub fn write<T: VtkValue>(
+    path: &Path,
     t: &Topology,
     f: &Field<T>,
     name: &str,
-    out: W,
 ) -> Result<(), VtkError> {
+    let cells = checked(t, f, name)?;
+    crate::cache::replace(path, |out| emit(&cells, name, out))
+}
+
+/// The cells of `f` on `t`, with `name` checked.
+fn checked<T: VtkValue>(t: &Topology, f: &Field<T>, name: &str) -> Result<Vec<Cell<T>>, VtkError> {
     check_name(name)?;
-    let cells = cells(t, f)?;
-    let (ids, points) = share_points(&cells);
-    let mut w = BufWriter::new(out);
+    cells(t, f)
+}
+
+/// Writes the cells as one `.vtu` to `w`.
+fn emit<T: VtkValue>(cells: &[Cell<T>], name: &str, w: &mut impl Write) -> Result<(), VtkError> {
+    let (ids, points) = share_points(cells);
     writeln!(w, r#"<?xml version="1.0"?>"#)?;
     writeln!(w, r#"<VTKFile type="UnstructuredGrid" version="0.1" byte_order="LittleEndian">"#)?;
     writeln!(w, "<UnstructuredGrid>")?;
@@ -195,8 +215,8 @@ pub fn write_vtu<T: VtkValue, W: Write>(
     };
     writeln!(w, r#"<CellData {role}="{name}">"#)?;
     writeln!(w, r#"<DataArray type="{}" Name="{name}"{components} format="ascii">"#, T::TYPE_NAME)?;
-    for c in &cells {
-        c.value.write_ascii(&mut w)?;
+    for c in cells {
+        c.value.write_ascii(w)?;
         writeln!(w)?;
     }
     writeln!(w, "</DataArray>\n</CellData>\n<Points>")?;
@@ -205,9 +225,8 @@ pub fn write_vtu<T: VtkValue, W: Write>(
         writeln!(w, "{} {} {}", p[0], p[1], p[2])?;
     }
     writeln!(w, "</DataArray>\n</Points>\n<Cells>")?;
-    write_cells(&mut w, &cells, &ids)?;
+    write_cells(w, cells, &ids)?;
     writeln!(w, "</Cells>\n</Piece>\n</UnstructuredGrid>\n</VTKFile>")?;
-    w.flush()?;
     Ok(())
 }
 
@@ -293,7 +312,7 @@ mod tests {
         e.activate([0, 0, 0]).unwrap();
         let other = e.commit().unwrap().0;
         let f = Field::new(&other, 0.0_f32);
-        let got = write_vtu(&empty, &f, "f", Vec::new());
+        let got = to_bytes(&empty, &f, "f");
         assert!(
             matches!(got, Err(VtkError::Field(crate::error::FieldError::StaleField))),
             "{got:?}"
@@ -314,9 +333,7 @@ mod tests {
     }
 
     fn text<T: VtkValue>(t: &Topology, f: &Field<T>) -> String {
-        let mut out = Vec::new();
-        write_vtu(t, f, "d", &mut out).unwrap();
-        String::from_utf8(out).unwrap()
+        String::from_utf8(to_bytes(t, f, "d").unwrap()).unwrap()
     }
 
     #[test]
@@ -375,13 +392,11 @@ mod tests {
         assert!(text(&t, &f).contains("format=\"ascii\">\n1.25 -2 3.5\n</DataArray>"));
         for v in [[0.0, f32::NEG_INFINITY, 0.0], [0.0, 0.0, f32::INFINITY]] {
             let (t, f) = one_tile([0, 8, 0], v);
-            let mut out = Vec::new();
-            let got = write_vtu(&t, &f, "d", &mut out);
+            let got = to_bytes(&t, &f, "d");
             assert!(matches!(got, Err(VtkError::Infinite { origin: [0, 8, 0] })), "{got:?}");
-            assert!(out.is_empty());
         }
         let (t, f) = one_tile([0, 8, 0], [1.0_f64, f64::INFINITY, 0.0]);
-        let got = write_vtu(&t, &f, "d", Vec::new());
+        let got = to_bytes(&t, &f, "d");
         assert!(matches!(got, Err(VtkError::Infinite { origin: [0, 8, 0] })), "{got:?}");
     }
 
@@ -422,10 +437,8 @@ mod tests {
     fn an_infinity_is_refused_before_anything_is_written() {
         for value in [f32::INFINITY, f32::NEG_INFINITY] {
             let (t, f) = one_tile([0, 8, 0], value);
-            let mut out = Vec::new();
-            let got = write_vtu(&t, &f, "d", &mut out);
+            let got = to_bytes(&t, &f, "d");
             assert!(matches!(got, Err(VtkError::Infinite { origin: [0, 8, 0] })), "{got:?}");
-            assert!(out.is_empty());
         }
         let empty = Topology::new();
         let mut e = empty.edit();
@@ -434,7 +447,7 @@ mod tests {
         let mut f = Field::new(&t, 0.0_f64);
         let n = t.leaf_numbers().next().unwrap();
         f.leaf_mut(&t, n).unwrap()[8 + 64] = f64::INFINITY;
-        let got = write_vtu(&t, &f, "d", Vec::new());
+        let got = to_bytes(&t, &f, "d");
         assert!(matches!(got, Err(VtkError::Infinite { origin: [0, 1, 1] })), "{got:?}");
     }
 
@@ -442,9 +455,9 @@ mod tests {
     fn a_name_needing_escapes_or_empty_is_refused() {
         let (t, f) = one_tile([0, 0, 0], 1_u32);
         for name in ["", "a<b", "a&b", "a\"b", "a'b", "tab\t", "é"] {
-            let got = write_vtu(&t, &f, name, Vec::new());
+            let got = to_bytes(&t, &f, name);
             assert!(matches!(got, Err(VtkError::Name(ref n)) if n == name), "{name:?}: {got:?}");
         }
-        assert!(write_vtu(&t, &f, "signed distance_2", Vec::new()).is_ok());
+        assert!(to_bytes(&t, &f, "signed distance_2").is_ok());
     }
 }

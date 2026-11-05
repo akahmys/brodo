@@ -624,11 +624,11 @@ pub struct Region {
 /// (docs/formats.md §8.6).
 pub fn read_region(
     path: &Path,
-    limit: u64,
     index: usize,
     extent: Bounds,
+    limit: u64,
 ) -> Result<Region, CacheError> {
-    region_from_bytes(&load(path, limit)?, limit, index, extent)
+    region_from_bytes(&load(path, limit)?, index, extent, limit)
 }
 
 /// Checks an archive's bytes as docs/formats.md §8.6 states and reads grid `index`'s region
@@ -637,9 +637,9 @@ pub fn read_region(
 /// promised.
 pub fn region_from_bytes(
     bytes: &[u8],
-    limit: u64,
     index: usize,
     extent: Bounds,
+    limit: u64,
 ) -> Result<Region, CacheError> {
     let found = find(bytes)?;
     let (place, g) = grid_number(&found, index)?;

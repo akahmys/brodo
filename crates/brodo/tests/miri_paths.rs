@@ -5,7 +5,7 @@
 //! closes, Miri runs them (TESTING.md §3). Each value is checked against the field it came
 //! from, so a path that reads the wrong bytes fails here as well as under Miri.
 
-use brodo::cache::{CacheEntry, CacheFile, to_bytes};
+use brodo::cache::{CacheEntry, to_bytes};
 use brodo::field::Field;
 use brodo::frozen::freeze;
 use brodo::gather::{GATHER_VOXELS, gather};
@@ -71,7 +71,7 @@ fn miri_a_cache_files_bytes_read_in_place() {
     let (t, f) = grid();
     let meta = GridMeta::new("probe", [1.0; 3], "voxel").unwrap();
     let bytes = to_bytes(&[CacheEntry::new(&meta, &t, &f).unwrap()]).unwrap();
-    let file = CacheFile::from_bytes(&bytes).unwrap();
+    let file = brodo::cache::from_bytes(&bytes).unwrap();
     assert_eq!(file.meta(0).unwrap(), &meta);
     reads_as(&file.view::<f32>(0).unwrap(), &t, &f);
 }

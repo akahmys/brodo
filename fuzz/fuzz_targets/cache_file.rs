@@ -1,4 +1,4 @@
-//! Fuzzes `CacheFile::from_bytes`, the reader of cache files (`crates/brodo/src/cache.rs`),
+//! Fuzzes `cache::from_bytes`, the reader of cache files (`crates/brodo/src/cache.rs`),
 //! and the reads of any file it accepts, every grid as every value type: no input may panic
 //! (TESTING.md T6).
 
@@ -37,7 +37,7 @@ fn exercise<T: Stored>(file: &CacheFile, i: usize) {
 }
 
 fuzz_target!(|data: &[u8]| {
-    if let Ok(file) = CacheFile::from_bytes(data) {
+    if let Ok(file) = brodo::cache::from_bytes(data) {
         for i in 0..file.grid_count() {
             let _meta = file.meta(i);
             let _bounds = file.bounds(i);

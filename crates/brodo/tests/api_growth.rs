@@ -8,7 +8,6 @@
 use brodo::analysis::{AnalysisError, Connectivity};
 #[cfg(feature = "archive")]
 use brodo::archive::Encoding;
-use brodo::cache::CacheFile;
 #[cfg(feature = "vdb")]
 use brodo::error::VdbError;
 use brodo::error::{
@@ -260,7 +259,7 @@ fn every_enum_that_may_grow_is_matched_with_a_wildcard() {
     assert_eq!(format_error(&FormatError::Misaligned), "Misaligned");
     let empty_unit = GridMeta::new("g", [1.0; 3], "").unwrap_err();
     assert_eq!(meta_error(&empty_unit), "EmptyUnit");
-    let not_a_file = CacheFile::from_bytes(&[0; 32]).unwrap_err();
+    let not_a_file = brodo::cache::from_bytes(&[0; 32]).unwrap_err();
     assert_eq!(cache_error(&not_a_file), "BadMagic");
     assert_eq!(rule(&Rule::Owner), "Owner");
     assert_eq!(hermite_error(&HermiteError::Missing("sign")), "Missing");

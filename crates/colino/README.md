@@ -49,7 +49,7 @@ let obj = b"v 10 0 0\nv -10 0 0\nv 0 10 0\nv 0 -10 0\nv 0 0 10\nv 0 0 -10\n\
             f 1 3 5\nf 3 2 5\nf 2 4 5\nf 4 1 5\nf 3 1 6\nf 2 3 6\nf 4 2 6\nf 1 4 6\n";
 // At most 2²⁰ triangles, 2²⁰ vertices and 64 MiB read.
 let limits = Limits::new(1 << 20, 1 << 20, 1 << 26);
-let mesh = colino::obj::read(obj, limits)?;
+let mesh = colino::obj::from_bytes(obj, limits)?;
 
 // Voxels of 0.5 in the mesh's unit; OBJ states none, so the grid is told its own.
 let options = Options::new(0.5).with_unit(Some("millimeter".into()));

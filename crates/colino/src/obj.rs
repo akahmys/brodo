@@ -19,6 +19,8 @@
 //! geometry, which defines shape this reader does not triangulate; `call` and `csh`, which
 //! would read another file or run a command; and any statement the format does not name.
 
+use std::path::Path;
+
 use crate::error::ReadError;
 use crate::mesh::{Grouping, Limits, Mesh};
 
@@ -146,8 +148,15 @@ fn face<'a>(
     Ok(())
 }
 
+/// Reads an OBJ file at `path`, of no more than `limits.bytes`, as `from_bytes` reads its
+/// bytes: a longer file is refused by its length before any of it is read, and no more
+/// than the limit and one byte are read.
+pub fn read(path: &Path, limits: Limits) -> Result<Mesh, ReadError> {
+    from_bytes(&limits.read_file(path)?, limits)
+}
+
 /// Reads an OBJ file's bytes.
-pub fn read(bytes: &[u8], limits: Limits) -> Result<Mesh, ReadError> {
+pub fn from_bytes(bytes: &[u8], limits: Limits) -> Result<Mesh, ReadError> {
     limits.check_bytes(u64::try_from(bytes.len()).unwrap_or(u64::MAX))?;
     let text = std::str::from_utf8(bytes).map_err(|_| ReadError::NotText)?;
     let mut mesh = Mesh::default();

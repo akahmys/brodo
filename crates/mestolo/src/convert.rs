@@ -5,18 +5,14 @@ use std::ffi::OsStr;
 use std::path::Path;
 
 use brodo::vdb::VdbEntry;
-use brodo::vtk::write_vtu;
+use brodo::vtk::write;
 
 use crate::error::MestoloError;
 use crate::load::{Grid, Loaded, Values};
 
-/// The bytes of `loaded` in the format `output`'s name ends in: every grid as `.vdb`, or
+/// Writes `loaded` at `output` in the format its name ends in: every grid as `.vdb`, or
 /// the one `grid` names; one grid as `.vtu`, its values named as the grid is.
-pub fn convert(
-    loaded: &Loaded,
-    grid: Option<&str>,
-    output: &Path,
-) -> Result<Vec<u8>, MestoloError> {
+pub fn convert(loaded: &Loaded, grid: Option<&str>, output: &Path) -> Result<(), MestoloError> {
     match output.extension().and_then(OsStr::to_str) {
         Some("vdb") => {
             let grids = match grid {
@@ -24,9 +20,9 @@ pub fn convert(
                 None => loaded.grids.iter().collect(),
             };
             let entries = grids.into_iter().map(entry).collect::<Result<Vec<_>, _>>()?;
-            Ok(brodo::vdb::to_bytes(&entries)?)
+            Ok(brodo::vdb::write(output, &entries)?)
         }
-        Some("vtu") => vtu(loaded.grid(grid)?),
+        Some("vtu") => vtu(loaded.grid(grid)?, output),
         _ => Err(MestoloError::OutputKind(output.to_path_buf())),
     }
 }
@@ -42,15 +38,15 @@ fn entry(g: &Grid) -> Result<VdbEntry, MestoloError> {
     }
 }
 
-fn vtu(g: &Grid) -> Result<Vec<u8>, MestoloError> {
-    let (t, name, mut out) = (&g.topology, g.meta.name.as_str(), Vec::new());
+fn vtu(g: &Grid, output: &Path) -> Result<(), MestoloError> {
+    let (t, name) = (&g.topology, g.meta.name.as_str());
     match &g.values {
-        Values::F32(f) => write_vtu(t, f, name, &mut out)?,
-        Values::F64(f) => write_vtu(t, f, name, &mut out)?,
-        Values::U8(f) => write_vtu(t, f, name, &mut out)?,
-        Values::U32(f) => write_vtu(t, f, name, &mut out)?,
-        Values::F32x3(f) => write_vtu(t, f, name, &mut out)?,
-        Values::F64x3(f) => write_vtu(t, f, name, &mut out)?,
+        Values::F32(f) => write(output, t, f, name)?,
+        Values::F64(f) => write(output, t, f, name)?,
+        Values::U8(f) => write(output, t, f, name)?,
+        Values::U32(f) => write(output, t, f, name)?,
+        Values::F32x3(f) => write(output, t, f, name)?,
+        Values::F64x3(f) => write(output, t, f, name)?,
     }
-    Ok(out)
+    Ok(())
 }

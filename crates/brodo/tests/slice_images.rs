@@ -9,7 +9,7 @@
 #![cfg(feature = "slice-png")]
 
 use brodo::field::Field;
-use brodo::slice::{Axis, ColorMap, Image, Slice, encode_png, render};
+use brodo::slice::{Axis, ColorMap, Image, Slice, render};
 use brodo::topology::Topology;
 use brodo::tree::{Coord, TileLevel};
 
@@ -120,9 +120,24 @@ fn slices_keep_their_golden_pixels() {
 #[test]
 fn the_same_image_encodes_to_the_same_bytes_and_decodes_back() {
     for (name, image) in scenes() {
-        let bytes = encode_png(&image).unwrap();
-        assert_eq!(encode_png(&image).unwrap(), bytes, "{name}");
+        let bytes = brodo::slice::to_bytes(&image).unwrap();
+        assert_eq!(brodo::slice::to_bytes(&image).unwrap(), bytes, "{name}");
         assert_eq!(decode(&bytes), image, "{name}");
+    }
+}
+
+/// `write` puts at its path the bytes `to_bytes` makes, replacing a file there whole.
+#[test]
+fn an_image_written_to_a_path_is_its_bytes() {
+    let path = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("written.png");
+    std::fs::write(&path, b"an older file").unwrap();
+    for (name, image) in scenes() {
+        brodo::slice::write(&path, &image).unwrap();
+        assert_eq!(
+            std::fs::read(&path).unwrap(),
+            brodo::slice::to_bytes(&image).unwrap(),
+            "{name}"
+        );
     }
 }
 
@@ -133,6 +148,6 @@ fn write_scenes_for_a_look() {
     let dir = format!("{}/../../out/slices", env!("CARGO_MANIFEST_DIR"));
     std::fs::create_dir_all(&dir).unwrap();
     for (name, image) in scenes() {
-        std::fs::write(format!("{dir}/{name}.png"), encode_png(&image).unwrap()).unwrap();
+        brodo::slice::write(std::path::Path::new(&format!("{dir}/{name}.png")), &image).unwrap();
     }
 }

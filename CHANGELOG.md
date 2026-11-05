@@ -48,6 +48,18 @@ archive profiles stay at version 2, and version 1 of them is no longer read nor 
 - `hermite::NO_CROSSING`, `hermite::Expanded` and `Hermite::expand`, a dense view of a set
   held sparsely, are gone. An edge whose ends' signs differ and that holds no crossing is
   refused for `Rule::NoCrossing`, not `Rule::Fraction`.
+- Every format reads and writes in one shape, `from_bytes`, `read`, `to_bytes` and
+  `write` (ADR-0055): `CacheFile::read` and `CacheFile::from_bytes` are `cache::read` and
+  `cache::from_bytes`; `archive::read_region` and `archive::region_from_bytes` take the
+  limit last, after the grid's index and the extent; `vtk::write_vtu`, which wrote to a
+  `Write`, is `vtk::to_bytes(t, f, name)` and `vtk::write(path, t, f, name)`;
+  `slice::encode_png` is `slice::to_bytes`, beside the new `slice::write`, and
+  `SliceError` gains `Io`. A `.vtu` and a PNG written to a path are written whole, as a
+  cache file is.
+- colino's `stl::read`, `obj::read` and `threemf::read`, which took bytes, are
+  `from_bytes`; `read` now takes a path, refusing a file longer than `Limits::bytes`
+  before reading it. `ReadError` gains `Io` and no longer derives `Clone`, `PartialEq` or
+  `Eq`.
 
 A file of version 1, written by 0.8 or earlier or by 0.9.0 on request, is first read by
 0.9.0 and written again by it, at version 2. A file of version 2 then converts with this

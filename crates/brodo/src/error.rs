@@ -367,6 +367,10 @@ pub enum SliceError {
     #[cfg(feature = "slice-png")]
     #[error(transparent)]
     Encode(std::io::Error),
+    /// Writing the file failed.
+    #[cfg(feature = "slice-png")]
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
 }
 
 /// Why grids could not be written as an OpenVDB file (ARCHITECTURE.md §4.7, ADR-0046).

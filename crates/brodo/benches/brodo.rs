@@ -160,7 +160,7 @@ impl Data {
         let paths = [out_dir().join("sphere.archive"), out_dir().join("sphere-8bit.archive")];
         archive::write(&paths[0], std::slice::from_ref(entry))?;
         archive::write_with(&paths[1], &[(entry, Encoding::EightBit)])?;
-        let region = archive::read_region(&paths[0], u64::MAX, 0, REGION)?;
+        let region = archive::read_region(&paths[0], 0, REGION, u64::MAX)?;
         if region.view::<f32>()?.leaves().next().is_none() {
             return Err(Failure::from(std::io::Error::other(
                 "the region item's box holds no leaf",
@@ -264,7 +264,7 @@ impl Data {
             repeated(
                 "cache_read",
                 16,
-                Box::new(|| Ok(CacheFile::read(&self.file, u64::MAX)?.grid_count() as f64)),
+                Box::new(|| Ok(brodo::cache::read(&self.file, u64::MAX)?.grid_count() as f64)),
             ),
             repeated(
                 "cache_map",
@@ -307,7 +307,7 @@ impl Data {
                 "archive_region",
                 8,
                 Box::new(move || {
-                    let region = archive::read_region(exact, u64::MAX, 0, REGION)?;
+                    let region = archive::read_region(exact, 0, REGION, u64::MAX)?;
                     Ok(region.view::<f32>()?.leaves().count() as f64)
                 }),
             ),

@@ -79,7 +79,7 @@ fuzz_target!(|data: &[u8]| {
     // A fixed box about the origin, and one the input's tail chooses.
     let extents = [Some(Bounds::Box { min: [-64; 3], max: [64; 3] }), extent_of(data)];
     for (i, extent) in (0..=grids).flat_map(|i| extents.iter().flatten().map(move |e| (i, *e))) {
-        if let Ok(r) = region_from_bytes(data, LIMIT, i, extent) {
+        if let Ok(r) = region_from_bytes(data, i, extent, LIMIT) {
             region::<f32>(&r);
             region::<f64>(&r);
             region::<u8>(&r);
