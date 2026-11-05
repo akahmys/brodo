@@ -109,8 +109,9 @@ git config core.hooksPath scripts/hooks
 the commit and fails the audit; nothing is skipped silently.
 
 **`.betterleaks.toml` extends the default rules** (`[extend] useDefault = true`); without
-that line the file's own rules are the only ones. The audit fails when fewer than 100
-rules load. It adds one rule, `path-outside-project`, for absolute paths into a home or
+that line the file's own rules are the only ones. betterleaks reads the file only when
+given it, `-c .betterleaks.toml`, from 1.10.0, so every scan by the project's rules names
+it, and the audit fails unless more rules load from it than betterleaks' default holds. It adds one rule, `path-outside-project`, for absolute paths into a home or
 temporary directory. A relative path that leads outside the root is found by
 `scripts/audit/paths.py`, which resolves each relative path against the file holding it.
 The file's path allow-list skips what `.gitignore` ignores at the root: `target/` and

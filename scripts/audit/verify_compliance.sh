@@ -162,10 +162,15 @@ echo "[Rules 14, L2] Secrets, personal data and paths outside the project..."
 ERROR_BEFORE=$ERROR; ERROR=0
 [ "$(git config core.hooksPath)" = "scripts/hooks" ] \
     || fail "the commit hooks are not installed: git config core.hooksPath scripts/hooks"
-rules=$(betterleaks config check 2>&1 | sed -nE 's/^OK: ([0-9]+) rules.*/\1/p')
-[ "${rules:-0}" -ge 100 ] || fail "betterleaks loaded ${rules:-no} rules; is [extend] missing?"
-betterleaks dir . --no-banner --redact >/dev/null 2>&1 \
-    || fail "betterleaks: run 'betterleaks dir . --no-banner --redact'"
+# betterleaks reads `.betterleaks.toml` only when given it (`-c`), from 1.10.0, so every
+# scan by the project's rules names it, and the project's rules are counted beyond the
+# default ones its `[extend]` loads (ADR-0003).
+count() { betterleaks config check "$@" 2>&1 | sed -nE 's/^OK: ([0-9]+) rules.*/\1/p'; }
+default=$(count); rules=$(count -c .betterleaks.toml)
+[ "${rules:-0}" -gt "${default:-0}" ] \
+    || fail "betterleaks loaded ${rules:-no} rules from .betterleaks.toml, its default ${default:-none}; is [extend] or a rule of the project's missing?"
+betterleaks dir . --no-banner --redact -c .betterleaks.toml >/dev/null 2>&1 \
+    || fail "betterleaks: run 'betterleaks dir . --no-banner --redact -c .betterleaks.toml'"
 # betterleaks' default allow-list skips paths by name (`node_modules/`, `.svg`, …); read
 # through standard input, every text file git would commit, and every text blob of the
 # history, is scanned whatever its name (ADR-0003).
@@ -195,7 +200,7 @@ PERSONAL="${PERSONAL_LEAKS:-$HOME/.config/betterleaks/personal.toml}"
 if [ $REMOTE -eq 1 ]; then
     echo "  SKIPPED on GitHub Actions: the personal rules stay on the owner's machine"
     if git rev-parse --verify -q HEAD >/dev/null; then
-        betterleaks git . --no-banner --redact >/dev/null 2>&1 \
+        betterleaks git . --no-banner --redact -c .betterleaks.toml >/dev/null 2>&1 \
             || fail "a secret or a path outside the project in the history"
     fi
 elif [ ! -f "$PERSONAL" ]; then
@@ -207,7 +212,7 @@ else
         || fail "personal data, read through standard input"
     if git rev-parse --verify -q HEAD >/dev/null; then
         # The history too: a commit made with --no-verify skipped the hooks.
-        betterleaks git . --no-banner --redact >/dev/null 2>&1 \
+        betterleaks git . --no-banner --redact -c .betterleaks.toml >/dev/null 2>&1 \
             || fail "a secret or a path outside the project in the history"
         betterleaks git . --no-banner --redact -c "$PERSONAL" >/dev/null 2>&1 \
             || fail "personal data in the history"

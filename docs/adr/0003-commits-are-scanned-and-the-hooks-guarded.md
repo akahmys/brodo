@@ -151,3 +151,20 @@ Shown to fire: the old guard passed each command above, and of 63 the new one bl
 43 it should and passes the 20 it should; a commit of the history, made before the hook held an ADR to its
 number, fails `--commits`; staged files under `node_modules/` and ending `.gltf` passed
 betterleaks and fail through standard input.
+
+## Amendment: the configuration named
+
+- **Date**: 2026-11-05
+
+After betterleaks was upgraded by Homebrew on 2026-11-05, the gate's scan of the working
+tree failed on four keys in OpenVDB's own workflow files, copies P7's reading spike keeps
+under `out/`, which `.betterleaks.toml` allows. Measured: betterleaks 1.10.0 loads that file
+only when given it, by `-c` or `--unsafe-auto-load-config`, and loaded 466 rules without
+it and 467 with it, the project's `path-outside-project` among them. Four calls of the
+gate named no file: the rule count, the scan of the tree and both scans of the history,
+which had therefore been run on the default rules alone. The owner decided, on
+2026-11-05, as proposed: each names `-c .betterleaks.toml`, and the count passes only when
+more rules load from the file than the default holds, in place of "at least 100", which
+the default alone met. Shown to fire: the file without `[extend]` loads one rule; a path
+into a home directory planted at the root fails the tree's scan with the file and the
+tree passes without it. The hooks and the scans of standard input named the file already.
