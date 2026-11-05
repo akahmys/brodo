@@ -7,11 +7,12 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use brodo::error::VdbError;
+use brodo::field::AnyField;
 use brodo::field::Field;
 use brodo::meta::{GridMeta, SDF_KEY, SDF_VERSION};
 use brodo::topology::Topology;
 use brodo::tree::TileLevel;
-use brodo::vdb::{VdbEntry, VdbField, VdbFile, VdbValue, from_bytes, read, to_bytes};
+use brodo::vdb::{VdbEntry, VdbFile, VdbValue, from_bytes, read, to_bytes};
 
 const BY12: &[u8] = include_bytes!("data/vdb_by12_v224.bin");
 const BY14: &[u8] = include_bytes!("data/vdb_by14_v225.bin");
@@ -73,9 +74,11 @@ fn listing_of(file: &VdbFile) -> Listing {
     let mut grids = BTreeMap::new();
     for g in &file.grids {
         let lines = match &g.field {
-            VdbField::F32(f) => lines_of(&g.meta, &g.topology, f),
-            VdbField::F64(f) => lines_of(&g.meta, &g.topology, f),
-            _ => panic!("a value type this test does not know"),
+            AnyField::F32(f) => lines_of(&g.meta, &g.topology, f),
+            AnyField::F64(f) => lines_of(&g.meta, &g.topology, f),
+            AnyField::U8(_) | AnyField::U32(_) | AnyField::F32x3(_) | AnyField::F64x3(_) | _ => {
+                panic!("a value type this test does not know")
+            }
         };
         grids.insert(g.meta.name.clone(), lines);
     }
@@ -167,14 +170,14 @@ fn a_grid_brodo_writes_reads_back_the_same() {
     let (m, t, f) = written(3.0_f32, |k| k as f32 * 0.5 - 900.0);
     let file = round_trip(&m, &t, &f);
     let (m2, t2, f2) = (&file.grids[0].meta, &file.grids[0].topology, &file.grids[0].field);
-    let VdbField::F32(f2) = f2 else { panic!("not a float grid") };
+    let AnyField::F32(f2) = f2 else { panic!("not a float grid") };
     let mut want = m.clone();
     want.extra = BTreeMap::from([("class".to_owned(), "level set".to_owned())]);
     assert_eq!(m2, &want);
     assert_eq!(lines_of(m2, t2, f2), lines_of(&want, &t, &f));
     let (m, t, g) = written(-1.0_f64, |k| f64::from(k) * 0.25 + 1e-12 * f64::from(k % 7));
     let file = round_trip(&m, &t, &g);
-    let VdbField::F64(g2) = &file.grids[0].field else { panic!("not a double grid") };
+    let AnyField::F64(g2) = &file.grids[0].field else { panic!("not a double grid") };
     assert_eq!(
         lines_of(&file.grids[0].meta, &file.grids[0].topology, g2),
         lines_of(&file.grids[0].meta, &t, &g)
@@ -237,7 +240,7 @@ fn charged(file: &VdbFile) -> u64 {
     let mut total = 0;
     for g in &file.grids {
         let t = &g.topology;
-        let size = if let VdbField::F64(_) = &g.field { 8 } else { 4 };
+        let size = if let AnyField::F64(_) = &g.field { 8 } else { 4 };
         let floor = |o: [i32; 3], span: i32| o.map(|c| c.div_euclid(span) * span);
         let (mut lowers, mut uppers) = (BTreeSet::new(), BTreeSet::new());
         for n in t.leaf_numbers() {
@@ -438,7 +441,7 @@ fn an_inactive_root_tile_of_another_value_is_kept() {
     let (_, active) = root_tile(&t, &f, &bytes);
     bytes[active] = 0;
     let file = from_bytes(&bytes, "mm", u64::MAX).unwrap();
-    let VdbField::F64(g) = &file.grids[0].field else { panic!("not a double grid") };
+    let AnyField::F64(g) = &file.grids[0].field else { panic!("not a double grid") };
     assert_eq!(
         lines_of(&file.grids[0].meta, &file.grids[0].topology, g),
         lines_of(&file.grids[0].meta, &t, &f)
@@ -489,7 +492,7 @@ fn indicators_openvdb_does_not_write_here_read_as_section_9_8_says() {
     let negated = |bytes: &[u8]| {
         let file = from_bytes(bytes, "m", u64::MAX).unwrap();
         let g = file.grids.iter().find(|g| g.meta.name == "fog").unwrap();
-        let VdbField::F64(f) = &g.field else { panic!("not a double grid") };
+        let AnyField::F64(f) = &g.field else { panic!("not a double grid") };
         let t = &g.topology;
         let bits = (-f.background()).to_bits();
         t.leaf_numbers().flat_map(|n| f.leaf(t, n).unwrap()).filter(|v| v.to_bits() == bits).count()

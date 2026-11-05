@@ -21,11 +21,13 @@ lib brodo field::tests::a_merge_weighs_each_value_by_its_voxels
 lib brodo field::tests::a_root_tile_split_passes_its_value_to_every_part
 lib brodo field::tests::a_stale_field_is_refused_everywhere
 lib brodo field::tests::a_voxel_finds_its_place_in_its_leaf
+lib brodo field::tests::each_value_type_is_its_code_and_name_and_its_field_its_variant
 lib brodo field::tests::every_value_type_compares_by_bits
 lib brodo field::tests::regions_activated_in_the_merging_commit_count_as_the_background
 lib brodo grid::tests::a_grid_shows_its_topology_and_field
 lib brodo grid::tests::a_grid_writes_its_leaves_in_parallel_and_its_tiles
 lib brodo grid::tests::an_edit_keeps_the_values_and_a_refused_one_changes_nothing
+lib brodo kind::tests::each_kind_is_told_by_its_magic_number_and_no_other_bytes_are
 lib brodo manifest::tests::a_location_is_eight_bytes
 lib brodo manifest::tests::a_step_beyond_the_coordinate_range_is_nothing
 lib brodo manifest::tests::directions_cover_the_block_but_its_centre
@@ -118,6 +120,7 @@ test cache_format a_file_reads_back_what_was_written
 test cache_format a_file_round_trips
 test cache_format a_file_unfit_to_map_is_refused
 test cache_format a_grid_of_f64_vectors_reads_copied_and_mapped
+test cache_format a_grid_thaws_as_its_type_within_its_limit
 test cache_format a_mapped_file_reads_as_a_copied_one
 test cache_format an_entry_of_bytes_padded_a_whole_block_is_refused
 test cache_format bounds_cover_leaves_and_tiles_and_an_empty_grid_has_none
@@ -146,6 +149,7 @@ test format_document the_document_s_reader_reads_every_region_of_the_archives_as
 test format_document the_document_s_reader_refuses_a_region_of_nodes_sharing_a_leaf_as_the_crates_do
 test frozen_format a_grid_of_f64_vectors_keeps_its_bytes
 test frozen_format a_topology_holding_other_leaves_or_tiles_is_refused_to_thaw_on
+test frozen_format a_value_type_of_another_size_or_no_code_is_refused
 test frozen_format a_view_reads_what_was_frozen
 test frozen_format a_view_thaws_into_what_was_frozen
 test frozen_format damaged_bytes_are_refused_or_read_safely

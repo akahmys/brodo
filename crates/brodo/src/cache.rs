@@ -14,14 +14,13 @@ use std::path::Path;
 use zerocopy::{FromZeros, IntoBytes};
 
 use crate::error::{CacheError, FormatError};
-use crate::field::{Field, ForType, Stored, with_type};
+use crate::field::{AnyField, Field, ForType, LEAF_VOXELS, Stored, ValueType, with_type};
 use crate::frozen::{BLOCK, Block, FrozenGrid, aligned, freeze};
 use crate::meta::{Bounds, GridMeta, SDF_KEY};
 use crate::topology::Topology;
 use crate::view::GridView;
 
-/// "BRDC", read as a little-endian `u32`.
-const MAGIC: u32 = u32::from_le_bytes(*b"BRDC");
+use crate::kind::CACHE_MAGIC as MAGIC;
 /// The format version this build reads and writes.
 pub(crate) const VERSION: u32 = 2;
 /// A directory entry's kinds (docs/formats.md §3.2).
@@ -75,7 +74,7 @@ impl CacheEntry {
             payload: Payload::Grid {
                 meta: meta.clone(),
                 bounds: Bounds::of(t)?,
-                value_type: T::TYPE_CODE,
+                value_type: T::VALUE_TYPE.code(),
                 frozen: freeze(t, f)?,
             },
         })
@@ -421,12 +420,17 @@ pub struct BytesEntry<'a> {
     pub bytes: &'a [u8],
 }
 
+/// What thawing a tile is counted to make, and a leaf beside its values (ADR-0050, measured
+/// in `spikes/thawmemory/`, 2026-11-03).
+const THAW_TILE: u64 = 256;
+const THAW_LEAF: u64 = 1024;
+
 /// One grid of a read file.
 #[derive(Debug, Clone)]
 pub(crate) struct Entry {
     meta: GridMeta,
     bounds: Bounds,
-    value_type: u32,
+    value_type: ValueType,
     /// The frozen buffer's byte range in the file.
     pub(crate) grid: std::ops::Range<usize>,
 }
@@ -466,7 +470,7 @@ impl Storage {
 
 /// Checks a grid's frozen buffer with the type its directory names: the bounds its leaves
 /// and tiles cover.
-fn check_grid(bytes: &[u8], value_type: u32) -> Result<Bounds, FormatError> {
+fn check_grid(bytes: &[u8], value_type: ValueType) -> Result<Bounds, FormatError> {
     struct Check<'a>(&'a [u8]);
     impl ForType for Check<'_> {
         type Out = Result<Bounds, FormatError>;
@@ -475,7 +479,6 @@ fn check_grid(bytes: &[u8], value_type: u32) -> Result<Bounds, FormatError> {
         }
     }
     with_type(value_type, Check(bytes))
-        .unwrap_or_else(|found| Err(FormatError::UnknownValueType(found)))
 }
 
 /// A range of `len` bytes from block `at`, which must be byte `expected`, where the writer
@@ -601,8 +604,10 @@ fn grid_entry(
 ) -> Result<Entry, CacheError> {
     let (meta, bounds) = decode_meta(meta)?;
     let grid = all.get(payload.clone()).ok_or(CacheError::Truncated("grid"))?;
-    let found =
-        check_grid(grid, value_type).map_err(|error| CacheError::Grid { index: place, error })?;
+    let refused = |error| CacheError::Grid { index: place, error };
+    let value_type = ValueType::from_code(value_type)
+        .ok_or(refused(FormatError::UnknownValueType(value_type)))?;
+    let found = check_grid(grid, value_type).map_err(refused)?;
     if found != bounds {
         return Err(CacheError::Inconsistent("bounds"));
     }
@@ -767,8 +772,8 @@ impl CacheFile {
         Ok(self.entry(i)?.bounds)
     }
 
-    /// The type code of a grid's values (`Stored::TYPE_CODE`).
-    pub fn value_type(&self, i: usize) -> Result<u32, CacheError> {
+    /// The type of a grid's values.
+    pub fn value_type(&self, i: usize) -> Result<ValueType, CacheError> {
         Ok(self.entry(i)?.value_type)
     }
 
@@ -778,6 +783,47 @@ impl CacheFile {
         let bytes =
             self.storage.bytes().get(e.grid.clone()).ok_or(CacheError::Truncated("grid"))?;
         GridView::new(bytes).map_err(|error| CacheError::Grid { index: i, error })
+    }
+
+    /// The bytes thawing a grid is counted to make (ARCHITECTURE.md §4.7): each leaf its
+    /// values' bytes and 1024 more, each tile 256. Its nodes are not counted.
+    pub fn thaw_size(&self, i: usize) -> Result<u64, CacheError> {
+        struct Size<'a>(&'a CacheFile, usize);
+        impl ForType for Size<'_> {
+            type Out = Result<u64, CacheError>;
+            fn run<T: Stored>(self) -> Self::Out {
+                let view = self.0.view::<T>(self.1)?;
+                let values = u64::try_from(LEAF_VOXELS * size_of::<T>()).unwrap_or(u64::MAX);
+                let count =
+                    |n: usize, each: u64| u64::try_from(n).unwrap_or(u64::MAX).saturating_mul(each);
+                Ok(count(view.leaf_count(), values.saturating_add(THAW_LEAF))
+                    .saturating_add(count(view.tile_count(), THAW_TILE)))
+            }
+        }
+        with_type(self.entry(i)?.value_type, Size(self, i))
+    }
+
+    /// A grid thawed into its topology and a field of the type the file states, refused as
+    /// `CacheError::ThawTooLarge` if thawing it is counted (`thaw_size`) to make more than
+    /// `limit` bytes.
+    pub fn thaw(&self, i: usize, limit: u64) -> Result<(Topology, AnyField), CacheError> {
+        struct Thaw<'a>(&'a CacheFile, usize);
+        impl ForType for Thaw<'_> {
+            type Out = Result<(Topology, AnyField), CacheError>;
+            fn run<T: Stored>(self) -> Self::Out {
+                let (t, f) = self
+                    .0
+                    .view::<T>(self.1)?
+                    .thaw()
+                    .map_err(|error| CacheError::Grid { index: self.1, error })?;
+                Ok((t, f.into()))
+            }
+        }
+        let need = self.thaw_size(i)?;
+        if need > limit {
+            return Err(CacheError::ThawTooLarge { index: i, need, limit });
+        }
+        with_type(self.entry(i)?.value_type, Thaw(self, i))
     }
 }
 

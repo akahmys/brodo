@@ -8,7 +8,9 @@ use brodo::vdb::VdbEntry;
 use brodo::vtk::write;
 
 use crate::error::MestoloError;
-use crate::load::{Grid, Loaded, Values};
+use brodo::field::AnyField;
+
+use crate::load::{Grid, Loaded};
 
 /// Writes `loaded` at `output` in the format its name ends in: every grid as `.vdb`, or
 /// the one `grid` names; one grid as `.vtu`, its values named as the grid is.
@@ -29,24 +31,26 @@ pub fn convert(loaded: &Loaded, grid: Option<&str>, output: &Path) -> Result<(),
 
 fn entry(g: &Grid) -> Result<VdbEntry, MestoloError> {
     let (m, t) = (&g.meta, &g.topology);
-    match &g.values {
-        Values::F32(f) => Ok(VdbEntry::new(m, t, f)?),
-        Values::F64(f) => Ok(VdbEntry::new(m, t, f)?),
-        Values::U8(_) | Values::U32(_) | Values::F32x3(_) | Values::F64x3(_) => {
-            Err(MestoloError::NotWritten { grid: m.name.clone(), value_type: g.values.type_name() })
+    match &g.field {
+        AnyField::F32(f) => Ok(VdbEntry::new(m, t, f)?),
+        AnyField::F64(f) => Ok(VdbEntry::new(m, t, f)?),
+        AnyField::U8(_) | AnyField::U32(_) | AnyField::F32x3(_) | AnyField::F64x3(_) => {
+            Err(MestoloError::NotWritten { grid: m.name.clone(), value_type: g.field.value_type() })
         }
+        _ => Err(MestoloError::ValueType(g.field.value_type())),
     }
 }
 
 fn vtu(g: &Grid, output: &Path) -> Result<(), MestoloError> {
     let (t, name) = (&g.topology, g.meta.name.as_str());
-    match &g.values {
-        Values::F32(f) => write(output, t, f, name)?,
-        Values::F64(f) => write(output, t, f, name)?,
-        Values::U8(f) => write(output, t, f, name)?,
-        Values::U32(f) => write(output, t, f, name)?,
-        Values::F32x3(f) => write(output, t, f, name)?,
-        Values::F64x3(f) => write(output, t, f, name)?,
+    match &g.field {
+        AnyField::F32(f) => write(output, t, f, name)?,
+        AnyField::F64(f) => write(output, t, f, name)?,
+        AnyField::U8(f) => write(output, t, f, name)?,
+        AnyField::U32(f) => write(output, t, f, name)?,
+        AnyField::F32x3(f) => write(output, t, f, name)?,
+        AnyField::F64x3(f) => write(output, t, f, name)?,
+        _ => return Err(MestoloError::ValueType(g.field.value_type())),
     }
     Ok(())
 }

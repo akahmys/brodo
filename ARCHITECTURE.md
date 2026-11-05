@@ -255,6 +255,14 @@ fastest. A neighbour beyond the `i32` coordinate range is the background.
   reads bytes and `read(path, …)` a file, the limit last wherever reading makes more than
   its input; `to_bytes(…)` makes the bytes and `write(path, …)` a file. colino's mesh
   readers take the same shape (§5).
+- A file's kind, a frozen grid, a cache file, an archive or a `.vdb`, is told by its first
+  eight bytes, its magic number (`kind::FileKind::of`), whatever features are built; that
+  the rest is of the kind is its reader's to check (ADR-0056).
+- A cache file's or an archive's grid thaws whole into its topology and an `AnyField` of
+  the type the file states (`CacheFile::thaw`), refused if what thawing it is counted to
+  make passes the limit given: each leaf its values' bytes and 1024 more, each tile 256
+  (`CacheFile::thaw_size`). Its nodes are not counted, and make about twice the bytes they
+  take in the file (`spikes/thawmemory/`, 2026-11-03; ADR-0050, ADR-0056).
 - A file brodo writes at a path, a cache file, an archive, a `.vdb`, a `.vtu` or a PNG, is
   written whole: to a hidden file beside it, flushed and renamed over it, so that a
   reader, a mapping process among them, sees the old file or the new one; the directory
@@ -309,7 +317,11 @@ a comparison by bits for merge rules, and `zerocopy`'s traits, so that its value
 bytes. `Value` is open: a field, its parallel update, gathers, accessors and analyses take
 a type of a user's own. Frozen grids and cache files hold only `Stored` types, a sealed
 trait over `Value` that brodo implements for `f32`, `f64`, `u8`, `u32`, `[f32; 3]` and
-`[f64; 3]`, each named by a type code brodo assigns (docs/formats.md §1.1, ADR-0029).
+`[f64; 3]`, each named by a type code brodo assigns (docs/formats.md §1.1, ADR-0029). A
+stored type is named at run time by `ValueType`, which gives its code and its name and is
+what a file's accessors and errors name a type by; a field of a type chosen at run time, a
+grid read from a file whose type its reader did not choose, is an `AnyField`, one variant a
+type (ADR-0056).
 
 ### 4.9 Hermite data (ADR-0032, ADR-0051)
 
@@ -483,10 +495,8 @@ Rust. It uses no GPU and no window.
   file are refused by name. Every file is read whole through brodo's readers, under a
   limit of 4 GiB that `--limit` changes, which bounds the file and what reading makes as
   each reader's does (§4.7); a cache file is read, not mapped. A cache file's or an
-  archive's grids are then thawed, their leaves and tiles counted first against the same
-  limit, a leaf its values' bytes and 1024 more, a tile 256; their nodes, not countable
-  before, make about twice the bytes they take in the file (`spikes/thawmemory/`,
-  2026-11-03; ADR-0050). A `.vdb`'s grids take the unit `unstated`, OpenVDB stating
+  archive's grids are then thawed by `CacheFile::thaw`, what thawing each is counted to
+  make (§4.7) counted first against the same limit, all the grids' together. A `.vdb`'s grids take the unit `unstated`, OpenVDB stating
   none, and its grids brodo does not read are listed as skipped.
 - **`info`** writes to standard output, one fact a line, a cache file's or an archive's
   entries of bytes by name and length, then each grid's facts indented under its name: its value type, unit, voxel size, transform, the bounds of its leaves and tiles,

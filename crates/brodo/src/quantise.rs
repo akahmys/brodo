@@ -8,7 +8,7 @@ use std::sync::OnceLock;
 use zerocopy::FromBytes;
 use zerocopy::little_endian::{F32, F64};
 
-use crate::field::Stored;
+use crate::field::ValueType;
 
 /// The scalar a floating value type is made of.
 #[derive(Debug, Clone, Copy)]
@@ -27,12 +27,12 @@ pub(crate) struct Kind {
 impl Kind {
     /// The kind of the value type of code `value_type`, if it is a floating one.
     pub(crate) fn of(value_type: u32) -> Option<Self> {
-        let (scalar, components) = match value_type {
-            t if t == f32::TYPE_CODE => (Scalar::F32, 1),
-            t if t == f64::TYPE_CODE => (Scalar::F64, 1),
-            t if t == <[f32; 3]>::TYPE_CODE => (Scalar::F32, 3),
-            t if t == <[f64; 3]>::TYPE_CODE => (Scalar::F64, 3),
-            _ => return None,
+        let (scalar, components) = match ValueType::from_code(value_type)? {
+            ValueType::F32 => (Scalar::F32, 1),
+            ValueType::F64 => (Scalar::F64, 1),
+            ValueType::F32x3 => (Scalar::F32, 3),
+            ValueType::F64x3 => (Scalar::F64, 3),
+            ValueType::U8 | ValueType::U32 => return None,
         };
         Some(Self { scalar, components })
     }
@@ -348,15 +348,15 @@ mod tests {
     #[test]
     fn the_floating_types_alone_have_a_kind() {
         for (code, size, components) in [
-            (f32::TYPE_CODE, 4, 1),
-            (f64::TYPE_CODE, 8, 1),
-            (<[f32; 3]>::TYPE_CODE, 4, 3),
-            (<[f64; 3]>::TYPE_CODE, 8, 3),
+            (ValueType::F32.code(), 4, 1),
+            (ValueType::F64.code(), 8, 1),
+            (ValueType::F32x3.code(), 4, 3),
+            (ValueType::F64x3.code(), 8, 3),
         ] {
             let k = Kind::of(code).unwrap();
             assert_eq!((k.scalar_size(), k.components()), (size, components), "type {code}");
         }
-        assert!(Kind::of(u8::TYPE_CODE).is_none());
+        assert!(Kind::of(ValueType::U8.code()).is_none());
     }
 
     fn scalars(xs: &[f64]) -> Vec<u8> {

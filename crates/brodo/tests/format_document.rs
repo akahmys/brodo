@@ -188,7 +188,7 @@ fn same_cache_grid(file: &CacheFile, i: usize, lines: &[String]) {
     let ours: Vec<_> =
         m.extra.iter().map(|(k, v)| (hex(k.as_bytes()), hex(v.as_bytes()))).collect();
     assert_eq!(pairs, ours, "free pairs");
-    match file.value_type(i).unwrap() {
+    match file.value_type(i).unwrap().code() {
         1 => values!(f32),
         2 => values!(f64),
         3 => values!(u8),
@@ -281,7 +281,7 @@ fn the_document_s_reader_reads_every_golden_file_as_the_crates_do() {
         let file = cache_file(&bytes).unwrap();
         assert_eq!(grids.len(), file.grid_count(), "{name}: grid count");
         for (i, (code, lines)) in grids.iter().enumerate() {
-            assert_eq!(*code, file.value_type(i).unwrap(), "{name}: grid {i}'s type");
+            assert_eq!(*code, file.value_type(i).unwrap().code(), "{name}: grid {i}'s type");
             same_cache_grid(&file, i, lines);
         }
         let hermite: Vec<String> =
@@ -378,7 +378,7 @@ fn crates_region(bytes: &[u8], index: usize, b: [i32; 6]) -> Option<Vec<String>>
     }
     let extent = Bounds::Box { min: [b[0], b[1], b[2]], max: [b[3], b[4], b[5]] };
     let r = region_from_bytes(bytes, index, extent, u64::MAX).ok()?;
-    Some(match r.value_type() {
+    Some(match r.value_type().code() {
         1 => lines::<f32>(&r, b),
         2 => lines::<f64>(&r, b),
         3 => lines::<u8>(&r, b),

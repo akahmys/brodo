@@ -19,8 +19,7 @@ use crate::tree::{LEAF_LOG2, LOWER_DIM_LOG2, LOWER_SPAN_LOG2, UPPER_DIM_LOG2};
 #[cfg(target_endian = "big")]
 compile_error!("the frozen layout stores values little-endian, as brodo's targets are");
 
-/// "BRDG", read as a little-endian `u32`.
-pub(crate) const MAGIC: u32 = u32::from_le_bytes(*b"BRDG");
+pub(crate) use crate::kind::GRID_MAGIC as MAGIC;
 /// The layout version this build reads and writes.
 pub(crate) const VERSION: u32 = 2;
 /// Bytes in a block, the unit of offsets and alignment.
@@ -377,7 +376,7 @@ fn header<T: Stored>(
     Ok(Header {
         magic: U32::new(MAGIC),
         version: U32::new(VERSION),
-        value_type: U32::new(T::TYPE_CODE),
+        value_type: U32::new(T::VALUE_TYPE.code()),
         value_size: U32::new(to_u32(size_of::<T>())?),
         counts: [
             to_u32(counts[0])?,

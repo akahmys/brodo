@@ -3,27 +3,28 @@
 
 use std::path::Path;
 
-use brodo::field::Field;
+use brodo::field::{AnyField, Field};
 use brodo::meta::{Bounds, SDF_KEY};
 use brodo::slice::{Axis, ColorMap, Image, Slice, render};
 
 use crate::error::MestoloError;
 use crate::info::{Parts, extremes};
-use crate::load::{Grid, Values};
+use crate::load::Grid;
 
 /// The most pixels a slice is drawn with: 2²⁶, a 256 MiB image of four bytes a pixel.
 pub const MOST_PIXELS: i64 = 1 << 26;
 
 /// Writes grid `g`'s plane perpendicular to `axis` at `at` as PNG at `path`.
 pub fn slice(g: &Grid, axis: Axis, at: i32, path: &Path) -> Result<(), MestoloError> {
-    let image = match &g.values {
-        Values::F32(f) => draw(g, f, axis, at)?,
-        Values::F64(f) => draw(g, f, axis, at)?,
-        Values::U8(f) => draw(g, f, axis, at)?,
-        Values::U32(f) => draw(g, f, axis, at)?,
-        Values::F32x3(_) | Values::F64x3(_) => {
-            return Err(MestoloError::NotScalar(g.values.type_name()));
+    let image = match &g.field {
+        AnyField::F32(f) => draw(g, f, axis, at)?,
+        AnyField::F64(f) => draw(g, f, axis, at)?,
+        AnyField::U8(f) => draw(g, f, axis, at)?,
+        AnyField::U32(f) => draw(g, f, axis, at)?,
+        AnyField::F32x3(_) | AnyField::F64x3(_) => {
+            return Err(MestoloError::NotScalar(g.field.value_type()));
         }
+        _ => return Err(MestoloError::ValueType(g.field.value_type())),
     };
     Ok(brodo::slice::write(path, &image)?)
 }

@@ -4,7 +4,8 @@
 
 #![no_main]
 
-use brodo::vdb::{VdbField, from_bytes};
+use brodo::field::AnyField;
+use brodo::vdb::from_bytes;
 use libfuzzer_sys::fuzz_target;
 
 #[path = "shared/probes.rs"]
@@ -17,12 +18,12 @@ fuzz_target!(|data: &[u8]| {
     if let Ok(file) = from_bytes(data, "m", LIMIT) {
         for g in &file.grids {
             match &g.field {
-                VdbField::F32(f) => {
+                AnyField::F32(f) => {
                     for v in PROBES {
                         let _value = f.value_at(&g.topology, v);
                     }
                 }
-                VdbField::F64(f) => {
+                AnyField::F64(f) => {
                     for v in PROBES {
                         let _value = f.value_at(&g.topology, v);
                     }

@@ -6,12 +6,12 @@
 use std::fmt::Display;
 use std::io::Write;
 
-use brodo::field::{Field, Value};
+use brodo::field::{AnyField, Field, Value};
 use brodo::meta::Bounds;
 use brodo::topology::Topology;
 
 use crate::error::MestoloError;
-use crate::load::{Grid, Loaded, Values};
+use crate::load::{Grid, Loaded};
 
 /// A value's components, each compared and written alone.
 pub trait Parts: Value {
@@ -94,13 +94,14 @@ pub fn write(loaded: &Loaded, out: &mut impl Write) -> Result<(), MestoloError> 
     for (i, g) in loaded.grids.iter().enumerate() {
         writeln!(out)?;
         writeln!(out, "grid {i}: {:?}", g.meta.name)?;
-        match &g.values {
-            Values::F32(f) => grid(g, f, out)?,
-            Values::F64(f) => grid(g, f, out)?,
-            Values::U8(f) => grid(g, f, out)?,
-            Values::U32(f) => grid(g, f, out)?,
-            Values::F32x3(f) => grid(g, f, out)?,
-            Values::F64x3(f) => grid(g, f, out)?,
+        match &g.field {
+            AnyField::F32(f) => grid(g, f, out)?,
+            AnyField::F64(f) => grid(g, f, out)?,
+            AnyField::U8(f) => grid(g, f, out)?,
+            AnyField::U32(f) => grid(g, f, out)?,
+            AnyField::F32x3(f) => grid(g, f, out)?,
+            AnyField::F64x3(f) => grid(g, f, out)?,
+            _ => return Err(MestoloError::ValueType(g.field.value_type())),
         }
     }
     Ok(())
@@ -108,7 +109,7 @@ pub fn write(loaded: &Loaded, out: &mut impl Write) -> Result<(), MestoloError> 
 
 fn grid<T: Parts>(g: &Grid, f: &Field<T>, out: &mut impl Write) -> Result<(), MestoloError> {
     let (m, t) = (&g.meta, &g.topology);
-    writeln!(out, "  type: {}", g.values.type_name())?;
+    writeln!(out, "  type: {}", g.field.value_type())?;
     writeln!(out, "  unit: {:?}", m.unit)?;
     writeln!(out, "  voxel size: {}", joined(m.voxel_size))?;
     let rows: Vec<String> = m.transform.iter().map(|r| joined(*r)).collect();

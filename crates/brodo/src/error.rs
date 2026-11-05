@@ -1,5 +1,6 @@
 //! The errors of brodo's operations (CODING.md Rule 8).
 
+use crate::field::ValueType;
 use crate::topology::Location;
 use crate::tree::{Coord, TileLevel};
 
@@ -140,10 +141,10 @@ pub enum FormatError {
     /// The values are of another type.
     #[error("the values are of type {found}, not {expected}")]
     WrongValueType {
-        /// The type code asked for.
-        expected: u32,
-        /// The type code found.
-        found: u32,
+        /// The type asked for.
+        expected: ValueType,
+        /// The type found.
+        found: ValueType,
     },
     /// A count, offset or index points outside its section, or contradicts another.
     #[error("the {0} section is inconsistent")]
@@ -242,19 +243,30 @@ pub enum CacheError {
     /// An archive's value encoding this build does not know (docs/formats.md §8.5).
     #[error("value encoding {0} is not read by this build")]
     UnknownEncoding(u32),
-    /// A grid asked to be quantised holds values of a type that is not: only floating ones
-    /// are (docs/formats.md §8.5).
-    #[error("grid {index}'s values, of type {value_type}, are not quantised")]
+    /// An entry asked to be quantised holds values of a type that is not, or bytes: only
+    /// floating values are (docs/formats.md §8.5).
+    #[error("entry {index}'s values, of type {}, are not quantised", value_type.map_or("bytes", ValueType::name))]
     NotQuantised {
-        /// The grid's place in what was written.
+        /// The entry's place in what was written.
         index: usize,
-        /// Its value type's code.
-        value_type: u32,
+        /// Its value type; none for an entry of bytes.
+        value_type: Option<ValueType>,
     },
     /// A grid's leaf value is one its encoding cannot hold: a NaN, a value beyond ±65504 in
     /// binary16, an infinity or a range wider than an `f64` holds in 8 bits.
     #[error("grid {0} holds a leaf value its encoding cannot hold")]
     Unrepresentable(usize),
+    /// Thawing a grid is counted to make more bytes than the limit given
+    /// (`CacheFile::thaw`), and it was not thawed.
+    #[error("grid {index} would thaw to {need} bytes or more, more than the limit of {limit}")]
+    ThawTooLarge {
+        /// The grid's place in the file.
+        index: usize,
+        /// The bytes thawing it is counted to make (`CacheFile::thaw_size`).
+        need: u64,
+        /// The limit given.
+        limit: u64,
+    },
     /// The metadata holds a key beginning `brodo.`, which `CacheEntry::new` leaves to
     /// brodo's formats built on the cache profile.
     #[error("the metadata holds the key {0:?}, which brodo's formats reserve")]

@@ -12,7 +12,7 @@ use brodo::archive::{
 };
 use brodo::cache::{self, CacheEntry, CacheFile};
 use brodo::error::{CacheError, FormatError};
-use brodo::field::{Field, Value};
+use brodo::field::{Field, Value, ValueType};
 use brodo::meta::{Bounds, GridMeta};
 use brodo::topology::Topology;
 use brodo::tree::{Coord, TileLevel};
@@ -112,7 +112,7 @@ fn format_version_2_keeps_its_bytes() {
     let packed = to_bytes(&big).unwrap();
     assert_eq!(word(&packed, 44), 3, "chunks of 8192, 8192 and the rest");
     let encoded = to_bytes_with(&[(&big[0], Encoding::Binary16)]);
-    assert!(matches!(encoded, Err(CacheError::NotQuantised { index: 0, value_type: 0 })));
+    assert!(matches!(encoded, Err(CacheError::NotQuantised { index: 0, value_type: None })));
     let mut one = GOLDEN_2.to_vec();
     one[4..8].copy_from_slice(&1_u32.to_le_bytes());
     assert!(matches!(from_bytes(&one, u64::MAX), Err(CacheError::UnsupportedVersion(1))));
@@ -468,7 +468,7 @@ fn a_value_its_encoding_cannot_hold_is_refused() {
     for encoding in [Encoding::Binary16, Encoding::EightBit] {
         assert!(matches!(
             to_bytes_with(&[(&exact, encoding), (&bytes, encoding)]),
-            Err(CacheError::NotQuantised { index: 1, value_type: 3 })
+            Err(CacheError::NotQuantised { index: 1, value_type: Some(ValueType::U8) })
         ));
     }
     let with = |x: f64| {

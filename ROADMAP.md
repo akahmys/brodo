@@ -559,7 +559,8 @@ since crates.io yanks a version but never deletes it.
         and docs/formats.md and ARCHITECTURE.md stated at the present versions (ADR-0054)
   - [x] the readers' and writers' names and arguments made one shape, colino's mesh
         readers and mestolo's output with them (ADR-0055)
-  - [ ] a value type named by an enum, and a field of any stored type
+  - [x] a value type named by an enum, and a field of any stored type, a cache file's
+        grid thawed as one within a limit and a file's kind told by brodo (ADR-0056)
   - [ ] a cache file's grids reached as its entries of bytes are; the reserved-key writers
         hidden
   - [ ] the errors' shapes, places and features made even

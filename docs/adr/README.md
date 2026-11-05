@@ -85,3 +85,4 @@ A record is `Proposed` until the human accepts it.
 | [0053](0053-metadata-keys-beginning-brodo-are-reserved.md) | Metadata keys beginning `brodo.` are reserved |
 | [0054](0054-version-1-of-the-frozen-layout-cache-and-archive-is-not-read.md) | Version 1 of the frozen layout, the cache and the archive is not read |
 | [0055](0055-every-format-reads-and-writes-in-one-shape.md) | Every format reads and writes in one shape |
+| [0056](0056-a-value-type-is-named-by-an-enum.md) | A value type is named by an enum, and a field of any stored type is one |

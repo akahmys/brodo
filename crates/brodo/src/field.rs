@@ -31,17 +31,149 @@ pub trait Value:
 }
 
 mod sealed {
-    /// Keeps [`super::Stored`] to the types brodo names in its files.
-    pub trait Sealed {}
-    impl Sealed for f32 {}
-    impl Sealed for f64 {}
-    impl Sealed for u8 {}
-    impl Sealed for u32 {}
-    impl Sealed for [f32; 3] {}
-    impl Sealed for [f64; 3] {}
+    use super::{AnyField, Field};
+
+    /// Keeps [`super::Stored`] to the types brodo names in its files, and wraps a field of
+    /// one in its variant of [`AnyField`].
+    pub trait Sealed: Sized {
+        fn any(f: Field<Self>) -> AnyField;
+    }
+    impl Sealed for f32 {
+        fn any(f: Field<Self>) -> AnyField {
+            AnyField::F32(f)
+        }
+    }
+    impl Sealed for f64 {
+        fn any(f: Field<Self>) -> AnyField {
+            AnyField::F64(f)
+        }
+    }
+    impl Sealed for u8 {
+        fn any(f: Field<Self>) -> AnyField {
+            AnyField::U8(f)
+        }
+    }
+    impl Sealed for u32 {
+        fn any(f: Field<Self>) -> AnyField {
+            AnyField::U32(f)
+        }
+    }
+    impl Sealed for [f32; 3] {
+        fn any(f: Field<Self>) -> AnyField {
+            AnyField::F32x3(f)
+        }
+    }
+    impl Sealed for [f64; 3] {
+        fn any(f: Field<Self>) -> AnyField {
+            AnyField::F64x3(f)
+        }
+    }
 }
 
-/// A value type brodo's frozen grids and files hold, named by a code brodo assigns
+/// A value type brodo's frozen grids and files hold, each named in them by its code
+/// (docs/formats.md §1.1, ADR-0056).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum ValueType {
+    /// `f32`, code 1.
+    F32,
+    /// `f64`, code 2.
+    F64,
+    /// `u8`, code 3.
+    U8,
+    /// `u32`, code 4.
+    U32,
+    /// `[f32; 3]`, code 5.
+    F32x3,
+    /// `[f64; 3]`, code 6, read by brodo from 0.3.0 on (ADR-0029).
+    F64x3,
+}
+
+impl ValueType {
+    /// The number naming the type in a frozen grid's header and a cache file's directory.
+    pub const fn code(self) -> u32 {
+        match self {
+            ValueType::F32 => 1,
+            ValueType::F64 => 2,
+            ValueType::U8 => 3,
+            ValueType::U32 => 4,
+            ValueType::F32x3 => 5,
+            ValueType::F64x3 => 6,
+        }
+    }
+
+    /// The type a code names; none for a code no type has.
+    pub const fn from_code(code: u32) -> Option<Self> {
+        match code {
+            1 => Some(ValueType::F32),
+            2 => Some(ValueType::F64),
+            3 => Some(ValueType::U8),
+            4 => Some(ValueType::U32),
+            5 => Some(ValueType::F32x3),
+            6 => Some(ValueType::F64x3),
+            _ => None,
+        }
+    }
+
+    /// The type's name, as Rust writes it: `f32`, `[f32; 3]`.
+    pub const fn name(self) -> &'static str {
+        match self {
+            ValueType::F32 => "f32",
+            ValueType::F64 => "f64",
+            ValueType::U8 => "u8",
+            ValueType::U32 => "u32",
+            ValueType::F32x3 => "[f32; 3]",
+            ValueType::F64x3 => "[f64; 3]",
+        }
+    }
+}
+
+impl std::fmt::Display for ValueType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.name())
+    }
+}
+
+/// A field of any [`Stored`] type, the type known at run time: a grid read from a file
+/// whose value type the reader did not choose (ADR-0056).
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub enum AnyField {
+    /// Of `f32`.
+    F32(Field<f32>),
+    /// Of `f64`.
+    F64(Field<f64>),
+    /// Of `u8`.
+    U8(Field<u8>),
+    /// Of `u32`.
+    U32(Field<u32>),
+    /// Of `[f32; 3]`.
+    F32x3(Field<[f32; 3]>),
+    /// Of `[f64; 3]`.
+    F64x3(Field<[f64; 3]>),
+}
+
+impl AnyField {
+    /// Its values' type.
+    pub fn value_type(&self) -> ValueType {
+        match self {
+            AnyField::F32(_) => ValueType::F32,
+            AnyField::F64(_) => ValueType::F64,
+            AnyField::U8(_) => ValueType::U8,
+            AnyField::U32(_) => ValueType::U32,
+            AnyField::F32x3(_) => ValueType::F32x3,
+            AnyField::F64x3(_) => ValueType::F64x3,
+        }
+    }
+}
+
+impl<T: Stored> From<Field<T>> for AnyField {
+    fn from(f: Field<T>) -> Self {
+        T::any(f)
+    }
+}
+
+/// A value type brodo's frozen grids and files hold, named by its [`ValueType`]
 /// (docs/formats.md §1.1). Sealed, so that a file holds only codes every build reads, and
 /// no other type takes one of them (ADR-0029).
 ///
@@ -53,12 +185,12 @@ mod sealed {
 ///     fn same_bits(&self, other: &Self) -> bool { self.0 == other.0 }
 /// }
 /// impl brodo::field::Stored for Count {
-///     const TYPE_CODE: u32 = 1;
+///     const VALUE_TYPE: brodo::field::ValueType = brodo::field::ValueType::F32;
 /// }
 /// ```
 pub trait Stored: Value + sealed::Sealed {
-    /// The number naming the type in a frozen grid's header and a cache file's directory.
-    const TYPE_CODE: u32;
+    /// The type, by which its code is written.
+    const VALUE_TYPE: ValueType;
 }
 
 impl Value for f32 {
@@ -68,7 +200,7 @@ impl Value for f32 {
 }
 
 impl Stored for f32 {
-    const TYPE_CODE: u32 = 1;
+    const VALUE_TYPE: ValueType = ValueType::F32;
 }
 
 impl Value for f64 {
@@ -78,7 +210,7 @@ impl Value for f64 {
 }
 
 impl Stored for f64 {
-    const TYPE_CODE: u32 = 2;
+    const VALUE_TYPE: ValueType = ValueType::F64;
 }
 
 impl Value for u8 {
@@ -88,7 +220,7 @@ impl Value for u8 {
 }
 
 impl Stored for u8 {
-    const TYPE_CODE: u32 = 3;
+    const VALUE_TYPE: ValueType = ValueType::U8;
 }
 
 impl Value for u32 {
@@ -98,7 +230,7 @@ impl Value for u32 {
 }
 
 impl Stored for u32 {
-    const TYPE_CODE: u32 = 4;
+    const VALUE_TYPE: ValueType = ValueType::U32;
 }
 
 impl Value for [f32; 3] {
@@ -108,7 +240,7 @@ impl Value for [f32; 3] {
 }
 
 impl Stored for [f32; 3] {
-    const TYPE_CODE: u32 = 5;
+    const VALUE_TYPE: ValueType = ValueType::F32x3;
 }
 
 impl Value for [f64; 3] {
@@ -117,28 +249,25 @@ impl Value for [f64; 3] {
     }
 }
 
-/// Read by brodo from 0.3.0 on; 0.2.0 refuses its code by name (ADR-0029).
 impl Stored for [f64; 3] {
-    const TYPE_CODE: u32 = 6;
+    const VALUE_TYPE: ValueType = ValueType::F64x3;
 }
 
-/// Work done for one stored type, chosen at run time by its type code (`with_type`).
+/// Work done for one stored type, chosen at run time (`with_type`).
 pub(crate) trait ForType {
     type Out;
     fn run<T: Stored>(self) -> Self::Out;
 }
 
-/// `work` run for the stored type whose code is `code`; a code no stored type has is given
-/// back.
-pub(crate) fn with_type<W: ForType>(code: u32, work: W) -> Result<W::Out, u32> {
-    match code {
-        t if t == f32::TYPE_CODE => Ok(work.run::<f32>()),
-        t if t == f64::TYPE_CODE => Ok(work.run::<f64>()),
-        t if t == u8::TYPE_CODE => Ok(work.run::<u8>()),
-        t if t == u32::TYPE_CODE => Ok(work.run::<u32>()),
-        t if t == <[f32; 3]>::TYPE_CODE => Ok(work.run::<[f32; 3]>()),
-        t if t == <[f64; 3]>::TYPE_CODE => Ok(work.run::<[f64; 3]>()),
-        found => Err(found),
+/// `work` run for the stored type `value_type`.
+pub(crate) fn with_type<W: ForType>(value_type: ValueType, work: W) -> W::Out {
+    match value_type {
+        ValueType::F32 => work.run::<f32>(),
+        ValueType::F64 => work.run::<f64>(),
+        ValueType::U8 => work.run::<u8>(),
+        ValueType::U32 => work.run::<u32>(),
+        ValueType::F32x3 => work.run::<[f32; 3]>(),
+        ValueType::F64x3 => work.run::<[f64; 3]>(),
     }
 }
 
@@ -340,6 +469,27 @@ impl<T: Value> Field<T> {
 mod tests {
     use super::*;
     use crate::tree::TileLevel;
+
+    /// Each value type is the code and name docs/formats.md §1.1 gives it, and a field of
+    /// it the variant of `AnyField` of its name.
+    #[test]
+    fn each_value_type_is_its_code_and_name_and_its_field_its_variant() {
+        let t = Topology::new();
+        let fields: [(AnyField, ValueType, u32, &str); 6] = [
+            (Field::new(&t, 0.0_f32).into(), f32::VALUE_TYPE, 1, "f32"),
+            (Field::new(&t, 0.0_f64).into(), f64::VALUE_TYPE, 2, "f64"),
+            (Field::new(&t, 0_u8).into(), u8::VALUE_TYPE, 3, "u8"),
+            (Field::new(&t, 0_u32).into(), u32::VALUE_TYPE, 4, "u32"),
+            (Field::new(&t, [0.0_f32; 3]).into(), <[f32; 3]>::VALUE_TYPE, 5, "[f32; 3]"),
+            (Field::new(&t, [0.0_f64; 3]).into(), <[f64; 3]>::VALUE_TYPE, 6, "[f64; 3]"),
+        ];
+        for (field, ty, code, name) in fields {
+            assert_eq!(field.value_type(), ty);
+            assert_eq!((ty.code(), ty.name(), ty.to_string()), (code, name, name.to_owned()));
+            assert_eq!(ValueType::from_code(code), Some(ty));
+        }
+        assert_eq!([0, 7, u32::MAX].map(ValueType::from_code), [None; 3]);
+    }
 
     /// Every value type compares by bits: equal values agree, a zero's sign and a NaN's
     /// payload are told apart, and so is any other difference, in each component.

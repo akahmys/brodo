@@ -12,7 +12,7 @@ use std::collections::BTreeMap;
 
 use brodo::cache::{CacheEntry, CacheFile, to_bytes, write};
 use brodo::error::{CacheError, FormatError, MetaError};
-use brodo::field::{Field, Stored, Value};
+use brodo::field::{AnyField, Field, Value, ValueType};
 use brodo::meta::{Bounds, GridMeta};
 use brodo::topology::Topology;
 use brodo::tree::{Coord, TileLevel};
@@ -84,7 +84,7 @@ proptest! {
         prop_assert_eq!(file.grid_count(), 2);
         prop_assert_eq!(file.meta(0).unwrap(), &m);
         prop_assert_eq!(file.bounds(0).unwrap(), Bounds::of(&t).unwrap());
-        prop_assert_eq!(file.value_type(1).unwrap(), u8::TYPE_CODE);
+        prop_assert_eq!(file.value_type(1).unwrap(), ValueType::U8);
         let (a, b) = (file.view::<f32>(0).unwrap(), file.view::<u8>(1).unwrap());
         for n in t.leaf_numbers() {
             let o = t.leaf_origin(n).unwrap();
@@ -533,7 +533,7 @@ fn a_grid_of_f64_vectors_reads_copied_and_mapped() {
         .unwrap(),
         brodo::cache::from_bytes(&bytes).unwrap(),
     ] {
-        assert_eq!(file.value_type(1).unwrap(), 6);
+        assert_eq!(file.value_type(1).unwrap(), ValueType::F64x3);
         assert_eq!(file.meta(1).unwrap(), &meta("velocity", &[("precision", "double")]));
         let view = file.view::<[f64; 3]>(1).unwrap();
         for v in [[-1, 0, 0], [4100, 3, 15], [130, 5, 5], [50, 50, 50], [-9, 0, 0]] {
@@ -545,7 +545,7 @@ fn a_grid_of_f64_vectors_reads_copied_and_mapped() {
                 wrong,
                 Err(CacheError::Grid {
                     index: 1,
-                    error: FormatError::WrongValueType { found: 6, .. }
+                    error: FormatError::WrongValueType { found: ValueType::F64x3, .. }
                 })
             ),
             "{wrong:?}"
@@ -595,6 +595,39 @@ fn a_file_unfit_to_map_is_refused() {
     ));
 }
 
+/// A grid thaws into the field of the type its file states, refused if what thawing it is
+/// counted to make passes the limit: each leaf its values' bytes and 1024 more, each tile
+/// 256.
+#[test]
+fn a_grid_thaws_as_its_type_within_its_limit() {
+    let t = build(&[[0, 0, 0], [8, 0, 0], [0, 64, 0]], &[(TileLevel::Lower, [128, 0, 0])]);
+    let m = meta("g", &[]);
+    let entries = [
+        CacheEntry::new(&m, &t, &numbered(&t, 0.5_f32, |n| n as f32)).unwrap(),
+        CacheEntry::new(&m, &t, &numbered(&t, [0.0_f64; 3], |n| [f64::from(n); 3])).unwrap(),
+    ];
+    let file = brodo::cache::from_bytes(&to_bytes(&entries).unwrap()).unwrap();
+    let sizes = [3 * (512 * 4 + 1024) + 256, 3 * (512 * 24 + 1024) + 256];
+    for (i, need) in sizes.into_iter().enumerate() {
+        assert_eq!(file.thaw_size(i).unwrap(), need);
+        assert!(matches!(
+            file.thaw(i, need - 1),
+            Err(CacheError::ThawTooLarge { index, need: n, limit }) if index == i && n == need && limit == need - 1
+        ));
+    }
+    let (t0, f0) = file.thaw(0, sizes[0]).unwrap();
+    let (t1, f1) = file.thaw(1, u64::MAX).unwrap();
+    assert_eq!((f0.value_type(), f1.value_type()), (ValueType::F32, ValueType::F64x3));
+    let (AnyField::F32(f0), AnyField::F64x3(f1)) = (f0, f1) else { panic!("other types") };
+    let (v0, v1) = (file.view::<f32>(0).unwrap(), file.view::<[f64; 3]>(1).unwrap());
+    for v in [[0, 0, 0], [9, 1, 2], [0, 70, 0], [130, 0, 0], [500, 0, 0]] {
+        assert_eq!(f0.value_at(&t0, v).unwrap().to_bits(), v0.get(v).unwrap().to_bits());
+        assert!(f1.value_at(&t1, v).unwrap().same_bits(&v1.get(v).unwrap()));
+    }
+    assert!(matches!(file.thaw_size(2), Err(CacheError::NoGrid(2))));
+    assert!(matches!(file.thaw(2, u64::MAX), Err(CacheError::NoGrid(2))));
+}
+
 fn entries_u8(t: &Topology) -> Field<u8> {
     numbered(t, 9_u8, |n| u8::try_from(n % 251).unwrap())
 }
@@ -626,7 +659,7 @@ fn every_value_type_is_written_and_read_back() {
     write(&path, &entries).unwrap();
     assert_eq!(std::fs::read(&path).ok(), Some(to_bytes(&entries).unwrap()));
     let file = brodo::cache::read(&path, u64::MAX).unwrap();
-    let codes: Vec<u32> = (0..6).map(|i| file.value_type(i).unwrap()).collect();
+    let codes: Vec<u32> = (0..6).map(|i| file.value_type(i).unwrap().code()).collect();
     assert_eq!(codes, [1, 2, 3, 4, 5, 6]);
     let (u8s, u32s, f64s) =
         (entries_u8(&t), numbered(&t, 9_u32, |n| n * 3), numbered(&t, -1.0_f64, k));

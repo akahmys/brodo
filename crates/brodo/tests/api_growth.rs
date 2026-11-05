@@ -14,13 +14,13 @@ use brodo::error::{
     CacheError, FieldError, FormatError, FreezeError, HermiteError, MetaError, Rule, SliceError,
     TreeError, VtkError,
 };
+use brodo::field::{AnyField, ValueType};
 use brodo::gather::GhostWidth;
 use brodo::grid::GridError;
+use brodo::kind::FileKind;
 use brodo::meta::GridMeta;
 #[cfg(feature = "slice-png")]
 use brodo::slice::{Axis, ColorMap, Image, Slice};
-#[cfg(feature = "vdb")]
-use brodo::vdb::VdbField;
 
 fn analysis_error(e: &AnalysisError) -> &'static str {
     match e {
@@ -109,6 +109,7 @@ fn cache_error(e: &CacheError) -> &'static str {
         CacheError::Grid { .. } => "Grid",
         CacheError::NoGrid(..) => "NoGrid",
         CacheError::TooLarge => "TooLarge",
+        CacheError::ThawTooLarge { .. } => "ThawTooLarge",
         CacheError::ReservedKey(..) => "ReservedKey",
         CacheError::FileTooLarge { .. } => "FileTooLarge",
         CacheError::Decompress { .. } => "Decompress",
@@ -224,11 +225,36 @@ fn vdb_error(e: &VdbError) -> &'static str {
     }
 }
 
-#[cfg(feature = "vdb")]
-fn vdb_field(e: &VdbField) -> &'static str {
+fn any_field(e: &AnyField) -> &'static str {
     match e {
-        VdbField::F32(..) => "F32",
-        VdbField::F64(..) => "F64",
+        AnyField::F32(..) => "F32",
+        AnyField::F64(..) => "F64",
+        AnyField::U8(..) => "U8",
+        AnyField::U32(..) => "U32",
+        AnyField::F32x3(..) => "F32x3",
+        AnyField::F64x3(..) => "F64x3",
+        _ => "later",
+    }
+}
+
+fn value_type(v: ValueType) -> &'static str {
+    match v {
+        ValueType::F32 => "F32",
+        ValueType::F64 => "F64",
+        ValueType::U8 => "U8",
+        ValueType::U32 => "U32",
+        ValueType::F32x3 => "F32x3",
+        ValueType::F64x3 => "F64x3",
+        _ => "later",
+    }
+}
+
+fn file_kind(k: FileKind) -> &'static str {
+    match k {
+        FileKind::Grid => "Grid",
+        FileKind::Cache => "Cache",
+        FileKind::Archive => "Archive",
+        FileKind::Vdb => "Vdb",
         _ => "later",
     }
 }
@@ -274,11 +300,10 @@ fn every_enum_that_may_grow_is_matched_with_a_wildcard() {
     assert_eq!(encoding(Encoding::default()), "Exact");
     #[cfg(feature = "vdb")]
     assert_eq!(vdb_error(&VdbError::Version(1)), "Version");
-    #[cfg(feature = "vdb")]
-    {
-        let t = brodo::topology::Topology::new();
-        assert_eq!(vdb_field(&VdbField::F32(brodo::field::Field::new(&t, 0.0))), "F32");
-    }
+    let t = brodo::topology::Topology::new();
+    assert_eq!(any_field(&AnyField::F32(brodo::field::Field::new(&t, 0.0))), "F32");
+    assert_eq!(value_type(ValueType::F64x3), "F64x3");
+    assert_eq!(file_kind(FileKind::Vdb), "Vdb");
 }
 
 #[test]

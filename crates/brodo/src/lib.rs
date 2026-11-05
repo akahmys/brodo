@@ -19,6 +19,7 @@ pub mod frozen;
 pub mod gather;
 pub mod grid;
 pub mod hermite;
+pub mod kind;
 pub mod manifest;
 #[cfg(feature = "mmap")]
 mod mapping;

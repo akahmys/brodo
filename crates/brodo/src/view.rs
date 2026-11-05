@@ -7,7 +7,7 @@ use zerocopy::{FromBytes, IntoBytes};
 
 use crate::error::FormatError;
 use crate::field::local_index;
-use crate::field::{Field, LEAF_VOXELS, Stored};
+use crate::field::{Field, LEAF_VOXELS, Stored, ValueType};
 use crate::frozen::{
     BLOCK, Header, LOWER_PLACES, LowerNode, MAGIC, ROOT_NODE, ROOT_TILE, RootEntry, UPPER_PLACES,
     UpperNode, VERSION, local, place,
@@ -127,12 +127,15 @@ fn check_header<T: Stored>(h: &Header, len: usize) -> Result<(), FormatError> {
     if h.version.get() != VERSION {
         return Err(FormatError::UnsupportedVersion(h.version.get()));
     }
-    let size_ok = usize::try_from(h.value_size.get()).is_ok_and(|s| s == size_of::<T>());
-    if h.value_type.get() != T::TYPE_CODE || !size_ok {
-        return Err(FormatError::WrongValueType {
-            expected: T::TYPE_CODE,
-            found: h.value_type.get(),
+    let code = h.value_type.get();
+    if code != T::VALUE_TYPE.code() {
+        return Err(match ValueType::from_code(code) {
+            Some(found) => FormatError::WrongValueType { expected: T::VALUE_TYPE, found },
+            None => FormatError::UnknownValueType(code),
         });
+    }
+    if usize::try_from(h.value_size.get()).ok() != Some(size_of::<T>()) {
+        return Err(lost("header"));
     }
     let blocks = usize::try_from(h.blocks.get()).ok().and_then(|b| b.checked_mul(BLOCK));
     if blocks != Some(len) {

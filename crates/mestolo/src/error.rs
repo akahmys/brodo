@@ -1,6 +1,7 @@
 //! Why a command could not be run: its command line refused, its input not read, or its
 //! output not written.
 
+use brodo::field::ValueType;
 use std::path::PathBuf;
 
 use brodo::error::{
@@ -52,9 +53,10 @@ pub enum MestoloError {
         /// The limit.
         limit: u64,
     },
-    /// A grid's value type code is none brodo stores.
-    #[error("value type {0} is not read")]
-    ValueType(u32),
+    /// A grid's values are of a type this build of mestolo does not know, one brodo added
+    /// after it.
+    #[error("values of type {0} are not read by this build")]
+    ValueType(ValueType),
     /// The file holds no grid of the name given.
     #[error("the file holds no grid named {0:?}")]
     NoGrid(String),
@@ -66,7 +68,7 @@ pub enum MestoloError {
     EmptyGrid(String),
     /// A slice of a grid whose values are not scalars.
     #[error("a slice of {0} values is not drawn: they are not scalars")]
-    NotScalar(&'static str),
+    NotScalar(ValueType),
     /// A slice's image would be larger than mestolo draws.
     #[error("the slice would be {width} × {height} pixels, more than {most}")]
     ImageTooLarge {
@@ -86,7 +88,7 @@ pub enum MestoloError {
         /// The grid's name.
         grid: String,
         /// Its value type.
-        value_type: &'static str,
+        value_type: ValueType,
     },
     /// A file is at the output's path, and `--force` was not given.
     #[error("{0:?} exists: give --force to replace it")]

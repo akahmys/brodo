@@ -20,15 +20,14 @@ use crate::cache::{
 };
 use crate::error::{CacheError, FormatError};
 use crate::field::local_index;
-use crate::field::{ForType, LEAF_VOXELS, Stored, with_type};
+use crate::field::{ForType, LEAF_VOXELS, Stored, ValueType, with_type};
 use crate::frozen::{BLOCK, Block, Header};
 use crate::meta::{Bounds, GridMeta};
 use crate::quantise::{self, Kind, Quantised};
 use crate::tree::Coord;
 use crate::view::{GridView, ViewLocation};
 
-/// "BRDA", read as a little-endian `u32`.
-const MAGIC: u32 = u32::from_le_bytes(*b"BRDA");
+use crate::kind::ARCHIVE_MAGIC as MAGIC;
 /// The format version this build reads and writes.
 const VERSION: u32 = 2;
 /// Blocks a chunk of an entry of bytes holds, 512 × 512 bytes, but its last (§8.3).
@@ -129,7 +128,8 @@ fn plan(
         Encoding::Binary16 => false,
         Encoding::EightBit => true,
     };
-    let kind = Kind::of(value_type).ok_or(CacheError::NotQuantised { index, value_type })?;
+    let kind = Kind::of(value_type)
+        .ok_or(CacheError::NotQuantised { index, value_type: ValueType::from_code(value_type) })?;
     let q = if eight {
         let leaves = pieces.iter().filter(|(_, leaf)| *leaf).map(|(p, _)| *p);
         Quantised::EightBit(
@@ -149,7 +149,7 @@ fn pack(index: usize, e: &CacheEntry, encoding: Encoding, cut: Cut) -> Result<Pa
     let (bytes, value_type) = match &e.payload {
         Payload::Grid { frozen, value_type, .. } => (frozen.as_bytes(), *value_type),
         Payload::Bytes { .. } if encoding != Encoding::Exact => {
-            return Err(CacheError::NotQuantised { index, value_type: 0 });
+            return Err(CacheError::NotQuantised { index, value_type: None });
         }
         Payload::Bytes { bytes, .. } => {
             let mut padded = bytes.clone();
@@ -606,7 +606,7 @@ pub struct Region {
     index: usize,
     meta: GridMeta,
     bounds: Bounds,
-    value_type: u32,
+    value_type: ValueType,
     extent: Bounds,
     /// The frozen buffer's length in bytes.
     len: usize,
@@ -659,8 +659,11 @@ pub fn region_from_bytes(
         None => Vec::new(),
     };
     let len = g.grid_blocks.checked_mul(BLOCK).ok_or(CacheError::TooLarge)?;
-    let leaves = meeting(g.value_type, head.as_bytes(), tail.as_bytes(), len, extent)
-        .map_err(|error| CacheError::Grid { index, error })?;
+    let refused = |error| CacheError::Grid { index, error };
+    let value_type = ValueType::from_code(g.value_type)
+        .ok_or(refused(FormatError::UnknownValueType(g.value_type)))?;
+    let leaves =
+        meeting(value_type, head.as_bytes(), tail.as_bytes(), len, extent).map_err(refused)?;
     let mut wanted: Vec<usize> = leaves.iter().map(|(n, _)| *n as usize / CHUNK_LEAVES).collect();
     wanted.dedup();
     let mut sizes = Vec::new();
@@ -685,7 +688,6 @@ pub fn region_from_bytes(
         });
     }
     run(&found, work.iter_mut().collect())?;
-    let value_type = g.value_type;
     Ok(Region { index, meta, bounds, value_type, extent, len, head, tail, chunks, leaves })
 }
 
@@ -730,9 +732,9 @@ fn decompress(
 }
 
 /// Checks a frozen buffer of `len` bytes held as `head` and `tail`, its leaf values left
-/// out, as a view of the type `value_type` names: the leaves meeting `extent`.
+/// out, as a view of type `value_type`: the leaves meeting `extent`.
 fn meeting(
-    value_type: u32,
+    value_type: ValueType,
     head: &[u8],
     tail: &[u8],
     len: usize,
@@ -755,7 +757,6 @@ fn meeting(
         }
     }
     with_type(value_type, Walk { head, tail, len, extent })
-        .unwrap_or_else(|found| Err(FormatError::UnknownValueType(found)))
 }
 
 impl Region {
@@ -770,8 +771,8 @@ impl Region {
         self.bounds
     }
 
-    /// The type code of the grid's values (`Stored::TYPE_CODE`).
-    pub fn value_type(&self) -> u32 {
+    /// The type of the grid's values.
+    pub fn value_type(&self) -> ValueType {
         self.value_type
     }
 

@@ -1,30 +1,22 @@
 //! A file read whole, through brodo's readers alone, its kind told by its first bytes
 //! (ADR-0050): a cache file, an archive or a `.vdb`, each grid thawed into a topology and
-//! a field. A cache file's or an archive's grids are counted before they are thawed, each
-//! leaf and tile at what thawing makes of it at most, and refused if they pass the limit.
+//! a field. A cache file's or an archive's grids are counted before they are thawed, by
+//! what brodo counts thawing to make, and refused if they pass the limit.
 
 use std::io::Read;
 use std::path::Path;
 
 use brodo::cache::CacheFile;
-use brodo::field::{Field, Stored};
+use brodo::field::AnyField;
+use brodo::kind::FileKind;
 use brodo::meta::GridMeta;
 use brodo::topology::Topology;
-use brodo::vdb::VdbField;
 
 use crate::args::Input;
 use crate::error::MestoloError;
 
 /// The unit a `.vdb`'s grids are given, since OpenVDB states none.
 pub const VDB_UNIT: &str = "unstated";
-
-/// An OpenVDB file's first eight bytes: its magic number as a little-endian `i64`
-/// (docs/formats.md §9.1).
-const VDB_MAGIC: [u8; 8] = 0x5644_4220_i64.to_le_bytes();
-
-/// What thawing a tile is counted to make, and a leaf beside its values (ADR-0050).
-const TILE: u64 = 256;
-const LEAF: u64 = 1024;
 
 /// What kind of file was read.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -49,38 +41,6 @@ impl Kind {
     }
 }
 
-/// A grid's values, of each type brodo stores.
-#[derive(Debug, Clone)]
-#[non_exhaustive]
-pub enum Values {
-    /// `f32`.
-    F32(Field<f32>),
-    /// `f64`.
-    F64(Field<f64>),
-    /// `u8`.
-    U8(Field<u8>),
-    /// `u32`.
-    U32(Field<u32>),
-    /// `[f32; 3]`.
-    F32x3(Field<[f32; 3]>),
-    /// `[f64; 3]`.
-    F64x3(Field<[f64; 3]>),
-}
-
-impl Values {
-    /// The value type's name, as Rust writes it.
-    pub fn type_name(&self) -> &'static str {
-        match self {
-            Values::F32(_) => "f32",
-            Values::F64(_) => "f64",
-            Values::U8(_) => "u8",
-            Values::U32(_) => "u32",
-            Values::F32x3(_) => "[f32; 3]",
-            Values::F64x3(_) => "[f64; 3]",
-        }
-    }
-}
-
 /// A grid read.
 #[derive(Debug, Clone)]
 #[non_exhaustive]
@@ -90,7 +50,7 @@ pub struct Grid {
     /// Its leaves and tiles.
     pub topology: Topology,
     /// Its values on them.
-    pub values: Values,
+    pub field: AnyField,
 }
 
 /// A file read.
@@ -128,82 +88,44 @@ impl Loaded {
 pub fn load(input: &Input) -> Result<Loaded, MestoloError> {
     let path = input.path.as_path();
     let mut head = Vec::new();
-    std::fs::File::open(path)?.take(8).read_to_end(&mut head)?;
-    if head.starts_with(b"BRDC") {
-        from_cache(brodo::cache::read(path, input.limit)?, Kind::Cache, input.limit)
-    } else if head.starts_with(b"BRDA") {
-        from_cache(brodo::archive::read(path, input.limit)?, Kind::Archive, input.limit)
-    } else if head == VDB_MAGIC {
-        from_vdb(path, input.limit)
-    } else if head.starts_with(b"BRDG") {
-        Err(MestoloError::BareGrid(path.to_path_buf()))
-    } else {
-        Err(MestoloError::UnknownKind(path.to_path_buf()))
+    std::fs::File::open(path)?.take(FileKind::HEAD as u64).read_to_end(&mut head)?;
+    match FileKind::of(&head) {
+        Some(FileKind::Cache) => {
+            from_cache(brodo::cache::read(path, input.limit)?, Kind::Cache, input.limit)
+        }
+        Some(FileKind::Archive) => {
+            from_cache(brodo::archive::read(path, input.limit)?, Kind::Archive, input.limit)
+        }
+        Some(FileKind::Vdb) => from_vdb(path, input.limit),
+        Some(FileKind::Grid) => Err(MestoloError::BareGrid(path.to_path_buf())),
+        _ => Err(MestoloError::UnknownKind(path.to_path_buf())),
     }
 }
 
-/// What thawing may still make of the limit.
-struct Budget {
-    left: u64,
-    limit: u64,
-}
-
+/// Each grid thawed, refused once what thawing the grids is counted to make
+/// (`CacheFile::thaw_size`) passes `limit` (ADR-0050).
 fn from_cache(file: CacheFile, kind: Kind, limit: u64) -> Result<Loaded, MestoloError> {
     let mut grids = Vec::new();
-    let mut budget = Budget { left: limit, limit };
+    let mut left = limit;
     for i in 0..file.grid_count() {
-        let b = &mut budget;
-        let (topology, values) = match file.value_type(i)? {
-            f32::TYPE_CODE => thaw(&file, i, Values::F32, b)?,
-            f64::TYPE_CODE => thaw(&file, i, Values::F64, b)?,
-            u8::TYPE_CODE => thaw(&file, i, Values::U8, b)?,
-            u32::TYPE_CODE => thaw(&file, i, Values::U32, b)?,
-            <[f32; 3]>::TYPE_CODE => thaw(&file, i, Values::F32x3, b)?,
-            <[f64; 3]>::TYPE_CODE => thaw(&file, i, Values::F64x3, b)?,
-            code => return Err(MestoloError::ValueType(code)),
-        };
-        grids.push(Grid { meta: file.meta(i)?.clone(), topology, values });
+        let need = file.thaw_size(i)?;
+        left = left.checked_sub(need).ok_or(MestoloError::TooMuchToThaw {
+            counted: (limit - left).saturating_add(need),
+            limit,
+        })?;
+        let (topology, field) = file.thaw(i, need)?;
+        grids.push(Grid { meta: file.meta(i)?.clone(), topology, field });
     }
     let bytes = file.bytes_entries().iter().map(|b| (b.name.to_owned(), b.bytes.len())).collect();
     Ok(Loaded { kind, grids, skipped: Vec::new(), bytes })
 }
 
-/// Grid `i` thawed, once its leaves and tiles are counted within `budget`.
-fn thaw<T: Stored>(
-    file: &CacheFile,
-    i: usize,
-    wrap: fn(Field<T>) -> Values,
-    budget: &mut Budget,
-) -> Result<(Topology, Values), MestoloError> {
-    let view = file.view::<T>(i)?;
-    let values = u64::try_from(512 * size_of::<T>()).unwrap_or(u64::MAX);
-    let count = |n: usize, each: u64| u64::try_from(n).unwrap_or(u64::MAX).saturating_mul(each);
-    let need = count(view.leaf_count(), values.saturating_add(LEAF))
-        .saturating_add(count(view.tile_count(), TILE));
-    let counted = (budget.limit - budget.left).saturating_add(need);
-    budget.left = budget
-        .left
-        .checked_sub(need)
-        .ok_or(MestoloError::TooMuchToThaw { counted, limit: budget.limit })?;
-    let (t, f) = view.thaw()?;
-    Ok((t, wrap(f)))
-}
-
 fn from_vdb(path: &Path, limit: u64) -> Result<Loaded, MestoloError> {
     let file = brodo::vdb::read(path, VDB_UNIT, limit)?;
-    let mut loaded =
-        Loaded { kind: Kind::Vdb, grids: Vec::new(), skipped: file.skipped, bytes: Vec::new() };
-    for g in file.grids {
-        // `VdbField` is `#[non_exhaustive]`: a type brodo adds is listed as skipped.
-        let values = match g.field {
-            VdbField::F32(f) => Values::F32(f),
-            VdbField::F64(f) => Values::F64(f),
-            _ => {
-                loaded.skipped.push(g.meta.name);
-                continue;
-            }
-        };
-        loaded.grids.push(Grid { meta: g.meta, topology: g.topology, values });
-    }
-    Ok(loaded)
+    let grids = file
+        .grids
+        .into_iter()
+        .map(|g| Grid { meta: g.meta, topology: g.topology, field: g.field })
+        .collect();
+    Ok(Loaded { kind: Kind::Vdb, grids, skipped: file.skipped, bytes: Vec::new() })
 }

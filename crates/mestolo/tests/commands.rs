@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command as Process;
 
 use brodo::cache::CacheEntry;
-use brodo::field::Field;
+use brodo::field::{Field, ValueType};
 use brodo::meta::GridMeta;
 use brodo::topology::Topology;
 use brodo::tree::TileLevel;
@@ -90,7 +90,7 @@ fn what_a_format_does_not_hold_is_refused_by_name() {
     let p = cache.to_str().unwrap();
     assert!(matches!(
         run(&["convert", p], "all.vdb"),
-        Err(MestoloError::NotWritten { value_type: "[f32; 3]", .. })
+        Err(MestoloError::NotWritten { value_type: ValueType::F32x3, .. })
     ));
     assert!(matches!(run(&["convert", p], "all.vtu"), Err(MestoloError::WhichGrid(2))));
     assert!(matches!(
@@ -99,7 +99,7 @@ fn what_a_format_does_not_hold_is_refused_by_name() {
     ));
     assert!(matches!(
         run(&["slice", p, "--grid", "velocity", "--axis", "x", "--at", "0"], "v.png"),
-        Err(MestoloError::NotScalar("[f32; 3]"))
+        Err(MestoloError::NotScalar(ValueType::F32x3))
     ));
     assert!(matches!(
         run(&["slice", p, "--grid", "none", "--axis", "x", "--at", "0"], "n.png"),

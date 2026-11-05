@@ -13,7 +13,7 @@ use std::path::Path;
 use crate::cache::read_within;
 use crate::error::VdbError;
 use crate::field::local_index;
-use crate::field::{Field, LEAF_VOXELS};
+use crate::field::{AnyField, Field, LEAF_VOXELS};
 use crate::meta::GridMeta;
 use crate::topology::Topology;
 use crate::tree::{Coord, TileLevel};
@@ -46,16 +46,6 @@ const TILE: u64 = 256;
 const LOWER_NODE: u64 = 2 * 1024 + 512;
 const UPPER_NODE: u64 = 2 * 8192 + 2048;
 
-/// A grid's values, of the type its file states.
-#[derive(Debug, Clone)]
-#[non_exhaustive]
-pub enum VdbField {
-    /// A grid of `Tree_float_5_4_3`.
-    F32(Field<f32>),
-    /// A grid of `Tree_double_5_4_3`.
-    F64(Field<f64>),
-}
-
 /// One grid read from an OpenVDB file (docs/formats.md §9.7).
 #[derive(Debug, Clone)]
 #[non_exhaustive]
@@ -65,8 +55,9 @@ pub struct VdbGrid {
     pub meta: GridMeta,
     /// Its leaves, and its tiles active or not holding the background.
     pub topology: Topology,
-    /// Its values on the topology, every leaf voxel's whether active or not.
-    pub field: VdbField,
+    /// Its values on the topology, every leaf voxel's whether active or not: `F32` for a
+    /// grid of `Tree_float_5_4_3`, `F64` for one of `Tree_double_5_4_3`, the only types read.
+    pub field: AnyField,
 }
 
 /// The grids of an OpenVDB file, in its order, and the names of those skipped.
@@ -98,11 +89,11 @@ pub fn from_bytes(bytes: &[u8], unit: &str, limit: u64) -> Result<VdbFile, VdbEr
         let read = match d.kind.as_slice() {
             b"Tree_float_5_4_3" if d.instance.is_empty() => {
                 let (meta, topology, f) = grid::<f32>(bytes, &d, unit, &mut budget)?;
-                Some(VdbGrid { meta, topology, field: VdbField::F32(f) })
+                Some(VdbGrid { meta, topology, field: AnyField::F32(f) })
             }
             b"Tree_double_5_4_3" if d.instance.is_empty() => {
                 let (meta, topology, f) = grid::<f64>(bytes, &d, unit, &mut budget)?;
-                Some(VdbGrid { meta, topology, field: VdbField::F64(f) })
+                Some(VdbGrid { meta, topology, field: AnyField::F64(f) })
             }
             _ => None,
         };

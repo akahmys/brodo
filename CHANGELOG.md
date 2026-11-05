@@ -60,6 +60,16 @@ archive profiles stay at version 2, and version 1 of them is no longer read nor 
   `from_bytes`; `read` now takes a path, refusing a file longer than `Limits::bytes`
   before reading it. `ReadError` gains `Io` and no longer derives `Clone`, `PartialEq` or
   `Eq`.
+- A stored value type is named by `field::ValueType` (ADR-0056): `Stored::TYPE_CODE` is
+  `Stored::VALUE_TYPE`; `CacheFile::value_type` and `Region::value_type` return a
+  `ValueType`; `FormatError::WrongValueType` holds two, and a header of the type asked for
+  but another size is `Inconsistent("header")`; `CacheError::NotQuantised` holds an
+  `Option<ValueType>`, `None` for an entry of bytes.
+- `vdb::VdbField` is gone: `VdbGrid::field` is a `field::AnyField`, which holds a field of
+  any stored type. `CacheFile::thaw` and `CacheFile::thaw_size` thaw a grid of the type its
+  file states within a limit, refused as `CacheError::ThawTooLarge`. `kind::FileKind::of`
+  tells a file's kind by its first bytes.
+- mestolo's `MestoloError::ValueType`, `NotScalar` and `NotWritten` name a `ValueType`.
 
 A file of version 1, written by 0.8 or earlier or by 0.9.0 on request, is first read by
 0.9.0 and written again by it, at version 2. A file of version 2 then converts with this

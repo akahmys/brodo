@@ -4,7 +4,7 @@
 //! with a panic.
 
 use brodo::error::FormatError;
-use brodo::field::{Field, Stored, Value};
+use brodo::field::{Field, Stored, Value, ValueType};
 use brodo::frozen::{FrozenGrid, freeze};
 use brodo::topology::{Location, Topology};
 use brodo::tree::{Coord, TileLevel};
@@ -232,10 +232,31 @@ fn every_value_type_round_trips_and_a_wrong_one_is_refused() {
     assert_eq!(bits(view.get([1, 1, 0]).unwrap()), bits([4.0, 5.0, 6.0]));
     assert_eq!(bits(view.get([100, 0, 0]).unwrap()), bits([1.0, 2.0, 3.0]));
     let wrong = frozen.view::<f32>().map(|_| ());
-    assert_eq!(wrong, Err(FormatError::WrongValueType { expected: f32::TYPE_CODE, found: 5 }));
+    assert_eq!(
+        wrong,
+        Err(FormatError::WrongValueType { expected: ValueType::F32, found: ValueType::F32x3 })
+    );
     let bytes = Field::new(&t, 7_u8);
     let frozen = freeze(&t, &bytes).unwrap();
     assert_eq!(frozen.view::<u8>().unwrap().get([8, 0, 0]).unwrap(), 7);
+}
+
+/// A header naming the type asked for, but not its size, is inconsistent; a code no type has
+/// is named as unknown.
+#[test]
+fn a_value_type_of_another_size_or_no_code_is_refused() {
+    let t = build(&[Op::Activate([0, 0, 0])]);
+    let frozen = freeze(&t, &Field::new(&t, 1.0_f32)).unwrap();
+    let with = |at: usize, word: u32| {
+        let mut bytes = frozen.as_bytes().to_vec();
+        bytes[at..at + 4].copy_from_slice(&word.to_le_bytes());
+        aligned(&bytes)
+    };
+    let view = |b: &[Block]| GridView::<f32>::new(b.as_bytes()).map(|_| ());
+    assert_eq!(view(&with(12, 4)), Ok(()));
+    assert_eq!(view(&with(12, 8)), Err(FormatError::Inconsistent("header")));
+    assert_eq!(view(&with(8, 7)), Err(FormatError::UnknownValueType(7)));
+    assert_eq!(view(&with(8, 0)), Err(FormatError::UnknownValueType(0)));
 }
 
 /// A 32-byte aligned copy of some bytes, as a file read into memory would be.
@@ -309,7 +330,10 @@ fn a_grid_of_f64_vectors_keeps_its_bytes() {
         assert_eq!(bits(view.get(v).unwrap()), bits(g.value_at(&t, v).unwrap()), "at {v:?}");
     }
     let wrong = GridView::<[f32; 3]>::new(copy.as_bytes()).map(|_| ());
-    assert_eq!(wrong, Err(FormatError::WrongValueType { expected: 5, found: 6 }));
+    assert_eq!(
+        wrong,
+        Err(FormatError::WrongValueType { expected: ValueType::F32x3, found: ValueType::F64x3 })
+    );
     // Merge rules compare by bits, every component: the last, and a zero's sign.
     assert!([1.0, 2.0, 3.0_f64].same_bits(&[1.0, 2.0, 3.0]));
     assert!(![1.0, 2.0, 3.0_f64].same_bits(&[1.0, 2.0, 4.0]));
@@ -395,7 +419,7 @@ fn each_check_refuses_its_damage() {
     assert_eq!(read(with_word(1, 0).as_bytes()), Err(FormatError::UnsupportedVersion(0)));
     assert_eq!(
         read(with_word(2, 2).as_bytes()),
-        Err(FormatError::WrongValueType { expected: 1, found: 2 })
+        Err(FormatError::WrongValueType { expected: ValueType::F32, found: ValueType::F64 })
     );
     // The tile values moved onto the leaf values: every length and link still fits, only
     // the sections overlap.

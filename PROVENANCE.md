@@ -46,8 +46,9 @@ copyright notice (`grep -rniE 'copyright|spdx|licen[cs]e' crates/*/src` finds no
 | `crates/brodo/src/euler.rs` | ARCHITECTURE.md §4.5, ADR-0024; the Euler–Poincaré formula over a voxel complex as stated by Sánchez-Cruz et al. (2013, J. Appl. Res. Technol. 11(1), 65–78); a sum over 2×2×2 neighbourhoods as ImageJ Ops' documentation of `EulerCharacteristic26N` describes it | the Euler characteristic of the voxels meeting a condition, under 6- or 26-connectivity |
 | `crates/brodo/src/frozen.rs` | ARCHITECTURE.md §4.6, ADR-0016, ADR-0052 only | the frozen layout, version 1, and `freeze` |
 | `crates/brodo/src/gather.rs` | ARCHITECTURE.md §4.4, ADR-0015 only | the gather of a leaf and one, two or three ghost layers |
-| `crates/brodo/src/field.rs` | ARCHITECTURE.md §4.2, ADR-0014 only | fields: the open `Value` trait and the sealed `Stored` one, values by leaf and tile number, the stamp check, the remap and merge rules |
+| `crates/brodo/src/field.rs` | ARCHITECTURE.md §4.2, §4.8, ADR-0014, ADR-0056 only | fields: the open `Value` trait and the sealed `Stored` one, the `ValueType` naming each stored type and the `AnyField` holding a field of one, values by leaf and tile number, the stamp check, the remap and merge rules |
 | `crates/brodo/src/grid.rs` | ARCHITECTURE.md §4.2, ADR-0014 only | a grid: one topology and one field, edited in one step |
+| `crates/brodo/src/kind.rs` | ARCHITECTURE.md §4.7, ADR-0056; docs/formats.md §2.1, §3.1, §8.1 and §9.1 for each file's first bytes | a file's kind told by its magic number, and each format's magic number |
 | `crates/brodo/src/hermite.rs` | ARCHITECTURE.md §4.9, ADR-0032, ADR-0051; Ju, Losasso, Schaefer and Warren (2002), *Dual Contouring of Hermite Data*, for Hermite data as signs on a lattice and a crossing and normal on each edge whose ends differ | the Hermite data format: a sign grid and its crossings held sparsely, its check, its cache entries and its reading in place |
 | `crates/brodo/src/lib.rs` | none | crate root |
 | `crates/brodo/src/manifest.rs` | ARCHITECTURE.md §4.3, ADR-0014 only | the leaf manifest: 26 directions and each leaf's neighbours |
@@ -82,7 +83,7 @@ copyright notice (`grep -rniE 'copyright|spdx|licen[cs]e' crates/*/src` finds no
 | `crates/mestolo/src/main.rs` | none | the program: its arguments run, its error and exit status |
 | `crates/mestolo/src/args.rs` | ARCHITECTURE.md §6.3, ADR-0050 only | the command line parsed with `std` |
 | `crates/mestolo/src/error.rs` | none | the crate's error type |
-| `crates/mestolo/src/load.rs` | ARCHITECTURE.md §6.3, ADR-0050; docs/formats.md §2, §3, §8 and §9.1 for each file's first bytes | a file's kind told and its grids read through brodo's readers |
+| `crates/mestolo/src/load.rs` | ARCHITECTURE.md §6.3, ADR-0050, ADR-0056 only | a file's kind told and its grids read and thawed through brodo, within the limit |
 | `crates/mestolo/src/info.rs` | ARCHITECTURE.md §6.3, ADR-0050 only | what a file holds, as text |
 | `crates/mestolo/src/draw.rs` | ARCHITECTURE.md §6.1, §6.3, ADR-0050; docs/formats.md §9 for OpenVDB's `class` of `level set` | a plane of a scalar grid drawn as PNG |
 | `crates/mestolo/src/convert.rs` | ARCHITECTURE.md §6.3, ADR-0050 only | grids written as `.vdb` or one as `.vtu` |

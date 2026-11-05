@@ -20,10 +20,9 @@ use crate::meta::{Bounds, GridMeta, SDF_KEY};
 use crate::topology::{LeafNumber, TileNumber, Topology};
 use crate::tree::{Coord, TileLevel};
 use crate::tree::{LEAF_LOG2, LOWER_DIM_LOG2, LOWER_SPAN_LOG2, UPPER_DIM_LOG2};
-pub use crate::vdb_read::{VdbField, VdbFile, VdbGrid, from_bytes, read};
+pub use crate::vdb_read::{VdbFile, VdbGrid, from_bytes, read};
 
-/// The file's magic number, an `i64`.
-pub(crate) const MAGIC: i64 = 0x5644_4220;
+pub(crate) use crate::kind::VDB_MAGIC as MAGIC;
 /// The file version written (ADR-0046).
 const FILE_VERSION: u32 = 225;
 /// The library version a file states, major and minor (ADR-0046).
