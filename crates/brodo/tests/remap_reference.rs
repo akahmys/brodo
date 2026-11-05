@@ -3,8 +3,8 @@
 //! maps, and gives values by position (ADR-0014): a new leaf takes what its region held
 //! before (its leaf, its tile's value, or the background); a new tile takes the old tile
 //! that held it, the background where nothing was, or the merge rule applied to what its
-//! region held before, the commit refused if the rule refuses. A region whose leaf the edit
-//! removed held the background. After every commit, three
+//! region held before, the commit refused if the rule refuses. A region whose leaf or tile the
+//! edit removed held the background. After every commit, three
 //! fields must hold the same bits as their models, leaves and tiles must be numbered in
 //! Morton order, and the fields not yet remapped must be refused.
 
@@ -137,6 +137,19 @@ impl Shape {
             }
         }
         self.leaves.insert(align(v, 3));
+        true
+    }
+
+    /// Removes the tile holding `v`; its region held the background.
+    fn remove_tile(&mut self, v: Coord) -> bool {
+        let Some((level, o)) = self.tile_at(v) else { return false };
+        self.tiles.remove(&(level, o));
+        match level {
+            TileLevel::Upper => self.removed.extend(regions(o)),
+            TileLevel::Lower | TileLevel::Root => {
+                self.removed.insert(o);
+            }
+        }
         true
     }
 
@@ -273,12 +286,21 @@ enum Op {
     Merge(TileLevel, Coord),
     /// Every leaf-sized region of a lower node's region made a tile.
     FillTiles(Coord),
+    RemoveTile(Coord),
 }
 
 /// A tile level. No root tiles: splitting one makes 36 862 tiles, which every later
 /// commit would carry through the model; the tree's tests and `field`'s split a root tile.
 fn level() -> impl Strategy<Value = TileLevel> {
     prop_oneof![Just(TileLevel::Upper), Just(TileLevel::Lower)]
+}
+
+/// A lower node's region of tiles, two split into leaves, merged into an upper-level tile
+/// in the same commit.
+fn refill(v: Coord) -> Vec<Op> {
+    let o = align(v, 7);
+    let at = |k: i32| [o[0] + 8 * k, o[1] + 40, o[2] + 64];
+    vec![Op::FillTiles(v), Op::Split(at(1)), Op::Split(at(9)), Op::Merge(TileLevel::Upper, v)]
 }
 
 /// Commits of edits on a few shared coordinates, so most splits and merges find what they
@@ -294,6 +316,8 @@ fn commits() -> impl Strategy<Value = Vec<(Vec<Op>, u64)>> {
         2 => Just(6),
         2 => Just(7),
         2 => Just(8),
+        3 => Just(9),
+        2 => Just(10),
     ];
     let edit = (kind, level(), 0..6_usize, [0..2_i32, 0..2, 0..2]);
     let commit = (prop::collection::vec(edit, 1..6), any::<u64>());
@@ -310,6 +334,10 @@ fn commits() -> impl Strategy<Value = Vec<(Vec<Op>, u64)>> {
                     4 => vec![Op::Merge(TileLevel::Upper, v)],
                     5 => vec![Op::FillTiles(v)],
                     6 => vec![Op::Deactivate(v)],
+                    9 => vec![Op::RemoveTile(v)],
+                    // A tile removed and its region given a leaf and a tile again in the
+                    // same commit, which take nothing of its value.
+                    10 => vec![Op::RemoveTile(v), Op::Activate(v), Op::AddTile(l, v)],
                     // An upper-level tile, if an earlier commit added one, split and its leaf
                     // removed and activated again, merged back in the same commit.
                     7 => vec![
@@ -318,18 +346,7 @@ fn commits() -> impl Strategy<Value = Vec<(Vec<Op>, u64)>> {
                         Op::Activate(v),
                         Op::Merge(TileLevel::Upper, v),
                     ],
-                    // A lower node's region of tiles, two split into leaves, merged into an
-                    // upper-level tile in the same commit.
-                    _ => {
-                        let o = align(v, 7);
-                        let at = |k: i32| [o[0] + 8 * k, o[1] + 40, o[2] + 64];
-                        vec![
-                            Op::FillTiles(v),
-                            Op::Split(at(1)),
-                            Op::Split(at(9)),
-                            Op::Merge(TileLevel::Upper, v),
-                        ]
-                    }
+                    _ => refill(v),
                 }
             })
             .collect()
@@ -431,6 +448,7 @@ fn edit(
         Op::AddTile(l, v) => (e.add_tile(l, v).is_ok(), s.add_tile(l, v)),
         Op::Split(v) => (e.split_tile(v).is_ok(), s.split(v)),
         Op::Merge(l, v) => (e.merge(l, v).is_ok(), s.merge(l, v)),
+        Op::RemoveTile(v) => (e.remove_tile(v).is_ok(), s.remove_tile(v)),
         Op::FillTiles(v) => {
             for r in regions(align(v, 7)) {
                 prop_assert_eq!(

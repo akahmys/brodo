@@ -14,8 +14,9 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   beginning `brodo.` reserved (ADR-0053), the public API reviewed, the survey of designs
   grown by accretion taken whole (ADR-0054 to ADR-0058), users' requests taken as issues
   the owner labels `owner-approved` (ADR-0049, amended), P9's retrospective (ADR-0001,
-  ADR-0033, ADR-0035, amended) and T14's survey of what each crate lacks.
-- **Next**: the gaps T14's survey found that 1.0 takes, brodo's core first;
+  ADR-0033, ADR-0035, amended), T14's survey of what each crate lacks, and its gaps in
+  brodo's core taken (ADR-0059).
+- **Next**: the gaps T14's survey found that 1.0 takes, brodo's formats next;
   then the rest of P9 in the order put to the owner (2026-11-04), the rules for versions
   after 1.0 first.
 
@@ -577,9 +578,10 @@ since crates.io yanks a version but never deletes it.
       ADR-0033); no duplication worth merging (the owner, 2026-11-05)
 - [x] T14's survey before 1.0, by running each crate (2026-11-05): thirteen gaps, those
       below taken before 1.0 (the owner, 2026-11-05), the rest recorded in §4 as additive
-- [ ] brodo's core: `TopologyEditor::remove_tile`; `Grid::from_parts`, `into_parts` and
-      `replace`, taking a thawed grid and a dilation or erosion; `Grid::edit`'s closure
-      giving the caller's own error; `LeafManifest`'s public `Default` gone
+- [x] brodo's core: `TopologyEditor::remove_tile`; `Grid::from_parts`, `into_parts` and
+      `replace`, taking a thawed grid and a dilation or erosion, and edits failing with
+      the caller's own error made through `replace`, `edit` unchanged; `LeafManifest`'s
+      public `Default` gone (ADR-0059)
 - [ ] brodo's formats: a cache file's grid names stated not unique; a `.vdb` level set
       read back with `SDF_KEY`; `CacheEntry::copy` and `copy_bytes`, an entry read written
       again as it was, its keys beginning `brodo.` kept

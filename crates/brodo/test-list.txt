@@ -1,4 +1,5 @@
 doc brodo crates/brodo/src/field.rs - field::Stored #1
+doc brodo crates/brodo/src/grid.rs - grid::Grid<T>::edit #1
 doc brodo crates/brodo/src/lib.rs - #1
 example diffusion tests::the_gaussian_is_followed_to_second_order_and_its_sum_kept
 example spheres tests::exact_distances_before_and_after_pruning
@@ -24,8 +25,10 @@ lib brodo field::tests::a_voxel_finds_its_place_in_its_leaf
 lib brodo field::tests::each_value_type_is_its_code_and_name_and_its_field_its_variant
 lib brodo field::tests::every_value_type_compares_by_bits
 lib brodo field::tests::regions_activated_in_the_merging_commit_count_as_the_background
+lib brodo grid::tests::a_grid_is_made_from_its_parts_and_takes_a_remap
 lib brodo grid::tests::a_grid_shows_its_topology_and_field
 lib brodo grid::tests::a_grid_writes_its_leaves_in_parallel_and_its_tiles
+lib brodo grid::tests::a_removed_root_tile_leaves_the_background_and_a_tile_added_again_takes_none_of_it
 lib brodo grid::tests::an_edit_keeps_the_values_and_a_refused_one_changes_nothing
 lib brodo kind::tests::each_kind_is_told_by_its_magic_number_and_no_other_bytes_are
 lib brodo manifest::tests::a_location_is_eight_bytes

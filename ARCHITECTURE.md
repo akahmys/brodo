@@ -108,15 +108,24 @@ pub struct Field<T> {
   takes the edits as a closure, commits them and remaps the field in one step; if any part
   fails, the grid is unchanged. Its field is written through the grid (`par_update_leaves`,
   `leaf_mut`, `set_tile`), never handed out to be replaced, so that it is always the
-  topology's (ADR-0014).
-- Topology changes (activation, removing a leaf, adding, splitting and merging tiles)
+  topology's (ADR-0014). A grid is made from a topology and a field on it, such as one
+  thawed from a file, by `from_parts`, which refuses a field of another topology, and given
+  up by `into_parts`; `replace` takes a new topology and the remap to it, a dilation's or
+  an erosion's, its field remapped, and changes nothing if the remap is not from its
+  topology to that one. Edits failing with the caller's own error are made by the steps
+  `edit` joins, its topology's copy edited, committed and given to `replace` (ADR-0059).
+- Topology changes (activation, removing a leaf, adding, splitting, merging and removing
+  tiles)
   go through an editor (`TopologyEditor`) and take effect at `commit`, which
   returns a new topology and a `Remap` to it, and leaves the old topology usable; dilation
   and erosion (§4.5) are `morphology` functions returning such a pair. Every
   field on the old topology is remapped by it. Removing a leaf removes the nodes it leaves
-  empty; in a tile it is refused (ADR-0025). Pruning is merging: `merge` turns the child
+  empty; in a tile it is refused (ADR-0025). Removing a tile, at any level, does the same
+  (`remove_tile`), so that a region a tile held is the background again in one call; a
+  leaf or tile the same edit puts there starts from the background (ADR-0059). Pruning is
+  merging: `merge` turns the child
   holding a voxel into one tile, its values merged by the remap's rule; there is no
-  whole-tree prune, which a caller builds from `merge` and `deactivate`. Every tile in a region becomes leaves by one
+  whole-tree prune, which a caller builds from `merge`, `deactivate` and `remove_tile`. Every tile in a region becomes leaves by one
   `split_tile` per leaf origin in it that a tile holds, in one editor, so one `Remap`; there
   is no operation of its own until a benchmark shows the calls cost (ROADMAP.md §4, R8).
 - Every topology carries a stamp unique in the process. A field records the stamp of the

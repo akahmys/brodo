@@ -112,7 +112,7 @@ impl Topology {
             leaf_numbers: Vec::new(),
             tiles: Vec::new(),
             tile_numbers: BTreeMap::new(),
-            manifest: LeafManifest::default(),
+            manifest: LeafManifest::empty(),
         }
     }
 
@@ -134,7 +134,7 @@ impl Topology {
             leaf_numbers,
             tiles,
             tile_numbers,
-            manifest: LeafManifest::default(),
+            manifest: LeafManifest::empty(),
         };
         // Neighbours in Morton order mostly share their lower node: a path keeps it.
         let mut path = Path::default();
@@ -284,7 +284,12 @@ impl Topology {
 
     /// An editor of a copy of this topology, which stays usable with its fields.
     pub fn edit(&self) -> TopologyEditor<'_> {
-        TopologyEditor { old: self, tree: self.tree.clone(), removed: BTreeSet::new() }
+        TopologyEditor {
+            old: self,
+            tree: self.tree.clone(),
+            removed: BTreeSet::new(),
+            cleared: [BTreeSet::new(), BTreeSet::new()],
+        }
     }
 }
 
@@ -323,9 +328,12 @@ impl Path {
 pub struct TopologyEditor<'a> {
     old: &'a Topology,
     tree: Tree,
-    /// The origins of the leaf-sized regions whose leaves the edit removed: what the commit
-    /// puts there takes nothing of the old values.
+    /// The origins of the leaf-sized regions whose leaves or tiles the edit removed: what
+    /// the commit puts there takes nothing of the old values.
     removed: BTreeSet<Coord>,
+    /// The origins of the root's and upper nodes' regions whose tiles the edit removed, the
+    /// same of them.
+    cleared: [BTreeSet<Coord>; 2],
 }
 
 impl TopologyEditor<'_> {
@@ -343,6 +351,21 @@ impl TopologyEditor<'_> {
             self.removed.insert(TileLevel::Lower.origin(v));
         }
         Ok(d)
+    }
+
+    /// Removes the tile holding the voxel, at whatever level, and the nodes it leaves empty
+    /// (`Tree::remove_tile`), giving the tile's level; a voxel in no tile is refused. A leaf
+    /// or tile the same edit puts in its region takes nothing of the removed tile's value:
+    /// it starts from the background.
+    pub fn remove_tile(&mut self, v: Coord) -> Result<TileLevel, TreeError> {
+        let level = self.tree.remove_tile(v)?;
+        let origin = level.origin(v);
+        match level {
+            TileLevel::Root => self.cleared[0].insert(origin),
+            TileLevel::Upper => self.cleared[1].insert(origin),
+            TileLevel::Lower => self.removed.insert(origin),
+        };
+        Ok(level)
     }
 
     /// Makes the region of the given level holding the voxel a tile (`Tree::add_tile`).
@@ -373,7 +396,12 @@ impl TopologyEditor<'_> {
     /// nothing a merge left unreachable outlives the commit.
     pub fn commit(self) -> Result<(Topology, Remap), TreeError> {
         let new = Topology::from_tree(self.tree.compacted()?)?;
-        let old = Before { old: self.old, tree: &self.old.tree, removed: &self.removed };
+        let old = Before {
+            old: self.old,
+            tree: &self.old.tree,
+            removed: &self.removed,
+            cleared: &self.cleared,
+        };
         let leaves = new
             .leaves
             .iter()
@@ -397,26 +425,37 @@ impl TopologyEditor<'_> {
 /// Leaf-sized regions in a lower node's region.
 const LOWER_REGIONS: u32 = 4096;
 
-/// The old topology as an edit leaves it to its commit: the regions whose leaves the edit
-/// removed are the background.
+/// The old topology as an edit leaves it to its commit: the regions whose leaves or tiles
+/// the edit removed are the background.
 struct Before<'a> {
     old: &'a Topology,
     /// The old topology's tree, for what its nodes hold.
     tree: &'a Tree,
     removed: &'a BTreeSet<Coord>,
+    cleared: &'a [BTreeSet<Coord>; 2],
 }
 
 impl Before<'_> {
+    /// Whether the edit removed a root's or an upper node's tile holding the voxel.
+    fn cleared(&self, v: Coord) -> bool {
+        self.cleared[0].contains(&TileLevel::Root.origin(v))
+            || self.cleared[1].contains(&TileLevel::Upper.origin(v))
+    }
+
     fn locate(&self, v: Coord) -> Location {
-        if self.removed.contains(&TileLevel::Lower.origin(v)) {
+        if self.cleared(v) || self.removed.contains(&TileLevel::Lower.origin(v)) {
             Location::Background
         } else {
             self.old.locate(v)
         }
     }
 
-    /// Whether the edit removed a leaf in the region a tile at `level` and `origin` covers.
+    /// Whether the edit removed a leaf or a tile in the region a tile at `level` and
+    /// `origin` covers.
     fn removed_in(&self, level: TileLevel, origin: Coord) -> bool {
+        if self.cleared(origin) {
+            return true;
+        }
         let region = |c: &Coord| level.origin(*c);
         self.removed
             .range([origin[0], i32::MIN, i32::MIN]..)
@@ -458,8 +497,7 @@ fn tile_source(
             Location::Background => return Ok(TileSource::Background),
         },
         // Nothing merges into a root tile: it is the same tile, or one added where nothing
-        // was or where the edit removed every leaf. A root tile's region held no leaf, so
-        // none was removed from it.
+        // was, where the edit removed every leaf, or where it removed the tile.
         TileLevel::Root => {
             return Ok(match old.locate(origin) {
                 Location::Tile(t, TileLevel::Root) => TileSource::Tile(t),

@@ -47,7 +47,7 @@ impl Offset {
 }
 
 /// What lies next to each leaf, in leaf-number order.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct LeafManifest {
     neighbours: Vec<[Location; DIRECTIONS]>,
 }
@@ -62,6 +62,11 @@ fn step(origin: Coord, d: [i32; 3]) -> Option<Coord> {
 }
 
 impl LeafManifest {
+    /// The manifest of a topology of no leaves.
+    pub(crate) const fn empty() -> Self {
+        Self { neighbours: Vec::new() }
+    }
+
     /// Builds the manifest of the leaves at `origins`, in leaf-number order, locating each
     /// neighbour with `locate`, in turn, so that it may keep the path of the last. A
     /// neighbour beyond the `i32` range is the background.

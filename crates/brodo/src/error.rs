@@ -19,11 +19,11 @@ pub enum NodeKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 #[non_exhaustive]
 pub enum TreeError {
-    /// No tile contains the voxel to split at.
+    /// No tile contains the voxel to split or remove at.
     #[error("no tile contains voxel {0:?}")]
     NotATile(Coord),
-    /// A tile holds the voxel to deactivate; it must be split first (ADR-0025).
-    #[error("a {level:?} tile holds voxel {voxel:?}; split it before deactivating")]
+    /// A tile holds the voxel to deactivate; it must be split or removed first (ADR-0025).
+    #[error("a {level:?} tile holds voxel {voxel:?}; split or remove it before deactivating")]
     InTile {
         /// The tile's level.
         level: TileLevel,

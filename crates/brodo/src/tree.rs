@@ -184,6 +184,11 @@ macro_rules! internal_node {
                 self.tiles.set(Self::index(v));
             }
 
+            /// Empties the place holding `v`, which holds a tile.
+            fn clear_tile(&mut self, v: Coord) {
+                self.tiles.clear(Self::index(v));
+            }
+
             /// Makes the place holding `v` a tile in place of its child, giving the child's
             /// number, or nothing where there was no child.
             fn child_to_tile(&mut self, v: Coord) -> Option<u32> {
@@ -605,6 +610,43 @@ impl Tree {
         }
     }
 
+    /// Removes the tile holding the voxel, at whatever level, and each node above it that is
+    /// left with nothing in it, so that its region is the background again, giving the
+    /// tile's level. A voxel in no tile is refused.
+    pub fn remove_tile(&mut self, v: Coord) -> Result<TileLevel, TreeError> {
+        let key = align(v, UPPER_SPAN_LOG2);
+        let u = match self.root.get(&key) {
+            None => return Err(TreeError::NotATile(v)),
+            Some(RootEntry::Tile) => {
+                self.root.remove(&key);
+                return Ok(TileLevel::Root);
+            }
+            Some(RootEntry::Node(u)) => *u,
+        };
+        let level = match self.upper[to_usize(u)].slot(v) {
+            Slot::Empty => return Err(TreeError::NotATile(v)),
+            Slot::Tile => {
+                self.upper[to_usize(u)].clear_tile(v);
+                TileLevel::Upper
+            }
+            Slot::Child(l) => {
+                let lower = &mut self.lower[to_usize(l)];
+                match lower.slot(v) {
+                    Slot::Tile => lower.clear_tile(v),
+                    Slot::Empty | Slot::Child(_) => return Err(TreeError::NotATile(v)),
+                }
+                if lower.is_empty() {
+                    let _removed = self.upper[to_usize(u)].remove_child(v);
+                }
+                TileLevel::Lower
+            }
+        };
+        if self.upper[to_usize(u)].is_empty() {
+            self.root.remove(&key);
+        }
+        Ok(level)
+    }
+
     /// Splits the tile holding the voxel down to the voxel's leaf: each level on the path
     /// becomes a node whose other children are tiles (ADR-0013).
     pub fn split_tile(&mut self, v: Coord) -> Result<LeafId, TreeError> {
@@ -924,6 +966,13 @@ mod tests {
             Ok(self.leaves.remove(&o).then_some(o))
         }
 
+        /// What removing the tile holding `v` gives: its level, or nothing outside a tile.
+        fn remove_tile(&mut self, v: Coord) -> Option<TileLevel> {
+            let l = self.tile_at(v)?;
+            self.tiles.remove(&(l, align(v, span(l))));
+            Some(l)
+        }
+
         /// The nodes a tree holding exactly these leaves and tiles needs: upper, lower.
         fn nodes(&self) -> [usize; 2] {
             let below_root = self.tiles.iter().filter(|(l, _)| *l != TileLevel::Root);
@@ -1051,6 +1100,7 @@ mod tests {
         Deactivate(Coord),
         AddTile(TileLevel, Coord),
         Split(Coord),
+        RemoveTile(Coord),
         Merge(TileLevel, Coord),
         /// Every leaf-sized region of a lower node's region made a leaf, or a tile.
         Fill(Coord, bool),
@@ -1081,6 +1131,7 @@ mod tests {
             Deactivate,
             AddTile(TileLevel),
             Split,
+            RemoveTile,
             Merge(TileLevel),
             Fill(bool),
             Compact,
@@ -1090,6 +1141,7 @@ mod tests {
             4 => Just(Kind::Deactivate),
             4 => level().prop_map(Kind::AddTile),
             4 => Just(Kind::Split),
+            3 => Just(Kind::RemoveTile),
             2 => Just(Kind::Merge(TileLevel::Lower)),
             2 => Just(Kind::Merge(TileLevel::Upper)),
             1 => Just(Kind::Merge(TileLevel::Root)),
@@ -1108,6 +1160,7 @@ mod tests {
                             Kind::Deactivate => Op::Deactivate(v),
                             Kind::AddTile(l) => Op::AddTile(l, v),
                             Kind::Split => Op::Split(v),
+                            Kind::RemoveTile => Op::RemoveTile(v),
                             Kind::Merge(l) => Op::Merge(l, v),
                             Kind::Fill(leaves) => Op::Fill(v, leaves),
                             Kind::Compact => Op::Compact,
@@ -1161,6 +1214,23 @@ mod tests {
         Ok(())
     }
 
+    /// Makes every leaf-sized region of the lower node's region holding `v` a leaf, or a
+    /// tile.
+    fn fill(t: &mut Tree, m: &mut Model, v: Coord, leaves: bool) -> Result<(), TestCaseError> {
+        for r in Model::regions(v) {
+            if leaves {
+                let got = matches!(t.activate(r).unwrap(), Activation::InTile(_));
+                prop_assert_eq!(got, m.activate(r).0 == 2);
+            } else {
+                prop_assert_eq!(
+                    t.add_tile(TileLevel::Lower, r).is_ok(),
+                    m.add_tile(TileLevel::Lower, r)
+                );
+            }
+        }
+        Ok(())
+    }
+
     fn step(t: &mut Tree, m: &mut Model, op: &Op) -> Result<Coord, TestCaseError> {
         let v = match *op {
             Op::Activate(v) => {
@@ -1187,22 +1257,16 @@ mod tests {
                 prop_assert_eq!(got, m.split(v));
                 v
             }
+            Op::RemoveTile(v) => {
+                prop_assert_eq!(t.remove_tile(v).ok(), m.remove_tile(v));
+                v
+            }
             Op::Merge(l, v) => {
                 prop_assert_eq!(t.merge(l, v).is_ok(), m.merge(l, v), "merge {:?} at {:?}", l, v);
                 v
             }
             Op::Fill(v, leaves) => {
-                for r in Model::regions(v) {
-                    if leaves {
-                        let got = matches!(t.activate(r).unwrap(), Activation::InTile(_));
-                        prop_assert_eq!(got, m.activate(r).0 == 2);
-                    } else {
-                        prop_assert_eq!(
-                            t.add_tile(TileLevel::Lower, r).is_ok(),
-                            m.add_tile(TileLevel::Lower, r)
-                        );
-                    }
-                }
+                fill(t, m, v, leaves)?;
                 v
             }
             Op::Compact => {

@@ -88,3 +88,4 @@ A record is `Proposed` until the human accepts it.
 | [0056](0056-a-value-type-is-named-by-an-enum.md) | A value type is named by an enum, and a field of any stored type is one |
 | [0057](0057-a-cache-files-grids-are-reached-as-its-entries-of-bytes-are.md) | A cache file's grids are reached as its entries of bytes are |
 | [0058](0058-errors-are-of-one-shape-in-one-place.md) | Errors are of one shape, in one place, and built with what gives them |
+| [0059](0059-a-tile-is-removed-and-a-grid-made-from-its-parts.md) | A tile is removed in one call, and a grid is made from its parts |

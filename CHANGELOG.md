@@ -84,6 +84,8 @@ archive profiles stay at version 2, and version 1 of them is no longer read nor 
 - `SliceError`, `VdbError` and `VtkError` are built only with `slice-png`, `vdb` and
   `vtk`, and `CacheError`'s `Decompress`, `Chunks`, `UnknownEncoding`, `NotQuantised` and
   `Unrepresentable` only with `archive`.
+- `manifest::LeafManifest` no longer implements `Default`: one belonging to no topology
+  meant nothing (ADR-0059). A topology's is `Topology::manifest`.
 
 A file of version 1, written by 0.8 or earlier or by 0.9.0 on request, is first read by
 0.9.0 and written again by it, at version 2. A file of version 2 then converts with this

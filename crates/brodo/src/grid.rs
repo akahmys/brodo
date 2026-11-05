@@ -7,7 +7,7 @@ use std::sync::Arc;
 use crate::error::{FieldError, GridError, TreeError};
 use crate::field::{Field, LEAF_VOXELS, MergeRule, Value, uniform};
 use crate::parallel::par_update;
-use crate::topology::{LeafNumber, TileNumber, Topology, TopologyEditor};
+use crate::topology::{LeafNumber, Remap, TileNumber, Topology, TopologyEditor};
 use crate::tree::Coord;
 
 /// One topology and one field on it, with the rule its merges use.
@@ -38,6 +38,35 @@ impl<T: Value> Grid<T> {
         let topology = Topology::new();
         let field = Field::new(&topology, background);
         Self { topology, field, rule }
+    }
+
+    /// A grid of `topology` and `field`, whose merges use `rule`, such as a grid thawed from
+    /// a file (`GridView::thaw`) or the values `morphology::dilate_values` gives. Refused if
+    /// the field belongs to another topology.
+    pub fn from_parts(
+        topology: Topology,
+        field: Field<T>,
+        rule: Arc<MergeRule<T>>,
+    ) -> Result<Self, FieldError> {
+        field.check(&topology)?;
+        Ok(Self { topology, field, rule })
+    }
+
+    /// Its topology, field and merge rule, the grid given up.
+    pub fn into_parts(self) -> (Topology, Field<T>, Arc<MergeRule<T>>) {
+        (self.topology, self.field, self.rule)
+    }
+
+    /// Takes `topology` in place of its own, its field remapped by `remap`, the remap from
+    /// its topology to `topology` that a commit or `morphology::dilate` or `erode` gives. If
+    /// the remap is not from its topology to `topology`, or the merge rule refuses a merged
+    /// tile, the grid is unchanged.
+    pub fn replace(&mut self, topology: Topology, remap: &Remap) -> Result<(), FieldError> {
+        let field = self.field.remap(remap, &*self.rule)?;
+        field.check(&topology)?;
+        self.topology = topology;
+        self.field = field;
+        Ok(())
     }
 
     /// Its topology.
@@ -79,6 +108,53 @@ impl<T: Value> Grid<T> {
 
     /// Edits the topology with `f`, commits it and remaps the field. If `f`, the commit or
     /// the remap fails, the grid is unchanged.
+    ///
+    /// Edits whose work fails with an error of the caller's own are made by the steps this
+    /// joins, editing the topology's copy, committing it and `replace`, the grid unchanged
+    /// as here if any fails (ADR-0059):
+    ///
+    /// ```
+    /// use brodo::error::{FieldError, TreeError};
+    /// use brodo::grid::Grid;
+    ///
+    /// #[derive(Debug)]
+    /// enum Error {
+    ///     Tree(TreeError),
+    ///     Field(FieldError),
+    ///     Behind([i32; 3]),
+    /// }
+    /// impl From<TreeError> for Error {
+    ///     fn from(e: TreeError) -> Self {
+    ///         Self::Tree(e)
+    ///     }
+    /// }
+    /// impl From<FieldError> for Error {
+    ///     fn from(e: FieldError) -> Self {
+    ///         Self::Field(e)
+    ///     }
+    /// }
+    ///
+    /// /// Activates each voxel, refusing all of them if one lies behind the origin.
+    /// fn grow(g: &mut Grid<f32>, at: &[[i32; 3]]) -> Result<(), Error> {
+    ///     let mut e = g.topology().edit();
+    ///     for v in at {
+    ///         if v[0] < 0 {
+    ///             return Err(Error::Behind(*v));
+    ///         }
+    ///         e.activate(*v)?;
+    ///     }
+    ///     let (t, remap) = e.commit()?;
+    ///     g.replace(t, &remap)?;
+    ///     Ok(())
+    /// }
+    ///
+    /// let mut g = Grid::new(0.0_f32);
+    /// grow(&mut g, &[[0, 0, 0], [8, 0, 0]])?;
+    /// assert_eq!(g.topology().leaf_count(), 2);
+    /// assert!(matches!(grow(&mut g, &[[16, 0, 0], [-1, 0, 0]]), Err(Error::Behind(_))));
+    /// assert_eq!(g.topology().leaf_count(), 2);
+    /// # Ok::<(), Error>(())
+    /// ```
     pub fn edit<R>(
         &mut self,
         f: impl FnOnce(&mut TopologyEditor<'_>) -> Result<R, TreeError>,
@@ -146,5 +222,55 @@ mod tests {
         assert_eq!(refused, Err(GridError::Tree(TreeError::NotATile([500, 0, 0]))));
         assert_eq!(g.topology().leaf_count(), before);
         assert_eq!(g.value_at([3, 3, 3]).map(f32::to_bits), Ok((-2.0_f32).to_bits()));
+    }
+
+    #[test]
+    fn a_removed_root_tile_leaves_the_background_and_a_tile_added_again_takes_none_of_it() {
+        let mut g = Grid::new(0_u32);
+        g.edit(|e| e.add_tile(TileLevel::Root, [0, 0, 0])).unwrap();
+        let n = g.topology().tile_numbers().next().unwrap();
+        g.set_tile(n, 9).unwrap();
+        assert_eq!(g.edit(|e| e.remove_tile([5, 6, 7])), Ok(TileLevel::Root));
+        assert_eq!((g.topology().tile_count(), g.topology().leaf_count()), (0, 0));
+        assert_eq!(g.value_at([4095, 0, 0]), Ok(0));
+        g.edit(|e| e.add_tile(TileLevel::Root, [0, 0, 0])).unwrap();
+        g.set_tile(g.topology().tile_numbers().next().unwrap(), 9).unwrap();
+        g.edit(|e| {
+            e.remove_tile([0, 0, 0])?;
+            e.add_tile(TileLevel::Upper, [0, 0, 0])?;
+            e.activate([200, 0, 0]).map(|_| ())
+        })
+        .unwrap();
+        assert_eq!([g.value_at([1, 1, 1]), g.value_at([200, 0, 0])], [Ok(0), Ok(0)]);
+        let refused = g.edit(|e| e.remove_tile([300, 0, 0]));
+        assert_eq!(refused, Err(GridError::Tree(TreeError::NotATile([300, 0, 0]))));
+    }
+
+    #[test]
+    fn a_grid_is_made_from_its_parts_and_takes_a_remap() {
+        let mut g = Grid::new(1_u8);
+        g.edit(|e| e.activate([0, 0, 0]).map(|_| ())).unwrap();
+        g.leaf_mut(g.topology().leaf_numbers().next().unwrap()).unwrap()[0] = 5;
+        let (t, f, rule) = g.clone().into_parts();
+        let again = Grid::from_parts(t.clone(), f.clone(), Arc::clone(&rule)).unwrap();
+        assert_eq!(again.value_at([0, 0, 0]), Ok(5));
+        let other = Topology::new();
+        assert_eq!(
+            Grid::from_parts(other, f.clone(), Arc::clone(&rule)).err(),
+            Some(FieldError::StaleField)
+        );
+        // A dilation's remap from the grid's topology: the values follow it.
+        let (bigger, remap) =
+            crate::morphology::dilate(&t, crate::analysis::Connectivity::Six, 1).unwrap();
+        assert!(bigger.leaf_count() > 1);
+        let want = f.remap(&remap, &*rule).unwrap();
+        g.replace(bigger.clone(), &remap).unwrap();
+        for v in [[0, 0, 0], [8, 0, 0], [100, 0, 0]] {
+            assert_eq!(g.value_at(v), want.value_at(&bigger, v));
+        }
+        // A remap from another topology changes nothing.
+        let before = g.topology().leaf_count();
+        assert_eq!(g.replace(Topology::new(), &remap), Err(FieldError::StaleField));
+        assert_eq!(g.topology().leaf_count(), before);
     }
 }
