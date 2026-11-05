@@ -10,9 +10,11 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
 
 - **Done**: P9's first units: B-018 and B-019 kept, patents and licences judged unchanged
   (ADR-0007), version 2's media types stated (ADR-0041), golden files of version 2's
-  bare frozen buffers written, and the tests run on macOS and Windows (ADR-0034).
-- **Next**: the reserved prefix of metadata keys, and the rest of P9 in the order put to
-  the owner (2026-11-04).
+  bare frozen buffers written, the tests run on macOS and Windows (ADR-0034), and keys
+  beginning `brodo.` reserved, Hermite data at version 3 and the SDF convention at
+  version 2 (ADR-0053).
+- **Next**: the review of the public API, and the rest of P9 in the order put to the
+  owner (2026-11-04).
 
 ## 2. Milestones
 
@@ -542,10 +544,12 @@ since crates.io yanks a version but never deletes it.
 - [ ] The public API reviewed for what would break a user after 1.0: each public enum and
       error `#[non_exhaustive]` or not, each public trait sealed or not, the public errors'
       `Clone` and `PartialEq` (After P7's review), each change a proposal to the owner
-- [ ] One prefix of metadata keys reserved for the formats brodo builds on the cache
+- [x] One prefix of metadata keys reserved for the formats brodo builds on the cache
       profile after 1.0, such as `brodo.`, `hermite.` kept as it is, so that each later
       one is not a breaking change to `CacheEntry::new` and `CacheEntry::bytes`, which
-      refuse only `hermite.` now (the owner, 2026-11-04; its ADR)
+      refuse only `hermite.` now (the owner, 2026-11-04; its ADR): `brodo.`, Hermite
+      data's and the SDF convention's keys moved under it, their earlier versions not read
+      (ADR-0053)
 - [x] Patents and licences judged again by the owner, for registration on crates.io:
       unchanged (2026-11-04; ADR-0007)
 - [ ] The rules for versions after 1.0, with their ADRs (AGENTS.md, "Changing the

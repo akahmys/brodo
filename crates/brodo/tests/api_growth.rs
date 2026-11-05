@@ -145,7 +145,6 @@ fn hermite_error(e: &HermiteError) -> &'static str {
         HermiteError::Format(..) => "Format",
         HermiteError::Violation { .. } => "Violation",
         HermiteError::OtherTopology(..) => "OtherTopology",
-        HermiteError::OtherMeta(..) => "OtherMeta",
         HermiteError::Missing(..) => "Missing",
         HermiteError::Twice(..) => "Twice",
         HermiteError::UnknownField(..) => "UnknownField",

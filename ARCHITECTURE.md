@@ -289,7 +289,7 @@ fastest. A neighbour beyond the `i32` coordinate range is the background.
 - OpenVDB files (`.vdb`), under the feature `vdb`, are written by brodo itself, float and
   double grids on its tree, as one file OpenVDB 14 reads with brodo's values where brodo
   samples them (docs/formats.md §9, ADR-0045, ADR-0046); every leaf voxel and tile is
-  written active, the unit, voxel size and free pairs but `sdf.version` are not, and two
+  written active, the unit, voxel size and free pairs but `brodo.sdf.version` are not, and two
   grids of one name are refused. They are read back, with those OpenVDB 12 to 14 writes by
   default, as docs/formats.md §9.7 states (ADR-0047): each float and double grid with its
   name, transform, voxel size, string metadata and a unit the caller gives; every leaf
@@ -337,13 +337,12 @@ are in ADR-0030.
   the point, the axis and the rule. Of several broken rules, which is named is not
   promised.
 - In a cache file of version 2, a set is its sign grid and an entry of bytes holding its
-  crossings, told apart by keys in their free pairs, the sign grid holding the group table
-  ([docs/formats.md](docs/formats.md) §4.3); a set of version 1, ten dense grids, an edge
-  with no crossing, every tile and the background holding fraction −1, normal zero and
-  group 0 (§4.1), is read, and written on request (`Hermite::entries_v1`). A reader reads
-  a set in place, without a copy, the sign grid's nodes walked from its root table, each
-  reached once and every leaf reached, and an entry's masks held to the sign grid's
-  leaves (§4.2, §4.3).
+  crossings, told apart by keys beginning `brodo.hermite.` in their free pairs, the sign
+  grid holding the group table ([docs/formats.md](docs/formats.md) §4.1). A set of an
+  earlier version, its keys beginning `hermite.`, is refused by its version, not read
+  (ADR-0053). A reader reads a set in place, without a copy, the sign grid's nodes walked
+  from its root table, each reached once and every leaf reached, and an entry's masks held
+  to the sign grid's leaves (§4.2).
 - A producer's own information, such as edges it found no surface for, is not in the
   format; it reports it beside the set.
 
@@ -388,8 +387,8 @@ are in ADR-0030.
   across a hole follows the regions, as coarse as the tiles there. The same mesh and
   options give the same topology and the same field bytes whatever the thread count. No
   dense grid: memory follows the band's volume. These are brodo's SDF convention, version
-  1, which the grid's `extra` names under the key `sdf.version` (`brodo::meta::SDF_KEY`,
-  ADR-0039) so that any producer can claim it.
+  2, which the grid's `extra` names under the key `brodo.sdf.version`
+  (`brodo::meta::SDF_KEY`, ADR-0039, ADR-0053) so that any producer can claim it.
 - Hermite data: a set in brodo's format (§4.9) on the conversion's topology, its signs
   found by the conversion's sign and its crossings found by a watertight edge test, with the count
   of crossed edges no triangle was hit on beside it, whose crossing is the nearest triangle's:
@@ -499,7 +498,7 @@ Rust. It uses no GPU and no window.
   terminal or makes a line; an error naming one escapes it too.
 - **`slice`** draws a plane of a scalar grid as PNG by §6.1's slice, across the grid's
   bounds in the plane's two other axes, refusing an image above 2²⁶ pixels. A level set,
-  by brodo's `sdf.version` or OpenVDB's `class` of `level set`, takes the diverging map
+  by brodo's `brodo.sdf.version` or OpenVDB's `class` of `level set`, takes the diverging map
   saturated at its background's magnitude; another grid the sequential map from its least
   value to its greatest.
 - **`convert`** writes, by the output's name, every grid or the one `--grid` names as

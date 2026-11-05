@@ -263,9 +263,9 @@ pub enum CacheError {
     /// binary16, an infinity or a range wider than an `f64` holds in 8 bits.
     #[error("grid {0} holds a leaf value its encoding cannot hold")]
     Unrepresentable(usize),
-    /// The metadata holds a key beginning `hermite.`, which `CacheEntry::new` leaves to
-    /// Hermite data.
-    #[error("the metadata holds the key {0:?}, which Hermite data reserves")]
+    /// The metadata holds a key beginning `brodo.`, which `CacheEntry::new` leaves to
+    /// brodo's formats built on the cache profile.
+    #[error("the metadata holds the key {0:?}, which brodo's formats reserve")]
     ReservedKey(String),
     /// An entry of bytes asked to be written at version 1, which holds grids alone
     /// (docs/formats.md §3.5).
@@ -323,9 +323,6 @@ pub enum HermiteError {
     /// A field of the set is on another topology.
     #[error("the {0} field is on another topology")]
     OtherTopology(&'static str),
-    /// A grid of the set differs from the sign grid in voxel size, unit or transform.
-    #[error("the {0} grid's voxel size, unit or transform differs from the sign grid's")]
-    OtherMeta(&'static str),
     /// A field of the set is not in the file.
     #[error("no {0} grid in the set")]
     Missing(&'static str),
@@ -344,10 +341,12 @@ pub enum HermiteError {
     /// A group key whose id is not a number from 1 written plainly.
     #[error("bad group key {0:?}")]
     BadGroupKey(String),
-    /// The metadata given for the entries already holds a key of the format.
-    #[error("the metadata already holds the format's key {0:?}")]
+    /// The metadata given for the entries holds a key beginning `brodo.`, which brodo's
+    /// formats reserve, or an entry of the set's crossings holds one of the format's
+    /// besides its own.
+    #[error("the metadata already holds the reserved key {0:?}")]
     ReservedKey(String),
-    /// The metadata given for the entries states the SDF convention, `sdf.version`: a set
+    /// The metadata given for the entries states the SDF convention, `SDF_KEY`: a set
     /// written with it would be taken for an SDF.
     #[error("the metadata states the SDF convention, which a Hermite set does not keep")]
     ClaimsSdf,

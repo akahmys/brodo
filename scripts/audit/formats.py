@@ -27,9 +27,8 @@ BLOCK = 32
 TYPES = {1: (4, "<f"), 2: (8, "<d"), 3: (1, "<B"), 4: (4, "<I"), 5: (12, "<3f"), 6: (24, "<3d")}
 LEVEL_EDGE_LOG2 = {"root": 12, "upper": 7, "lower": 3}
 UPPER_NODE, LOWER_NODE = 8224, 1056
-FIELDS = ["sign"] + [f"{a}.{f}" for a in "xyz" for f in ("fraction", "normal", "group")]
-FIELD_TYPES = {"sign": 3, "fraction": 1, "normal": 5, "group": 4}
-NO_CROSSING = (struct.pack("<f", -1.0), struct.pack("<3f", 0.0, 0.0, 0.0), 0)
+SIGN_TYPE = 3
+H = b"brodo.hermite."
 
 
 class Refused(Exception):
@@ -726,9 +725,9 @@ def group_table(pairs):
     """§4.1: the names by id, group 0 first; [] when there is no group key."""
     by_id = {}
     for k, v in pairs:
-        if not k.startswith(b"hermite.group."):
+        if not k.startswith(H + b"group."):
             continue
-        id_ = k[len(b"hermite.group.") :]
+        id_ = k[len(H + b"group.") :]
         need(id_.isdigit() and id_[:1] != b"0" and int(id_) < 2 ** 32, "group key")
         by_id[int(id_)] = v
     need(sorted(by_id) == list(range(1, len(by_id) + 1)), "group ids")
@@ -737,25 +736,40 @@ def group_table(pairs):
     return [b""] + names if names else []
 
 
-def hermite_v2(grids, entries, name):
-    """§4.3: the set `name`'s sign grid and metadata, and its crossings: a function from a
-    leaf, an axis and a place to a crossing, or none."""
+def sets_of(grids, entries=()):
+    """The names of the sets `grids` and `entries` hold, of this version or, by their keys
+    beginning `hermite.`, of an earlier one (§4.2, rule 1)."""
+    names = set()
+    for m, _ in list(grids) + list(entries):
+        pairs = dict(m["pairs"])
+        names.add(pairs.get(H + b"set", pairs.get(b"hermite.set")))
+    return sorted(names - {None})
+
+
+def hermite(grids, name, entries=()):
+    """§4.2: checks the set `name`; returns its group table."""
+    for m, _ in list(grids) + list(entries):
+        pairs = dict(m["pairs"])
+        if pairs.get(H + b"set") == name:
+            need(pairs.get(H + b"version") == b"3", "hermite version")
+        elif pairs.get(b"hermite.set") == name:
+            need(False, "hermite version of an earlier release")
     signs, crossings = [], []
     for m, g in grids:
         pairs = dict(m["pairs"])
-        if pairs.get(b"hermite.set") == name:
-            need(pairs.get(b"hermite.field") == b"sign", "hermite field")
+        if pairs.get(H + b"set") == name:
+            need(pairs.get(H + b"field") == b"sign", "hermite field")
             signs.append((m, g))
     for m, data in entries:
         pairs = dict(m["pairs"])
-        if pairs.get(b"hermite.set") == name:
-            need(pairs.get(b"hermite.field") == b"crossings", "hermite field")
-            ours = {b"hermite.version", b"hermite.set", b"hermite.field"}
-            need(all(not k.startswith(b"hermite.") or k in ours for k in pairs), "hermite key")
+        if pairs.get(H + b"set") == name:
+            need(pairs.get(H + b"field") == b"crossings", "hermite field")
+            ours = {H + b"version", H + b"set", H + b"field"}
+            need(all(not k.startswith(H) or k in ours for k in pairs), "hermite key")
             crossings.append(data)
     need(len(signs) == 1 and len(crossings) == 1, "hermite missing")
     (sm, s), data = signs[0], crossings[0]
-    need(s.code == FIELD_TYPES["sign"], "hermite type")
+    need(s.code == SIGN_TYPE, "hermite type")
     masks, starts = [], [0]
     for n in range(s.nleaves):
         words = struct.unpack_from("<24Q", data, 192 * n) if 192 * (n + 1) <= len(data) else None
@@ -773,57 +787,20 @@ def hermite_v2(grids, entries, name):
         at = 192 * s.nleaves + 20 * (starts[n] + before)
         return data[at : at + 4], data[at + 4 : at + 16], struct.unpack_from("<I", data, at + 16)[0]
 
-    return sm, s, crossing
+    return hermite_check(sm, s, crossing)
 
 
-def hermite(grids, name, entries=()):
-    """§4.2 and §4.3: checks the set `name`; returns its group table."""
-    versions = {dict(m["pairs"]).get(b"hermite.version") for m, _ in list(grids) + list(entries)
-                if dict(m["pairs"]).get(b"hermite.set") == name}
-    need(len(versions) == 1 and versions <= {b"1", b"2"}, "hermite version")
-    if versions == {b"2"}:
-        return hermite_check(*hermite_v2(grids, entries, name), None)
-    found = {}
-    for m, g in grids:
-        pairs = dict(m["pairs"])
-        if pairs.get(b"hermite.set") != name:
-            continue
-        field = pairs.get(b"hermite.field", b"").decode()
-        need(field in FIELDS and field not in found, "hermite field")
-        need(g.code == FIELD_TYPES[field.split(".")[-1]], "hermite type")
-        found[field] = (m, g)
-    need(len(found) == 10, "hermite missing")
-    sm, s = found["sign"]
-    for f in FIELDS[1:]:
-        m, g = found[f]
-        same = (m["voxel_size"], m["transform"], m["unit"])
-        need(same == (sm["voxel_size"], sm["transform"], sm["unit"]), "hermite metadata")
-        need(g.tree == s.tree, "hermite topology")
-    axes = [tuple(found[f"{a}.{f}"][1] for f in ("fraction", "normal", "group")) for a in "xyz"]
-    return hermite_check(sm, s, None, axes)
-
-
-def hermite_check(sm, s, sparse, axes=None):
-    """§4.2 rules 4 to 11 on a set's sign grid `s` and its crossings: `sparse`, a function
-    from a leaf, an axis and a place to a crossing or none, at version 2; or, at version 1,
-    `axes`, each axis's three dense grids."""
+def hermite_check(sm, s, crossing):
+    """§4.2 rules 2 and 4 to 10 on a set's sign grid `s` and its crossings, `crossing`, a
+    function from a leaf, an axis and a place to a crossing or none."""
     names = group_table(sm["pairs"])
     groups = max(len(names), 1)
-
-    def crossing(axis, get):
-        f, n, g = axes[axis]
-        return get(f), get(n), struct.unpack("<I", get(g))[0]
-
     sign = lambda v: s.get(v)[0]
     need(s.background == b"\0", "sign background")
-    for a in range(3 if axes else 0):
-        need(crossing(a, lambda g: g.background) == NO_CROSSING, "crossing background")
     leaves, tiles = s.regions()
     need(None not in leaves, "leaf unreached")
     for _, _, t in tiles:
         need(s.tile(t)[0] <= 1, "tile sign")
-        for a in range(3 if axes else 0):
-            need(crossing(a, lambda g: g.tile(t)) == NO_CROSSING, "tile crossing")
     for n in range(s.nleaves):
         need(all(x <= 1 for x in s.leaf(n)), "leaf sign")
     is_leaf = lambda v: s.locate(v)[0] == "leaf"
@@ -844,13 +821,11 @@ def hermite_check(sm, s, sparse, axes=None):
             here = sign(v)
             for a in range(3):
                 w = [v[k] + unit[a][k] for k in range(3)]
-                if axes:
-                    c = crossing(a, lambda g: g.leaf(n)[i * g.size : (i + 1) * g.size])
-                else:
-                    c = sparse(n, a, i) or NO_CROSSING
+                c = crossing(n, a, i)
                 if sign(w) == here:
-                    need(c == NO_CROSSING, "crossing where signs agree")
+                    need(c is None, "crossing where signs agree")
                 else:
+                    need(c is not None, "no crossing where signs differ")
                     fraction = struct.unpack("<f", c[0])[0]
                     normal = struct.unpack("<3f", c[1])
                     length = sum(x * x for x in normal) ** 0.5
@@ -909,7 +884,7 @@ def read(path, brief, b=None, box=None):
             grids, sets = [(None, Grid(b))], []
         else:
             grids = archive(b, entries) if b[0:4] == b"BRDA" else cache(b, entries)
-            sets = sorted({dict(m["pairs"]).get(b"hermite.set") for m, _ in grids} - {None})
+            sets = sets_of(grids)
         verdicts = []
         for name in sets:
             try:

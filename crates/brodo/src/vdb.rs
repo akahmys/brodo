@@ -78,7 +78,7 @@ pub struct VdbEntry {
 impl VdbEntry {
     /// A topology and a field on it, with its metadata, for an OpenVDB file.
     ///
-    /// Of the metadata, the name and the transform are written, and `sdf.version` among
+    /// Of the metadata, the name and the transform are written, and `SDF_KEY` among
     /// the free pairs makes the grid a level set; the unit, the voxel size and the other
     /// pairs are not written, OpenVDB having no place for a unit and the transform alone
     /// placing the voxels. Every leaf voxel and tile is written active (ADR-0046).

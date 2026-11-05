@@ -7,15 +7,16 @@ mod timed;
 
 use std::collections::BTreeMap;
 
-use brodo::cache::{CacheEntry, CacheFile, to_bytes, to_bytes_version};
+use brodo::cache::{CacheEntry, CacheFile, to_bytes};
 use brodo::error::{HermiteError, Rule};
 use brodo::field::Field;
-use brodo::hermite::{Crossing, Crossings, FIELDS, Hermite, HermiteView, NO_CROSSING};
+use brodo::hermite::{Crossing, Crossings, Hermite, HermiteView, NO_CROSSING};
 use brodo::meta::GridMeta;
 use brodo::topology::{Location, Topology};
 use brodo::tree::{Coord, TileLevel};
 
-/// One axis's crossings as dense fields, as version 1 holds them: the parts a test breaks.
+/// One axis's crossings as dense fields, as `Hermite::expand` gives them: the parts a test
+/// breaks.
 struct Axis {
     fraction: Field<f32>,
     normal: Field<[f32; 3]>,
@@ -460,11 +461,10 @@ fn a_normal_perpendicular_to_its_edge_is_taken() {
     }
 }
 
-/// Tiles' signs and the signs' background are checked in memory and from either version;
-/// tiles' and backgrounds' crossings exist at version 1 alone, whose file refuses any but
-/// `NO_CROSSING` (docs/formats.md §4.2, rules 5 and 6).
+/// A tile's sign and the signs' background are 0 or 1, and the background 0 (docs/formats.md
+/// §4.2); a set holds no crossing on a tile or the background, which have no place in it.
 #[test]
-fn tiles_and_backgrounds_hold_the_values_of_no_crossing() {
+fn a_tiles_or_the_backgrounds_sign_out_of_range_is_refused() {
     let mut p = valid();
     let t = p.topology.tile_numbers().next().unwrap();
     p.signs.set_tile(&p.topology, t, 2).unwrap();
@@ -472,16 +472,6 @@ fn tiles_and_backgrounds_hold_the_values_of_no_crossing() {
     let mut p = valid();
     p.signs = Field::new(&p.topology, 1);
     assert_eq!(rule(p.make()), Ok((None, None, Rule::Sign)));
-    let at_1 = |p: &Parts| {
-        let f = CacheFile::from_bytes(&to_bytes_version(&unchecked(p), 1).unwrap()).unwrap();
-        rule(HermiteView::find(&f, "u"))
-    };
-    let mut p = valid();
-    p.axes[2].group.set_tile(&p.topology, t, 1).unwrap();
-    assert_eq!(at_1(&p), Ok((Some([8, 8, 8]), Some(2), Rule::NoCrossing)));
-    let mut p = valid();
-    p.axes[1].normal = Field::new(&p.topology, [0.0, 0.0, -0.0]);
-    assert_eq!(at_1(&p), Ok((None, Some(1), Rule::NoCrossing)));
 }
 
 /// One inside tile and no leaf: its faces own edges into the outside background.
@@ -574,7 +564,6 @@ fn a_set_round_trips_through_a_file_among_others() {
     let f = file(&entries);
     let read = HermiteView::find(&f, "box").unwrap();
     assert_eq!(read.group_names(), ["", "a", "b"]);
-    assert_eq!(read.version(), "2");
     let t = set.topology();
     let bits = |c: Option<Crossing>| {
         c.map(|c| (c.fraction.to_bits(), c.normal.map(f32::to_bits), c.group))
@@ -596,217 +585,38 @@ fn a_set_round_trips_through_a_file_among_others() {
     assert!(matches!(HermiteView::find(&f, "none"), Err(HermiteError::Missing("sign"))));
 }
 
-/// The small set's entries, each with `extra` changed by `edit` before it is written.
-fn edited(edit: impl Fn(usize, &mut GridMeta)) -> Vec<CacheEntry> {
-    let set = parts(1, None, 2, 6).make().unwrap();
-    let t = set.topology();
-    let mut out = Vec::new();
-    for (i, field) in FIELDS.iter().enumerate() {
-        let mut m = meta("s");
-        m.extra.insert("hermite.version".into(), "1".into());
-        m.extra.insert("hermite.set".into(), "s".into());
-        m.extra.insert("hermite.field".into(), (*field).into());
-        if i == 0 {
-            m.extra.insert("hermite.group.1".into(), "a".into());
-            m.extra.insert("hermite.group.2".into(), "b".into());
-        }
-        edit(i, &mut m);
-        let (fraction, normal, group) = set.expand(i.saturating_sub(1) / 3).unwrap();
-        let e = match i {
-            0 => CacheEntry::with_reserved_keys(&m, t, set.signs()),
-            i if i % 3 == 1 => CacheEntry::with_reserved_keys(&m, t, &fraction),
-            i if i % 3 == 2 => CacheEntry::with_reserved_keys(&m, t, &normal),
-            _ => CacheEntry::with_reserved_keys(&m, t, &group),
-        };
-        out.push(e.unwrap());
-    }
+/// The keys of a set's entry: `brodo.hermite.` and `rest` joined to it.
+fn keys(set: &str, field: &str, rest: &[(String, String)]) -> BTreeMap<String, String> {
+    let mut out: BTreeMap<String, String> = [
+        ("brodo.hermite.version", "3"),
+        ("brodo.hermite.set", set),
+        ("brodo.hermite.field", field),
+    ]
+    .map(|(k, v)| (k.to_owned(), v.to_owned()))
+    .into();
+    out.extend(rest.iter().cloned());
     out
 }
 
-#[test]
-fn a_files_keys_that_do_not_fit_are_refused() {
-    let found = |e: Vec<CacheEntry>| HermiteView::find(&file(&e), "s").map(|_| ());
-    assert!(found(edited(|_, _| {})).is_ok());
-    let mut missing = edited(|_, _| {});
-    missing.remove(5);
-    assert!(matches!(found(missing), Err(HermiteError::Missing("y.normal"))));
-    let mut twice = edited(|_, _| {});
-    twice.push(edited(|_, _| {}).remove(3));
-    assert!(matches!(found(twice), Err(HermiteError::Twice("x.group"))));
-    let e = edited(|i, m| {
-        if i == 4 {
-            m.extra.insert("hermite.version".into(), "2".into());
-        }
-    });
-    assert!(matches!(found(e), Err(HermiteError::Version(v)) if v == "2"));
-    let e = edited(|_, m| {
-        m.extra.insert("hermite.version".into(), "3".into());
-    });
-    assert!(matches!(found(e), Err(HermiteError::Version(v)) if v == "3"));
-    let e = edited(|i, m| {
-        if i == 7 {
-            m.extra.insert("hermite.field".into(), "z.fractions".into());
-        }
-    });
-    assert!(matches!(found(e), Err(HermiteError::UnknownField(f)) if f == "z.fractions"));
-    let e = edited(|i, m| {
-        if i == 9 {
-            m.unit = "meter".into();
-        }
-    });
-    assert!(matches!(found(e), Err(HermiteError::OtherMeta("z.group"))));
-    let e = edited(|i, m| {
-        if i == 0 {
-            m.extra.remove("hermite.group.1");
-        }
-    });
-    assert!(matches!(found(e), Err(HermiteError::BadGroupName(1))));
-    let e = edited(|i, m| {
-        if i == 0 {
-            m.extra.insert("hermite.group.03".into(), "c".into());
-        }
-    });
-    assert!(matches!(found(e), Err(HermiteError::BadGroupKey(k)) if k == "hermite.group.03"));
-    let mut reserved = meta("s");
-    reserved.extra.insert("hermite.set".into(), "t".into());
-    let set = parts(1, None, 2, 6).make().unwrap();
-    assert!(
-        matches!(set.entries("s", &reserved), Err(HermiteError::ReservedKey(k)) if k == "hermite.set")
-    );
-}
-
-#[test]
-fn a_file_with_a_broken_rule_or_another_topology_is_refused() {
-    let set = parts(1, None, 2, 6).make().unwrap();
-    let mut entries = set.entries_v1("s", &meta("s")).unwrap();
-    // A sign grid of 2s in the place of the signs, written with the same keys.
-    let t = set.topology();
-    let mut m = meta("s");
-    for (k, v) in [("hermite.version", "1"), ("hermite.set", "s"), ("hermite.field", "sign")] {
-        m.extra.insert(k.into(), v.into());
-    }
-    m.extra.insert("hermite.group.1".into(), "a".into());
-    m.extra.insert("hermite.group.2".into(), "b".into());
-    let mut wrong = Field::new(t, 0_u8);
-    let n = t.leaf_numbers().next().unwrap();
-    wrong.leaf_mut(t, n).unwrap()[index([3, 3, 3])] = 2;
-    entries[0] = CacheEntry::with_reserved_keys(&m, t, &wrong).unwrap();
-    let f = file(&entries);
-    assert!(matches!(
-        HermiteView::find(&f, "s"),
-        Err(HermiteError::Violation { at: Some([3, 3, 3]), axis: None, rule: Rule::Sign })
-    ));
-    let other = topology(2, None);
-    m.extra.insert("hermite.field".into(), "x.normal".into());
-    m.extra.retain(|k, _| !k.starts_with("hermite.group."));
-    let mut entries = set.entries_v1("s", &meta("s")).unwrap();
-    entries[2] =
-        CacheEntry::with_reserved_keys(&m, &other, &Field::new(&other, NO_CROSSING.1)).unwrap();
-    assert!(matches!(
-        HermiteView::find(&file(&entries), "s"),
-        Err(HermiteError::OtherTopology("x.normal"))
-    ));
-}
-
-/// The bytes of a file of `entries` whose last grid holds one tile value more, reached by
-/// no node: its frozen buffer grown by a block (docs/formats.md §2.1, §3.2).
-fn with_a_tile_more(entries: &[CacheEntry]) -> Vec<u8> {
-    // Version 1, whose frozen buffers leave a value no node reaches to the Hermite reader.
-    let mut b = to_bytes_version(entries, 1).unwrap();
-    let word = |b: &[u8], at: usize| u32::from_le_bytes(b[at..at + 4].try_into().unwrap());
-    let put = |b: &mut [u8], at: usize, v: u32| b[at..at + 4].copy_from_slice(&v.to_le_bytes());
-    let entry = 32 * entries.len();
-    let frozen = 32 * word(&b, entry + 8) as usize;
-    let blocks = word(&b, frozen + 56);
-    assert_eq!(word(&b, frozen + 32), 0, "a grid with no tile");
-    put(&mut b, frozen + 32, 1);
-    put(&mut b, frozen + 52, blocks);
-    put(&mut b, frozen + 56, blocks + 1);
-    put(&mut b, entry + 12, blocks + 1);
-    b.extend([0; 32]);
-    b
-}
-
-#[test]
-fn a_field_holding_values_no_node_reaches_is_refused() {
-    // The z groups hold a tile value more than the signs: the same nodes, another tree.
-    let set = parts(1, None, 2, 6).make().unwrap();
-    let entries = set.entries_v1("s", &meta("s")).unwrap();
-    assert_eq!(FIELDS.last(), Some(&"z.group"));
-    let f = CacheFile::from_bytes(&with_a_tile_more(&entries)).unwrap();
-    assert!(matches!(HermiteView::find(&f, "s"), Err(HermiteError::OtherTopology("z.group"))));
-}
-
-/// The committed files' set: the one leaf inside [2, 6)³.
-fn golden_set() -> Hermite {
-    parts(1, None, 2, 6).make().unwrap()
-}
-
-const GOLDEN: &[u8] = include_bytes!("data/hermite_v1.bin");
-const GOLDEN_2: &[u8] = include_bytes!("data/hermite_v2.bin");
-
-/// The crossing a file's set holds at [5, 3, 3] along x, the one leaf's.
-fn at_5_3_3(bytes: &[u8]) -> Option<Crossing> {
-    let f = CacheFile::from_bytes(bytes).unwrap();
-    HermiteView::find(&f, "golden").unwrap().crossing(0, 0, 5 + 8 * 3 + 64 * 3).unwrap()
-}
-
-#[test]
-fn format_version_1_keeps_its_bytes() {
-    let bytes =
-        to_bytes_version(&golden_set().entries_v1("golden", &meta("cube")).unwrap(), 1).unwrap();
-    assert_eq!(bytes.len(), GOLDEN.len(), "length");
-    assert!(bytes == GOLDEN, "the bytes of Hermite format version 1 changed; raise the version");
-    let c = at_5_3_3(GOLDEN).unwrap();
-    assert_eq!((c.fraction.to_bits(), c.group), (0.5_f32.to_bits(), 1));
-}
-
-#[test]
-fn format_version_2_keeps_its_bytes() {
-    let bytes = to_bytes(&golden_set().entries("golden", &meta("cube")).unwrap()).unwrap();
-    assert_eq!(bytes.len(), GOLDEN_2.len(), "length");
-    assert!(bytes == GOLDEN_2, "the bytes of Hermite format version 2 changed; raise the version");
-    assert_eq!(at_5_3_3(GOLDEN_2), at_5_3_3(GOLDEN));
-    assert!(at_5_3_3(GOLDEN_2).is_some());
-}
-
-/// A set's parts written as they are, unchecked, under the keys `entries` would give.
-fn unchecked(p: &Parts) -> Vec<CacheEntry> {
+/// A set's parts written as they are, unchecked, under the keys `edit` leaves of those
+/// `entries` would give, the sign grid's at 0 and the crossings' at 1: its sign grid, and its
+/// crossings' bytes as docs/formats.md §4 lays them out, written here from the document.
+fn unchecked_as(
+    p: &Parts,
+    set: &str,
+    edit: impl Fn(usize, &mut BTreeMap<String, String>),
+) -> Vec<CacheEntry> {
     let t = &p.topology;
-    let mut out = Vec::new();
-    for (i, field) in FIELDS.iter().enumerate() {
-        let mut m = meta("u");
-        for (k, v) in [("hermite.version", "1"), ("hermite.set", "u"), ("hermite.field", field)] {
-            m.extra.insert(k.into(), v.into());
-        }
-        if i == 0 {
-            for (id, name) in p.names.iter().enumerate().skip(1) {
-                m.extra.insert(format!("hermite.group.{id}"), name.clone());
-            }
-        }
-        let e = match (i, p.axes.get(i.saturating_sub(1) / 3)) {
-            (0, _) => CacheEntry::with_reserved_keys(&m, t, &p.signs),
-            (i, Some(c)) if i % 3 == 1 => CacheEntry::with_reserved_keys(&m, t, &c.fraction),
-            (i, Some(c)) if i % 3 == 2 => CacheEntry::with_reserved_keys(&m, t, &c.normal),
-            (_, Some(c)) => CacheEntry::with_reserved_keys(&m, t, &c.group),
-            _ => unreachable!(),
-        };
-        out.push(e.unwrap());
-    }
-    out
-}
-
-/// A set's parts written as they are, unchecked, at version 2: its sign grid, and its
-/// crossings' bytes as docs/formats.md §4.3 lays them out, written here from the document.
-fn unchecked_v2(p: &Parts) -> Vec<CacheEntry> {
-    let t = &p.topology;
-    let mut m = meta("u");
-    for (k, v) in [("hermite.version", "2"), ("hermite.set", "u"), ("hermite.field", "sign")] {
-        m.extra.insert(k.into(), v.into());
-    }
-    for (id, name) in p.names.iter().enumerate().skip(1) {
-        m.extra.insert(format!("hermite.group.{id}"), name.clone());
-    }
+    let groups: Vec<(String, String)> = p
+        .names
+        .iter()
+        .enumerate()
+        .skip(1)
+        .map(|(id, name)| (format!("brodo.hermite.group.{id}"), name.clone()))
+        .collect();
+    let mut m = meta(set);
+    m.extra = keys(set, "sign", &groups);
+    edit(0, &mut m.extra);
     let (mut masks, mut items) = (Vec::new(), Vec::new());
     for leaf in p.crossings() {
         for axis in &leaf {
@@ -821,21 +631,156 @@ fn unchecked_v2(p: &Parts) -> Vec<CacheEntry> {
         }
     }
     masks.extend(items);
-    let extra: BTreeMap<String, String> =
-        [("hermite.version", "2"), ("hermite.set", "u"), ("hermite.field", "crossings")]
-            .map(|(k, v)| (k.to_owned(), v.to_owned()))
-            .into();
+    let mut extra = keys(set, "crossings", &[]);
+    edit(1, &mut extra);
     vec![
         CacheEntry::with_reserved_keys(&m, t, &p.signs).unwrap(),
-        CacheEntry::bytes_with_reserved_keys("u", extra, masks),
+        CacheEntry::bytes_with_reserved_keys(set, extra, masks),
     ]
+}
+
+/// A set's parts written unchecked under the keys `entries` would give, named `u`.
+fn unchecked(p: &Parts) -> Vec<CacheEntry> {
+    unchecked_as(p, "u", |_, _| {})
+}
+
+/// The small set's entries, named `s`, each with its keys changed by `edit`.
+fn edited(edit: impl Fn(usize, &mut BTreeMap<String, String>)) -> Vec<CacheEntry> {
+    unchecked_as(&parts(1, None, 2, 6), "s", edit)
+}
+
+#[test]
+fn a_files_keys_that_do_not_fit_are_refused() {
+    let found = |e: Vec<CacheEntry>| HermiteView::find(&file(&e), "s").map(|_| ());
+    assert!(found(edited(|_, _| {})).is_ok());
+    for (i, field) in [(0, "sign"), (1, "crossings")] {
+        let mut missing = edited(|_, _| {});
+        missing.remove(i);
+        assert!(matches!(found(missing), Err(HermiteError::Missing(f)) if f == field));
+        let mut twice = edited(|_, _| {});
+        twice.push(edited(|_, _| {}).remove(i));
+        assert!(matches!(found(twice), Err(HermiteError::Twice(f)) if f == field));
+    }
+    let e = edited(|i, m| {
+        if i == 1 {
+            m.insert("brodo.hermite.version".into(), "2".into());
+        }
+    });
+    assert!(matches!(found(e), Err(HermiteError::Version(v)) if v == "2"));
+    let e = edited(|_, m| {
+        m.insert("brodo.hermite.version".into(), "4".into());
+    });
+    assert!(matches!(found(e), Err(HermiteError::Version(v)) if v == "4"));
+    for (i, other) in [(0, "signs"), (1, "x.fraction")] {
+        let e = edited(|j, m| {
+            if j == i {
+                m.insert("brodo.hermite.field".into(), other.into());
+            }
+        });
+        assert!(matches!(found(e), Err(HermiteError::UnknownField(f)) if f == other));
+    }
+    let e = edited(|i, m| {
+        if i == 0 {
+            m.remove("brodo.hermite.group.1");
+        }
+    });
+    assert!(matches!(found(e), Err(HermiteError::BadGroupName(1))));
+    let e = edited(|i, m| {
+        if i == 0 {
+            m.insert("brodo.hermite.group.03".into(), "c".into());
+        }
+    });
+    assert!(matches!(found(e), Err(HermiteError::BadGroupKey(k)) if k == "brodo.hermite.group.03"));
+    let e = edited(|i, m| {
+        if i == 1 {
+            m.insert("brodo.hermite.group.1".into(), "a".into());
+        }
+    });
+    assert!(matches!(found(e), Err(HermiteError::ReservedKey(k)) if k == "brodo.hermite.group.1"));
+}
+
+/// A set's writers refuse a key beginning `brodo.` in the metadata given them, kept for
+/// brodo's formats (ADR-0053), the SDF convention's named for itself; keys beginning
+/// `hermite.`, an earlier version's, are free, and a set is still found among them.
+#[test]
+fn a_sets_writers_refuse_a_brodo_key() {
+    let set = parts(1, None, 2, 6).make().unwrap();
+    for key in ["brodo.kind", "brodo.hermite.set"] {
+        let mut later = meta("s");
+        later.extra.insert(key.into(), "t".into());
+        assert!(matches!(set.entries("s", &later), Err(HermiteError::ReservedKey(k)) if k == key));
+    }
+    let mut sdf = meta("s");
+    sdf.extra.insert(brodo::meta::SDF_KEY.into(), brodo::meta::SDF_VERSION.into());
+    assert!(matches!(set.entries("s", &sdf), Err(HermiteError::ClaimsSdf)));
+    let mut free = meta("s");
+    free.extra.insert("hermite.set".into(), "s".into());
+    free.extra.insert("hermite.version".into(), "2".into());
+    let f = file(&set.entries("s", &free).unwrap());
+    assert!(HermiteView::find(&f, "s").is_ok());
+}
+
+#[test]
+fn a_file_with_a_broken_rule_or_another_topology_is_refused() {
+    // A sign grid of 2s in the place of the signs, written with the same keys.
+    let mut p = parts(1, None, 2, 6);
+    let t = p.topology.clone();
+    let n = t.leaf_numbers().next().unwrap();
+    p.signs.leaf_mut(&t, n).unwrap()[index([3, 3, 3])] = 2;
+    assert!(matches!(
+        HermiteView::find(&file(&unchecked_as(&p, "s", |_, _| {})), "s"),
+        Err(HermiteError::Violation { at: Some([3, 3, 3]), axis: None, rule: Rule::Sign })
+    ));
+    // The crossings of a set on two leaves beside the signs of one.
+    let one = unchecked_as(&parts(1, None, 2, 6), "s", |_, _| {});
+    let two = unchecked_as(&parts(2, None, 2, 6), "s", |_, _| {});
+    let entries = vec![one[0].clone(), two[1].clone()];
+    assert!(matches!(
+        HermiteView::find(&file(&entries), "s"),
+        Err(HermiteError::OtherTopology("crossings"))
+    ));
+}
+
+/// The committed file's set: the one leaf inside [2, 6)³.
+fn golden_set() -> Hermite {
+    parts(1, None, 2, 6).make().unwrap()
+}
+
+const GOLDEN: &[u8] = include_bytes!("data/hermite_v3.bin");
+const EARLIER: [(&[u8], &str); 2] =
+    [(include_bytes!("data/hermite_v1.bin"), "1"), (include_bytes!("data/hermite_v2.bin"), "2")];
+
+#[test]
+fn format_version_3_keeps_its_bytes() {
+    let bytes = to_bytes(&golden_set().entries("golden", &meta("cube")).unwrap()).unwrap();
+    if bytes != GOLDEN {
+        let path = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("hermite_v3.bin");
+        std::fs::write(&path, &bytes).unwrap();
+        panic!("the bytes of Hermite format version 3 changed; they are at {}", path.display());
+    }
+    let f = CacheFile::from_bytes(GOLDEN).unwrap();
+    let c = HermiteView::find(&f, "golden").unwrap().crossing(0, 0, 5 + 8 * 3 + 64 * 3).unwrap();
+    let c = c.unwrap();
+    assert_eq!((c.fraction.to_bits(), c.group), (0.5_f32.to_bits(), 1));
+}
+
+/// A set of version 1 or 2, its keys beginning `hermite.`, is refused by its version, not
+/// read (ADR-0053); the file holding it is still read as a cache file.
+#[test]
+fn a_set_of_an_earlier_version_is_refused() {
+    for (bytes, version) in EARLIER {
+        let f = CacheFile::from_bytes(bytes).unwrap();
+        assert!(
+            matches!(HermiteView::find(&f, "golden"), Err(HermiteError::Version(v)) if v == version)
+        );
+        assert!(matches!(HermiteView::find(&f, "other"), Err(HermiteError::Missing("sign"))));
+    }
 }
 
 /// What a check decided: taken, or the violation it named.
 fn verdict<T>(r: Result<T, HermiteError>) -> Result<(), String> {
     r.map(|_| ()).map_err(|e| format!("{e:?}"))
 }
-
 /// Sets of tiles alone, by name, and whether they are taken.
 fn tile_sets() -> [(&'static str, Parts, bool); 3] {
     [
@@ -886,13 +831,10 @@ fn a_file_decides_as_memory_does() {
         ("a hole by a tile's face", shell_with_hole(), false),
     ];
     for (name, p, taken) in cases.into_iter().chain(tile_sets()) {
-        let one = to_bytes_version(&unchecked(&p), 1).unwrap();
-        let two = to_bytes(&unchecked_v2(&p)).unwrap();
+        let bytes = to_bytes(&unchecked(&p)).unwrap();
         let in_memory = verdict(p.make());
         assert_eq!(in_memory.is_ok(), taken, "{name}: {in_memory:?}");
-        for (version, bytes) in [(1, one), (2, two)] {
-            let f = CacheFile::from_bytes(&bytes).unwrap();
-            assert_eq!(verdict(HermiteView::find(&f, "u")), in_memory, "{name}, version {version}");
-        }
+        let f = CacheFile::from_bytes(&bytes).unwrap();
+        assert_eq!(verdict(HermiteView::find(&f, "u")), in_memory, "{name}");
     }
 }

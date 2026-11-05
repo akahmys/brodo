@@ -105,19 +105,33 @@ fn bounds_cover_leaves_and_tiles_and_an_empty_grid_has_none() {
     assert_eq!(Bounds::of(&t).unwrap(), Bounds::Box { min: [-8, 0, 0], max: [255, 127, 127] });
 }
 
-/// Keys beginning `hermite.` are a Hermite set's (U1 of P5's review): refused by `new`, so
-/// that a grid is not taken for one by mistake, and taken by `with_reserved_keys`, which a
-/// set's own entries and files made to break the format use.
+/// Keys beginning `brodo.` are brodo's formats' (U1 of P5's review, ADR-0053): refused by
+/// `new` and `bytes`, so that a grid is not taken for a Hermite set's by mistake, and taken
+/// by their `with_reserved_keys` forms, which a set's own entries and files made to break a
+/// format use; the SDF convention's key is one `new` takes, and a key only beginning
+/// `brodo`, or beginning `hermite.`, an earlier version's, is free.
 #[test]
-fn a_hermite_key_is_written_on_purpose_only() {
+fn a_brodo_key_is_written_on_purpose_only() {
     let t = Topology::new();
     let f = Field::new(&t, 0.0_f32);
-    let m = meta("g", &[("hermite.set", "s")]);
-    assert!(
-        matches!(CacheEntry::new(&m, &t, &f), Err(CacheError::ReservedKey(k)) if k == "hermite.set")
-    );
-    assert!(CacheEntry::with_reserved_keys(&m, &t, &f).is_ok());
-    assert!(CacheEntry::new(&meta("g", &[("hermitage", "s")]), &t, &f).is_ok());
+    for key in ["brodo.kind", "brodo.hermite.set"] {
+        let m = meta("g", &[(key, "x")]);
+        assert!(matches!(CacheEntry::new(&m, &t, &f), Err(CacheError::ReservedKey(k)) if k == key));
+        assert!(CacheEntry::with_reserved_keys(&m, &t, &f).is_ok());
+    }
+    for key in ["brodosity", "hermite.set", brodo::meta::SDF_KEY] {
+        assert!(CacheEntry::new(&meta("g", &[(key, "x")]), &t, &f).is_ok());
+    }
+    let extra = BTreeMap::from([("brodo.kind".to_owned(), "x".to_owned())]);
+    assert!(matches!(
+        CacheEntry::bytes("b", extra.clone(), vec![1]),
+        Err(CacheError::ReservedKey(k)) if k == "brodo.kind"
+    ));
+    let free = BTreeMap::from([("brodosity".to_owned(), "x".to_owned())]);
+    assert!(CacheEntry::bytes("b", free, vec![1]).is_ok());
+    let file = to_bytes(&[CacheEntry::bytes_with_reserved_keys("b", extra, vec![1])]).unwrap();
+    let read = CacheFile::from_bytes(&file).unwrap();
+    assert_eq!(read.bytes_entries()[0].extra.get("brodo.kind").map(String::as_str), Some("x"));
 }
 
 #[test]

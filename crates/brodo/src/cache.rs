@@ -16,7 +16,7 @@ use zerocopy::{FromZeros, IntoBytes};
 use crate::error::{CacheError, FormatError};
 use crate::field::{Field, ForType, Stored, with_type};
 use crate::frozen::{BLOCK, Block, FrozenGrid, aligned, freeze};
-use crate::meta::{Bounds, GridMeta};
+use crate::meta::{Bounds, GridMeta, SDF_KEY};
 use crate::topology::Topology;
 use crate::view::GridView;
 
@@ -44,19 +44,29 @@ pub(crate) enum Payload {
     Bytes { name: String, extra: BTreeMap<String, String>, bytes: Vec<u8> },
 }
 
+/// The prefix of the keys brodo's formats on the cache profile keep: Hermite data's, the
+/// SDF convention's, and those of formats to come (docs/formats.md §3.3, ADR-0053).
+pub const RESERVED_PREFIX: &str = "brodo.";
+
+/// Whether `key` is one brodo's formats keep.
+pub(crate) fn reserved(key: &str) -> bool {
+    key.starts_with(RESERVED_PREFIX)
+}
+
 impl CacheEntry {
     /// Freezes a topology and a field on it, with its metadata, for a cache file. The
-    /// metadata may hold no key beginning `hermite.`: those are a Hermite set's, written by
+    /// metadata may hold no key beginning `brodo.` (`RESERVED_PREFIX`) but the SDF
+    /// convention's, `SDF_KEY`: the others are brodo's formats', a Hermite set's written by
     /// `Hermite::entries`, so that a grid is not taken for one by mistake.
     pub fn new<T: Stored>(meta: &GridMeta, t: &Topology, f: &Field<T>) -> Result<Self, CacheError> {
-        if let Some(key) = meta.extra.keys().find(|k| k.starts_with(crate::hermite::PREFIX)) {
+        if let Some(key) = meta.extra.keys().find(|k| reserved(k) && *k != SDF_KEY) {
             return Err(CacheError::ReservedKey(key.clone()));
         }
         Self::with_reserved_keys(meta, t, f)
     }
 
-    /// As `new`, the metadata free to hold keys beginning `hermite.`: for a Hermite set's
-    /// own grids, or a file made on purpose to break its format, as a test of a reader.
+    /// As `new`, the metadata free to hold keys beginning `brodo.`: for a Hermite set's own
+    /// grids, or a file made on purpose to break its format, as a test of a reader.
     pub fn with_reserved_keys<T: Stored>(
         meta: &GridMeta,
         t: &Topology,
@@ -75,19 +85,19 @@ impl CacheEntry {
 
     /// An entry of bytes, named, with free pairs, which a file of version 2 holds beside its
     /// grids for a format built on it (docs/formats.md §3.5); the pairs may hold no key
-    /// beginning `hermite.`, as `new`'s may not.
+    /// beginning `brodo.`, as `new`'s may not, the SDF convention's included.
     pub fn bytes(
         name: &str,
         extra: BTreeMap<String, String>,
         bytes: Vec<u8>,
     ) -> Result<Self, CacheError> {
-        if let Some(key) = extra.keys().find(|k| k.starts_with(crate::hermite::PREFIX)) {
+        if let Some(key) = extra.keys().find(|k| reserved(k)) {
             return Err(CacheError::ReservedKey(key.clone()));
         }
         Ok(Self::bytes_with_reserved_keys(name, extra, bytes))
     }
 
-    /// As `bytes`, the pairs free to hold keys beginning `hermite.`: for a Hermite set's own
+    /// As `bytes`, the pairs free to hold keys beginning `brodo.`: for a Hermite set's own
     /// entry, or a file made on purpose to break its format, as a test of a reader.
     pub fn bytes_with_reserved_keys(
         name: &str,

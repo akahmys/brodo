@@ -8,11 +8,12 @@ use crate::topology::Topology;
 use crate::tree::Coord;
 
 /// The key in `GridMeta::extra` that marks a grid as a narrow-band SDF written to brodo's
-/// convention, docs/formats.md §5 (ADR-0039). Its value is the convention's version.
-pub const SDF_KEY: &str = "sdf.version";
+/// convention, docs/formats.md §5 (ADR-0039, ADR-0053). Its value is the convention's
+/// version.
+pub const SDF_KEY: &str = "brodo.sdf.version";
 
 /// The version of the SDF convention this brodo states.
-pub const SDF_VERSION: &str = "1";
+pub const SDF_VERSION: &str = "2";
 
 /// What a file stores of a grid beside its topology and values.
 #[derive(Debug, Clone, PartialEq)]

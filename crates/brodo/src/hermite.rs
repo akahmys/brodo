@@ -12,10 +12,9 @@
 //! set's table names. The signs' background is 0.
 //!
 //! In a cache file, `GridMeta::extra` tells a set's entries apart and holds the group table,
-//! as `docs/formats.md` §4 states, which this code follows: at version 2, the sign grid and
-//! an entry of bytes holding the crossings (§4.3); at version 1, read and written on
-//! request, ten dense fields, an edge with no crossing, every tile and the background
-//! holding `NO_CROSSING` (§4.1).
+//! as `docs/formats.md` §4 states, which this code follows: the sign grid and an entry of
+//! bytes holding the crossings. A set of an earlier version, its keys beginning `hermite.`,
+//! is refused, not read (ADR-0053).
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -28,32 +27,17 @@ use crate::topology::{LeafNumber, Location, Topology};
 use crate::tree::{Coord, TileLevel};
 use crate::view::{GridView, ViewLocation};
 
-/// The format's version, in each entry's `hermite.version`.
-pub const VERSION: &str = "2";
-/// The version before it, read, and written on request (TESTING.md V6).
-pub const VERSION_1: &str = "1";
-/// The field of a set's entry of bytes holding its crossings, at version 2.
+/// The format's version, in each entry's `brodo.hermite.version`.
+pub const VERSION: &str = "3";
+/// The field of a set's entry of bytes holding its crossings.
 pub const CROSSINGS: &str = "crossings";
-/// The ten fields of a set at version 1, in the order `Hermite::entries_v1` writes them.
-pub const FIELDS: [&str; 10] = [
-    "sign",
-    "x.fraction",
-    "x.normal",
-    "x.group",
-    "y.fraction",
-    "y.normal",
-    "y.group",
-    "z.fraction",
-    "z.normal",
-    "z.group",
-];
 /// How far a normal's length may be from 1 (ADR-0032): each component of a unit `f64`
 /// vector rounded to `f32` moves by at most 2⁻²⁴ of itself, so its length by at most 2⁻²⁴,
 /// about 6 × 10⁻⁸, and the length worked in `f64` adds a rounding of 10⁻¹⁶; 10⁻⁶ holds
 /// that sixteen times over, so that a producer rounding once more, as a normal averaged
 /// then rounded does, is still read.
 pub const NORMAL_TOLERANCE: f64 = 1e-6;
-/// The fraction, normal and group a dense field of version 1 holds for an edge with no
+/// The fraction, normal and group `Hermite::expand`'s dense fields hold for an edge with no
 /// crossing, a tile and the background.
 pub const NO_CROSSING: (f32, [f32; 3], u32) = (-1.0, [0.0; 3], 0);
 /// Bytes a leaf's masks take in a set's entry of bytes: 8 `u64` words an axis.
@@ -61,12 +45,15 @@ const MASK_BYTES: usize = 3 * 8 * 8;
 /// Bytes a crossing takes there: a fraction, three normal components and a group.
 const CROSSING_BYTES: usize = 20;
 
-const KEY_VERSION: &str = "hermite.version";
-const KEY_SET: &str = "hermite.set";
-const KEY_FIELD: &str = "hermite.field";
-const KEY_GROUP: &str = "hermite.group.";
-/// The keys a Hermite set's grids hold, written by `Hermite::entries` alone.
-pub(crate) const PREFIX: &str = "hermite.";
+const KEY_VERSION: &str = "brodo.hermite.version";
+const KEY_SET: &str = "brodo.hermite.set";
+const KEY_FIELD: &str = "brodo.hermite.field";
+const KEY_GROUP: &str = "brodo.hermite.group.";
+/// The keys a Hermite set's entries hold, written by `Hermite::entries` alone.
+const PREFIX: &str = "brodo.hermite.";
+/// The keys of a set of version 1 or 2, which named the set and its version.
+const OLD_SET: &str = "hermite.set";
+const OLD_VERSION: &str = "hermite.version";
 
 /// A crossing: where the surface crosses an edge, its normal there and its group.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -87,7 +74,7 @@ impl Crossing {
 
 /// A set's crossings, held only on the edges that hold one: per leaf and axis a mask of the
 /// points whose edge holds one, and the crossings in leaf, axis and place order
-/// (docs/formats.md §4.3). A place is a point's index in its leaf, x + 8y + 64z.
+/// (docs/formats.md §4.1). A place is a point's index in its leaf, x + 8y + 64z.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Crossings {
     stamp: u64,
@@ -152,7 +139,7 @@ impl Crossings {
         self.stamp == t.stamp() && self.masks.len() == t.leaf_count()
     }
 
-    /// The bytes of a set's entry of crossings (docs/formats.md §4.3).
+    /// The bytes of a set's entry of crossings (docs/formats.md §4.1).
     fn to_bytes(&self) -> Vec<u8> {
         let mut out = Vec::with_capacity(self.masks.len() * MASK_BYTES + self.items.len() * 20);
         for w in self.masks.iter().flatten().flatten() {
@@ -224,20 +211,13 @@ pub struct Hermite {
     group_names: Vec<String>,
 }
 
-/// One axis's dense fields, read in place from a cache file of version 1.
-#[derive(Debug, Clone, Copy)]
-struct DenseAxis<'a> {
-    fraction: GridView<'a, f32>,
-    normal: GridView<'a, [f32; 3]>,
-    group: GridView<'a, u32>,
-}
-
-/// A set's crossings read in place: an entry of bytes at version 2, its leaves' starts
-/// worked out from their masks; or ten dense fields at version 1.
+/// A set's crossings read in place from its entry of bytes, its leaves' starts worked out
+/// from their masks.
 #[derive(Debug, Clone)]
-enum ViewCrossings<'a> {
-    Sparse { masks: &'a [u8], items: &'a [u8], starts: Vec<u32> },
-    Dense(Box<[DenseAxis<'a>; 3]>),
+struct ViewCrossings<'a> {
+    masks: &'a [u8],
+    items: &'a [u8],
+    starts: Vec<u32>,
 }
 
 /// A set read in place from a cache file, checked whole when found.
@@ -246,7 +226,6 @@ pub struct HermiteView<'a> {
     signs: GridView<'a, u8>,
     crossings: ViewCrossings<'a>,
     group_names: Vec<String>,
-    version: &'static str,
 }
 
 /// The unit step along an axis.
@@ -303,7 +282,7 @@ trait Source {
     fn sign_at(&self, v: Coord) -> Result<u8, HermiteError>;
     fn sign_leaf(&self, n: u32) -> Result<&[u8; LEAF_VOXELS], HermiteError>;
     /// The crossing on the edge along `axis` of leaf `n`'s point at `place`, or
-    /// `NO_CROSSING` where it holds none: a dense field's value, or a sparse set's.
+    /// `NO_CROSSING` where it holds none.
     fn crossing(
         &self,
         axis: usize,
@@ -311,8 +290,7 @@ trait Source {
         place: usize,
     ) -> Result<(f32, [f32; 3], u32), HermiteError>;
     fn sign_tile(&self, t: u32) -> Result<u8, HermiteError>;
-    fn crossing_tile(&self, axis: usize, t: u32) -> Result<(f32, [f32; 3], u32), HermiteError>;
-    fn backgrounds(&self) -> (u8, [(f32, [f32; 3], u32); 3]);
+    fn sign_background(&self) -> u8;
 }
 
 /// Whether two crossings' values are the same, by bits for the floats.
@@ -356,24 +334,13 @@ fn voxel(origin: Coord, i: usize) -> Coord {
 fn check(s: &impl Source, names: &[String]) -> Result<(), HermiteError> {
     check_names(names)?;
     let groups = names.len().max(1);
-    let (sign_bg, crossing_bg) = s.backgrounds();
-    if sign_bg != 0 {
+    if s.sign_background() != 0 {
         return Err(violation(None, None, Rule::Sign));
-    }
-    for (axis, c) in crossing_bg.iter().enumerate() {
-        if !same(*c, NO_CROSSING) {
-            return Err(violation(None, Some(axis), Rule::NoCrossing));
-        }
     }
     let tiles = s.tiles()?;
     for (_, origin, t) in &tiles {
         if s.sign_tile(*t)? > 1 {
             return Err(violation(Some(*origin), None, Rule::Sign));
-        }
-        for axis in 0..3 {
-            if !same(s.crossing_tile(axis, *t)?, NO_CROSSING) {
-                return Err(violation(Some(*origin), Some(axis), Rule::NoCrossing));
-            }
         }
     }
     let leaves = s.leaves()?;
@@ -574,12 +541,8 @@ impl Source for Owned<'_> {
         Ok(self.0.signs.tile_value_at(t)?)
     }
 
-    fn crossing_tile(&self, _: usize, _: u32) -> Result<(f32, [f32; 3], u32), HermiteError> {
-        Ok(NO_CROSSING)
-    }
-
-    fn backgrounds(&self) -> (u8, [(f32, [f32; 3], u32); 3]) {
-        (self.0.signs.background(), [NO_CROSSING; 3])
+    fn sign_background(&self) -> u8 {
+        self.0.signs.background()
     }
 }
 
@@ -629,7 +592,7 @@ impl Hermite {
 
     /// The crossings on the edges along `axis`, 0 to 2 for x to z, as three dense fields on
     /// the set's topology, an edge with none, every tile and the background holding
-    /// `NO_CROSSING`: for a tool that shows grids, and the fields of version 1.
+    /// `NO_CROSSING`: for a tool that shows grids.
     pub fn expand(&self, axis: usize) -> Result<Expanded, HermiteError> {
         let t = &self.topology;
         let (f, n, g) = NO_CROSSING;
@@ -658,47 +621,37 @@ impl Hermite {
         Ok((fraction, normal, group))
     }
 
-    /// `meta` with the keys of the set named `set`, version `version`, for field `field`;
-    /// refused if `meta` holds a key beginning `hermite.` or states the SDF convention.
-    fn keyed(
-        meta: &GridMeta,
-        set: &str,
-        version: &str,
-        field: &str,
-    ) -> Result<GridMeta, HermiteError> {
-        if let Some(key) = meta.extra.keys().find(|k| k.starts_with(PREFIX)) {
-            return Err(HermiteError::ReservedKey(key.clone()));
-        }
+    /// `meta` with the keys of the set named `set` for field `field`; refused if `meta`
+    /// holds a key beginning `brodo.`, the SDF convention's among them.
+    fn keyed(meta: &GridMeta, set: &str, field: &str) -> Result<GridMeta, HermiteError> {
         if meta.extra.contains_key(crate::meta::SDF_KEY) {
             return Err(HermiteError::ClaimsSdf);
         }
+        if let Some(key) = meta.extra.keys().find(|k| crate::cache::reserved(k)) {
+            return Err(HermiteError::ReservedKey(key.clone()));
+        }
         let mut m = meta.clone();
-        m.extra.insert(KEY_VERSION.to_owned(), version.to_owned());
+        m.extra.insert(KEY_VERSION.to_owned(), VERSION.to_owned());
         m.extra.insert(KEY_SET.to_owned(), set.to_owned());
         m.extra.insert(KEY_FIELD.to_owned(), field.to_owned());
         Ok(m)
     }
 
-    /// The sign grid's entry, with the group table, of version `version`.
-    fn sign_entry(
-        &self,
-        set: &str,
-        meta: &GridMeta,
-        version: &str,
-    ) -> Result<CacheEntry, HermiteError> {
-        let mut sign_meta = Self::keyed(meta, set, version, "sign")?;
+    /// The sign grid's entry, with the group table.
+    fn sign_entry(&self, set: &str, meta: &GridMeta) -> Result<CacheEntry, HermiteError> {
+        let mut sign_meta = Self::keyed(meta, set, "sign")?;
         for (id, name) in self.group_names.iter().enumerate().skip(1) {
             sign_meta.extra.insert(format!("{KEY_GROUP}{id}"), name.clone());
         }
         Ok(CacheEntry::with_reserved_keys(&sign_meta, &self.topology, &self.signs)?)
     }
 
-    /// The cache entries of the set named `set`, at version 2: its sign grid, with `meta`,
-    /// and its entry of bytes holding the crossings, named as `meta` is (docs/formats.md
-    /// §4.3), for a cache file of version 2. `meta` may hold no key beginning `hermite.`,
-    /// nor state the SDF convention (`SDF_KEY`).
+    /// The cache entries of the set named `set`: its sign grid, with `meta`, and its entry
+    /// of bytes holding the crossings, named as `meta` is (docs/formats.md §4), for a cache
+    /// file of version 2. `meta` may hold no key beginning `brodo.`, and so does not state
+    /// the SDF convention (`SDF_KEY`).
     pub fn entries(&self, set: &str, meta: &GridMeta) -> Result<Vec<CacheEntry>, HermiteError> {
-        let sign = self.sign_entry(set, meta, VERSION)?;
+        let sign = self.sign_entry(set, meta)?;
         let mut extra = BTreeMap::new();
         extra.insert(KEY_VERSION.to_owned(), VERSION.to_owned());
         extra.insert(KEY_SET.to_owned(), set.to_owned());
@@ -706,22 +659,6 @@ impl Hermite {
         let bytes =
             CacheEntry::bytes_with_reserved_keys(&meta.name, extra, self.crossings.to_bytes());
         Ok(vec![sign, bytes])
-    }
-
-    /// The ten cache entries of the set named `set` at version 1, written on request for a
-    /// cache file of version 1 (TESTING.md V6), in the order of `FIELDS`, each with `meta`
-    /// and the keys that tell it apart; `meta` as `entries` takes it.
-    pub fn entries_v1(&self, set: &str, meta: &GridMeta) -> Result<Vec<CacheEntry>, HermiteError> {
-        let t = &self.topology;
-        let mut out = vec![self.sign_entry(set, meta, VERSION_1)?];
-        for (axis, name) in ["x", "y", "z"].iter().enumerate() {
-            let (fraction, normal, group) = self.expand(axis)?;
-            let m = |field: &str| Self::keyed(meta, set, VERSION_1, &format!("{name}.{field}"));
-            out.push(CacheEntry::with_reserved_keys(&m("fraction")?, t, &fraction)?);
-            out.push(CacheEntry::with_reserved_keys(&m("normal")?, t, &normal)?);
-            out.push(CacheEntry::with_reserved_keys(&m("group")?, t, &group)?);
-        }
-        Ok(out)
     }
 }
 
@@ -762,43 +699,16 @@ impl Source for Viewed<'_, '_> {
         n: u32,
         place: usize,
     ) -> Result<(f32, [f32; 3], u32), HermiteError> {
-        let lost = || HermiteError::Format(FormatError::Inconsistent("leaf value"));
-        match &self.set.crossings {
-            ViewCrossings::Sparse { masks, items, starts } => {
-                Ok(sparse_crossing(masks, items, starts, n, axis, place)?.unwrap_or(NO_CROSSING))
-            }
-            ViewCrossings::Dense(axes) => {
-                let c = axes.get(axis).ok_or(HermiteError::Missing("an axis"))?;
-                let f = c.fraction.leaf(n)?.get(place).copied().ok_or_else(lost)?;
-                let v = c.normal.leaf(n)?.get(place).copied().ok_or_else(lost)?;
-                let g = c.group.leaf(n)?.get(place).copied().ok_or_else(lost)?;
-                Ok((f, v, g))
-            }
-        }
+        let c = &self.set.crossings;
+        Ok(sparse_crossing(c.masks, c.items, &c.starts, n, axis, place)?.unwrap_or(NO_CROSSING))
     }
 
     fn sign_tile(&self, t: u32) -> Result<u8, HermiteError> {
         Ok(self.set.signs.tile_value(t)?)
     }
 
-    fn crossing_tile(&self, axis: usize, t: u32) -> Result<(f32, [f32; 3], u32), HermiteError> {
-        match &self.set.crossings {
-            ViewCrossings::Sparse { .. } => Ok(NO_CROSSING),
-            ViewCrossings::Dense(axes) => {
-                let c = axes.get(axis).ok_or(HermiteError::Missing("an axis"))?;
-                Ok((c.fraction.tile_value(t)?, c.normal.tile_value(t)?, c.group.tile_value(t)?))
-            }
-        }
-    }
-
-    fn backgrounds(&self) -> (u8, [(f32, [f32; 3], u32); 3]) {
-        let crossings = match &self.set.crossings {
-            ViewCrossings::Sparse { .. } => [NO_CROSSING; 3],
-            ViewCrossings::Dense(axes) => axes
-                .each_ref()
-                .map(|c| (c.fraction.background(), c.normal.background(), c.group.background())),
-        };
-        (self.set.signs.background(), crossings)
+    fn sign_background(&self) -> u8 {
+        self.set.signs.background()
     }
 }
 
@@ -841,7 +751,7 @@ fn sparse_crossing(
     Ok(Some((fraction, normal, u32::from_le_bytes(next()?))))
 }
 
-/// An entry of crossings checked against `leaves` leaves (docs/formats.md §4.3, rule 3): its
+/// An entry of crossings checked against `leaves` leaves (docs/formats.md §4.2, rule 3): its
 /// masks and its crossings, and where each leaf's start.
 fn sparse(bytes: &[u8], leaves: usize) -> Result<ViewCrossings<'_>, HermiteError> {
     let lost = || HermiteError::OtherTopology(CROSSINGS);
@@ -861,7 +771,7 @@ fn sparse(bytes: &[u8], leaves: usize) -> Result<ViewCrossings<'_>, HermiteError
     if expected != Some(items.len()) {
         return Err(lost());
     }
-    Ok(ViewCrossings::Sparse { masks, items, starts })
+    Ok(ViewCrossings { masks, items, starts })
 }
 
 /// The group table in a sign grid's `extra`: ids from 1 with no gap.
@@ -888,73 +798,40 @@ fn group_table(meta: &GridMeta) -> Result<Vec<String>, HermiteError> {
     Ok(names)
 }
 
-/// The version of the set named `set` in `file`: every entry of it, grid or bytes, states
-/// the same.
-fn version_of(file: &CacheFile, set: &str) -> Result<&'static str, HermiteError> {
-    let mut found: Option<String> = None;
-    let grids = (0..file.grid_count()).map(|i| file.meta(i).map(|m| &m.extra));
-    let bytes = file.bytes_entries();
-    for extra in
-        grids.collect::<Result<Vec<_>, _>>()?.into_iter().chain(bytes.iter().map(|b| b.extra))
-    {
-        if extra.get(KEY_SET).map(String::as_str) != Some(set) {
-            continue;
-        }
-        let v = extra.get(KEY_VERSION).cloned().unwrap_or_default();
-        if found.as_ref().is_some_and(|f| *f != v) {
-            return Err(HermiteError::Version(v));
-        }
-        found = Some(v);
+/// Every key/value set of `file`'s entries, grids first, then entries of bytes.
+fn extras(file: &CacheFile) -> Result<Vec<&BTreeMap<String, String>>, HermiteError> {
+    let mut out = Vec::with_capacity(file.grid_count() + file.bytes_entries().len());
+    for i in 0..file.grid_count() {
+        out.push(&file.meta(i)?.extra);
     }
-    match found.as_deref() {
-        Some(VERSION) => Ok(VERSION),
-        Some(VERSION_1) => Ok(VERSION_1),
-        Some(other) => Err(HermiteError::Version(other.to_owned())),
-        None => Err(HermiteError::Missing("sign")),
-    }
+    out.extend(file.bytes_entries().into_iter().map(|b| b.extra));
+    Ok(out)
 }
 
-/// The places in `file` of the set's ten grids of version 1, in the order of `FIELDS`.
-fn grids_of(file: &CacheFile, set: &str) -> Result<Vec<usize>, HermiteError> {
-    let mut found: [Option<usize>; 10] = [None; 10];
-    for i in 0..file.grid_count() {
-        let meta = file.meta(i)?;
-        if meta.extra.get(KEY_SET).map(String::as_str) != Some(set) {
-            continue;
-        }
-        let field = meta.extra.get(KEY_FIELD).cloned().unwrap_or_default();
-        let place = FIELDS.iter().zip(found.iter_mut()).find(|(f, _)| **f == field);
-        let (name, slot) = place.ok_or(HermiteError::UnknownField(field))?;
-        if slot.replace(i).is_some() {
-            return Err(HermiteError::Twice(name));
+/// Checks that every entry of the set named `set` in `file` states this version, and that
+/// no set of that name was written by an earlier one, whose keys began `hermite.`.
+fn check_version(file: &CacheFile, set: &str) -> Result<(), HermiteError> {
+    for extra in extras(file)? {
+        if extra.get(KEY_SET).map(String::as_str) == Some(set) {
+            let v = extra.get(KEY_VERSION).map(String::as_str).unwrap_or_default();
+            if v != VERSION {
+                return Err(HermiteError::Version(v.to_owned()));
+            }
+        } else if extra.get(OLD_SET).map(String::as_str) == Some(set) {
+            let v = extra.get(OLD_VERSION).cloned().unwrap_or_default();
+            return Err(HermiteError::Version(v));
         }
     }
-    let mut at = Vec::with_capacity(FIELDS.len());
-    for (f, name) in found.iter().zip(FIELDS) {
-        at.push(f.ok_or(HermiteError::Missing(name))?);
-    }
-    Ok(at)
+    Ok(())
 }
 
 impl<'a> HermiteView<'a> {
-    /// The set named `set` in `file`, its entries found by their keys and checked whole, as
-    /// docs/formats.md §4.2 and §4.3 state: at version 2 its sign grid and its entry of
-    /// crossings, at version 1 its ten grids; of several broken rules, which is named is not
-    /// promised.
+    /// The set named `set` in `file`, its sign grid and its entry of crossings found by
+    /// their keys and checked whole, as docs/formats.md §4.2 states; of several broken
+    /// rules, which is named is not promised. A set written by an earlier version, its keys
+    /// beginning `hermite.`, is refused with `Version`.
     pub fn find(file: &'a CacheFile, set: &str) -> Result<HermiteView<'a>, HermiteError> {
-        let view = if version_of(file, set)? == VERSION_1 {
-            Self::find_v1(file, set)?
-        } else {
-            Self::find_v2(file, set)?
-        };
-        let regions = view.signs.regions()?;
-        check(&Viewed { set: &view, regions }, &view.group_names)?;
-        Ok(view)
-    }
-
-    /// A set of version 2: one sign grid, one entry of crossings, no other key of the
-    /// format's on the entry (§4.3, rule 1).
-    fn find_v2(file: &'a CacheFile, set: &str) -> Result<HermiteView<'a>, HermiteError> {
+        check_version(file, set)?;
         let mut sign = None;
         for i in 0..file.grid_count() {
             let extra = &file.meta(i)?.extra;
@@ -991,59 +868,14 @@ impl<'a> HermiteView<'a> {
         }
         let crossings = crossings.ok_or(HermiteError::Missing(CROSSINGS))?;
         let signs: GridView<'a, u8> = file.view(sign)?;
-        Ok(HermiteView {
+        let view = HermiteView {
             crossings: sparse(crossings, signs.leaf_count())?,
             signs,
             group_names: group_table(file.meta(sign)?)?,
-            version: VERSION,
-        })
-    }
-
-    /// A set of version 1: ten grids that agree in their metadata and topology (§4.2).
-    fn find_v1(file: &'a CacheFile, set: &str) -> Result<HermiteView<'a>, HermiteError> {
-        let at = grids_of(file, set)?;
-        let [sign_at, x @ ..] = at.as_slice() else { return Err(HermiteError::Missing("sign")) };
-        let sign_meta = file.meta(*sign_at)?;
-        for (i, name) in x.iter().zip(FIELDS.iter().skip(1)) {
-            let m = file.meta(*i)?;
-            let bits =
-                |a: &[f64], b: &[f64]| a.iter().zip(b).all(|(p, q)| p.to_bits() == q.to_bits());
-            let agree = bits(&m.voxel_size, &sign_meta.voxel_size)
-                && m.unit == sign_meta.unit
-                && bits(m.transform.as_flattened(), sign_meta.transform.as_flattened());
-            if !agree {
-                return Err(HermiteError::OtherMeta(name));
-            }
-        }
-        let group_names = group_table(sign_meta)?;
-        let [xf, xn, xg, yf, yn, yg, zf, zn, zg] = x else {
-            return Err(HermiteError::Missing("an axis"));
         };
-        let dense = |f: usize, n: usize, g: usize| -> Result<DenseAxis<'a>, HermiteError> {
-            Ok(DenseAxis { fraction: file.view(f)?, normal: file.view(n)?, group: file.view(g)? })
-        };
-        let signs: GridView<'a, u8> = file.view(*sign_at)?;
-        let axes = [dense(*xf, *xn, *xg)?, dense(*yf, *yn, *yg)?, dense(*zf, *zn, *zg)?];
-        let mut same = Vec::with_capacity(9);
-        for c in &axes {
-            same.push(signs.same_topology(&c.fraction));
-            same.push(signs.same_topology(&c.normal));
-            same.push(signs.same_topology(&c.group));
-        }
-        if let Some((name, _)) = FIELDS.iter().skip(1).zip(&same).find(|(_, same)| !**same) {
-            return Err(HermiteError::OtherTopology(name));
-        }
-        Ok(HermiteView {
-            signs,
-            crossings: ViewCrossings::Dense(Box::new(axes)),
-            group_names,
-            version: VERSION_1,
-        })
-    }
-
-    /// The set's format version: `VERSION`, or `VERSION_1`.
-    pub fn version(&self) -> &'static str {
-        self.version
+        let regions = view.signs.regions()?;
+        check(&Viewed { set: &view, regions }, &view.group_names)?;
+        Ok(view)
     }
 
     /// The signs, 1 inside, 0 outside.

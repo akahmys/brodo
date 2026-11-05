@@ -76,3 +76,12 @@ buffers'; and that the checks a reader rebuilding the tree adds are listed (§2.
 first made under that rule refuses a cache file whose bounds' least corner passes its
 greatest, which brodo never wrote, in the crate's reader and in the document's,
 `scripts/audit/formats.py`.
+
+## Amendment: set aside before 1.0
+
+- **Date**: 2026-11-05
+
+The owner decided, on 2026-11-05, that before 1.0 a format's earlier versions may be left
+unread, the decision recorded in an ADR, so that a change made once before 1.0 need not
+be carried by every release after it. TESTING.md V6 says so. It was used once, for Hermite
+data and the SDF convention, whose keys moved under `brodo.` (ADR-0053).

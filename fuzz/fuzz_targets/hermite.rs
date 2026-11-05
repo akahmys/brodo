@@ -25,7 +25,8 @@ fuzz_target!(|data: &[u8]| {
     if let Ok(file) = CacheFile::from_bytes(data) {
         let mut sets = vec![String::new()];
         for i in 0..file.grid_count() {
-            if let Some(set) = file.meta(i).ok().and_then(|m| m.extra.get("hermite.set").cloned()) {
+            let set = file.meta(i).ok().and_then(|m| m.extra.get("brodo.hermite.set").cloned());
+            if let Some(set) = set {
                 sets.push(set);
             }
         }

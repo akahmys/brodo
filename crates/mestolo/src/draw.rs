@@ -56,7 +56,7 @@ fn size(min: [i32; 2], max: [i32; 2]) -> Result<(), MestoloError> {
 
 /// A level set's colours diverge at zero, saturated at its background's magnitude, the
 /// band's half-width; another grid's run from its least value to its greatest. A grid is a
-/// level set by brodo's `sdf.version` or OpenVDB's `class` of `level set`
+/// level set by brodo's `SDF_KEY` or OpenVDB's `class` of `level set`
 /// (docs/formats.md §9).
 fn colors<T>(g: &Grid, f: &Field<T>) -> Result<ColorMap, MestoloError>
 where

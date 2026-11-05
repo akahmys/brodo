@@ -293,10 +293,6 @@ exclude_re = [
     # is, and the same bytes are read.
     # [same]
     'cache\.rs:.*: replace \+ with \* in CacheFile::read$',
-    # A set in memory holds no tile's crossing, and the original returns `NO_CROSSING`,
-    # these values.
-    # [same]
-    'hermite\.rs:.*: replace <impl Source for Owned<.*>>::crossing_tile -> .* with Ok\(\(-1\.0, \[0\.0; 3\], 0\)\)$',
     # A view is found only once every edge is checked: an edge with no crossing holds
     # `NO_CROSSING` to the bit, and a crossing's fraction lies in [0, 1], never -1, so the
     # fraction alone tells them apart.

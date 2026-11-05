@@ -4,6 +4,37 @@ Each version, newest first, with the milestones it closed and every change that 
 user (TESTING.md V2, V3). Format versions of the `GridView` layout and the file profiles
 are recorded here when they change (V6).
 
+## Unreleased
+
+Format versions (TESTING.md V6): Hermite data is at version 3 and the SDF convention at
+version 2, their keys moved under `brodo.`; neither's earlier versions are read, the owner
+setting V6's rule aside for them before 1.0 (ADR-0053). The frozen layout and the cache
+and archive profiles are unchanged. Every change below breaks a user.
+
+- Keys beginning `brodo.` are reserved: `CacheEntry::new` refuses one but
+  `brodo.sdf.version`, and `CacheEntry::bytes` and `Hermite::entries` every one, with
+  `ReservedKey`; `CacheEntry::with_reserved_keys` and
+  `CacheEntry::bytes_with_reserved_keys` still write one. Keys beginning `hermite.` are
+  free.
+- `SDF_KEY` is `brodo.sdf.version` and `SDF_VERSION` is `2`; a grid holding `sdf.version`
+  is no longer taken for an SDF, by `mestolo slice` or by the `.vdb` writer's `class`.
+- A Hermite set's keys are `brodo.hermite.version` (`3`), `brodo.hermite.set`,
+  `brodo.hermite.field` and `brodo.hermite.group.<id>`. A set of version 1 or 2 is
+  refused by `HermiteView::find` with `Version`. `Hermite::entries_v1`, `FIELDS`,
+  `VERSION_1`, `HermiteView::version` and `HermiteError::OtherMeta` are gone.
+
+A file written by 0.9.0 or earlier converts with this release alone, its grids and entries
+of bytes still read as a cache file (`CacheFile::view`, `GridView::thaw`,
+`CacheFile::bytes_entries`), and written again with each key renamed:
+
+- a Hermite set of version 2: the sign grid and the entry of crossings, each `hermite.*`
+  key renamed `brodo.hermite.*` and `brodo.hermite.version` set to `3`, written with
+  `CacheEntry::with_reserved_keys` and `CacheEntry::bytes_with_reserved_keys`;
+- a Hermite set of version 1: its ten grids thawed, every leaf value other than
+  `NO_CROSSING` given to `Crossings::builder` leaf by leaf, the set made by `Hermite::new`
+  with the sign grid and the `hermite.group.<id>` names, and written by `Hermite::entries`;
+- an SDF: `sdf.version` renamed `brodo.sdf.version`, its value `2`, the grid written again.
+
 ## 0.9.0 (2026-11-04)
 
 Closes P8: `mestolo`, a command that looks inside brodo's files without Rust (`info`,

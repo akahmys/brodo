@@ -83,6 +83,11 @@ pub struct VdbFile {
 /// that breaks it; of several broken rules, which is named is not promised. OpenVDB states
 /// no unit, so `unit` is every grid's. The leaves, tiles and nodes it makes are counted as
 /// ARCHITECTURE.md §4.7 states, and more than `limit` bytes is refused before it is made.
+///
+/// A grid's string metadata is kept in its free pairs as the file holds it, so a key
+/// beginning `brodo.` there, but `SDF_KEY`, makes `CacheEntry::new` refuse the grid with
+/// `ReservedKey` (docs/formats.md §3.3): remove such a key before writing the grid to a
+/// cache file, or write it with `CacheEntry::with_reserved_keys` to keep it.
 pub fn from_bytes(bytes: &[u8], unit: &str, limit: u64) -> Result<VdbFile, VdbError> {
     let mut budget = Budget { left: limit, limit };
     let mut c = Cursor { bytes, at: 0 };

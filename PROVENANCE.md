@@ -48,7 +48,7 @@ copyright notice (`grep -rniE 'copyright|spdx|licen[cs]e' crates/*/src` finds no
 | `crates/brodo/src/gather.rs` | ARCHITECTURE.md §4.4, ADR-0015 only | the gather of a leaf and one, two or three ghost layers |
 | `crates/brodo/src/field.rs` | ARCHITECTURE.md §4.2, ADR-0014 only | fields: the open `Value` trait and the sealed `Stored` one, values by leaf and tile number, the stamp check, the remap and merge rules |
 | `crates/brodo/src/grid.rs` | ARCHITECTURE.md §4.2, ADR-0014 only | a grid: one topology and one field, edited in one step |
-| `crates/brodo/src/hermite.rs` | ARCHITECTURE.md §4.9, ADR-0032, ADR-0051; Ju, Losasso, Schaefer and Warren (2002), *Dual Contouring of Hermite Data*, for Hermite data as signs on a lattice and a crossing and normal on each edge whose ends differ | the Hermite data format: a set of ten fields, its check, its cache entries and its reading in place |
+| `crates/brodo/src/hermite.rs` | ARCHITECTURE.md §4.9, ADR-0032, ADR-0051; Ju, Losasso, Schaefer and Warren (2002), *Dual Contouring of Hermite Data*, for Hermite data as signs on a lattice and a crossing and normal on each edge whose ends differ | the Hermite data format: a sign grid and its crossings held sparsely, its check, its cache entries and its reading in place |
 | `crates/brodo/src/lib.rs` | none | crate root |
 | `crates/brodo/src/manifest.rs` | ARCHITECTURE.md §4.3, ADR-0014 only | the leaf manifest: 26 directions and each leaf's neighbours |
 | `crates/brodo/src/mapping.rs` | ARCHITECTURE.md §4.7, ADR-0008 only | mapping a file read-only: brodo's one unsafe operation |

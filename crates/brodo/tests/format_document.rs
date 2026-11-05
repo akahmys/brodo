@@ -26,6 +26,7 @@ const GOLDEN: &[&str] = &[
     "cache_v2.bin",
     "hermite_v1.bin",
     "hermite_v2.bin",
+    "hermite_v3.bin",
     #[cfg(feature = "archive")]
     "archive_v1.bin",
     #[cfg(feature = "archive")]
@@ -232,7 +233,10 @@ fn crates_read(bytes: &[u8]) -> Vec<String> {
     let Ok(file) = cache_file(bytes) else { return vec!["refused".to_owned()] };
     let mut out = vec!["accepted".to_owned()];
     let mut sets: Vec<String> = (0..file.grid_count())
-        .filter_map(|i| file.meta(i).unwrap().extra.get("hermite.set").cloned())
+        .filter_map(|i| {
+            let extra = &file.meta(i).unwrap().extra;
+            extra.get("brodo.hermite.set").or_else(|| extra.get("hermite.set")).cloned()
+        })
         .collect();
     sets.sort();
     sets.dedup();
@@ -288,37 +292,6 @@ fn the_document_s_reader_reads_every_golden_file_as_the_crates_do() {
             lines.iter().filter(|l| l.starts_with("hermite ")).cloned().collect();
         assert_eq!(verdict(&hermite), crates_read(&bytes)[1..], "{name}: Hermite sets");
     }
-}
-
-/// The Hermite golden file, its last grid, the z groups, holding one tile value more,
-/// reached by no node: its frozen buffer grown by a block (docs/formats.md §2.1, §3.2).
-fn hermite_with_a_tile_more() -> Vec<u8> {
-    let mut b = std::fs::read(data("hermite_v1.bin")).unwrap();
-    let word = |b: &[u8], at: usize| u32::from_le_bytes(b[at..at + 4].try_into().unwrap());
-    let put = |b: &mut [u8], at: usize, v: u32| b[at..at + 4].copy_from_slice(&v.to_le_bytes());
-    let entry = 32 * word(&b, 8) as usize;
-    let frozen = 32 * word(&b, entry + 8) as usize;
-    let blocks = word(&b, frozen + 56);
-    assert_eq!(word(&b, frozen + 32), 0, "a grid with no tile");
-    put(&mut b, frozen + 32, 1);
-    put(&mut b, frozen + 52, blocks);
-    put(&mut b, frozen + 56, blocks + 1);
-    put(&mut b, entry + 12, blocks + 1);
-    b.extend([0; 32]);
-    b
-}
-
-#[test]
-fn the_document_s_reader_refuses_a_hermite_field_holding_values_no_node_reaches() {
-    let bytes = hermite_with_a_tile_more();
-    let path = Path::new(env!("CARGO_TARGET_TMPDIR")).join("hermite_with_a_tile_more.bin");
-    std::fs::write(&path, &bytes).unwrap();
-    let out = reports(&reader(&[&path.display().to_string()], ""));
-    let hermite: Vec<String> =
-        out[0].1.iter().filter(|l| l.starts_with("hermite ")).cloned().collect();
-    let ours = crates_read(&bytes);
-    assert!(ours[1].ends_with(" refused"), "{ours:?}");
-    assert_eq!(verdict(&hermite), ours[1..]);
 }
 
 /// The offsets of the words damaged in a golden file: the first three blocks of the file

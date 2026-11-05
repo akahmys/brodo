@@ -227,6 +227,12 @@ largest voxel, inclusive, x, y, z each, or zero for an empty one; the count of f
 `u32`; each pair a key string and a value string, keys strictly ascending by their bytes.
 The writer works the bounds out from the grid's leaves and tiles.
 
+Keys beginning `brodo.` are brodo's formats' (ADR-0053): Hermite data's, beginning
+`brodo.hermite.` (§4.1), the SDF convention's, `brodo.sdf.version` (§5), and those of
+formats brodo builds on the cache profile later. A writer puts none but for such a format,
+the SDF convention's on a grid it states, and a reader leaves those it does not know
+unread. Every other key is free.
+
 ### 3.4 What a reader checks
 
 A reader refuses a file, before answering anything, unless:
@@ -248,8 +254,8 @@ The bounds are not checked against the grid.
 ### 3.5 Version 2
 
 A cache file of version 2 holds, beside grids, **entries of bytes**: a name, free pairs,
-and bytes the profile does not read, for a format built on it such as Hermite data's
-version 2 (§4.3, ADR-0051). Media type `application/vnd.brodo.cache; version=2`, stated
+and bytes the profile does not read, for a format built on it such as Hermite data
+(§4, ADR-0051). Media type `application/vnd.brodo.cache; version=2`, stated
 and not registered (ADR-0041). Its header is version 1's with version `u32` 2, its grids'
 frozen buffers are of version 2 (§2.7), and its directory entry is:
 
@@ -278,105 +284,83 @@ buffer and version 2 for 1, and:
 8. each grid's bounds are those its leaves and tiles cover, by §2.4's tree, an empty one
    with none.
 
-## 4. Hermite data, version 1
+## 4. Hermite data, version 3
 
 A sign at each lattice point and, on each edge whose ends differ, where a surface crosses
-it, its normal there and its group (ARCHITECTURE.md §4.9, ADR-0032). Media type
-`application/vnd.brodo.hermite; version=1` for a cache file holding a set, stated and not
-registered (ADR-0041); a reader checks it as a cache file first.
+it, its normal there and its group (ARCHITECTURE.md §4.9, ADR-0032), held only on the
+edges that hold one (ADR-0051), in a cache file of version 2 (§3.5). Media type
+`application/vnd.brodo.hermite; version=3` for a cache file holding a set, stated and not
+registered (ADR-0041); a reader checks it as a cache file first. Versions 1 and 2, whose
+keys began `hermite.`, are not read (ADR-0053).
 
 ### 4.1 The set
 
 Point v lies at the corner of voxel v, the image of v under the transform; it owns the
-edges from v to v + x̂, v + ŷ and v + ẑ. A set is ten grids of a cache file on one tree:
+edges from v to v + x̂, v + ŷ and v + ẑ. A set is a sign grid and one entry of bytes:
 
-| Field | Type | Holds |
-| :--- | :--- | :--- |
-| `sign` | `u8` | 1 inside, 0 outside |
-| `x.fraction`, `y.fraction`, `z.fraction` | `f32` | the crossing's place from the edge's lower end |
-| `x.normal`, `y.normal`, `z.normal` | three `f32` | the surface's unit normal at the crossing |
-| `x.group`, `y.group`, `z.group` | `u32` | the crossing's group id |
+- the **sign grid**, of `u8`, 1 inside and 0 outside, its free pairs holding
+  `brodo.hermite.version` = `3`, `brodo.hermite.set` = the set's name,
+  `brodo.hermite.field` = `sign`, and the group table: `brodo.hermite.group.<id>` = the
+  group's name, for ids 1, 2, … with no gap, the id in decimal with no leading zero; group
+  0, named `""`, has no key;
+- the **entry of crossings**, its free pairs holding `brodo.hermite.version` and
+  `brodo.hermite.set` as the sign grid's and `brodo.hermite.field` = `crossings`, and no
+  other key beginning `brodo.hermite.`.
 
-Each grid's free pairs hold `hermite.version` = `1`, `hermite.set` = the set's name and
-`hermite.field` = its field. The sign grid holds the group table: `hermite.group.<id>` =
-the group's name, for ids 1, 2, … with no gap, the id in decimal with no leading zero;
-group 0, named `""`, has no key. Keys beginning `hermite.` are the format's: a writer puts
-no other, and a reader reads the group table from the sign grid alone and leaves every
-other key unread. A set's grids hold no `sdf.version` (§5); other grids and other keys are free.
+Keys beginning `brodo.hermite.` are the format's: a writer puts no other, and a reader
+reads the group table from the sign grid alone and leaves every other key unread. A set's
+entries hold no `brodo.sdf.version` (§5); other grids and other keys are free.
 
-An edge with no crossing holds **no crossing**: fraction −1, normal (0, 0, 0), group 0, as
-bits.
-
-### 4.2 What a reader checks
-
-A reader finds the grids whose `hermite.set` is the name asked for, and refuses the set
-unless:
-
-1. each has `hermite.version` 1 and a `hermite.field` of the table, each field once, all
-   ten present, each of its type;
-2. the ten agree in voxel size and transform, as bits, and unit;
-3. the ten root tables, upper nodes and lower nodes are the same bytes, and the ten hold
-   as many leaves and as many tiles;
-4. the group table's keys are as §4.1 says, the names not empty and none twice;
-5. the signs' background is 0, and the three axes' backgrounds hold no crossing;
-6. every tile's sign is 0 or 1 and its crossings no crossing;
-7. every leaf point's sign is 0 or 1;
-8. for every tile, every point just outside each face, in no leaf, has the tile's sign;
-   tiles and the background cover whole 8³ blocks, so one point of each 8 × 8 patch of a
-   face stands for the patch;
-9. for every leaf point v and axis a, with w = v + â and the signs where §2.4 finds them:
-   if v and w have the same sign, the edge holds no crossing; otherwise its fraction lies
-   in [0, 1], its normal's length, worked in `f64`, is within 10⁻⁶ of 1, its component
-   along a is not negative when v is inside and not positive when v is outside, and its
-   group is 0 or an id the table names;
-10. for every leaf point v and axis a, the point u = v − â, when in no leaf, has v's sign;
-11. walking the sign grid's nodes from its root table, as §2.4 does, reaches every leaf, and
-    no upper node, lower node, leaf or tile value twice.
-
-A point beyond the `i32` range of coordinates, which rules 8 to 10 reach from the range's
-ends, is the background: sign 0, in no leaf.
-
-Rules 8 and 10 hold that only a leaf point owns an edge whose ends differ. Rule 11 refuses
-what §2.5 leaves unchecked, nodes shared between entries, so that checking a set costs what
-its bytes hold (ADR-0038).
-
-### 4.3 Version 2
-
-A set of version 2 holds its crossings only on the edges that hold one (ADR-0051), in a
-cache file of version 2 (§3.5); media type `application/vnd.brodo.hermite; version=2` for
-a cache file holding one, stated and not registered (ADR-0041). It holds its sign grid, as
-at version 1 with `hermite.version` = `2` and `hermite.field` = `sign`, the group table in
-its free pairs; and one entry of bytes,
-`hermite.field` = `crossings`, with `hermite.version` and `hermite.set` as the sign grid's
-and no other key beginning `hermite.`. The set's leaves are its sign grid's, in its order
-(§2: the leaves' Morton order). The entry's bytes are:
+The set's leaves are its sign grid's, in its order (§2: the leaves' Morton order). The
+entry's bytes are:
 
 | Part | Size, bytes | Holds |
 | :--- | :--- | :--- |
 | masks | 192 a leaf | per leaf in order, per axis x, y, z: 8 `u64` words, place p at bit p mod 64 of word p div 64, set where point p's edge along the axis holds a crossing; p is the point's index in the leaf, x + 8y + 64z |
-| crossings | 20 each | in leaf order, then axis, then place: fraction `f32`, normal 3 × `f32`, group `u32` |
+| crossings | 20 each | in leaf order, then axis, then place: fraction `f32`, the place of the crossing from the edge's lower end; normal 3 × `f32`, the surface's unit normal there; group `u32`, its group id |
 
 The bytes end with the last crossing. The crossing of an edge is found by counting the
 bits set before its own in the masks before it; a reader may keep where each leaf's start.
+Tiles and the background hold no crossing, which the bytes have no place for.
 
-A reader refuses a set of version 2 unless §4.2's rules 1 to 11 hold, read for its sign
-grid alone and with these for rules 1, 3, 5, 6 and 9:
+### 4.2 What a reader checks
 
-1. the sign grid and one entry of bytes have `hermite.version` 2 and the set's name, the
-   grid's field `sign` of type `u8`, the entry's `crossings`;
+A reader finds the entries whose `brodo.hermite.set` is the name asked for, and refuses
+the set unless:
+
+1. there is one sign grid, of type `u8`, and one entry of crossings, each with the fields
+   of §4.1 and `brodo.hermite.version` 3, and no entry of either kind beside them; an
+   entry with no `brodo.hermite.set` but a `hermite.set` of the name, a set of version 1
+   or 2, is refused by the version its `hermite.version` states;
+2. the group table's keys are as §4.1 says, the names not empty and none twice;
 3. the entry's byte length is 192 × the sign grid's leaves + 20 × the masks' bits set;
-5. and 6. the signs' background and every tile's sign are as at version 1; tiles and the
-   background hold no crossing, which the bytes have no place for;
-9. for every leaf point v and axis a, with w = v + â and the signs where §2.4 finds them:
+4. the signs' background is 0;
+5. every tile's sign is 0 or 1;
+6. every leaf point's sign is 0 or 1;
+7. for every tile, every point just outside each face, in no leaf, has the tile's sign;
+   tiles and the background cover whole 8³ blocks, so one point of each 8 × 8 patch of a
+   face stands for the patch;
+8. for every leaf point v and axis a, with w = v + â and the signs where §2.4 finds them:
    the mask's bit is set exactly when v and w differ in sign, and then the crossing's
    fraction lies in [0, 1], its normal's length, worked in `f64`, is within 10⁻⁶ of 1,
    its component along a is not negative when v is inside and not positive when v is
-   outside, and its group is 0 or an id the table names.
+   outside, and its group is 0 or an id the table names;
+9. for every leaf point v and axis a, the point u = v − â, when in no leaf, has v's sign;
+10. walking the sign grid's nodes from its root table, as §2.4 does, reaches every leaf,
+    and no upper node, lower node, leaf or tile value twice.
 
-## 5. The narrow-band SDF convention, version 1
+A point beyond the `i32` range of coordinates, which rules 7 to 9 reach from the range's
+ends, is the background: sign 0, in no leaf.
+
+Rules 7 and 9 hold that only a leaf point owns an edge whose ends differ. Rule 10 refuses
+what §2.5 leaves unchecked, nodes shared between entries, so that checking a set costs what
+its bytes hold (ADR-0038).
+
+## 5. The narrow-band SDF convention, version 2
 
 A grid of `f32` is an SDF written to this convention when its free pairs hold
-`sdf.version` = `1` (ADR-0039):
+`brodo.sdf.version` = `2` (ADR-0039); version 1's key, `sdf.version`, is not read
+(ADR-0053), and the convention is otherwise version 1's:
 
 - voxel v is sampled at the image of v + ½ under the transform, its centre;
 - its value is the signed distance there to the surface, in the grid's unit, negative
@@ -393,9 +377,11 @@ samples shifted by −h/2.
 Each format carries its own version: the frozen layout in its header, the cache profile in
 its header, the archive profile in its header, Hermite data and the SDF convention in free
 pairs; which older versions a release reads is TESTING.md V6's (ADR-0038). The frozen
-layout, the cache and archive profiles and Hermite data are at version 2 (§2.7, §3.5, §4.3,
-§8.7; ADR-0051, ADR-0052), which brodo writes; it reads version 1 of each too, and writes
-it on request. The SDF convention is at version 1, the first.
+layout and the cache and archive profiles are at version 2 (§2.7, §3.5, §8.7; ADR-0051,
+ADR-0052), which brodo writes; it reads version 1 of each too, and writes it on request.
+Hermite data is at version 3 and the SDF convention at version 2, their keys moved under
+`brodo.`, and neither's earlier versions are read: before 1.0, the owner set TESTING.md
+V6's rule aside for them (ADR-0053).
 
 Within a version only two changes are made, each recorded in CHANGELOG.md: a value type
 code (§1.1) or an archive's value encoding code (§8.5) added, which a reader that does not
@@ -421,10 +407,11 @@ The golden files in `crates/brodo/tests/data/`, written by brodo's Format-tier t
 | `cache_v1.bin` | a cache file of two grids, `f32` and three `f32`, with bounds and a free pair |
 | `archive_v1.bin` | an archive of the same two grids as `cache_v1.bin` |
 | `archive_v1_quantised.bin` | an archive of the same two grids, the first in binary16, the second in 8 bits |
-| `hermite_v1.bin` | a cache file holding one Hermite set, `golden`, on one leaf, with two named groups |
+| `hermite_v1.bin` | a cache file holding one Hermite set of version 1, `golden`, on one leaf, with two named groups: refused by its version (§4.2, rule 1) |
 | `cache_v2.bin` | `cache_v1.bin`'s grids at version 2, an entry of bytes, `readme`, between them |
 | `archive_v2.bin` | an archive of version 2 of the same entries as `cache_v2.bin` |
-| `hermite_v2.bin` | `hermite_v1.bin`'s set at version 2: its sign grid and its entry of crossings |
+| `hermite_v2.bin` | `hermite_v1.bin`'s set at version 2: refused by its version (§4.2, rule 1) |
+| `hermite_v3.bin` | `hermite_v1.bin`'s set at version 3: its sign grid and its entry of crossings |
 
 ## 8. The archive profile, format version 1
 
@@ -619,7 +606,7 @@ of the file: the body's start, the start of its leaf buffers (§9.6), and the bo
 
    | Name | Type | Value |
    | :--- | :--- | :--- |
-   | `class` | `string` | `level set` for a grid holding `sdf.version` (§5), else `unknown` |
+   | `class` | `string` | `level set` for a grid holding `brodo.sdf.version` (§5), else `unknown` |
    | `file_bbox_max` | `vec3i` | the greatest voxel of a leaf or tile, three `i32`; with none, `i32::MIN` thrice |
    | `file_bbox_min` | `vec3i` | the least such voxel; with none, `i32::MAX` thrice |
    | `file_compression` | `string` | `active values` |
