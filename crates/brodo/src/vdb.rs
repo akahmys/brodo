@@ -14,8 +14,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use crate::error::VdbError;
+use crate::field::Field;
 use crate::field::local_index;
-use crate::field::{Field, Stored};
 use crate::meta::{Bounds, GridMeta, SDF_KEY};
 use crate::topology::{LeafNumber, TileNumber, Topology};
 use crate::tree::{Coord, TileLevel};
@@ -40,16 +40,28 @@ const LEAF_PLACES: usize = 1 << 9;
 /// writes them for an empty grid (docs/formats.md §9.3).
 const EMPTY_BOX: (Coord, Coord) = ([i32::MAX; 3], [i32::MIN; 3]);
 
-/// A value type OpenVDB holds a grid of: `f32` or `f64` (ADR-0046).
-pub trait VdbValue: Stored {
-    /// OpenVDB's name for a tree of the type.
-    const TREE_TYPE: &'static str;
+/// A value type OpenVDB holds a grid of: `f32` or `f64` (ADR-0046). It names the types and
+/// promises nothing more: what writing one needs is brodo's own.
+pub trait VdbValue: sealed::VdbWrite {}
 
-    /// Appends the value's little-endian bytes.
-    fn put(self, out: &mut Vec<u8>);
+/// Keeps what writing a value needs out of brodo's API.
+mod sealed {
+    use crate::field::Stored;
+
+    /// What writing a value as OpenVDB's needs.
+    pub trait VdbWrite: Stored {
+        /// OpenVDB's name for a tree of the type.
+        const TREE_TYPE: &'static str;
+
+        /// Appends the value's little-endian bytes.
+        fn put(self, out: &mut Vec<u8>);
+    }
 }
 
-impl VdbValue for f32 {
+impl VdbValue for f32 {}
+impl VdbValue for f64 {}
+
+impl sealed::VdbWrite for f32 {
     const TREE_TYPE: &'static str = "Tree_float_5_4_3";
 
     fn put(self, out: &mut Vec<u8>) {
@@ -57,7 +69,7 @@ impl VdbValue for f32 {
     }
 }
 
-impl VdbValue for f64 {
+impl sealed::VdbWrite for f64 {
     const TREE_TYPE: &'static str = "Tree_double_5_4_3";
 
     fn put(self, out: &mut Vec<u8>) {

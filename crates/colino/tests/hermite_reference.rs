@@ -22,18 +22,33 @@ use colino::hermite::{Produced, hermite};
 use colino::mesh::Mesh;
 use colino::winding::Accuracy;
 
-/// One axis's crossings as dense fields, `NO_CROSSING` where an edge holds none.
+/// One axis's crossings as dense fields, fraction −1, normal zero and group 0 where an
+/// edge holds none.
 struct Dense {
     fraction: brodo::field::Field<f32>,
     normal: brodo::field::Field<[f32; 3]>,
     group: brodo::field::Field<u32>,
 }
 
-/// A set's crossings on x, y and z, each expanded into dense fields (`Hermite::expand`).
+/// A set's crossings on x, y and z, each laid out as dense fields.
 fn axes(set: &brodo::hermite::Hermite) -> [Dense; 3] {
-    [0, 1, 2].map(|axis| {
-        let (fraction, normal, group) = set.expand(axis).unwrap();
-        Dense { fraction, normal, group }
+    let t = set.topology();
+    brodo::tree::Axis::ALL.map(|axis| {
+        let mut d = Dense {
+            fraction: brodo::field::Field::new(t, -1.0),
+            normal: brodo::field::Field::new(t, [0.0; 3]),
+            group: brodo::field::Field::new(t, 0),
+        };
+        for n in t.leaf_numbers() {
+            for place in 0..512 {
+                if let Some(c) = set.crossings().get(n, axis, place) {
+                    d.fraction.leaf_mut(t, n).unwrap()[place] = c.fraction;
+                    d.normal.leaf_mut(t, n).unwrap()[place] = c.normal;
+                    d.group.leaf_mut(t, n).unwrap()[place] = c.group;
+                }
+            }
+        }
+        d
     })
 }
 

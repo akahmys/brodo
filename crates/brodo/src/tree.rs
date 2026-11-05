@@ -9,6 +9,32 @@ use crate::error::{NodeKind, TreeError};
 /// A voxel coordinate.
 pub type Coord = [i32; 3];
 
+/// An axis of the voxels' index space: what a slice is perpendicular to, and what a
+/// Hermite set's edge runs along.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Axis {
+    /// x, a coordinate's first component.
+    X,
+    /// y, its second.
+    Y,
+    /// z, its third.
+    Z,
+}
+
+impl Axis {
+    /// The three, in order.
+    pub const ALL: [Axis; 3] = [Axis::X, Axis::Y, Axis::Z];
+
+    /// Its component's index in a coordinate: 0, 1 or 2.
+    pub fn index(self) -> usize {
+        match self {
+            Axis::X => 0,
+            Axis::Y => 1,
+            Axis::Z => 2,
+        }
+    }
+}
+
 /// log2 of a leaf's edge, in voxels.
 pub(crate) const LEAF_LOG2: u32 = 3;
 /// log2 of a lower node's edge, in children.
@@ -220,13 +246,13 @@ enum RootEntry {
     Tile,
 }
 
-/// A leaf of a tree, by its number in that tree.
+/// A leaf of a tree, by its number in that tree, which a commit renumbers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct LeafId(u32);
+pub(crate) struct LeafId(u32);
 
 impl LeafId {
     /// The leaf's number.
-    pub fn get(self) -> u32 {
+    pub(crate) fn get(self) -> u32 {
         self.0
     }
 }
@@ -265,7 +291,7 @@ impl TileLevel {
 
 /// What holds a voxel.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Probe {
+pub(crate) enum Probe {
     /// A leaf.
     Leaf(LeafId),
     /// A tile at this level.
@@ -293,7 +319,7 @@ pub(crate) enum Place {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Deactivation {
     /// The voxel's leaf was removed, with the nodes above it it left empty.
-    Removed(LeafId),
+    Removed,
     /// The voxel was in the background already; nothing changed.
     Background,
 }
@@ -302,9 +328,9 @@ pub enum Deactivation {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Activation {
     /// The voxel's leaf was there already.
-    Existing(LeafId),
+    Existing,
     /// The voxel's leaf was created, with the nodes above it that were missing.
-    Created(LeafId),
+    Created,
     /// A tile at this level holds the voxel, which is active already; nothing changed.
     InTile(TileLevel),
 }
@@ -506,8 +532,8 @@ impl Tree {
         };
         match self.lower[to_usize(l)].slot(v) {
             Slot::Tile => Ok(Activation::InTile(TileLevel::Lower)),
-            Slot::Child(id) => Ok(Activation::Existing(LeafId(id))),
-            Slot::Empty => self.new_leaf(l, v).map(Activation::Created),
+            Slot::Child(_) => Ok(Activation::Existing),
+            Slot::Empty => self.new_leaf(l, v).map(|_| Activation::Created),
         }
     }
 
@@ -528,14 +554,13 @@ impl Tree {
             Slot::Child(l) => l,
         };
         let lower = &mut self.lower[to_usize(l)];
-        let leaf = match lower.slot(v) {
+        match lower.slot(v) {
             Slot::Empty => return Ok(Deactivation::Background),
             Slot::Tile => return in_tile(TileLevel::Lower),
-            Slot::Child(id) => {
-                lower.remove_child(v);
-                id
+            Slot::Child(_) => {
+                let _removed = lower.remove_child(v);
             }
-        };
+        }
         if lower.is_empty() {
             let upper = &mut self.upper[to_usize(u)];
             upper.remove_child(v);
@@ -543,7 +568,7 @@ impl Tree {
                 self.root.remove(&key);
             }
         }
-        Ok(Deactivation::Removed(LeafId(leaf)))
+        Ok(Deactivation::Removed)
     }
 
     /// Makes the region of the given level holding the voxel a tile, creating the nodes
@@ -724,20 +749,21 @@ mod tests {
     #[test]
     fn negative_coordinates_round_down() {
         let mut t = Tree::new();
-        let Activation::Created(id) = t.activate([-1, -1, -1]).unwrap() else { panic!() };
+        assert_eq!(t.activate([-1, -1, -1]), Ok(Activation::Created));
+        let Probe::Leaf(id) = t.probe([-1, -1, -1]) else { panic!() };
         assert_eq!(t.leaf_origin(id), Ok([-8, -8, -8]));
         assert_eq!(t.probe([-8, -8, -8]), Probe::Leaf(id));
         assert_eq!(t.probe([-9, -1, -1]), Probe::Background);
         assert_eq!(t.probe([0, 0, 0]), Probe::Background);
-        assert_eq!(t.activate([-8, -2, -5]), Ok(Activation::Existing(id)));
+        assert_eq!(t.activate([-8, -2, -5]), Ok(Activation::Existing));
     }
 
     #[test]
     fn leaves_either_side_of_a_root_boundary_differ() {
         let mut t = Tree::new();
-        let a = t.activate([4095, 0, 0]).unwrap();
-        let b = t.activate([4096, 0, 0]).unwrap();
-        assert_ne!(a, b);
+        assert_eq!(t.activate([4095, 0, 0]), Ok(Activation::Created));
+        assert_eq!(t.activate([4096, 0, 0]), Ok(Activation::Created));
+        assert_ne!(t.probe([4095, 0, 0]), t.probe([4096, 0, 0]));
         assert_eq!(t.leaf_count(), 2);
         let Probe::Leaf(id) = t.probe([4096, 7, 7]) else { panic!() };
         assert_eq!(t.leaf_origin(id), Ok([4096, 0, 0]));
@@ -1114,10 +1140,19 @@ mod tests {
         out
     }
 
+    /// The origin of the leaf holding `v`, read from its entry, if a leaf holds it.
+    fn held(t: &Tree, v: Coord) -> Option<Coord> {
+        match t.probe(v) {
+            Probe::Leaf(id) => Some(t.leaves[to_usize(id.0)]),
+            Probe::Tile(_) | Probe::Background => None,
+        }
+    }
+
     fn deactivate(t: &mut Tree, m: &mut Model, v: Coord) -> Result<(), TestCaseError> {
-        // The removed leaf's origin is read before a later edit could reuse its entry.
+        // The leaf's origin is read before the edit could reuse its entry.
+        let held = held(t, v);
         let got = match t.deactivate(v) {
-            Ok(Deactivation::Removed(id)) => Ok(Some(t.leaves[to_usize(id.0)])),
+            Ok(Deactivation::Removed) => Ok(held),
             Ok(Deactivation::Background) => Ok(None),
             Err(TreeError::InTile { level, voxel }) if voxel == v => Err(level),
             Err(e) => return Err(TestCaseError::fail(format!("{e}"))),
@@ -1129,9 +1164,11 @@ mod tests {
     fn step(t: &mut Tree, m: &mut Model, op: &Op) -> Result<Coord, TestCaseError> {
         let v = match *op {
             Op::Activate(v) => {
-                let got = match t.activate(v).unwrap() {
-                    Activation::Created(id) => (1, Some(t.leaf_origin(id).unwrap())),
-                    Activation::Existing(id) => (0, Some(t.leaf_origin(id).unwrap())),
+                let activated = t.activate(v).unwrap();
+                let origin = held(t, v);
+                let got = match activated {
+                    Activation::Created => (1, origin),
+                    Activation::Existing => (0, origin),
                     Activation::InTile(_) => (2, None),
                 };
                 prop_assert_eq!(got, m.activate(v));

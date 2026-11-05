@@ -35,7 +35,7 @@ fuzz_target!(|data: &[u8]| {
                 exercise(view.signs());
                 let count = u32::try_from(view.signs().leaf_count()).unwrap_or(u32::MAX);
                 for n in [0, count.saturating_sub(1), count] {
-                    for axis in 0..4 {
+                    for axis in brodo::tree::Axis::ALL {
                         for place in [0, 511, 512] {
                             let _crossing = view.crossing(n, axis, place);
                         }

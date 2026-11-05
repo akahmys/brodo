@@ -279,7 +279,7 @@ pub enum CacheError {
 pub enum Rule {
     /// A sign other than 0 or 1, or a background sign other than 0.
     Sign,
-    /// An edge with no crossing, a tile or a background holding other than `NO_CROSSING`.
+    /// An edge holding a crossing where its ends' signs agree, or none where they differ.
     NoCrossing,
     /// A crossing's fraction outside [0, 1].
     Fraction,
@@ -316,7 +316,7 @@ pub enum HermiteError {
         /// The point, or the tile's origin; none for the background.
         at: Option<Coord>,
         /// The axis of the edge, when an edge's values break it.
-        axis: Option<usize>,
+        axis: Option<crate::tree::Axis>,
         /// The rule broken.
         rule: Rule,
     },

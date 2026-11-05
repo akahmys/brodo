@@ -10,7 +10,12 @@ use std::collections::BTreeMap;
 use brodo::cache::{CacheEntry, CacheFile, to_bytes};
 use brodo::error::{HermiteError, Rule};
 use brodo::field::Field;
-use brodo::hermite::{Crossing, Crossings, Hermite, HermiteView, NO_CROSSING};
+use brodo::hermite::{Crossing, Crossings, Hermite, HermiteView};
+use brodo::tree::Axis as EdgeAxis;
+
+/// The fraction, normal and group a dense field of this test holds where an edge holds no
+/// crossing.
+const NO_CROSSING: (f32, [f32; 3], u32) = (-1.0, [0.0; 3], 0);
 use brodo::meta::GridMeta;
 use brodo::topology::{Location, Topology};
 use brodo::tree::{Coord, TileLevel};
@@ -194,7 +199,9 @@ fn meta(name: &str) -> GridMeta {
 /// The rule a set breaks, or what was made instead of a violation.
 fn rule<T>(r: Result<T, HermiteError>) -> Result<(Option<Coord>, Option<usize>, Rule), String> {
     match r {
-        Err(HermiteError::Violation { at, axis, rule }) => Ok((at, axis, rule)),
+        Err(HermiteError::Violation { at, axis, rule }) => {
+            Ok((at, axis.map(EdgeAxis::index), rule))
+        }
         Err(other) => Err(format!("{other:?}")),
         Ok(_) => Err("a set".to_owned()),
     }
@@ -443,11 +450,11 @@ fn each_broken_value_is_refused_for_its_rule() {
         Ok((Some([-1, 0, 0]), Some(0), Rule::Owner))
     );
     // The tile turned outside inside the box: the leaf point before it owns a crossing it
-    // lacks.
+    // lacks, an edge whose ends differ holding none.
     let mut p = valid();
     let t = p.topology.tile_numbers().next().unwrap();
     p.signs.set_tile(&p.topology, t, 0).unwrap();
-    assert_eq!(rule(p.make()).map(|r| r.2), Ok(Rule::Fraction));
+    assert_eq!(rule(p.make()).map(|r| r.2), Ok(Rule::NoCrossing));
 }
 
 /// A normal perpendicular to its edge points neither way and is taken, whichever end is
@@ -530,11 +537,11 @@ fn the_builder_refuses_crossings_out_of_its_order() {
     assert_eq!(built.len(), 3);
     assert!(!built.is_empty());
     assert!(Crossings::builder(&Topology::new()).build().unwrap().is_empty());
-    assert_eq!(built.get(n[0], 0, 511), Some(c));
-    assert_eq!(built.get(n[0], 2, 7), Some(c));
-    assert_eq!(built.get(n[0], 2, 6), None);
-    assert_eq!(built.get(n[1], 0, 511), None);
-    assert_eq!(built.get(n[0], 3, 0), None);
+    assert_eq!(built.get(n[0], EdgeAxis::X, 511), Some(c));
+    assert_eq!(built.get(n[0], EdgeAxis::Z, 7), Some(c));
+    assert_eq!(built.get(n[0], EdgeAxis::Z, 6), None);
+    assert_eq!(built.get(n[1], EdgeAxis::X, 511), None);
+    assert_eq!(built.get(n[0], EdgeAxis::X, 512), None);
     assert!(Crossings::builder(&topology(1, None)).leaf(n[0], [&[], &[], &[]]).is_ok());
 }
 
@@ -572,7 +579,7 @@ fn a_set_round_trips_through_a_file_among_others() {
     for n in t.leaf_numbers() {
         for (place, v) in t.leaf_voxels(n).unwrap().enumerate() {
             assert_eq!(read.signs().get(v).unwrap(), set.signs().value_at(t, v).unwrap());
-            for axis in 0..3 {
+            for axis in EdgeAxis::ALL {
                 let held = set.crossings().get(n, axis, place);
                 seen += usize::from(held.is_some());
                 assert_eq!(bits(read.crossing(n.get(), axis, place).unwrap()), bits(held));
@@ -759,7 +766,8 @@ fn format_version_3_keeps_its_bytes() {
         panic!("the bytes of Hermite format version 3 changed; they are at {}", path.display());
     }
     let f = CacheFile::from_bytes(GOLDEN).unwrap();
-    let c = HermiteView::find(&f, "golden").unwrap().crossing(0, 0, 5 + 8 * 3 + 64 * 3).unwrap();
+    let c = HermiteView::find(&f, "golden").unwrap().crossing(0, EdgeAxis::X, 5 + 8 * 3 + 64 * 3);
+    let c = c.unwrap();
     let c = c.unwrap();
     assert_eq!((c.fraction.to_bits(), c.group), (0.5_f32.to_bits(), 1));
 }

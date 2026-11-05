@@ -84,3 +84,13 @@ The same review's mutation run found the slice's size, its colour map and the ex
 ties untested; the first two are functions of their own with unit tests, and of equal
 extremes, 0 and −0, the first in leaf order, then tile order, is written.
 
+
+## Amendment: what its library promises
+
+- **Date**: 2026-11-05
+
+A survey before 1.0 found every module of `mestolo`'s library public, so that publishing it
+would make each a promise under semantic versioning, though they are public only for its
+tests. The owner decided, on 2026-11-05, that its promises be `run`, `USAGE`, `args` and
+`error`, and that `convert`, `draw`, `info`, `load` and `output` stay public but
+`#[doc(hidden)]`, promising nothing, as its README says.

@@ -27,6 +27,21 @@ and archive profiles are unchanged. Every change below breaks a user.
 - `SliceError::Encode` holds a `std::io::Error`, the PNG encoder's error inside it, in
   place of `png::EncodingError`, so that the encoder's crate is not a public dependency.
   zerocopy 0.8 is one: `field::Value`'s bounds are its traits.
+- colino no longer turns on brodo's `mmap`, which it does not use: a program that maps
+  cache files and reached `mmap` through colino names it on brodo.
+- `tree::LeafId` and `tree::Probe` are no longer public, and `Activation::Existing`,
+  `Activation::Created` and `Deactivation::Removed` carry no id: a leaf's id meant nothing
+  once the edit was committed, which numbers leaves as `LeafNumber`.
+- `vdb::VdbValue` and `vtk::VtkValue` are markers: their constants and methods, what
+  writing a value needs, are brodo's own.
+- `mestolo`'s library promises `run`, `USAGE`, `args` and `error`; its other modules are
+  hidden and promise nothing (ADR-0050).
+- `tree::Axis`, always built, is the axis of index space: `slice::Axis` is it, and
+  `Crossings::get`, `HermiteView::crossing` and `HermiteError::Violation` take or hold it
+  in place of a `usize`.
+- `hermite::NO_CROSSING`, `hermite::Expanded` and `Hermite::expand`, a dense view of a set
+  held sparsely, are gone. An edge whose ends' signs differ and that holds no crossing is
+  refused for `Rule::NoCrossing`, not `Rule::Fraction`.
 
 A file written by 0.9.0 or earlier converts with this release alone, its grids and entries
 of bytes still read as a cache file (`CacheFile::view`, `GridView::thaw`,
@@ -35,8 +50,8 @@ of bytes still read as a cache file (`CacheFile::view`, `GridView::thaw`,
 - a Hermite set of version 2: the sign grid and the entry of crossings, each `hermite.*`
   key renamed `brodo.hermite.*` and `brodo.hermite.version` set to `3`, written with
   `CacheEntry::with_reserved_keys` and `CacheEntry::bytes_with_reserved_keys`;
-- a Hermite set of version 1: its ten grids thawed, every leaf value other than
-  `NO_CROSSING` given to `Crossings::builder` leaf by leaf, the set made by `Hermite::new`
+- a Hermite set of version 1: its ten grids thawed, every leaf value other than fraction
+  −1, normal zero and group 0 given to `Crossings::builder` leaf by leaf, the set made by `Hermite::new`
   with the sign grid and the `hermite.group.<id>` names, and written by `Hermite::entries`;
 - an SDF: `sdf.version` renamed `brodo.sdf.version`, its value `2`, the grid written again.
 

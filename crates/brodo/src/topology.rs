@@ -339,7 +339,7 @@ impl TopologyEditor<'_> {
     /// its region takes nothing of the removed leaf's values: it starts from the background.
     pub fn deactivate(&mut self, v: Coord) -> Result<Deactivation, TreeError> {
         let d = self.tree.deactivate(v)?;
-        if matches!(d, Deactivation::Removed(_)) {
+        if matches!(d, Deactivation::Removed) {
             self.removed.insert(TileLevel::Lower.origin(v));
         }
         Ok(d)

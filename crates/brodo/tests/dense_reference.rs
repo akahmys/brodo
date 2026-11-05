@@ -127,7 +127,7 @@ proptest! {
                 let _refused = g.edit(|e| match op {
                     Op::Activate(v) => e.activate(v).map(|_| ()),
                     Op::Deactivate(v) => e.deactivate(v).map(|d| {
-                        removed = matches!(d, Deactivation::Removed(_)).then_some(v);
+                        removed = matches!(d, Deactivation::Removed).then_some(v);
                     }),
                     Op::AddTile(l, v) => e.add_tile(l, v),
                     Op::Split(v) => e.split_tile(v),

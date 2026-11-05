@@ -24,7 +24,10 @@ mestolo convert grids.cache --grid sdf -o sdf.vtu          # for ParaView
 
 ## As a library
 
-The program is a thin user of the library, which runs a command line into any writer:
+The program is a thin user of the library, which runs a command line into any writer.
+Its promises are `run`, `USAGE`, `args` and `error`, as semantic versioning holds them; the
+command's other parts are public for its tests alone, hidden from its documentation, and
+promise nothing:
 
 ```rust
 use mestolo::args::{Command, parse};

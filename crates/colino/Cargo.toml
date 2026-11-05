@@ -9,7 +9,7 @@ publish.workspace = true
 readme = "README.md"
 
 [dependencies]
-brodo = { workspace = true, features = ["mmap"] }
+brodo.workspace = true
 miniz_oxide = { workspace = true, optional = true }
 quick-xml = { workspace = true, optional = true }
 rawzip = { workspace = true, optional = true }

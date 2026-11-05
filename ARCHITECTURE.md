@@ -326,8 +326,8 @@ are in ADR-0030.
   outside) and its crossings, held only on the edges that hold one (`Crossings`): per
   leaf and axis a mask of the points whose edge holds one, and each crossing's fraction
   (`f32`), normal (`[f32; 3]`) and group (`u32`), with a table naming each group, group 0
-  `""`. A producer builds the crossings leaf by leaf (`Crossings::builder`); a tool that
-  shows grids takes one axis's as dense fields (`Hermite::expand`).
+  `""`. A producer builds the crossings leaf by leaf (`Crossings::builder`), and a reader
+  asks for one by leaf, `tree::Axis` and place.
 - An edge has a crossing exactly when the stored signs of its ends differ, tiles' and the
   background's included; its owner is then a leaf point. The fraction is the crossing's
   place from the edge's lower end, in [0, 1]; the normal is of unit length within 1e-6,

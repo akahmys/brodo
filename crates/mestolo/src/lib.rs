@@ -5,11 +5,19 @@
 use std::io::Write;
 
 pub mod args;
-pub mod convert;
-pub mod draw;
 pub mod error;
+
+// The command's own parts, public for its tests and hidden: they promise nothing across
+// versions (ADR-0050).
+#[doc(hidden)]
+pub mod convert;
+#[doc(hidden)]
+pub mod draw;
+#[doc(hidden)]
 pub mod info;
+#[doc(hidden)]
 pub mod load;
+#[doc(hidden)]
 pub mod output;
 
 use args::Command;

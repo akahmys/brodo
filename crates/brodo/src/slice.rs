@@ -11,21 +11,12 @@ use crate::accessor::ValueAccessor;
 use crate::error::SliceError;
 use crate::field::{Field, Value};
 use crate::topology::{Location, Topology};
+pub use crate::tree::Axis;
 use crate::tree::Coord;
 
-/// The axis a slice is perpendicular to.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Axis {
-    /// The slice is the plane x = position; the image's u is y, its v is z.
-    X,
-    /// The plane y = position; u is x, v is z.
-    Y,
-    /// The plane z = position; u is x, v is y.
-    Z,
-}
-
 /// Where to cut and what to draw: the plane, and the inclusive range of its two other
-/// coordinates (u, v). The image's top row is the largest v.
+/// coordinates (u, v). The image's top row is the largest v. Perpendicular to x, u is y and
+/// v is z; to y, u is x and v is z; to z, u is x and v is y.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct Slice {

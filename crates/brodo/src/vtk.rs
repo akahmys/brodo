@@ -18,7 +18,7 @@ use std::collections::BTreeMap;
 use std::io::{BufWriter, Write};
 
 use crate::error::VtkError;
-use crate::field::{Field, Stored};
+use crate::field::Field;
 use crate::topology::Topology;
 use crate::tree::Coord;
 
@@ -28,22 +28,40 @@ const VOXEL: u8 = 11;
 /// A point, in index space; `i64` so that a tile's far corner never overflows.
 type Point = [i64; 3];
 
-/// A value type with a VTK data-array type and a number of components (ADR-0018).
-pub trait VtkValue: Stored {
-    /// The `type` attribute of its `DataArray`.
-    const TYPE_NAME: &'static str;
+/// A value type with a VTK data-array type and a number of components (ADR-0018). It names
+/// the types and promises nothing more: what writing one needs is brodo's own.
+pub trait VtkValue: sealed::VtkWrite {}
 
-    /// Its components: 1 for a scalar, 3 for a vector.
-    const COMPONENTS: u32;
+/// Keeps what writing a value needs out of brodo's API.
+mod sealed {
+    use std::io::Write;
 
-    /// Whether VTK reads the value back as written: false for an infinity.
-    fn readable(self) -> bool;
+    use crate::field::Stored;
 
-    /// Writes the value as ASCII, components apart by a space; a NaN as `NaN`.
-    fn write_ascii(self, w: &mut dyn Write) -> std::io::Result<()>;
+    /// What writing a value as VTK's needs.
+    pub trait VtkWrite: Stored {
+        /// The `type` attribute of its `DataArray`.
+        const TYPE_NAME: &'static str;
+
+        /// Its components: 1 for a scalar, 3 for a vector.
+        const COMPONENTS: u32;
+
+        /// Whether VTK reads the value back as written: false for an infinity.
+        fn readable(self) -> bool;
+
+        /// Writes the value as ASCII, components apart by a space; a NaN as `NaN`.
+        fn write_ascii(self, w: &mut dyn Write) -> std::io::Result<()>;
+    }
 }
 
-impl VtkValue for f32 {
+impl VtkValue for f32 {}
+impl VtkValue for f64 {}
+impl VtkValue for u8 {}
+impl VtkValue for u32 {}
+impl VtkValue for [f32; 3] {}
+impl VtkValue for [f64; 3] {}
+
+impl sealed::VtkWrite for f32 {
     const TYPE_NAME: &'static str = "Float32";
     const COMPONENTS: u32 = 1;
 
@@ -57,7 +75,7 @@ impl VtkValue for f32 {
     }
 }
 
-impl VtkValue for f64 {
+impl sealed::VtkWrite for f64 {
     const TYPE_NAME: &'static str = "Float64";
     const COMPONENTS: u32 = 1;
 
@@ -70,7 +88,7 @@ impl VtkValue for f64 {
     }
 }
 
-impl VtkValue for u8 {
+impl sealed::VtkWrite for u8 {
     const TYPE_NAME: &'static str = "UInt8";
     const COMPONENTS: u32 = 1;
 
@@ -83,7 +101,7 @@ impl VtkValue for u8 {
     }
 }
 
-impl VtkValue for u32 {
+impl sealed::VtkWrite for u32 {
     const TYPE_NAME: &'static str = "UInt32";
     const COMPONENTS: u32 = 1;
 
@@ -106,7 +124,7 @@ fn write_components<S: VtkValue>(c: [S; 3], w: &mut dyn Write) -> std::io::Resul
     Ok(())
 }
 
-impl VtkValue for [f32; 3] {
+impl sealed::VtkWrite for [f32; 3] {
     const TYPE_NAME: &'static str = "Float32";
     const COMPONENTS: u32 = 3;
 
@@ -119,7 +137,7 @@ impl VtkValue for [f32; 3] {
     }
 }
 
-impl VtkValue for [f64; 3] {
+impl sealed::VtkWrite for [f64; 3] {
     const TYPE_NAME: &'static str = "Float64";
     const COMPONENTS: u32 = 3;
 

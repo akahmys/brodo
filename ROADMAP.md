@@ -13,8 +13,9 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   bare frozen buffers written, the tests run on macOS and Windows (ADR-0034), and keys
   beginning `brodo.` reserved, Hermite data at version 3 and the SDF convention at
   version 2 (ADR-0053), and the public API reviewed.
-- **Next**: a survey of designs grown by accretion, asked by the owner before 1.0
-  (2026-11-05); then the rest of P9 in the order put to the owner (2026-11-04).
+- **Next**: the rest of the survey of designs grown by accretion (2026-11-05), version 1
+  of the frozen layout, cache and archive first; then the rest of P9 in the order put to
+  the owner (2026-11-04).
 
 ## 2. Milestones
 
@@ -548,6 +549,18 @@ since crates.io yanks a version but never deletes it.
       `SliceError`, and zerocopy 0.8 stated a public dependency; the other enums, `Crossing`
       and `Betti` kept exhaustive, and no error given `Clone` or `PartialEq`, which can be
       added later (the owner, 2026-11-05)
+- [ ] Designs grown by accretion surveyed before 1.0, each taken, in the order put to the
+      owner (the owner, 2026-11-05):
+  - [x] colino's `mmap` on brodo dropped; `LeafId` and `Probe` hidden; the writers' value
+        traits made markers; `mestolo`'s library stated; one `Axis`; Hermite data's dense
+        leftovers dropped
+  - [ ] version 1 of the frozen layout and the cache and archive profiles no longer read,
+        and docs/formats.md and ARCHITECTURE.md stated at the present versions
+  - [ ] the readers' and writers' names and arguments made one shape
+  - [ ] a value type named by an enum, and a field of any stored type
+  - [ ] a cache file's grids reached as its entries of bytes are; the reserved-key writers
+        hidden
+  - [ ] the errors' shapes, places and features made even
 - [x] One prefix of metadata keys reserved for the formats brodo builds on the cache
       profile after 1.0, such as `brodo.`, `hermite.` kept as it is, so that each later
       one is not a breaking change to `CacheEntry::new` and `CacheEntry::bytes`, which

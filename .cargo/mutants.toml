@@ -293,11 +293,6 @@ exclude_re = [
     # is, and the same bytes are read.
     # [same]
     'cache\.rs:.*: replace \+ with \* in CacheFile::read$',
-    # A view is found only once every edge is checked: an edge with no crossing holds
-    # `NO_CROSSING` to the bit, and a crossing's fraction lies in [0, 1], never -1, so the
-    # fraction alone tells them apart.
-    # [same]
-    'hermite\.rs:\d+:43: replace && with \|\| in HermiteView<.*>::crossing$',
     # `check_links` runs first and holds the root keys strictly ascending, and distinct keys
     # have distinct Morton codes, so no two upper nodes' are equal here.
     # [same]

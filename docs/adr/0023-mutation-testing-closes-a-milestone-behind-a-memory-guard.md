@@ -355,3 +355,12 @@ can tell from the original, are excluded as `[same]`, each with its reason: a re
 the version a grid holds, a read's room grown as it is for a longer file, a value the
 original returns, a crossing told by its fraction alone, a bound `check_links` already
 holds, and a box's margin narrowed beside its other three.
+
+## Amendment: exclusions gone with their code before 1.0
+
+- **Date**: 2026-11-05
+
+Two mutants excluded as equivalent in P8's amendment went with the code they were in:
+`Owned::crossing_tile`'s, when Hermite data's earlier versions stopped being read
+(ADR-0053), and `HermiteView::crossing`'s comparison with `NO_CROSSING`, when the reader
+returned a crossing or none in place of that value (the survey before 1.0, ROADMAP.md P9).
