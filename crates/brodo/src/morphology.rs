@@ -257,9 +257,19 @@ fn removed(
     Ok((leaves, split))
 }
 
-/// A value with an order to take the largest or smallest by: the scalar value types. A
-/// vector has no such order, so `[f32; 3]` has none here (ADR-0025).
-pub trait Ordered: Value + PartialOrd {}
+/// A value with an order to take the largest or smallest by: the scalar value types, and
+/// no other, the trait sealed. A vector has no such order, so `[f32; 3]` has none here
+/// (ADR-0025).
+pub trait Ordered: Value + PartialOrd + sealed::Sealed {}
+
+mod sealed {
+    /// Keeps [`super::Ordered`] to brodo's scalar value types.
+    pub trait Sealed {}
+    impl Sealed for f32 {}
+    impl Sealed for f64 {}
+    impl Sealed for u8 {}
+    impl Sealed for u32 {}
+}
 
 impl Ordered for f32 {}
 impl Ordered for f64 {}

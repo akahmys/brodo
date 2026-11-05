@@ -374,10 +374,11 @@ pub enum SliceError {
     #[cfg(feature = "slice-png")]
     #[error("the colour map {0:?} has no finite, non-empty range")]
     BadColorMap(crate::slice::ColorMap),
-    /// The PNG encoder refused the image.
+    /// The PNG encoder refused the image: its own error inside, by `io::Error::other`, so
+    /// that the encoder's crate is not a public dependency.
     #[cfg(feature = "slice-png")]
     #[error(transparent)]
-    Encode(#[from] png::EncodingError),
+    Encode(std::io::Error),
 }
 
 /// Why grids could not be written as an OpenVDB file (ARCHITECTURE.md §4.7, ADR-0046).

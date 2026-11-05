@@ -59,6 +59,7 @@ fn dense(meets: impl Fn(Coord) -> bool, conn: Connectivity) -> i64 {
                     let (counted, dim) = match conn {
                         Connectivity::TwentySix => (around.iter().any(|v| meets(*v)), dim),
                         Connectivity::Six => (around.iter().all(|v| meets(*v)), 3 - dim),
+                        _ => unreachable!("a connectivity this test does not know"),
                     };
                     if counted {
                         chi += if dim % 2 == 0 { 1 } else { -1 };

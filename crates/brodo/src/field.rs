@@ -19,6 +19,10 @@ pub const LEAF_VOXELS: usize = 512;
 /// it out and a view read it in place. Open to types outside brodo, which a field, its
 /// parallel update, gathers and analyses take in memory; only a [`Stored`] type goes into a
 /// frozen grid or a file (ADR-0029).
+///
+/// A method added to it later comes with a default, so that a type implementing it keeps
+/// building. Its bounds are zerocopy 0.8's traits, which such a type derives: zerocopy is a
+/// public dependency, and a release of it breaking 0.8 is taken in a major release of brodo.
 pub trait Value:
     Copy + Send + Sync + 'static + FromBytes + IntoBytes + Immutable + KnownLayout
 {

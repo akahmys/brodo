@@ -16,8 +16,9 @@ use crate::topology::{Location, Topology};
 use crate::tree::{Coord, Place, TileLevel, align, child_place};
 use crate::tree::{LEAF_LOG2, LOWER_SPAN_LOG2, UPPER_SPAN_LOG2};
 
-/// Which neighbours touch.
+/// Which neighbours touch; another may be added, such as 18 neighbours.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Connectivity {
     /// Across a face: 6 neighbours.
     Six,

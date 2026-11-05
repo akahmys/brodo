@@ -34,6 +34,8 @@ brodo = { git = "https://github.com/akahmys/brodo", tag = "v0.9.0" }
 colino = { git = "https://github.com/akahmys/brodo", tag = "v0.9.0" }
 ```
 
+- zerocopy 0.8 is a public dependency: a type of your own that a field holds implements
+  `brodo::field::Value`, whose bounds are zerocopy's traits it derives.
 - They need Rust 1.98 or later, and build for 64-bit, little-endian targets alone, which
   the frozen layout reads in place. Their tests run on Linux (x86-64), macOS (arm64) and
   Windows (x86-64) after each push.

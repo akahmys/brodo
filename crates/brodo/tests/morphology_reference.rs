@@ -220,6 +220,7 @@ fn an_upper_tile_is_split_where_it_must_go() {
         let cases = match conn {
             Connectivity::Six => [(3, false), (2, true)],
             Connectivity::TwentySix => [(1, false), (9, false)],
+            _ => unreachable!("a connectivity this test does not know"),
         };
         for (k, dilating) in cases {
             assert_eq!(

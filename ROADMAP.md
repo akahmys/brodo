@@ -12,9 +12,9 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   (ADR-0007), version 2's media types stated (ADR-0041), golden files of version 2's
   bare frozen buffers written, the tests run on macOS and Windows (ADR-0034), and keys
   beginning `brodo.` reserved, Hermite data at version 3 and the SDF convention at
-  version 2 (ADR-0053).
-- **Next**: the review of the public API, and the rest of P9 in the order put to the
-  owner (2026-11-04).
+  version 2 (ADR-0053), and the public API reviewed.
+- **Next**: a survey of designs grown by accretion, asked by the owner before 1.0
+  (2026-11-05); then the rest of P9 in the order put to the owner (2026-11-04).
 
 ## 2. Milestones
 
@@ -541,9 +541,13 @@ since crates.io yanks a version but never deletes it.
 
 - [x] B-018 and B-019 revisited, as their rows say (§3): neither taken now (the owner,
       2026-11-04)
-- [ ] The public API reviewed for what would break a user after 1.0: each public enum and
+- [x] The public API reviewed for what would break a user after 1.0: each public enum and
       error `#[non_exhaustive]` or not, each public trait sealed or not, the public errors'
-      `Clone` and `PartialEq` (After P7's review), each change a proposal to the owner
+      `Clone` and `PartialEq` (After P7's review), each change a proposal to the owner:
+      `Connectivity` `#[non_exhaustive]`, `Ordered` sealed, `png`'s error kept out of
+      `SliceError`, and zerocopy 0.8 stated a public dependency; the other enums, `Crossing`
+      and `Betti` kept exhaustive, and no error given `Clone` or `PartialEq`, which can be
+      added later (the owner, 2026-11-05)
 - [x] One prefix of metadata keys reserved for the formats brodo builds on the cache
       profile after 1.0, such as `brodo.`, `hermite.` kept as it is, so that each later
       one is not a breaking change to `CacheEntry::new` and `CacheEntry::bytes`, which

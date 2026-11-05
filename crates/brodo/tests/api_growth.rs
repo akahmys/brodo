@@ -5,7 +5,7 @@
 //! losing the attribute fails the gate. Each struct a user builds is built by its
 //! constructor and set by assignment, which a field added later leaves working.
 
-use brodo::analysis::AnalysisError;
+use brodo::analysis::{AnalysisError, Connectivity};
 #[cfg(feature = "archive")]
 use brodo::archive::Encoding;
 use brodo::cache::CacheFile;
@@ -237,6 +237,14 @@ fn vdb_field(e: &VdbField) -> &'static str {
     }
 }
 
+fn connectivity(c: Connectivity) -> &'static str {
+    match c {
+        Connectivity::Six => "Six",
+        Connectivity::TwentySix => "TwentySix",
+        _ => "later",
+    }
+}
+
 #[cfg(feature = "slice-png")]
 fn color_map(e: &ColorMap) -> &'static str {
     match e {
@@ -262,6 +270,7 @@ fn every_enum_that_may_grow_is_matched_with_a_wildcard() {
     assert_eq!(slice_error(&SliceError::EmptyRange), "EmptyRange");
     assert_eq!(vtk_error(&VtkError::Inconsistent), "Inconsistent");
     assert_eq!(ghost_width(&GhostWidth::Two), "Two");
+    assert_eq!(connectivity(Connectivity::Six), "Six");
     assert_eq!(grid_error(&GridError::Tree(TreeError::TooManyTiles)), "Tree");
     #[cfg(feature = "slice-png")]
     assert_eq!(color_map(&ColorMap::Diverging { limit: 1.0 }), "Diverging");

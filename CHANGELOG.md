@@ -22,6 +22,11 @@ and archive profiles are unchanged. Every change below breaks a user.
   `brodo.hermite.field` and `brodo.hermite.group.<id>`. A set of version 1 or 2 is
   refused by `HermiteView::find` with `Version`. `Hermite::entries_v1`, `FIELDS`,
   `VERSION_1`, `HermiteView::version` and `HermiteError::OtherMeta` are gone.
+- `analysis::Connectivity` is `#[non_exhaustive]`: a `match` on it ends in a wildcard arm.
+- `morphology::Ordered` is sealed: brodo's scalar value types are its only ones.
+- `SliceError::Encode` holds a `std::io::Error`, the PNG encoder's error inside it, in
+  place of `png::EncodingError`, so that the encoder's crate is not a public dependency.
+  zerocopy 0.8 is one: `field::Value`'s bounds are its traits.
 
 A file written by 0.9.0 or earlier converts with this release alone, its grids and entries
 of bytes still read as a cache file (`CacheFile::view`, `GridView::thaw`,

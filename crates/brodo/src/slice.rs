@@ -228,9 +228,10 @@ pub fn encode_png(image: &Image) -> Result<Vec<u8>, SliceError> {
     encoder.set_depth(png::BitDepth::Eight);
     encoder.set_compression(png::Compression::Balanced);
     encoder.set_filter(png::Filter::Adaptive);
-    let mut writer = encoder.write_header()?;
-    writer.write_image_data(&image.rgba)?;
-    writer.finish()?;
+    let refused = |e: png::EncodingError| SliceError::Encode(std::io::Error::other(e));
+    let mut writer = encoder.write_header().map_err(refused)?;
+    writer.write_image_data(&image.rgba).map_err(refused)?;
+    writer.finish().map_err(refused)?;
     Ok(out)
 }
 
