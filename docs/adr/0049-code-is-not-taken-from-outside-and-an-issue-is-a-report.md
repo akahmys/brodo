@@ -1,6 +1,6 @@
 # ADR-0049: Code is not taken from outside, and an issue is a report
 
-- **Status**: Accepted
+- **Status**: Amended
 - **Date**: 2026-11-02
 
 ## Context
@@ -34,3 +34,31 @@ enforced and shown:
 A fix offered as code is written again here from the issue's report, at the cost of the
 time the code would have saved. A collaborator is invited by the owner, and keeps S1 as an
 agent here does.
+
+## Amendment
+
+- **Date**: 2026-11-05
+
+The owner decided, on 2026-11-05, to take requests from brodo's users as GitHub issues,
+the owner opening each in general terms, and asked how an approved one is told from any
+other: the repository is public, so anyone can open an issue. GitHub's documentation of
+issue events states that a `labeled` and an `unlabeled` event carry `actor`, `label[name]`
+and `created_at`, listed by `GET /repos/{owner}/{repo}/issues/{issue_number}/events`, and
+that the Triage, Write, Maintain and Admin roles apply labels, Read does not. The owner
+decided, as proposed:
+
+- An issue enters ROADMAP.md only with the label `owner-approved`, applied by the owner.
+  That it was is checked by a read alone: the last `labeled` event naming it, with no
+  `unlabeled` naming it after, has `actor.login` `akahmys`. The item in ROADMAP.md links
+  the issue and states the date of the check.
+- An issue without the label is not worked on and its body is not read: it is reported to
+  the owner by number and title only. Recording a request outside the scope in ROADMAP.md
+  §4 applies to an approved issue alone, which issues are taken being the owner's choice.
+- A commit names an issue by its number alone, never with a keyword GitHub closes it by
+  (`close`, `fix`, `resolve` and their forms): pushing `main` is delegated, closing is
+  not, and the owner closes the issue. Nothing refuses such a keyword; a check would be a
+  change to `scripts/hooks/`, proposed apart.
+- The owner creates and applies the label. The gate needs no GitHub access, so it checks
+  neither; S5 says so.
+- A vulnerability is not reported in a public issue. How it is reported privately is
+  ROADMAP.md P9's item on `SECURITY.md`, decided by the owner in that item's turn.

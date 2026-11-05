@@ -10,13 +10,12 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
 
 - **Done**: P9's first units: B-018 and B-019 kept, patents and licences judged unchanged
   (ADR-0007), version 2's media types stated (ADR-0041), golden files of version 2's
-  bare frozen buffers written, the tests run on macOS and Windows (ADR-0034), and keys
-  beginning `brodo.` reserved, Hermite data at version 3 and the SDF convention at
-  version 2 (ADR-0053), the public API reviewed, and the survey's small items taken and
-  version 1 of the frozen layout, cache and archive dropped (ADR-0054).
-- **Next**: the rest of the survey of designs grown by accretion (2026-11-05), the readers'
-  and writers' shapes first; then the rest of P9 in the order put to the owner
-  (2026-11-04).
+  bare frozen buffers written, the tests run on macOS and Windows (ADR-0034), keys
+  beginning `brodo.` reserved (ADR-0053), the public API reviewed, the survey of designs
+  grown by accretion taken whole (ADR-0054 to ADR-0058), and users' requests taken as
+  issues the owner labels `owner-approved` (ADR-0049, amended 2026-11-05).
+- **Next**: the rest of P9 in the order put to the owner (2026-11-04), the rules for
+  versions after 1.0 first.
 
 ## 2. Milestones
 
@@ -564,6 +563,12 @@ since crates.io yanks a version but never deletes it.
   - [x] a cache file's grids reached as its entries of bytes are; the reserved-key writers
         hidden (ADR-0057)
   - [x] the errors' shapes, places and features made even (ADR-0058)
+- [x] Users' requests taken as GitHub issues, brodo's alone at first, opened by the owner
+      in general terms: one enters this roadmap only with the label `owner-approved`,
+      its actor checked by a read; one without it reported by number and title; a commit
+      names an issue by number, never a closing keyword, the owner closing it; a
+      vulnerability not taken in a public issue (AGENTS.md S5; ADR-0049, amended; the
+      owner, 2026-11-05)
 - [x] One prefix of metadata keys reserved for the formats brodo builds on the cache
       profile after 1.0, such as `brodo.`, `hermite.` kept as it is, so that each later
       one is not a breaking change to `CacheEntry::new` and `CacheEntry::bytes`, which
