@@ -5,18 +5,22 @@
 //! losing the attribute fails the gate. Each struct a user builds is built by its
 //! constructor and set by assignment, which a field added later leaves working.
 
-use brodo::analysis::{AnalysisError, Connectivity};
+use brodo::analysis::Connectivity;
 #[cfg(feature = "archive")]
 use brodo::archive::Encoding;
+use brodo::error::AnalysisError;
+use brodo::error::GridError;
+#[cfg(feature = "slice-png")]
+use brodo::error::SliceError;
 #[cfg(feature = "vdb")]
 use brodo::error::VdbError;
+#[cfg(feature = "vtk")]
+use brodo::error::VtkError;
 use brodo::error::{
-    CacheError, FieldError, FormatError, FreezeError, HermiteError, MetaError, Rule, SliceError,
-    TreeError, VtkError,
+    CacheError, FieldError, FormatError, FreezeError, HermiteError, MetaError, Rule, TreeError,
 };
 use brodo::field::{AnyField, ValueType};
 use brodo::gather::GhostWidth;
-use brodo::grid::GridError;
 use brodo::kind::FileKind;
 use brodo::meta::GridMeta;
 #[cfg(feature = "slice-png")]
@@ -112,10 +116,15 @@ fn cache_error(e: &CacheError) -> &'static str {
         CacheError::ThawTooLarge { .. } => "ThawTooLarge",
         CacheError::ReservedKey(..) => "ReservedKey",
         CacheError::FileTooLarge { .. } => "FileTooLarge",
+        #[cfg(feature = "archive")]
         CacheError::Decompress { .. } => "Decompress",
+        #[cfg(feature = "archive")]
         CacheError::Chunks(..) => "Chunks",
+        #[cfg(feature = "archive")]
         CacheError::UnknownEncoding(..) => "UnknownEncoding",
+        #[cfg(feature = "archive")]
         CacheError::NotQuantised { .. } => "NotQuantised",
+        #[cfg(feature = "archive")]
         CacheError::Unrepresentable(..) => "Unrepresentable",
         _ => "later",
     }
@@ -145,7 +154,7 @@ fn hermite_error(e: &HermiteError) -> &'static str {
         HermiteError::Missing(..) => "Missing",
         HermiteError::Twice(..) => "Twice",
         HermiteError::UnknownField(..) => "UnknownField",
-        HermiteError::Version(..) => "Version",
+        HermiteError::UnsupportedVersion(..) => "UnsupportedVersion",
         HermiteError::BadGroupName(..) => "BadGroupName",
         HermiteError::BadGroupKey(..) => "BadGroupKey",
         HermiteError::ReservedKey(..) => "ReservedKey",
@@ -155,19 +164,20 @@ fn hermite_error(e: &HermiteError) -> &'static str {
     }
 }
 
+#[cfg(feature = "slice-png")]
 fn slice_error(e: &SliceError) -> &'static str {
     match e {
         SliceError::Field(..) => "Field",
         SliceError::EmptyRange => "EmptyRange",
         SliceError::TooLarge => "TooLarge",
-        #[cfg(feature = "slice-png")]
         SliceError::BadColorMap(..) => "BadColorMap",
-        #[cfg(feature = "slice-png")]
         SliceError::Encode(..) => "Encode",
+        SliceError::Io(..) => "Io",
         _ => "later",
     }
 }
 
+#[cfg(feature = "vtk")]
 fn vtk_error(e: &VtkError) -> &'static str {
     match e {
         VtkError::Field(..) => "Field",
@@ -216,7 +226,7 @@ fn vdb_error(e: &VdbError) -> &'static str {
         VdbError::Tree(..) => "Tree",
         VdbError::DuplicateName(..) => "DuplicateName",
         VdbError::TooLarge(..) => "TooLarge",
-        VdbError::Version(..) => "Version",
+        VdbError::UnsupportedVersion(..) => "UnsupportedVersion",
         VdbError::Unsupported(..) => "Unsupported",
         VdbError::Map(..) => "Map",
         VdbError::Malformed(..) => "Malformed",
@@ -289,7 +299,9 @@ fn every_enum_that_may_grow_is_matched_with_a_wildcard() {
     assert_eq!(cache_error(&not_a_file), "BadMagic");
     assert_eq!(rule(&Rule::Owner), "Owner");
     assert_eq!(hermite_error(&HermiteError::Missing("sign")), "Missing");
+    #[cfg(feature = "slice-png")]
     assert_eq!(slice_error(&SliceError::EmptyRange), "EmptyRange");
+    #[cfg(feature = "vtk")]
     assert_eq!(vtk_error(&VtkError::Inconsistent), "Inconsistent");
     assert_eq!(ghost_width(&GhostWidth::Two), "Two");
     assert_eq!(connectivity(Connectivity::Six), "Six");
@@ -299,7 +311,7 @@ fn every_enum_that_may_grow_is_matched_with_a_wildcard() {
     #[cfg(feature = "archive")]
     assert_eq!(encoding(Encoding::default()), "Exact");
     #[cfg(feature = "vdb")]
-    assert_eq!(vdb_error(&VdbError::Version(1)), "Version");
+    assert_eq!(vdb_error(&VdbError::UnsupportedVersion(1)), "UnsupportedVersion");
     let t = brodo::topology::Topology::new();
     assert_eq!(any_field(&AnyField::F32(brodo::field::Field::new(&t, 0.0))), "F32");
     assert_eq!(value_type(ValueType::F64x3), "F64x3");

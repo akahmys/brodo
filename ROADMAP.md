@@ -550,7 +550,7 @@ since crates.io yanks a version but never deletes it.
       `SliceError`, and zerocopy 0.8 stated a public dependency; the other enums, `Crossing`
       and `Betti` kept exhaustive, and no error given `Clone` or `PartialEq`, which can be
       added later (the owner, 2026-11-05)
-- [ ] Designs grown by accretion surveyed before 1.0, each taken, in the order put to the
+- [x] Designs grown by accretion surveyed before 1.0, each taken, in the order put to the
       owner (the owner, 2026-11-05):
   - [x] colino's `mmap` on brodo dropped; `LeafId` and `Probe` hidden; the writers' value
         traits made markers; `mestolo`'s library stated; one `Axis`; Hermite data's dense
@@ -563,7 +563,7 @@ since crates.io yanks a version but never deletes it.
         grid thawed as one within a limit and a file's kind told by brodo (ADR-0056)
   - [x] a cache file's grids reached as its entries of bytes are; the reserved-key writers
         hidden (ADR-0057)
-  - [ ] the errors' shapes, places and features made even
+  - [x] the errors' shapes, places and features made even (ADR-0058)
 - [x] One prefix of metadata keys reserved for the formats brodo builds on the cache
       profile after 1.0, such as `brodo.`, `hermite.` kept as it is, so that each later
       one is not a breaking change to `CacheEntry::new` and `CacheEntry::bytes`, which

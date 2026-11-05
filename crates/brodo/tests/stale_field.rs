@@ -5,9 +5,9 @@
 //! (ARCHITECTURE.md §4.2, ADR-0014).
 
 use brodo::accessor::{ValueAccessor, ValueAccessorMut};
+use brodo::analysis::euler;
 use brodo::analysis::{Connectivity, flood_fill, label};
 use brodo::cache::CacheEntry;
-use brodo::euler::euler;
 use brodo::field::Field;
 use brodo::frozen::freeze;
 use brodo::meta::GridMeta;

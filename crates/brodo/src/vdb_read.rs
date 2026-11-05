@@ -243,7 +243,7 @@ fn header(c: &mut Cursor<'_>) -> Result<usize, VdbError> {
     }
     let version = c.u32("file version")?;
     if !VERSIONS.contains(&version) {
-        return Err(VdbError::Version(version));
+        return Err(VdbError::UnsupportedVersion(version));
     }
     c.take(8, "library version")?;
     if c.u8("grid offsets")? != 1 {

@@ -26,7 +26,7 @@ archive profiles stay at version 2, and version 1 of them is no longer read nor 
   is no longer taken for an SDF, by `mestolo slice` or by the `.vdb` writer's `class`.
 - A Hermite set's keys are `brodo.hermite.version` (`3`), `brodo.hermite.set`,
   `brodo.hermite.field` and `brodo.hermite.group.<id>`. A set of version 1 or 2 is
-  refused by `HermiteView::find` with `Version`. `Hermite::entries_v1`, `FIELDS`,
+  refused by `HermiteView::find` with `UnsupportedVersion`. `Hermite::entries_v1`, `FIELDS`,
   `VERSION_1`, `HermiteView::version` and `HermiteError::OtherMeta` are gone.
 - `analysis::Connectivity` is `#[non_exhaustive]`: a `match` on it ends in a wildcard arm.
 - `morphology::Ordered` is sealed: brodo's scalar value types are its only ones.
@@ -77,6 +77,13 @@ archive profiles stay at version 2, and version 1 of them is no longer read nor 
   them.
 - `CacheEntry::with_reserved_keys` and `CacheEntry::bytes_with_reserved_keys` are
   `#[doc(hidden)]`: they stay for brodo's own formats and for tests, and promise nothing.
+- Errors are of one shape, in one place (ADR-0058): `HermiteError::Version` and
+  `VdbError::Version` are `UnsupportedVersion`, and every version error says "version N is
+  not read by this build"; `GridError` and `AnalysisError` are `brodo::error::GridError`
+  and `brodo::error::AnalysisError`; `brodo::euler::euler` is `brodo::analysis::euler`.
+- `SliceError`, `VdbError` and `VtkError` are built only with `slice-png`, `vdb` and
+  `vtk`, and `CacheError`'s `Decompress`, `Chunks`, `UnknownEncoding`, `NotQuantised` and
+  `Unrepresentable` only with `archive`.
 
 A file of version 1, written by 0.8 or earlier or by 0.9.0 on request, is first read by
 0.9.0 and written again by it, at version 2. A file of version 2 then converts with this

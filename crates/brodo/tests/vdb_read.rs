@@ -207,7 +207,7 @@ fn zip_another_version_and_a_longer_file_are_refused() {
     ));
     let mut old = BY14.to_vec();
     old[8] = 223;
-    assert!(matches!(from_bytes(&old, "m", u64::MAX), Err(VdbError::Version(223))));
+    assert!(matches!(from_bytes(&old, "m", u64::MAX), Err(VdbError::UnsupportedVersion(223))));
     let mut longer = BY14.to_vec();
     longer.push(0);
     assert!(matches!(from_bytes(&longer, "m", u64::MAX), Err(VdbError::Malformed("file's end"))));

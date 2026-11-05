@@ -24,8 +24,8 @@
 //! sign, at its accuracy (`Converted::accuracy`). Each place is checked by its box's
 //! invariants at h and at h/2, sampled by that sign.
 
+use brodo::analysis::euler;
 use brodo::analysis::{Connectivity, Label, Labels, label};
-use brodo::euler::euler;
 use brodo::tree::Coord;
 
 use crate::convert::{Converted, Inside, Lattice};

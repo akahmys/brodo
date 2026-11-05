@@ -4,23 +4,11 @@
 
 use std::sync::Arc;
 
-use crate::error::{FieldError, TreeError};
+use crate::error::{FieldError, GridError, TreeError};
 use crate::field::{Field, LEAF_VOXELS, MergeRule, Value, uniform};
 use crate::parallel::par_update;
 use crate::topology::{LeafNumber, TileNumber, Topology, TopologyEditor};
 use crate::tree::Coord;
-
-/// Why an edit of a grid was refused.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
-#[non_exhaustive]
-pub enum GridError {
-    /// The edit of the topology was refused.
-    #[error(transparent)]
-    Tree(#[from] TreeError),
-    /// The field could not be remapped.
-    #[error(transparent)]
-    Field(#[from] FieldError),
-}
 
 /// One topology and one field on it, with the rule its merges use.
 #[derive(Clone)]

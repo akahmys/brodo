@@ -673,11 +673,11 @@ fn a_files_keys_that_do_not_fit_are_refused() {
             m.insert("brodo.hermite.version".into(), "2".into());
         }
     });
-    assert!(matches!(found(e), Err(HermiteError::Version(v)) if v == "2"));
+    assert!(matches!(found(e), Err(HermiteError::UnsupportedVersion(v)) if v == "2"));
     let e = edited(|_, m| {
         m.insert("brodo.hermite.version".into(), "4".into());
     });
-    assert!(matches!(found(e), Err(HermiteError::Version(v)) if v == "4"));
+    assert!(matches!(found(e), Err(HermiteError::UnsupportedVersion(v)) if v == "4"));
     for (i, other) in [(0, "signs"), (1, "x.fraction")] {
         let e = edited(|j, m| {
             if j == i {
@@ -778,7 +778,7 @@ fn a_set_of_an_earlier_version_is_refused() {
     for (bytes, version) in EARLIER {
         let f = brodo::cache::from_bytes(bytes).unwrap();
         assert!(
-            matches!(HermiteView::find(&f, "golden"), Err(HermiteError::Version(v)) if v == version)
+            matches!(HermiteView::find(&f, "golden"), Err(HermiteError::UnsupportedVersion(v)) if v == version)
         );
         assert!(matches!(HermiteView::find(&f, "other"), Err(HermiteError::Missing("sign"))));
     }

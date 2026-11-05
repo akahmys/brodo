@@ -754,11 +754,11 @@ fn check_version(file: &CacheFile, set: &str) -> Result<(), HermiteError> {
         if extra.get(KEY_SET).map(String::as_str) == Some(set) {
             let v = extra.get(KEY_VERSION).map(String::as_str).unwrap_or_default();
             if v != VERSION {
-                return Err(HermiteError::Version(v.to_owned()));
+                return Err(HermiteError::UnsupportedVersion(v.to_owned()));
             }
         } else if extra.get(OLD_SET).map(String::as_str) == Some(set) {
             let v = extra.get(OLD_VERSION).cloned().unwrap_or_default();
-            return Err(HermiteError::Version(v));
+            return Err(HermiteError::UnsupportedVersion(v));
         }
     }
     Ok(())

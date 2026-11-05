@@ -102,6 +102,44 @@ pub enum FieldError {
     },
 }
 
+/// Why an edit of a grid was refused.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
+pub enum GridError {
+    /// The edit of the topology was refused.
+    #[error(transparent)]
+    Tree(#[from] TreeError),
+    /// The field could not be remapped.
+    #[error(transparent)]
+    Field(#[from] FieldError),
+}
+
+/// Why an analysis failed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
+pub enum AnalysisError {
+    /// The field does not belong to the topology.
+    #[error(transparent)]
+    Field(#[from] FieldError),
+    /// The topology refused a lookup by number.
+    #[error(transparent)]
+    Tree(#[from] TreeError),
+    /// The root's keys are spread so widely that the compressed root grid would be too
+    /// large.
+    #[error("the root's keys are too spread out to label")]
+    TooSpread,
+    /// More units than a `u32` numbers.
+    #[error("too many voxels, tiles and empty regions to label")]
+    TooLarge,
+    /// A voxel no unit stands for: the labels and topology disagree.
+    #[error("voxel {0:?} has no unit")]
+    Unlabelled(Coord),
+    /// The voxels meeting the condition include the background, so are unbounded and have
+    /// no Euler characteristic (ADR-0024).
+    #[error("the background meets the condition: the set is unbounded")]
+    Unbounded,
+}
+
 /// Why a grid could not be frozen.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 #[non_exhaustive]
@@ -133,7 +171,7 @@ pub enum FormatError {
     #[error("magic number {0:#010x} is not a frozen grid's")]
     BadMagic(u32),
     /// A layout version this build does not read (ADR-0016).
-    #[error("layout version {0} is not read by this build")]
+    #[error("version {0} is not read by this build")]
     UnsupportedVersion(u32),
     /// The values are of a type no brodo type code names.
     #[error("the values are of type {0}, which this brodo does not know")]
@@ -193,7 +231,7 @@ pub enum CacheError {
     #[error("magic number {0:#010x} is not that of the kind of file read")]
     BadMagic(u32),
     /// A format version this build does not read (ADR-0016).
-    #[error("format version {0} is not read by this build")]
+    #[error("version {0} is not read by this build")]
     UnsupportedVersion(u32),
     /// The file ends before a part of it does.
     #[error("the file ends before its {0} does")]
@@ -230,6 +268,7 @@ pub enum CacheError {
         limit: u64,
     },
     /// An archive's chunk does not decompress to the length its table states.
+    #[cfg(feature = "archive")]
     #[error("grid {index}'s chunk {chunk} does not decompress to its length")]
     Decompress {
         /// The grid's place in the file.
@@ -238,13 +277,16 @@ pub enum CacheError {
         chunk: usize,
     },
     /// An archive's grid is not cut into chunks as its writer cuts it (docs/formats.md §8.3).
+    #[cfg(feature = "archive")]
     #[error("grid {0} is not cut into chunks as the format cuts it")]
     Chunks(usize),
     /// An archive's value encoding this build does not know (docs/formats.md §8.5).
+    #[cfg(feature = "archive")]
     #[error("value encoding {0} is not read by this build")]
     UnknownEncoding(u32),
     /// An entry asked to be quantised holds values of a type that is not, or bytes: only
     /// floating values are (docs/formats.md §8.5).
+    #[cfg(feature = "archive")]
     #[error("entry {index}'s values, of type {}, are not quantised", value_type.map_or("bytes", ValueType::name))]
     NotQuantised {
         /// The entry's place in what was written.
@@ -254,6 +296,7 @@ pub enum CacheError {
     },
     /// A grid's leaf value is one its encoding cannot hold: a NaN, a value beyond ±65504 in
     /// binary16, an infinity or a range wider than an `f64` holds in 8 bits.
+    #[cfg(feature = "archive")]
     #[error("grid {0} holds a leaf value its encoding cannot hold")]
     Unrepresentable(usize),
     /// Thawing a grid is counted to make more bytes than the limit given
@@ -333,8 +376,8 @@ pub enum HermiteError {
     #[error("a grid names field {0:?}, which the format does not")]
     UnknownField(String),
     /// A grid states a format version this build does not read.
-    #[error("format version {0:?} is not read by this build")]
-    Version(String),
+    #[error("version {0} is not read by this build")]
+    UnsupportedVersion(String),
     /// A group's name is empty, repeated, or missing from the ids' run, or group 0 is named.
     #[error("group {0} has no name of its own")]
     BadGroupName(u32),
@@ -357,6 +400,7 @@ pub enum HermiteError {
 }
 
 /// Why a slice could not be drawn or encoded (ARCHITECTURE.md §6.1).
+#[cfg(feature = "slice-png")]
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum SliceError {
@@ -371,21 +415,19 @@ pub enum SliceError {
     #[error("the slice's range holds more pixels than an image can")]
     TooLarge,
     /// The colour map's range is not finite, or is empty (ARCHITECTURE.md §6.1).
-    #[cfg(feature = "slice-png")]
     #[error("the colour map {0:?} has no finite, non-empty range")]
     BadColorMap(crate::slice::ColorMap),
     /// The PNG encoder refused the image: its own error inside, by `io::Error::other`, so
     /// that the encoder's crate is not a public dependency.
-    #[cfg(feature = "slice-png")]
     #[error(transparent)]
     Encode(std::io::Error),
     /// Writing the file failed.
-    #[cfg(feature = "slice-png")]
     #[error(transparent)]
     Io(#[from] std::io::Error),
 }
 
-/// Why grids could not be written as an OpenVDB file (ARCHITECTURE.md §4.7, ADR-0046).
+/// Why grids could not be read or written as an OpenVDB file (ARCHITECTURE.md §4.7, ADR-0046).
+#[cfg(feature = "vdb")]
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum VdbError {
@@ -407,9 +449,9 @@ pub enum VdbError {
     /// A count, length or offset does not fit the format's field for it.
     #[error("the {0} does not fit the file format")]
     TooLarge(&'static str),
-    /// The file's version is neither 224 nor 225 (docs/formats.md §9.7).
-    #[error("file version {0} is not read; 224 and 225 are")]
-    Version(u32),
+    /// A file version this build does not read (docs/formats.md §9.7).
+    #[error("version {0} is not read by this build")]
+    UnsupportedVersion(u32),
     /// The file holds what brodo does not read, named (docs/formats.md §9.7, ADR-0047).
     #[error("{0} is not read")]
     Unsupported(&'static str),
@@ -432,6 +474,7 @@ pub enum VdbError {
 }
 
 /// Why a field could not be written as `.vtu` (ARCHITECTURE.md §6.1).
+#[cfg(feature = "vtk")]
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum VtkError {

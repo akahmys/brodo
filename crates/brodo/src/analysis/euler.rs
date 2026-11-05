@@ -11,7 +11,8 @@
 
 use rayon::prelude::*;
 
-use crate::analysis::{AnalysisError, Connectivity};
+use super::Connectivity;
+use crate::error::AnalysisError;
 use crate::field::{Field, Value};
 use crate::gather::{GATHER_EDGE, GATHER_VOXELS, gather};
 use crate::manifest::Offset;

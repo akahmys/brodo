@@ -1,5 +1,6 @@
 //! Topology analysis (ARCHITECTURE.md §4.5, ADR-0013): connected components of the voxels
-//! whose value meets a condition, tiles and the background included, and flood fill.
+//! whose value meets a condition, tiles and the background included, flood fill, and the
+//! Euler characteristic (`euler`, ADR-0024).
 //!
 //! The units joined are leaf voxels, tiles, the empty places of lower nodes (8³) and upper
 //! nodes (128³), the empty regions at the root, found on a grid compressed along each axis
@@ -10,11 +11,14 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::error::{FieldError, TreeError};
+use crate::error::{AnalysisError, FieldError};
 use crate::field::{Field, Value, leaf_place};
 use crate::topology::{Location, Topology};
 use crate::tree::{Coord, Place, TileLevel, align, child_place};
 use crate::tree::{LEAF_LOG2, LOWER_SPAN_LOG2, UPPER_SPAN_LOG2};
+
+mod euler;
+pub use euler::euler;
 
 /// Which neighbours touch; another may be added, such as 18 neighbours.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -36,32 +40,6 @@ impl Connectivity {
         })
         .collect()
     }
-}
-
-/// Why an analysis failed.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
-#[non_exhaustive]
-pub enum AnalysisError {
-    /// The field does not belong to the topology.
-    #[error(transparent)]
-    Field(#[from] FieldError),
-    /// The topology refused a lookup by number.
-    #[error(transparent)]
-    Tree(#[from] TreeError),
-    /// The root's keys are spread so widely that the compressed root grid would be too
-    /// large.
-    #[error("the root's keys are too spread out to label")]
-    TooSpread,
-    /// More units than a `u32` numbers.
-    #[error("too many voxels, tiles and empty regions to label")]
-    TooLarge,
-    /// A voxel no unit stands for: the labels and topology disagree.
-    #[error("voxel {0:?} has no unit")]
-    Unlabelled(Coord),
-    /// The voxels meeting the condition include the background, so are unbounded and have
-    /// no Euler characteristic (ADR-0024).
-    #[error("the background meets the condition: the set is unbounded")]
-    Unbounded,
 }
 
 /// A voxel's label.

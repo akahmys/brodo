@@ -4,8 +4,8 @@
 //! of which lies in the band, holding the same values; a sphere and a torus keep their
 //! Betti numbers; the bytes do not depend on the thread count.
 
+use brodo::analysis::euler;
 use brodo::analysis::{Connectivity, Label, label};
-use brodo::euler::euler;
 use brodo::meta::{SDF_KEY, SDF_VERSION};
 use brodo::topology::Location;
 use brodo::tree::Coord;

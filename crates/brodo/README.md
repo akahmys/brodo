@@ -37,7 +37,7 @@ Where to start:
 | :--- | :--- |
 | make and edit the set of active voxels | `topology::Topology` and its `edit` |
 | hold values on it | `field::Field` |
-| label components, find the Euler characteristic, dilate or erode | `analysis`, `euler`, `morphology` |
+| label components, find the Euler characteristic, dilate or erode | `analysis`, `morphology` |
 | save and load | `cache`, `archive`, `vdb` |
 | read a saved grid in place | `frozen::freeze`, `view::GridView` |
 | look at a field | `slice`, `vtk` |
@@ -60,7 +60,7 @@ saved as a cache file's bytes and read back:
 ```rust
 use brodo::analysis::{Connectivity, label};
 use brodo::cache::{CacheEntry, CacheFile, to_bytes};
-use brodo::euler::euler;
+use brodo::analysis::euler;
 use brodo::field::Field;
 use brodo::meta::GridMeta;
 use brodo::topology::Topology;

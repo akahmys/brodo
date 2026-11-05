@@ -215,7 +215,9 @@ pub enum ConvertError {
     OutOfRange,
 }
 
-/// Why Hermite data could not be made (ADR-0030).
+/// Why Hermite data could not be made by `hermite` (ADR-0030). Named after the function that
+/// gives it, as `ConvertError` and `ReportError` are; brodo's own `brodo::error::HermiteError`,
+/// why a set breaks brodo's format, it holds as `Format`.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum HermiteError {
@@ -248,7 +250,7 @@ pub enum ReportError {
     Mesh(#[from] MeshError),
     /// Labelling or the Euler characteristic was refused.
     #[error(transparent)]
-    Analysis(#[from] brodo::analysis::AnalysisError),
+    Analysis(#[from] brodo::error::AnalysisError),
     /// The grid's transform is not the axis-aligned one conversion writes.
     #[error("the grid's transform is not axis-aligned with positive voxel sizes")]
     Transform,

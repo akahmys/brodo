@@ -13,7 +13,7 @@ use std::collections::BTreeSet;
 use std::time::Instant;
 
 use brodo::analysis::Connectivity;
-use brodo::euler::euler;
+use brodo::analysis::euler;
 use brodo::field::Field;
 use brodo::topology::Topology;
 use brodo::tree::{Coord, TileLevel};

@@ -3,8 +3,9 @@
 //! their known values. The dense box covers every leaf and tile with a margin; the
 //! background never meets the condition, so nothing beyond the box is counted.
 
-use brodo::analysis::{AnalysisError, Connectivity, Label, label};
-use brodo::euler::euler;
+use brodo::analysis::euler;
+use brodo::analysis::{Connectivity, Label, label};
+use brodo::error::AnalysisError;
 use brodo::field::Field;
 use brodo::topology::Topology;
 use brodo::tree::{Coord, TileLevel};
