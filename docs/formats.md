@@ -186,6 +186,10 @@ metadata its name, a string; its byte length, `u64`, its payload's blocks × 32 
 than 32; and its free pairs, as §3.3 ends. Its payload is its bytes, zero-padded to a
 block.
 
+An entry's name need not be unique among the file's: the profile tells its entries apart
+by their place in the directory, and a format built on it by its free pairs, as Hermite
+data does (§4.1, ADR-0060).
+
 ### 3.1 Header, one block
 
 | Byte | Field | Value |

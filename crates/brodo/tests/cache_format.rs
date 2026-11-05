@@ -106,20 +106,21 @@ fn bounds_cover_leaves_and_tiles_and_an_empty_grid_has_none() {
 }
 
 /// A file's grids are listed in its order, numbered among themselves past its entries of
-/// bytes, each handle naming its number in the errors it gives.
+/// bytes, each handle naming its number in the errors it gives; names need not be unique
+/// (ADR-0060).
 #[test]
 fn grids_are_listed_in_order_past_the_entries_of_bytes() {
     let t = build(&[[0, 0, 0]], &[]);
     let entries = [
         CacheEntry::bytes("a", BTreeMap::new(), vec![1, 2, 3]).unwrap(),
         CacheEntry::new(&meta("first", &[]), &t, &Field::new(&t, 1.0_f32)).unwrap(),
-        CacheEntry::bytes("b", BTreeMap::new(), vec![4]).unwrap(),
-        CacheEntry::new(&meta("second", &[]), &t, &Field::new(&t, 2_u8)).unwrap(),
+        CacheEntry::bytes("first", BTreeMap::new(), vec![4]).unwrap(),
+        CacheEntry::new(&meta("first", &[]), &t, &Field::new(&t, 2_u8)).unwrap(),
     ];
     let file = brodo::cache::from_bytes(&to_bytes(&entries).unwrap()).unwrap();
     let grids = file.grids();
     let names: Vec<_> = grids.iter().map(|g| (g.index(), g.meta().name.as_str())).collect();
-    assert_eq!(names, [(0, "first"), (1, "second")]);
+    assert_eq!(names, [(0, "first"), (1, "first")]);
     assert_eq!((grids[0].value_type(), grids[1].value_type()), (ValueType::F32, ValueType::U8));
     assert_eq!(grids[1].bounds(), Bounds::Box { min: [0; 3], max: [7; 3] });
     assert_eq!(grids[1].view::<u8>().unwrap().get([1, 2, 3]).unwrap(), 2);
@@ -128,7 +129,7 @@ fn grids_are_listed_in_order_past_the_entries_of_bytes() {
         Err(CacheError::Grid { index: 1, error: FormatError::WrongValueType { .. } })
     ));
     let bytes: Vec<_> = file.bytes_entries().iter().map(|b| (b.name, b.bytes.to_vec())).collect();
-    assert_eq!(bytes, [("a", vec![1, 2, 3]), ("b", vec![4])]);
+    assert_eq!(bytes, [("a", vec![1, 2, 3]), ("first", vec![4])]);
 }
 
 /// Keys beginning `brodo.` are brodo's formats' (U1 of P5's review, ADR-0053): refused by

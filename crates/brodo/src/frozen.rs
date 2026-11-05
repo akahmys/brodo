@@ -107,6 +107,11 @@ pub struct FrozenGrid {
 }
 
 impl FrozenGrid {
+    /// A frozen grid of these blocks, a buffer already checked (docs/formats.md §2.5).
+    pub(crate) fn of_blocks(blocks: Vec<Block>) -> Self {
+        Self { blocks }
+    }
+
     /// The buffer's bytes; their start is 32-byte aligned.
     pub fn as_bytes(&self) -> &[u8] {
         self.blocks.as_bytes()

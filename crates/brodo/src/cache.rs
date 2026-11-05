@@ -108,6 +108,28 @@ impl CacheEntry {
         Self { payload: Payload::Bytes { name: name.to_owned(), extra, bytes } }
     }
 
+    /// A grid a file read holds (`CacheFile::grids`), to be written again as it was: its
+    /// metadata, keys beginning `brodo.` among them, its bounds, its value type and its
+    /// frozen buffer, copied, not thawed nor frozen again. A Hermite set's sign grid or an
+    /// SDF read from a cache file or an archive is so written to another whole.
+    pub fn copy(grid: GridEntry<'_>) -> Self {
+        Self {
+            payload: Payload::Grid {
+                meta: grid.meta.clone(),
+                bounds: grid.bounds,
+                value_type: grid.value_type.code(),
+                frozen: FrozenGrid::of_blocks(aligned(grid.bytes)),
+            },
+        }
+    }
+
+    /// An entry of bytes a file read holds (`CacheFile::bytes_entries`), to be written again
+    /// as it was: its name, its free pairs, keys beginning `brodo.` among them, and its
+    /// bytes, copied. A Hermite set's crossings are so written to another file whole.
+    pub fn copy_bytes(entry: BytesEntry<'_>) -> Self {
+        Self::bytes_with_reserved_keys(entry.name, entry.extra.clone(), entry.bytes.to_vec())
+    }
+
     /// The entry as a file places it: its metadata as stored, and its part.
     pub(crate) fn part(&self) -> Result<(Vec<u8>, Part), CacheError> {
         let (meta, value_type, kind, len) = match &self.payload {

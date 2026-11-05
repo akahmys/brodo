@@ -249,7 +249,12 @@ fastest. A neighbour beyond the `i32` coordinate range is the background.
   Hermite data's crossings among them (`CacheEntry::bytes`). A file read gives its grids
   and its entries of bytes each as a list in the file's order, `CacheFile::grids` and
   `CacheFile::bytes_entries`, a grid's facts, view and thawing reached from its
-  `GridEntry` (ADR-0057). A
+  `GridEntry` (ADR-0057). Names need not be unique among a file's entries, which their
+  place tells apart; a `.vdb`, whose grids OpenVDB tells apart by name, refuses two of one
+  (`VdbError::DuplicateName`). An entry read is written again as it was by
+  `CacheEntry::copy` and `CacheEntry::copy_bytes`, its keys beginning `brodo.` kept and a
+  grid's frozen buffer copied, not thawed, so that a Hermite set or an SDF passes between
+  cache files and archives whole (ADR-0060). A
   bare frozen buffer, a file of its own, holds one grid's header, topology and values
   (docs/formats.md §2).
 - A grid's metadata is a `GridMeta`, apart from `Grid<T>`, so that any topology and field

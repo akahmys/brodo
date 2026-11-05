@@ -16,7 +16,7 @@ use brodo::tree::Axis as EdgeAxis;
 /// The fraction, normal and group a dense field of this test holds where an edge holds no
 /// crossing.
 const NO_CROSSING: (f32, [f32; 3], u32) = (-1.0, [0.0; 3], 0);
-use brodo::meta::GridMeta;
+use brodo::meta::{GridMeta, SDF_KEY, SDF_VERSION};
 use brodo::topology::{Location, Topology};
 use brodo::tree::{Coord, TileLevel};
 
@@ -590,6 +590,39 @@ fn a_set_round_trips_through_a_file_among_others() {
     assert!(seen > 0);
     assert_eq!(HermiteView::find(&f, "small").unwrap().signs().get([2, 2, 2]).unwrap(), 1);
     assert!(matches!(HermiteView::find(&f, "none"), Err(HermiteError::Missing("sign"))));
+}
+
+/// A file's grids and entries of bytes, copied to be written again (`CacheEntry::copy`,
+/// `CacheEntry::copy_bytes`), the grids first.
+fn copied(f: &CacheFile) -> Vec<CacheEntry> {
+    let mut out: Vec<CacheEntry> = f.grids().into_iter().map(CacheEntry::copy).collect();
+    out.extend(f.bytes_entries().into_iter().map(CacheEntry::copy_bytes));
+    out
+}
+
+/// A set and an SDF read from a file are written again, keys beginning `brodo.` kept, to
+/// the same bytes, and through an archive back to them (ADR-0060).
+#[test]
+fn a_set_and_an_sdf_copied_from_a_file_are_written_again_as_they_were() {
+    let set = valid().make().unwrap();
+    let t = topology(1, None);
+    let mut sdf = meta("sdf");
+    sdf.extra.insert(SDF_KEY.to_owned(), SDF_VERSION.to_owned());
+    let mut entries = vec![CacheEntry::new(&sdf, &t, &Field::new(&t, 1.0_f32)).unwrap()];
+    entries.extend(set.entries("box", &meta("b")).unwrap());
+    let bytes = to_bytes(&entries).unwrap();
+    let f = brodo::cache::from_bytes(&bytes).unwrap();
+    assert_eq!(to_bytes(&copied(&f)).unwrap(), bytes);
+    #[cfg(feature = "archive")]
+    {
+        let archive = brodo::archive::to_bytes(&copied(&f)).unwrap();
+        let back = brodo::archive::from_bytes(&archive, u64::MAX).unwrap();
+        assert_eq!(to_bytes(&copied(&back)).unwrap(), bytes);
+        assert_eq!(HermiteView::find(&back, "box").unwrap().group_names(), ["", "a", "b"]);
+    }
+    let again = brodo::cache::from_bytes(&to_bytes(&copied(&f)).unwrap()).unwrap();
+    assert_eq!(HermiteView::find(&again, "box").unwrap().group_names(), ["", "a", "b"]);
+    assert_eq!(again.grids()[0].meta().extra.get(SDF_KEY).map(String::as_str), Some(SDF_VERSION));
 }
 
 /// The keys of a set's entry: `brodo.hermite.` and `rest` joined to it.
