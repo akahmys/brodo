@@ -754,8 +754,7 @@ fn golden_set() -> Hermite {
 }
 
 const GOLDEN: &[u8] = include_bytes!("data/hermite_v3.bin");
-const EARLIER: [(&[u8], &str); 2] =
-    [(include_bytes!("data/hermite_v1.bin"), "1"), (include_bytes!("data/hermite_v2.bin"), "2")];
+const EARLIER: [(&[u8], &str); 1] = [(include_bytes!("data/hermite_v2.bin"), "2")];
 
 #[test]
 fn format_version_3_keeps_its_bytes() {

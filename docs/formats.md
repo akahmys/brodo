@@ -62,10 +62,10 @@ The **Morton key** of an origin interleaves the bits of its three coordinates, e
 XORed with 0x80000000 so that order follows the signed value: bit i of x, y and z goes to
 bit 3i, 3i + 1 and 3i + 2.
 
-## 2. The frozen layout, version 1
+## 2. The frozen layout, version 2
 
 One buffer holding one grid, read in place (ARCHITECTURE.md §4.6). A bare frozen buffer is
-also a file of its own, as the golden files `frozen_v*_*.bin` are.
+also a file of its own, as the golden files `frozen_v2_*.bin` are.
 
 | Section | At | Entry size, bytes | Order |
 | :--- | :--- | :--- | :--- |
@@ -84,7 +84,7 @@ block 3, and the buffer ends at the last section's block boundary.
 | Byte | Field | Value |
 | :--- | :--- | :--- |
 | 0 | magic | the bytes `BRDG` |
-| 4 | version | `u32` 1 |
+| 4 | version | `u32` 2 |
 | 8 | value type | `u32` code, §1.1 |
 | 12 | value size | `u32` bytes, §1.1 |
 | 16 | counts | 5 × `u32`: root entries, upper nodes, lower nodes, leaves, tiles |
@@ -135,7 +135,7 @@ A reader refuses a buffer, before reading any value, unless:
 
 1. its length is a multiple of 32 and at least 96, and, read in place, it begins at a
    32-byte boundary in memory; a reader that copies it aligns the copy;
-2. the magic, version 1, and the value type and size are those the reader asks for;
+2. the magic, version 2, and the value type and size are those the reader asks for;
 3. blocks × 32 is the buffer's length;
 4. each section, in the order of the table, starts at or after the end of the one before,
    the header ending at byte 96, and ends within the buffer, counts × entry size bytes;
@@ -143,27 +143,7 @@ A reader refuses a buffer, before reading any value, unless:
    index less than the tile count (kind 0) or the upper node count (kind 1);
 6. in every upper node, first child + its children bits ≤ the lower node count, first
    tile + its tiles bits ≤ the tile count, and no place has both bits; in every lower node
-   the same, against the leaf count and the tile count.
-
-Padding, the background's bytes beyond its size, the order of nodes, whether every node and
-leaf is reached, and four more of the writer's rules, that a node with no child or tile
-holds 0 for each first, that root tiles take tile places in table order, that the other
-tile places go to the nodes in node order, and that each section starts at the block right
-after the one before, are not checked here: a producer meets them, since a reader that
-rebuilds the tree (§2.6) refuses some.
-
-### 2.6 What a reader rebuilding the tree also checks
-
-A reader that walks the whole tree from the root table, to rebuild it or to list its
-leaves and tiles, also refuses a buffer in which the walk reaches a node, a leaf or a tile
-value twice, or reaches no leaf the leaf count holds.
-
-### 2.7 Version 2
-
-The same bytes as version 1, with version `u32` 2 in the header, and every rule a writer
-keeps checked by a reader (ADR-0052). A reader refuses a buffer of version 2, before
-reading any value, unless §2.5's rules 1 to 6 hold, version 2 in rule 2's place, and:
-
+   the same, against the leaf count and the tile count;
 7. the header's padding, the background's bytes beyond its size, and each root entry's and
    node's padding are zero;
 8. each section starts at the block right after the one before ends, the first at block
@@ -177,34 +157,42 @@ reading any value, unless §2.5's rules 1 to 6 hold, version 2 in rule 2's place
     equal to the tile places taken before it, root tiles first; a node with no children
     holds 0 as first child, one with no tiles 0 as first tile; the upper nodes' children
     add up to the lower node count, the lower nodes' to the leaf count, and the root
-    tiles and nodes' tiles to the tile count.
+    tiles and nodes' tiles to the tile count (ADR-0052).
 
 Rules 9 and 11 together give every node, leaf and tile value exactly one place that
-reaches it, so that §2.6's walk is needed no more at version 2: each is reached once. A
-lower node's origin is its upper node's and its place, and a leaf's its lower node's and
-its place, so rules 10 and 11 put both in Morton order as version 1's writer does.
+reaches it, so that a walk of the tree from the root table reaches each once and every
+leaf. A lower node's origin is its upper node's and its place, and a leaf's its lower
+node's and its place, so rules 10 and 11 put both in Morton order. Version 1, the same
+bytes with version 1 and rules 7 to 11 left to the writer, is not read (ADR-0054).
 
-## 3. The cache profile, format version 1
+## 3. The cache profile, format version 2
 
-Grids with their metadata in one file (ARCHITECTURE.md §4.7). Media type
-`application/vnd.brodo.cache; version=1`, stated and not registered (ADR-0041). Every
-part's place follows from those before it, with no gap, so that the same grids give the
-same bytes whoever writes them; a file of no grid is its header alone.
+Grids with their metadata in one file (ARCHITECTURE.md §4.7), and **entries of bytes**
+beside them: a name, free pairs, and bytes the profile does not read, for a format built
+on it such as Hermite data (§4, ADR-0051). Media type `application/vnd.brodo.cache;
+version=2`, stated and not registered (ADR-0041). Every part's place follows from those
+before it, with no gap, so that the same entries give the same bytes whoever writes them;
+a file of no entry is its header alone.
 
 | Part | At | Size |
 | :--- | :--- | :--- |
 | header | block 0 | 1 block |
-| directory | block 1 | 1 block per grid |
-| per grid, in directory order: metadata | the block after the previous part | its length, zero-padded to a block |
-| then its frozen buffer, §2 | the block after its metadata | its blocks |
+| directory | block 1 | 1 block per entry |
+| per entry, in directory order: metadata | the block after the previous part | its length, zero-padded to a block |
+| then its payload | the block after its metadata | its blocks |
+
+A grid's payload is its frozen buffer, §2, its metadata §3.3's. An entry of bytes has as
+metadata its name, a string; its byte length, `u64`, its payload's blocks × 32 less fewer
+than 32; and its free pairs, as §3.3 ends. Its payload is its bytes, zero-padded to a
+block.
 
 ### 3.1 Header, one block
 
 | Byte | Field | Value |
 | :--- | :--- | :--- |
 | 0 | magic | the bytes `BRDC` |
-| 4 | version | `u32` 1 |
-| 8 | grid count | `u32` |
+| 4 | version | `u32` 2 |
+| 8 | entry count | `u32` |
 | 12 | unused | 20 bytes, zero |
 
 ### 3.2 Directory entry, one block
@@ -213,10 +201,11 @@ same bytes whoever writes them; a file of no grid is its header alone.
 | :--- | :--- |
 | 0 | metadata offset, `u32` blocks |
 | 4 | metadata length, `u32` bytes |
-| 8 | frozen buffer offset, `u32` blocks |
-| 12 | frozen buffer length, `u32` blocks |
-| 16 | value type, `u32` code, §1.1 |
-| 20 | unused, 12 bytes, zero |
+| 8 | payload offset, `u32` blocks |
+| 12 | payload length, `u32` blocks |
+| 16 | value type, `u32` code, §1.1, for a grid; 0 for bytes |
+| 20 | kind, `u32`: 0 a grid, 1 bytes |
+| 24 | unused, 8 bytes, zero |
 
 ### 3.3 Metadata
 
@@ -238,57 +227,30 @@ unread. Every other key is free.
 A reader refuses a file, before answering anything, unless:
 
 1. its length is a multiple of 32;
-2. the magic and version 1, and the header's unused bytes zero;
-3. for each grid: the directory's unused words zero; its metadata starting at the block
-   right after the previous part, (count + 1) × 32 for the first, and its frozen buffer at
-   the block right after the metadata, both ending within the file; the bytes between them
-   zero;
-4. its metadata: strings valid UTF-8 with zero padding; the bounds kind 0 or 1, an empty
-   box's corners zero and a box's least corner at or below its greatest along each axis; keys strictly ascending; no byte left over; the unit not empty; the
-   voxel size finite and positive; the transform finite;
-5. its frozen buffer passes §2.5 with the directory's value type;
-6. the last grid's buffer ends where the file ends, or, with no grid, the header does.
-
-The bounds are not checked against the grid.
-
-### 3.5 Version 2
-
-A cache file of version 2 holds, beside grids, **entries of bytes**: a name, free pairs,
-and bytes the profile does not read, for a format built on it such as Hermite data
-(§4, ADR-0051). Media type `application/vnd.brodo.cache; version=2`, stated
-and not registered (ADR-0041). Its header is version 1's with version `u32` 2, its grids'
-frozen buffers are of version 2 (§2.7), and its directory entry is:
-
-| Byte | Field |
-| :--- | :--- |
-| 0 | metadata offset, `u32` blocks |
-| 4 | metadata length, `u32` bytes |
-| 8 | payload offset, `u32` blocks |
-| 12 | payload length, `u32` blocks |
-| 16 | value type, `u32` code, §1.1, for a grid; 0 for bytes |
-| 20 | kind, `u32`: 0 a grid, 1 bytes |
-| 24 | unused, 8 bytes, zero |
-
-A grid's payload is its frozen buffer, its metadata §3.3's. An entry of bytes has as
-metadata its name, a string; its byte length, `u64`, its payload's blocks × 32 less fewer
-than 32; and its free pairs, as §3.3 ends. Its payload is its bytes, zero-padded to a
-block. Parts follow one another as at version 1, payload where the frozen
-buffer was.
-
-A reader refuses a file of version 2 unless §3.4's rules hold, reading payload for frozen
-buffer and version 2 for 1, and:
-
-7. each entry's kind is 0 or 1; an entry of bytes' value type is 0, its byte length within
-   its last block, its padding zero, and its metadata as above, keys strictly ascending,
-   with no byte left over;
+2. the magic and version 2, and the header's unused bytes zero;
+3. for each entry: the directory's unused words zero and its kind 0 or 1; its metadata
+   starting at the block right after the previous part, (count + 1) × 32 for the first,
+   and its payload at the block right after the metadata, both ending within the file;
+   the bytes between them zero;
+4. a grid's metadata: strings valid UTF-8 with zero padding; the bounds kind 0 or 1, an
+   empty box's corners zero and a box's least corner at or below its greatest along each
+   axis; keys strictly ascending; no byte left over; the unit not empty; the voxel size
+   finite and positive; the transform finite;
+5. a grid's frozen buffer passes §2.5 with the directory's value type;
+6. the last entry's payload ends where the file ends, or, with no entry, the header does;
+7. an entry of bytes' value type is 0, its byte length within its last block, its padding
+   zero, and its metadata as above, keys strictly ascending, with no byte left over;
 8. each grid's bounds are those its leaves and tiles cover, by §2.4's tree, an empty one
    with none.
+
+Version 1, which held grids alone, its directory's kind word unused and its bounds not
+checked, is not read (ADR-0054).
 
 ## 4. Hermite data, version 3
 
 A sign at each lattice point and, on each edge whose ends differ, where a surface crosses
 it, its normal there and its group (ARCHITECTURE.md §4.9, ADR-0032), held only on the
-edges that hold one (ADR-0051), in a cache file of version 2 (§3.5). Media type
+edges that hold one (ADR-0051), in a cache file (§3). Media type
 `application/vnd.brodo.hermite; version=3` for a cache file holding a set, stated and not
 registered (ADR-0041); a reader checks it as a cache file first. Versions 1 and 2, whose
 keys began `hermite.`, are not read (ADR-0053).
@@ -377,21 +339,19 @@ samples shifted by −h/2.
 Each format carries its own version: the frozen layout in its header, the cache profile in
 its header, the archive profile in its header, Hermite data and the SDF convention in free
 pairs; which older versions a release reads is TESTING.md V6's (ADR-0038). The frozen
-layout and the cache and archive profiles are at version 2 (§2.7, §3.5, §8.7; ADR-0051,
-ADR-0052), which brodo writes; it reads version 1 of each too, and writes it on request.
-Hermite data is at version 3 and the SDF convention at version 2, their keys moved under
-`brodo.`, and neither's earlier versions are read: before 1.0, the owner set TESTING.md
-V6's rule aside for them (ADR-0053).
+layout and the cache and archive profiles are at version 2 (ADR-0051, ADR-0052), Hermite
+data at version 3 and the SDF convention at version 2, their keys under `brodo.`
+(ADR-0053). None of their earlier versions is read: before 1.0, the owner set V6's rule
+aside for them (ADR-0053, ADR-0054).
 
 Within a version only two changes are made, each recorded in CHANGELOG.md: a value type
 code (§1.1) or an archive's value encoding code (§8.5) added, which a reader that does not
-know it refuses; and a reader's rule added
-that refuses only what brodo's writer never wrote, so that every file brodo wrote at that
-version is still read. Any other change to the bytes or to what a reader takes raises the
-version. A cache file of version 1 holds frozen buffers of version 1 (§3.4), so raising the
-frozen layout's version raises the cache profile's, and the cache profile's raises the
-archive profile's (§8); Hermite data and the SDF convention
-carry versions of their own.
+know it refuses; and a reader's rule added that refuses only what brodo's writer never
+wrote, so that every file brodo wrote at that version is still read. Any other change to
+the bytes or to what a reader takes raises the version. A cache file holds frozen buffers
+of its own version (§3.4), so raising the frozen layout's version raises the cache
+profile's, and the cache profile's raises the archive profile's (§8); Hermite data and the
+SDF convention carry versions of their own.
 
 ## 7. Test vectors
 
@@ -400,32 +360,29 @@ The golden files in `crates/brodo/tests/data/`, written by brodo's Format-tier t
 
 | File | Holds |
 | :--- | :--- |
-| `frozen_v1_f32.bin` | a bare frozen buffer of `f32`: leaves, and a tile at each level |
-| `frozen_v1_f64x3.bin` | a bare frozen buffer of three `f64`, the same tree |
-| `frozen_v2_f32.bin` | `frozen_v1_f32.bin`'s grid at layout version 2 |
-| `frozen_v2_f64x3.bin` | `frozen_v1_f64x3.bin`'s grid at layout version 2 |
-| `cache_v1.bin` | a cache file of two grids, `f32` and three `f32`, with bounds and a free pair |
-| `archive_v1.bin` | an archive of the same two grids as `cache_v1.bin` |
-| `archive_v1_quantised.bin` | an archive of the same two grids, the first in binary16, the second in 8 bits |
-| `hermite_v1.bin` | a cache file holding one Hermite set of version 1, `golden`, on one leaf, with two named groups: refused by its version (§4.2, rule 1) |
-| `cache_v2.bin` | `cache_v1.bin`'s grids at version 2, an entry of bytes, `readme`, between them |
-| `archive_v2.bin` | an archive of version 2 of the same entries as `cache_v2.bin` |
-| `hermite_v2.bin` | `hermite_v1.bin`'s set at version 2: refused by its version (§4.2, rule 1) |
-| `hermite_v3.bin` | `hermite_v1.bin`'s set at version 3: its sign grid and its entry of crossings |
+| `frozen_v2_f32.bin` | a bare frozen buffer of `f32`: leaves, and a tile at each level |
+| `frozen_v2_f64x3.bin` | a bare frozen buffer of three `f64`, the same tree |
+| `cache_v2.bin` | a cache file of two grids, `f32` and three `f32`, with bounds and a free pair, and an entry of bytes, `readme`, between them |
+| `archive_v2.bin` | an archive of the same entries as `cache_v2.bin` |
+| `archive_v2_grids.bin` | an archive of `cache_v2.bin`'s two grids alone |
+| `archive_v2_quantised.bin` | an archive of the same two grids, the first in binary16, the second in 8 bits |
+| `hermite_v2.bin` | a cache file holding one Hermite set of version 2, `golden`, on one leaf, with two named groups: refused by its version (§4.2, rule 1) |
+| `hermite_v3.bin` | `hermite_v2.bin`'s set at version 3: its sign grid and its entry of crossings |
 
-## 8. The archive profile, format version 1
+## 8. The archive profile, format version 2
 
-Grids with their metadata in one file, each frozen buffer cut into chunks compressed apart
-(ARCHITECTURE.md §4.7). Media type `application/vnd.brodo.archive; version=1`, stated and not
-registered (ADR-0041). It is read back as the cache file (§3) of the same grids: a reader
-decompresses each grid's chunks, in order, into its frozen buffer, restoring leaf values
-stored quantised (§8.5), and checks the cache file so made as §3.4 does. Every part's place follows from those before it, with no gap.
+The entries of a cache file in one file, each payload cut into chunks compressed apart
+(ARCHITECTURE.md §4.7). Media type `application/vnd.brodo.archive; version=2`, stated and
+not registered (ADR-0041). It is read back as the cache file (§3) of the same entries: a
+reader decompresses each entry's chunks, in order, into its payload, restoring leaf values
+stored quantised (§8.5), and checks the cache file so made as §3.4 does. Every part's place
+follows from those before it, with no gap.
 
 | Part | At | Size |
 | :--- | :--- | :--- |
 | header | block 0 | 1 block |
-| directory | block 1 | 1 block per grid |
-| per grid, in directory order: metadata, §3.3 | the block after the previous part | its length, zero-padded to a block |
+| directory | block 1 | 1 block per entry |
+| per entry, in directory order: metadata, the cache file's (§3) | the block after the previous part | its length, zero-padded to a block |
 | then its chunk table, and its ranges for encoding 2 (§8.5) | the block after its metadata | 8 bytes a chunk, then 16 bytes a component for encoding 2, zero-padded to a block |
 | then each chunk, in order | the block after the previous part | its compressed length, zero-padded to a block |
 
@@ -434,8 +391,8 @@ stored quantised (§8.5), and checks the cache file so made as §3.4 does. Every
 | Byte | Field | Value |
 | :--- | :--- | :--- |
 | 0 | magic | the bytes `BRDA` |
-| 4 | version | `u32` 1 |
-| 8 | grid count | `u32` |
+| 4 | version | `u32` 2 |
+| 8 | entry count | `u32` |
 | 12 | codec | `u32` 1: the LZ4 block format |
 | 16 | leaves a chunk | `u32` 512 |
 | 20 | unused | 12 bytes, zero |
@@ -448,10 +405,10 @@ stored quantised (§8.5), and checks the cache file so made as §3.4 does. Every
 | 4 | metadata length, `u32` bytes |
 | 8 | chunk table offset, `u32` blocks |
 | 12 | chunk count, `u32` |
-| 16 | frozen buffer length, `u32` blocks |
-| 20 | value type, `u32` code, §1.1 |
-| 24 | value encoding, `u32` code, §8.5 |
-| 28 | unused, 4 bytes, zero |
+| 16 | payload length, `u32` blocks |
+| 20 | value type, `u32` code, §1.1, for a grid; 0 for bytes |
+| 24 | value encoding, `u32` code, §8.5, for a grid; 0 for bytes |
+| 28 | kind, `u32`: 0 a grid, 1 bytes |
 
 ### 8.3 Chunks
 
@@ -464,26 +421,28 @@ the tile values, if there are any. Each chunk is one LZ4 block, as the LZ4 proje
 `lz4_Block_format.md` describes it: no frame, no checksum, no stated length. Before
 compression a chunk is its bytes of the frozen buffer, or, for a leaf chunk (one within
 the leaf values section) of an encoding other than 0, those bytes encoded as §8.5 says;
-its length before compression follows from the table's.
+its length before compression follows from the table's. An entry of bytes' payload is cut
+every 512 × 512 bytes, its last chunk the rest, each exact.
 
 ### 8.4 What a reader checks
 
 A reader refuses a file, before answering anything, unless:
 
 1. its length is a multiple of 32;
-2. the magic and version 1, codec 1, 512 leaves a chunk, and the header's unused bytes zero;
-3. for each grid: the directory's unused word zero; its value encoding 0, or 1 or 2 with a
+2. the magic and version 2, codec 1, 512 leaves a chunk, and the header's unused bytes zero;
+3. for each entry: its kind 0 or 1, an entry of bytes' value type and encoding 0; a
+   grid's value encoding 0, or 1 or 2 with a
    value type of code 1, 2, 5 or 6; for encoding 2, each range's ends finite, the least at
    or below the greatest, and their difference finite; its metadata at the block right after
    the previous part, (count + 1) × 32 for the first, its chunk table at the block right
    after the metadata and each chunk at the block right after the part before it, all
    ending within the file; the bytes between parts zero;
-4. its chunks' lengths, none zero, add up to its frozen buffer's length, and each chunk
+4. its chunks' lengths, none zero, add up to its payload's length, and each chunk
    decompresses to exactly its length before compression, which for a leaf chunk follows
    from rule 6's cut, read from the frozen header (§2.1) in the first chunk;
 5. the cache file so made, its leaf values restored as §8.5 says, passes §3.4;
-6. each grid's chunks are cut as §8.3 cuts its frozen buffer;
-7. the last grid's last chunk ends, padded, where the file ends, or, with no grid, the
+6. each entry's chunks are cut as §8.3 cuts its payload;
+7. the last entry's last chunk ends, padded, where the file ends, or, with no entry, the
    header does.
 
 That a chunk's compressed bytes are those brodo's compressor gives is not checked: another
@@ -526,45 +485,23 @@ A reader of one grid's region, a box of voxels, decompresses that grid's first c
 last if it holds the tile values, and each leaf chunk holding a leaf whose 8 × 8 × 8 voxels
 meet the box (ADR-0016). It refuses a file, before answering anything, unless:
 
-1. rules 1 to 3 and 7 of §8.4 hold, and, for every grid, its chunks' lengths add up to its
-   frozen buffer's length;
+1. rules 1 to 3 and 7 of §8.4 hold, and, for every entry, its chunks' lengths add up to its
+   payload's length;
 2. the grid's metadata passes §3.4, rule 4;
 3. each chunk it decompresses does so to exactly its length before compression, its first
    before any other;
 4. the grid's chunks are cut as §8.3 cuts its frozen buffer, read from the frozen header in
    its first chunk;
-5. its frozen buffer passes §2.5's rules 2 to 6, the leaf values section's bytes aside,
-   with the directory's value type;
-6. walking the grid's nodes from its root table, as §2.4 does, into the regions that meet
-   the box alone, reaches no upper node, lower node or leaf twice.
+5. its frozen buffer passes §2.5, the leaf values section's bytes aside, with the
+   directory's value type, so that a walk of its nodes into the regions that meet the box
+   reaches each once.
 
 A chunk it does not decompress is not checked to decompress, nor are its values: a file
 that a whole read (§8.4) refuses may answer a region. It answers a voxel within the box as
 the frozen buffer does, and refuses any other, though the chunks it holds may cover it.
 
-### 8.7 Version 2
-
-An archive of version 2 is read back as the cache file of version 2 (§3.5) of the same
-entries. Media type `application/vnd.brodo.archive; version=2`, stated and not registered
-(ADR-0041). Its header is version 1's with version `u32` 2, and its directory entry is §8.2's
-with these words:
-
-| Byte | Field |
-| :--- | :--- |
-| 0 | metadata offset, `u32` blocks |
-| 4 | metadata length, `u32` bytes |
-| 8 | chunk table offset, `u32` blocks |
-| 12 | chunk count, `u32` |
-| 16 | payload length, `u32` blocks |
-| 20 | value type, `u32` code, §1.1, for a grid; 0 for bytes |
-| 24 | value encoding, `u32` code, §8.5, for a grid; 0 for bytes |
-| 28 | kind, `u32`: 0 a grid, 1 bytes |
-
-An entry's metadata is the cache file's (§3.3, §3.5). A grid's chunks are cut as §8.3 says; an entry of
-bytes' payload is cut every 512 × 512 bytes, its last chunk the rest. A reader refuses an
-archive of version 2 unless §8.4's rules hold, version 2 for 1 and payload for frozen
-buffer, an entry of bytes holding encoding 0, and the cache file made passes §3.5.
-§8.6's region is read from grids alone.
+Version 1, which held grids alone, its directory's last word unused, is not read
+(ADR-0054).
 
 ## 9. OpenVDB files
 

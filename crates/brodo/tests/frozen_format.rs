@@ -268,15 +268,7 @@ fn golden() -> FrozenGrid {
     freeze(&t, &f).unwrap()
 }
 
-/// `bytes` with the layout version word set to `version`.
-fn at_version(bytes: &[u8], version: u32) -> Vec<u8> {
-    let mut out = bytes.to_vec();
-    out[4..8].copy_from_slice(&version.to_le_bytes());
-    out
-}
-
-const GOLDEN: &[u8] = include_bytes!("data/frozen_v1_f32.bin");
-const GOLDEN_2: &[u8] = include_bytes!("data/frozen_v2_f32.bin");
+const GOLDEN: &[u8] = include_bytes!("data/frozen_v2_f32.bin");
 
 /// The committed grid's values as `[f64; 3]`, every word of each nonzero, the background's
 /// included, so that its six words of the header are all written.
@@ -298,21 +290,14 @@ fn golden_vectors() -> (Topology, Field<[f64; 3]>) {
     (t, g)
 }
 
-const GOLDEN_VECTORS: &[u8] = include_bytes!("data/frozen_v1_f64x3.bin");
-const GOLDEN_VECTORS_2: &[u8] = include_bytes!("data/frozen_v2_f64x3.bin");
+const GOLDEN_VECTORS: &[u8] = include_bytes!("data/frozen_v2_f64x3.bin");
 
-/// `[f64; 3]` came after layout version 1 without changing it (ADR-0029): its header holds a
-/// background of six words, all of them written, and every other type's bytes are as
-/// before (the test above).
+/// A grid of `[f64; 3]` keeps its bytes (ADR-0029): its header holds a background of six
+/// words, all of them written.
 #[test]
 fn a_grid_of_f64_vectors_keeps_its_bytes() {
     let (t, g) = golden_vectors();
     let frozen = freeze(&t, &g).unwrap();
-    assert!(
-        frozen.as_bytes() == GOLDEN_VECTORS_2 && GOLDEN_VECTORS_2 == at_version(GOLDEN_VECTORS, 2),
-        "the bytes of [f64; 3] grids changed"
-    );
-    let frozen = frozen.with_version(1).unwrap();
     assert!(frozen.as_bytes() == GOLDEN_VECTORS, "the bytes of [f64; 3] grids changed");
     let copy = aligned(GOLDEN_VECTORS);
     let view = GridView::<[f64; 3]>::new(copy.as_bytes()).unwrap();
@@ -331,18 +316,23 @@ fn a_grid_of_f64_vectors_keeps_its_bytes() {
     assert!(![0.0, 2.0, 3.0_f64].same_bits(&[-0.0, 2.0, 3.0]));
 }
 
-/// Version 2's bytes are version 1's with the version word 2 (docs/formats.md §2.7): each
-/// has its golden file, and version 1 is still written on request.
+/// The layout keeps its bytes (docs/formats.md §2), and a version 1 is refused by its
+/// version (ADR-0054).
 #[test]
-fn layout_version_1_keeps_its_bytes() {
-    assert!(golden().as_bytes() == GOLDEN_2, "the bytes of layout version 2 changed");
-    assert!(GOLDEN_2 == at_version(GOLDEN, 2), "version 2's bytes are not version 1's");
-    assert_eq!(golden().version(), 2);
-    let g = golden().with_version(1).unwrap();
+fn layout_version_2_keeps_its_bytes() {
+    let g = golden();
+    assert_eq!(g.version(), 2);
     assert_eq!(g.as_bytes().len(), GOLDEN.len(), "length");
     assert!(
         g.as_bytes() == GOLDEN,
-        "the bytes of layout version 1 changed; raise the version (TESTING.md V6)"
+        "the bytes of layout version 2 changed; raise the version (TESTING.md V6)"
+    );
+    let mut one = GOLDEN.to_vec();
+    one[4..8].copy_from_slice(&1_u32.to_le_bytes());
+    let one = aligned(&one);
+    assert_eq!(
+        GridView::<f32>::new(one.as_bytes()).map(|_| ()),
+        Err(FormatError::UnsupportedVersion(1))
     );
     let copy = aligned(GOLDEN);
     let view = GridView::<f32>::new(copy.as_bytes()).unwrap();
@@ -403,7 +393,6 @@ fn each_check_refuses_its_damage() {
     assert_eq!(read(with_word(0, 7).as_bytes()), Err(FormatError::BadMagic(7)));
     assert_eq!(read(with_word(1, 3).as_bytes()), Err(FormatError::UnsupportedVersion(3)));
     assert_eq!(read(with_word(1, 0).as_bytes()), Err(FormatError::UnsupportedVersion(0)));
-    assert!(matches!(golden().with_version(3), Err(brodo::error::FreezeError::Version(3))));
     assert_eq!(
         read(with_word(2, 2).as_bytes()),
         Err(FormatError::WrongValueType { expected: 1, found: 2 })
@@ -460,11 +449,9 @@ fn each_link_check_refuses_its_damage() {
     // An upper node's number, and a root tile's, one past the last.
     assert_eq!(read(&with_words(&[(root(0, 4), 3)])), lost("root"));
     assert_eq!(read(&with_words(&[(root(2, 4), 3)])), lost("root"));
-    // A root tile's number the count of tiles, in version 1, whose readers keep none of
-    // version 2's rules on the order of tiles.
+    // A root tile's number the count of tiles.
     let tiles = u32::try_from(GridView::<f32>::new(golden().as_bytes()).unwrap().tile_count());
-    let past = with_words(&[(root(2, 4), tiles.unwrap())]);
-    assert_eq!(read(&aligned(&at_version(past.as_bytes(), 1))), lost("root"));
+    assert_eq!(read(&with_words(&[(root(2, 4), tiles.unwrap())])), lost("root"));
     // Upper node 1's children run one past the lower nodes; its tiles one past the tiles.
     assert_eq!(read(&with_words(&[(upper(1, 2048), 3)])), lost("upper node"));
     assert_eq!(read(&with_words(&[(upper(1, 2049), 3)])), lost("upper node"));

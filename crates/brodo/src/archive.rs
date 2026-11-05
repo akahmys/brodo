@@ -4,9 +4,9 @@
 //! listed in `UNTRUSTED_INPUT`, indexes nothing (CODING.md Rule 3), checks the whole file
 //! before it answers, and is fuzzed (TESTING.md T6).
 //!
-//! The bytes are in `docs/formats.md` §8, which this code follows: version 2, written, holds
-//! entries of bytes beside grids (§8.7, ADR-0051); version 1 is read, and written on request
-//! (TESTING.md V6). A region's read (§8.6) checks the archive's structure and only the chunks
+//! The bytes are in `docs/formats.md` §8, which this code follows: version 2, which holds
+//! entries of bytes beside grids (ADR-0051); version 1 is neither read nor written
+//! (ADR-0054). A region's read (§8.6) checks the archive's structure and only the chunks
 //! it decompresses.
 
 use std::path::Path;
@@ -29,11 +29,9 @@ use crate::view::{GridView, ViewLocation};
 
 /// "BRDA", read as a little-endian `u32`.
 const MAGIC: u32 = u32::from_le_bytes(*b"BRDA");
-/// The format version this build writes, and reads with the one before it (ADR-0038).
+/// The format version this build reads and writes.
 const VERSION: u32 = 2;
-/// The version before it, read, and written on request (TESTING.md V6).
-const VERSION_1: u32 = 1;
-/// Blocks a chunk of an entry of bytes holds, 512 × 512 bytes, but its last (§8.7).
+/// Blocks a chunk of an entry of bytes holds, 512 × 512 bytes, but its last (§8.3).
 const BYTES_CHUNK: usize = 512 * 512 / BLOCK;
 /// The LZ4 block format, the only codec (ADR-0016).
 const CODEC: u32 = 1;
@@ -143,26 +141,13 @@ fn plan(
     Ok(Some((kind, q)))
 }
 
-/// Entry `index`'s chunks in a file of `version`: a grid's frozen buffer cut by `cut` and
+/// Entry `index`'s chunks: a grid's frozen buffer cut by `cut` and
 /// its leaf values encoded by `encoding`; an entry of bytes cut every `BYTES_CHUNK` blocks,
 /// exact.
-fn pack(
-    index: usize,
-    e: &CacheEntry,
-    encoding: Encoding,
-    cut: Cut,
-    version: u32,
-) -> Result<Packed, CacheError> {
-    let (meta, part) = e.part(version)?;
-    let restamped;
+fn pack(index: usize, e: &CacheEntry, encoding: Encoding, cut: Cut) -> Result<Packed, CacheError> {
+    let (meta, part) = e.part()?;
     let (bytes, value_type) = match &e.payload {
-        Payload::Grid { frozen, value_type, .. } if frozen.version() == version => {
-            (frozen.as_bytes(), *value_type)
-        }
-        Payload::Grid { frozen, value_type, .. } => {
-            restamped = frozen.clone().with_version(version)?;
-            (restamped.as_bytes(), *value_type)
-        }
+        Payload::Grid { frozen, value_type, .. } => (frozen.as_bytes(), *value_type),
         Payload::Bytes { .. } if encoding != Encoding::Exact => {
             return Err(CacheError::NotQuantised { index, value_type: 0 });
         }
@@ -230,24 +215,20 @@ fn compress(
 /// How a frozen buffer is cut into chunks: `cuts`, but for a test of the reader.
 type Cut = fn(&[u8]) -> Result<Vec<Piece>, CacheError>;
 
-/// Writes the archive of `version` holding `grids` to `out`, part by part, each frozen
-/// buffer cut by `cut`.
+/// Writes the archive holding `grids` to `out`, part by part, each frozen buffer cut by
+/// `cut`.
 fn emit(
     grids: &[(&CacheEntry, Encoding)],
     cut: Cut,
-    version: u32,
     out: &mut impl std::io::Write,
 ) -> Result<(), CacheError> {
-    if version != VERSION && version != VERSION_1 {
-        return Err(CacheError::UnsupportedVersion(version));
-    }
     let packed = grids
         .iter()
         .enumerate()
-        .map(|(i, (e, encoding))| pack(i, e, *encoding, cut, version))
+        .map(|(i, (e, encoding))| pack(i, e, *encoding, cut))
         .collect::<Result<Vec<_>, _>>()?;
     let mut top = Vec::new();
-    for x in [MAGIC, version, u32_of(grids.len())?, CODEC, u32_of(CHUNK_LEAVES)?, 0, 0, 0] {
+    for x in [MAGIC, VERSION, u32_of(grids.len())?, CODEC, u32_of(CHUNK_LEAVES)?, 0, 0, 0] {
         put_u32(&mut top, x);
     }
     let mut at = 1 + grids.len();
@@ -300,20 +281,11 @@ pub fn to_bytes(entries: &[CacheEntry]) -> Result<Vec<u8>, CacheError> {
 /// The bytes of an archive holding `grids`, in order, each grid's leaf values stored by its
 /// encoding. A grid quantised but not of a floating value type is refused, `NotQuantised`,
 /// and one holding a value its encoding cannot hold, `Unrepresentable`, both naming its
-/// place in `grids`.
+/// place in `grids`. An entry of bytes is stored exact; another encoding for one is
+/// refused, `NotQuantised`.
 pub fn to_bytes_with(grids: &[(&CacheEntry, Encoding)]) -> Result<Vec<u8>, CacheError> {
-    to_bytes_version(grids, VERSION)
-}
-
-/// The bytes of an archive of version `version`, 2 or, on request, 1, which holds grids
-/// alone and refuses an entry of bytes, as `to_bytes_with` makes them (TESTING.md V6). An
-/// entry of bytes is stored exact; another encoding for one is refused, `NotQuantised`.
-pub fn to_bytes_version(
-    grids: &[(&CacheEntry, Encoding)],
-    version: u32,
-) -> Result<Vec<u8>, CacheError> {
     let mut out = Vec::new();
-    emit(grids, cuts, version, &mut out)?;
+    emit(grids, cuts, &mut out)?;
     Ok(out)
 }
 
@@ -326,17 +298,7 @@ pub fn write(path: &Path, entries: &[CacheEntry]) -> Result<(), CacheError> {
 /// Writes an archive holding `grids`, each by its encoding, as `to_bytes_with` makes it,
 /// replacing `path` whole as `cache::write` does.
 pub fn write_with(path: &Path, grids: &[(&CacheEntry, Encoding)]) -> Result<(), CacheError> {
-    write_version(path, grids, VERSION)
-}
-
-/// Writes an archive of version `version`, as `to_bytes_version` makes it, replacing `path`
-/// whole as `cache::write` does.
-pub fn write_version(
-    path: &Path,
-    grids: &[(&CacheEntry, Encoding)],
-    version: u32,
-) -> Result<(), CacheError> {
-    crate::cache::replace(path, |out| emit(grids, cuts, version, out))
+    crate::cache::replace(path, |out| emit(grids, cuts, out))
 }
 
 /// An entry as read: where its metadata is, its payload's length in blocks, its value
@@ -352,32 +314,31 @@ struct Found<'a> {
 }
 
 /// Reads the header block: the magic number, a format version this build reads, codec and
-/// chunk size, and unused words of zero. Returns the version and the entry count.
-fn header(c: &mut Cursor<'_>) -> Result<(u32, usize), CacheError> {
+/// chunk size, and unused words of zero. Returns the entry count.
+fn header(c: &mut Cursor<'_>) -> Result<usize, CacheError> {
     let magic = c.u32()?;
     if magic != MAGIC {
         return Err(CacheError::BadMagic(magic));
     }
     let version = c.u32()?;
-    if version != VERSION && version != VERSION_1 {
+    if version != VERSION {
         return Err(CacheError::UnsupportedVersion(version));
     }
     let count = c.u32()?;
     if [c.u32()?, c.u32()?] != [CODEC, u32_of(CHUNK_LEAVES)?] || !zero(c.take(BLOCK - 20)?) {
         return Err(CacheError::Inconsistent("header"));
     }
-    Ok((version, usize::try_from(count).map_err(|_| CacheError::TooLarge)?))
+    usize::try_from(count).map_err(|_| CacheError::TooLarge)
 }
 
 /// Checks an archive's parts, each where the writer puts it with padding of zeros between
-/// and nothing after the last: every entry's metadata, chunk table and chunks. Returns the
-/// version and the entries.
-fn find(all: &[u8]) -> Result<(u32, Vec<Found<'_>>), CacheError> {
+/// and nothing after the last: every entry's metadata, chunk table and chunks.
+fn find(all: &[u8]) -> Result<Vec<Found<'_>>, CacheError> {
     if !all.len().is_multiple_of(BLOCK) {
         return Err(CacheError::Inconsistent("length"));
     }
     let mut c = Cursor { rest: all, what: "header" };
-    let (version, count) = header(&mut c)?;
+    let count = header(&mut c)?;
     c.what = "directory";
     let mut after =
         count.checked_add(1).and_then(|n| n.checked_mul(BLOCK)).ok_or(CacheError::TooLarge)?;
@@ -386,14 +347,14 @@ fn find(all: &[u8]) -> Result<(u32, Vec<Found<'_>>), CacheError> {
     }
     let mut grids = Vec::new();
     for _ in 0..count {
-        let (g, end) = grid(all, &mut c, after, version)?;
+        let (g, end) = grid(all, &mut c, after)?;
         grids.push(g);
         after = end;
     }
     if after != all.len() {
         return Err(CacheError::Inconsistent("end"));
     }
-    Ok((version, grids))
+    Ok(grids)
 }
 
 fn size(n: u32) -> Result<usize, CacheError> {
@@ -406,12 +367,11 @@ fn grid<'a>(
     all: &'a [u8],
     c: &mut Cursor<'_>,
     after: usize,
-    version: u32,
 ) -> Result<(Found<'a>, usize), CacheError> {
     let [meta_at, meta_len, table_at, chunk_count, grid_blocks, value_type, encoding, entry] =
         [(); 8].map(|()| c.u32());
     let (entry, value_type, encoding) = (entry?, value_type?, encoding?);
-    let bytes_ok = version == VERSION && value_type == 0 && encoding == 0;
+    let bytes_ok = value_type == 0 && encoding == 0;
     if !(entry == KIND_GRID || (entry == KIND_BYTES && bytes_ok)) {
         return Err(CacheError::Inconsistent("directory"));
     }
@@ -497,7 +457,7 @@ fn chunks<'a>(
 /// by the lengths the archive states, before any of it is made. Of several broken rules,
 /// which is named is not promised.
 pub fn from_bytes(bytes: &[u8], limit: u64) -> Result<CacheFile, CacheError> {
-    let (version, found) = find(bytes)?;
+    let found = find(bytes)?;
     let parts: Vec<_> = found
         .iter()
         .map(|g| Part {
@@ -507,7 +467,7 @@ pub fn from_bytes(bytes: &[u8], limit: u64) -> Result<CacheFile, CacheError> {
             kind: g.kind,
         })
         .collect();
-    let (top, places) = head(&parts, version)?;
+    let (top, places) = head(&parts)?;
     let blocks = places
         .last()
         .zip(found.last())
@@ -555,7 +515,7 @@ fn unpack(found: &[Found<'_>], top: &[u8], blocks: usize) -> Result<Vec<Block>, 
 }
 
 /// Entry `index`'s chunks as §8.3 cuts a grid's frozen buffer, read from the frozen header
-/// in `head`, its first chunk decompressed, or as §8.7 cuts an entry of bytes; a table that
+/// in `head`, its first chunk decompressed, or as §8.3 cuts an entry of bytes; a table that
 /// lists others is refused (§8.4, rule 6).
 fn pieces(index: usize, g: &Found<'_>, head: &[u8]) -> Result<Vec<Piece>, CacheError> {
     let pieces = if g.kind == KIND_BYTES {
@@ -681,7 +641,7 @@ pub fn region_from_bytes(
     index: usize,
     extent: Bounds,
 ) -> Result<Region, CacheError> {
-    let (_, found) = find(bytes)?;
+    let found = find(bytes)?;
     let (place, g) = grid_number(&found, index)?;
     let (meta, bounds) = decode_meta(g.meta)?;
     let chunk = |k: usize| g.chunks.get(k).copied().ok_or(CacheError::Chunks(index));
@@ -966,7 +926,7 @@ mod tests {
     fn a_grid_cut_otherwise_is_refused() {
         let e = entries();
         let mut bytes = Vec::new();
-        emit(&exact(&e), |b| Ok(vec![(b.len() / BLOCK, false)]), VERSION, &mut bytes).unwrap();
+        emit(&exact(&e), |b| Ok(vec![(b.len() / BLOCK, false)]), &mut bytes).unwrap();
         assert!(matches!(from_bytes(&bytes, u64::MAX), Err(CacheError::Chunks(0))));
     }
 }

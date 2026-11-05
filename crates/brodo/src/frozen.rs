@@ -1,9 +1,9 @@
 //! The frozen layout (ARCHITECTURE.md §4.6, ADR-0016) and `freeze`, which packs a topology
 //! and a field into one 32-byte aligned buffer that a `GridView` reads in place.
 //!
-//! The layout's bytes are in `docs/formats.md` §2, which this code follows: version 2, which
-//! `freeze` writes, is version 1's bytes with every writer rule checked by a reader (§2.7,
-//! ADR-0052); version 1 is written on request.
+//! The layout's bytes are in `docs/formats.md` §2, which this code follows: version 2, every
+//! writer rule checked by a reader (ADR-0052). Version 1 is neither read nor written
+//! (ADR-0054).
 
 use std::collections::BTreeMap;
 
@@ -21,10 +21,8 @@ compile_error!("the frozen layout stores values little-endian, as brodo's target
 
 /// "BRDG", read as a little-endian `u32`.
 pub(crate) const MAGIC: u32 = u32::from_le_bytes(*b"BRDG");
-/// The layout version this build writes, and reads with the one before it (ADR-0038).
+/// The layout version this build reads and writes.
 pub(crate) const VERSION: u32 = 2;
-/// The version before it, read, and written on request (TESTING.md V6).
-pub(crate) const VERSION_1: u32 = 1;
 /// Bytes in a block, the unit of offsets and alignment.
 pub(crate) const BLOCK: usize = 32;
 /// Places in an upper node, and its mask words.
@@ -103,7 +101,7 @@ pub(crate) fn aligned(bytes: &[u8]) -> Vec<Block> {
     out
 }
 
-/// A frozen grid: the bytes of layout version 2, or 1 on request, 32-byte aligned.
+/// A frozen grid: the bytes of layout version 2, 32-byte aligned.
 #[derive(Debug, Clone)]
 pub struct FrozenGrid {
     blocks: Vec<Block>,
@@ -113,18 +111,6 @@ impl FrozenGrid {
     /// The buffer's bytes; their start is 32-byte aligned.
     pub fn as_bytes(&self) -> &[u8] {
         self.blocks.as_bytes()
-    }
-
-    /// The same grid in layout version `version`, 1 or 2: their bytes differ in the
-    /// header's version alone (docs/formats.md §2.7).
-    pub fn with_version(mut self, version: u32) -> Result<FrozenGrid, FreezeError> {
-        if version != VERSION && version != VERSION_1 {
-            return Err(FreezeError::Version(version));
-        }
-        let (h, _) = Header::mut_from_prefix(self.blocks.as_mut_bytes())
-            .map_err(|_| FreezeError::TooLarge)?;
-        h.version = U32::new(version);
-        Ok(self)
     }
 
     /// The layout version the bytes are in.

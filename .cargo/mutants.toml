@@ -285,10 +285,6 @@ exclude_re = [
     'vdb_read\.rs:.*: delete match arm 2 in values$',
     # As above.
     'vdb_read\.rs:.*: delete match arm 4 in values$',
-    # A grid already at the version it is packed at, restamped to that version, gives the
-    # bytes it held.
-    # [same]
-    'archive\.rs:.*: replace match guard frozen\.version\(\) == version with false in pack$',
     # Room for a block fewer is grown by `fill` as room for a file longer than it reported
     # is, and the same bytes are read.
     # [same]

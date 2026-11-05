@@ -1,14 +1,14 @@
 //! Format tier (TESTING.md §1) for the archive profile: an archive reads back as the cache
-//! file of the same grids, the same grids give the same bytes whatever the threads, format
-//! version 1 keeps the bytes of a committed file (TESTING.md V6), a region reads as the
+//! file of the same grids, the same grids give the same bytes whatever the threads, the
+//! format keeps the bytes of its committed files (TESTING.md V6), a region reads as the
 //! whole grid does within its box (§8.6), and damaged archives are refused, never read
 //! wrongly or with a panic.
 
 #![cfg(feature = "archive")]
 
 use brodo::archive::{
-    Encoding, from_bytes, read, read_region, region_from_bytes, to_bytes, to_bytes_version,
-    to_bytes_with, write, write_with,
+    Encoding, from_bytes, read, read_region, region_from_bytes, to_bytes, to_bytes_with, write,
+    write_with,
 };
 use brodo::cache::{self, CacheEntry, CacheFile};
 use brodo::error::{CacheError, FormatError};
@@ -55,7 +55,8 @@ fn meta(name: &str, extra: &[(&str, &str)]) -> GridMeta {
     m
 }
 
-/// The grids of the committed file: those of `cache_v1.bin`.
+/// The grids of the committed files `archive_v2_grids.bin` and `archive_v2_quantised.bin`:
+/// those of `cache_v2.bin`.
 fn golden_entries() -> Vec<CacheEntry> {
     let t = build(
         &[[-1, 0, 0], [4096, 7, 9]],
@@ -69,11 +70,24 @@ fn golden_entries() -> Vec<CacheEntry> {
     ]
 }
 
-const GOLDEN: &[u8] = include_bytes!("data/archive_v1.bin");
+const GOLDEN: &[u8] = include_bytes!("data/archive_v2_grids.bin");
+
+/// Fails unless `bytes` are the committed file `name`'s, writing them beside the target
+/// for a look when they are not.
+fn keeps(bytes: &[u8], golden: &[u8], name: &str) {
+    if bytes != golden {
+        let path = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join(name);
+        std::fs::write(&path, bytes).unwrap();
+        panic!(
+            "the bytes of {name} changed; raise the version (TESTING.md V6): {}",
+            path.display()
+        );
+    }
+}
 const GOLDEN_2: &[u8] = include_bytes!("data/archive_v2.bin");
 
 /// An archive of version 2 keeps its bytes, holds an entry of bytes cut every 256 KiB, and
-/// reads back as the cache file of the same entries (docs/formats.md §8.7); one of more
+/// reads back as the cache file of the same entries (docs/formats.md §8); one of more
 /// than a chunk is cut so too.
 #[test]
 fn format_version_2_keeps_its_bytes() {
@@ -99,10 +113,11 @@ fn format_version_2_keeps_its_bytes() {
     assert_eq!(word(&packed, 44), 3, "chunks of 8192, 8192 and the rest");
     let encoded = to_bytes_with(&[(&big[0], Encoding::Binary16)]);
     assert!(matches!(encoded, Err(CacheError::NotQuantised { index: 0, value_type: 0 })));
-    let one = to_bytes_version(&[(&e[1], Encoding::Exact)], 1);
-    assert!(matches!(one, Err(CacheError::BytesAtVersion1)));
+    let mut one = GOLDEN_2.to_vec();
+    one[4..8].copy_from_slice(&1_u32.to_le_bytes());
+    assert!(matches!(from_bytes(&one, u64::MAX), Err(CacheError::UnsupportedVersion(1))));
 }
-const QUANTISED: &[u8] = include_bytes!("data/archive_v1_quantised.bin");
+const QUANTISED: &[u8] = include_bytes!("data/archive_v2_quantised.bin");
 
 /// How far a binary16 value restores from x (docs/formats.md §8.5): 2⁻¹¹ × |x| + 2⁻²⁵.
 const BINARY16_RELATIVE: f32 = 1.0 / 2048.0;
@@ -182,16 +197,9 @@ fn the_same_grids_give_the_same_bytes_whatever_the_threads() {
 }
 
 #[test]
-fn format_version_1_keeps_its_bytes_and_a_file_round_trips() {
-    let e = golden_entries();
-    let bytes =
-        to_bytes_version(&e.iter().map(|g| (g, Encoding::Exact)).collect::<Vec<_>>(), 1).unwrap();
-    assert_eq!(bytes.len(), GOLDEN.len(), "length");
-    assert!(
-        bytes == GOLDEN,
-        "the bytes of archive format version 1 changed; raise the version (TESTING.md V6)"
-    );
-    let path = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("archive_v1.brda");
+fn an_archive_of_grids_keeps_its_bytes_and_a_file_round_trips() {
+    keeps(&to_bytes(&golden_entries()).unwrap(), GOLDEN, "archive_v2_grids.bin");
+    let path = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("archive_grids.brda");
     // A file an earlier run left must not stand in for this one's.
     let _absent = std::fs::remove_file(&path);
     write(&path, &golden_entries()).unwrap();
@@ -406,10 +414,10 @@ proptest! {
 #[test]
 fn quantised_values_keep_their_bytes_and_read_back_within_their_bounds() {
     let e = golden_entries();
-    let bytes = to_bytes_version(&quantised(&e), 1).unwrap();
-    assert!(bytes == QUANTISED, "the bytes of a quantised archive changed (TESTING.md V6)");
+    let bytes = to_bytes_with(&quantised(&e)).unwrap();
+    keeps(&bytes, QUANTISED, "archive_v2_quantised.bin");
     assert!(bytes.len() < GOLDEN.len(), "quantised is smaller");
-    let path = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("archive_v1_q.brda");
+    let path = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("archive_q.brda");
     let _absent = std::fs::remove_file(&path);
     write_with(&path, &quantised(&e)).unwrap();
     assert!(std::fs::read(&path).unwrap() == to_bytes_with(&quantised(&e)).unwrap());

@@ -209,25 +209,21 @@ fastest. A neighbour beyond the `i32` coordinate range is the background.
   between nodes is a number within its section: a node's first child and first tile, the
   rest found from its masks. Every structure is 32-byte aligned, little-endian, and laid out
   in `u32` words.
-- Layout version 2, written, and version 1, read and written on request: a header, the
-  root table, upper nodes, lower nodes, leaf values and tile values, in that order; its
-  bytes are in [docs/formats.md](docs/formats.md) §2. The two differ in the header's
-  version alone (`FrozenGrid::with_version`); a reader of version 2 checks every rule its
-  writer keeps (§2.7, ADR-0052).
+- Layout version 2: a header, the root table, upper nodes, lower nodes, leaf values and
+  tile values, in that order; its bytes are in [docs/formats.md](docs/formats.md) §2. A
+  reader checks every rule its writer keeps (§2.5, ADR-0052); version 1 is not read
+  (ADR-0054).
 - A node's masks number its children's places in Morton order, so that its children,
   being consecutive in that order, are found as its first child's number plus the set bits
   below the place; no list of child numbers is stored. Tile values follow the same rule.
 - A view is made only from a buffer it has checked whole: alignment, magic number,
-  version, value type, every section within the buffer, and every node's children and
-  tiles within their sections; at version 2 also padding, sections with no gap, nodes in
-  Morton order, and each node's first child and first tile, so that every node, leaf and
-  tile value is reached from one place. It accepts versions 2 and 1 (ADR-0038); any other
-  is a typed error naming it.
+  version, value type, every section within the buffer, every node's children and tiles
+  within their sections, padding, sections with no gap, nodes in Morton order, and each
+  node's first child and first tile, so that every node, leaf and tile value is reached
+  from one place. Another version is a typed error naming it.
 - A view thaws into an owned `Topology` and `Field<T>` (`GridView::thaw`), or into a field
-  on a topology holding its leaves and tiles (`thaw_on`), by walking its nodes once and
-  refusing a node, a leaf or a tile value reached twice, and a leaf never reached; the
-  topology numbers them in its
-  own order, so that one buffer gives one topology. Views whose root tables, nodes and
+  on a topology holding its leaves and tiles (`thaw_on`), by walking its nodes once; the
+  topology numbers them in its own order, so that one buffer gives one topology. Views whose root tables, nodes and
   counts agree hold one tree (`same_topology`) (ADR-0042).
 
 ### 4.7 Files (ADR-0016)
@@ -239,8 +235,8 @@ fastest. A neighbour beyond the `i32` coordinate range is the background.
 
 - A cache file holds a header (magic number, format version, entry count) and, per grid, its
   name, value type, voxel size and unit, affine transform, bounding box and free
-  key-value metadata, the topology and the values; at version 2 also entries of bytes,
-  each a name, free pairs and bytes the profile does not read, for a format built on it,
+  key-value metadata, the topology and the values; and entries of bytes, each a name,
+  free pairs and bytes the profile does not read, for a format built on it,
   Hermite data's crossings among them (`CacheEntry::bytes`, `CacheFile::bytes_entries`). A
   bare frozen buffer, a file of its own, holds one grid's header, topology and values
   (docs/formats.md §2).
@@ -250,13 +246,11 @@ fastest. A neighbour beyond the `i32` coordinate range is the background.
   does not interpret; the voxel size and unit are always present. The bounding box is
   worked out from the topology when a file is written; a grid with no leaf or tile has an
   empty one, a variant of its own.
-- The cache profile, format version 2 written, and 1 read and written on request
-  (`cache::to_bytes_version`): a header, a directory, then each entry's metadata and
-  payload, a grid's frozen buffer (§4.6) of the same version, on block boundaries; its
-  bytes are in [docs/formats.md](docs/formats.md) §3. A reader checks the whole file,
-  every grid's buffer included, before it answers, as docs/formats.md §3.4 and §3.5
-  state; at version 2 a grid's bounds are checked against its leaves and tiles, at
-  version 1 they are not (ADR-0016, ADR-0038, ADR-0052).
+- The cache profile, format version 2: a header, a directory, then each entry's metadata
+  and payload, a grid's frozen buffer (§4.6), on block boundaries; its bytes are in
+  [docs/formats.md](docs/formats.md) §3. A reader checks the whole file, every grid's
+  buffer and bounds included, before it answers, as docs/formats.md §3.4 states (ADR-0016,
+  ADR-0052); version 1 is not read (ADR-0054).
 - A cache file is written whole: to a hidden file beside it, flushed and renamed over it,
   so that a reader, a mapping process among them, sees the old file or the new one; the
   directory must be writable, and a process killed while writing may leave the hidden
@@ -266,10 +260,11 @@ fastest. A neighbour beyond the `i32` coordinate range is the background.
   `mmap`); both go through one parser. Mapping is brodo's only unsafe code, in one module
   (ADR-0008); `CacheFile::map` is an `unsafe fn`, its caller promising that the file stays
   unchanged while it is mapped.
-- The archive profile, format version 2 written, and 1 read and written on request, under
-  the feature `archive`, opted into: a header, a directory, then each entry's metadata,
-  its chunk table and its chunks on block boundaries, an entry of bytes cut every 256 KiB; its bytes are in [docs/formats.md](docs/formats.md) §8. A reader
-  decompresses the chunks in parallel into the cache file of the same grids and checks it
+- The archive profile, format version 2, under the feature `archive`, opted into: a
+  header, a directory, then each entry's metadata, its chunk table and its chunks on block
+  boundaries, an entry of bytes cut every 256 KiB; its bytes are in
+  [docs/formats.md](docs/formats.md) §8, and version 1 is not read (ADR-0054). A reader
+  decompresses the chunks in parallel into the cache file of the same entries and checks it
   as a cache file, so that an archive is read as a `CacheFile` (`archive::read`); it also
   checks the rest docs/formats.md §8.4 states, how each grid is cut into chunks among it,
   but not that a chunk's compressed bytes are brodo's compressor's. It carries no checksum

@@ -18,7 +18,7 @@ Two of these were checked at version 1 already where they cost most: a Hermite s
 thawing refuse a node, leaf or tile value reached twice and a leaf never reached
 (ADR-0038's amendments, ADR-0042).
 
-docs/formats.md §2.7, §3.5, §4.3 and §8.7 state version 2 as proposed here.
+docs/formats.md §2.5, §3, §4.1 and §8 state version 2 as proposed here.
 
 ## Decision
 
@@ -35,7 +35,7 @@ The owner chose, on 2026-11-03, the first option of each point, as proposed.
   of the nodes, which rule 11 makes one pass. (2) Dropped from the metadata at version 2,
   a reader working them out when asked: one fact fewer in the file, but every reader
   asking for them walks the tree.
-- **c. An entry of bytes**: as docs/formats.md §3.5 states: a kind word in the directory,
+- **c. An entry of bytes**: as docs/formats.md §3 states: a kind word in the directory,
   its byte length in its metadata after its name, so that the archive's directory entry,
   whose words are all used, needs no new one; its payload cut into chunks of 256 KiB in
   an archive.
@@ -44,7 +44,7 @@ The owner chose, on 2026-11-03, the first option of each point, as proposed.
 
 ## Consequences
 
-docs/formats.md §2.7, §3.5, §4.3 and §8.7 state version 2; brodo writes it, reads it and
+docs/formats.md §2.5, §3, §4.1 and §8 state version 2; brodo writes it, reads it and
 version 1, and writes version 1 on request, in the unit that closes P8 (ROADMAP.md §2).
 A reader of version 2 needs no walk of its own to find a node reached twice, so the
 checks ADR-0038's amendments added at version 1 stay for version 1 alone. `formats.py`,

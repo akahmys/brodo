@@ -18,21 +18,17 @@ use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 /// The golden files, the archive's where the crate reads it.
 const GOLDEN: &[&str] = &[
-    "frozen_v1_f32.bin",
-    "frozen_v1_f64x3.bin",
     "frozen_v2_f32.bin",
     "frozen_v2_f64x3.bin",
-    "cache_v1.bin",
     "cache_v2.bin",
-    "hermite_v1.bin",
     "hermite_v2.bin",
     "hermite_v3.bin",
     #[cfg(feature = "archive")]
-    "archive_v1.bin",
-    #[cfg(feature = "archive")]
-    "archive_v1_quantised.bin",
-    #[cfg(feature = "archive")]
     "archive_v2.bin",
+    #[cfg(feature = "archive")]
+    "archive_v2_grids.bin",
+    #[cfg(feature = "archive")]
+    "archive_v2_quantised.bin",
 ];
 
 /// A cache file as the crates read the bytes: a cache file's, or an archive's decompressed.
@@ -351,7 +347,7 @@ fn the_document_s_reader_accepts_and_refuses_damaged_files_as_the_crates_do() {
 /// within the root tile, meeting nothing, and just past a leaf's last voxel and just short
 /// of its first.
 #[cfg(feature = "archive")]
-const ARCHIVES: [&str; 2] = ["archive_v1.bin", "archive_v1_quantised.bin"];
+const ARCHIVES: [&str; 2] = ["archive_v2_grids.bin", "archive_v2_quantised.bin"];
 #[cfg(feature = "archive")]
 const BOXES: [[i32; 6]; 6] = [
     [-12, -4, -4, 3, 11, 11],
@@ -481,9 +477,8 @@ fn archive_with_a_shared_leaf() -> Vec<u8> {
     let t = e.commit().unwrap().0;
     let meta = GridMeta::new("g", [1.0; 3], "mm").unwrap();
     let entry = CacheEntry::new(&meta, &t, &Field::new(&t, 1.0_f32)).unwrap();
-    // Version 1, whose reader leaves a shared leaf to a region's walk (§2.7 refuses it at 2).
-    let exact = [(&entry, brodo::archive::Encoding::Exact)];
-    let bytes = brodo::archive::to_bytes_version(&exact, 1).unwrap();
+    // The writer's rules refuse a shared leaf (§2.5, rule 11), a region's read among them.
+    let bytes = brodo::archive::to_bytes(&[entry]).unwrap();
     let word = |b: &[u8], at: usize| u32::from_le_bytes(b[at..at + 4].try_into().unwrap()) as usize;
     let (table, chunks) = (word(&bytes, 40) * 32, word(&bytes, 44));
     assert_eq!(chunks, 2, "the nodes, then the leaves");
@@ -507,11 +502,12 @@ fn archive_with_a_shared_leaf() -> Vec<u8> {
 /// the document's reader as by the crates (§8.6 rule 6).
 #[cfg(feature = "archive")]
 #[test]
-fn the_document_s_reader_refuses_a_region_reaching_a_leaf_twice_as_the_crates_do() {
+fn the_document_s_reader_refuses_a_region_of_nodes_sharing_a_leaf_as_the_crates_do() {
     let bytes = archive_with_a_shared_leaf();
     let path = Path::new(env!("CARGO_TARGET_TMPDIR")).join("archive_with_a_shared_leaf.bin");
     std::fs::write(&path, &bytes).unwrap();
-    for (b, accepted) in [([0, 0, 0, 135, 7, 7], false), ([128, 0, 0, 135, 7, 7], true)] {
+    // Refused whichever box: the nodes break the writer's rules, not only the walk to it.
+    for (b, accepted) in [([0, 0, 0, 135, 7, 7], false), ([128, 0, 0, 135, 7, 7], false)] {
         let mut args = region_args(0, b);
         args.extend(["--brief".to_owned(), path.display().to_string()]);
         let args: Vec<&str> = args.iter().map(String::as_str).collect();

@@ -116,9 +116,6 @@ pub enum FreezeError {
     /// leaves of `f32` (docs/formats.md §2).
     #[error("the grid is too large for the frozen layout")]
     TooLarge,
-    /// A layout version this build does not write: it writes 2, and 1 on request.
-    #[error("layout version {0} is not written by this build")]
-    Version(u32),
 }
 
 /// Why bytes were refused as a frozen grid (ARCHITECTURE.md §4.6).
@@ -151,11 +148,6 @@ pub enum FormatError {
     /// A count, offset or index points outside its section, or contradicts another.
     #[error("the {0} section is inconsistent")]
     Inconsistent(&'static str),
-    /// Walking the nodes from the root table reaches a node, a leaf or a tile value twice,
-    /// which a reader walking the whole tree, or a region's nodes, refuses (docs/formats.md
-    /// §2.6, §4.2, rule 11, and §8.6, rule 6).
-    #[error("a node, leaf or tile value is reached twice from the root table")]
-    Shared,
     /// A topology asked to hold a view's values does not hold the view's leaves and tiles.
     #[error("the topology does not hold the view's leaves and tiles")]
     OtherTopology,
@@ -267,10 +259,6 @@ pub enum CacheError {
     /// brodo's formats built on the cache profile.
     #[error("the metadata holds the key {0:?}, which brodo's formats reserve")]
     ReservedKey(String),
-    /// An entry of bytes asked to be written at version 1, which holds grids alone
-    /// (docs/formats.md §3.5).
-    #[error("an entry of bytes is not written at format version 1")]
-    BytesAtVersion1,
 }
 
 /// Which rule of the Hermite data format a set breaks (ADR-0032).

@@ -114,7 +114,7 @@ left unrestored, and without the check of a leaf reached twice, the reader disag
 
 - **Date**: 2026-11-04
 
-P8's retrospective found that docs/formats.md §2.7 stated version 2's rule 9, root tiles
+P8's retrospective found that docs/formats.md §2.5 stated version 2's rule 9, root tiles
 numbered in table order, wrongly, and that nothing found it until the code was written,
 since the reader gained the rule only with the code. The owner decided, on 2026-11-04,
 that a check the document gains for a reader is added to `formats.py` in the same commit

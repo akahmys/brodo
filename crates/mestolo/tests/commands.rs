@@ -55,13 +55,12 @@ fn written(words: &[&str], out: &Path) -> Vec<u8> {
 
 #[test]
 fn info_writes_what_a_cache_file_an_archive_and_a_vdb_hold() {
-    assert_eq!(info("cache_v1.bin"), INFO_CACHE);
+    // The cache file holds an entry of bytes beside the grids, listed by its name and length.
+    let cache = INFO_CACHE.replacen("grids: 2\n", "grids: 2\nbytes: \"readme\", 11 bytes\n", 1);
+    assert_eq!(info("cache_v2.bin"), cache);
     let archive = INFO_CACHE.replacen("kind: cache file", "kind: archive", 1);
-    assert_eq!(info("archive_v1.bin"), archive);
+    assert_eq!(info("archive_v2_grids.bin"), archive);
     assert_eq!(info("vdb_by14_v225.bin"), INFO_VDB);
-    // Version 2: the same grids, an entry of bytes listed by its name and length.
-    let v2 = INFO_CACHE.replacen("grids: 2\n", "grids: 2\nbytes: \"readme\", 11 bytes\n", 1);
-    assert_eq!(info("cache_v2.bin"), v2);
 }
 
 #[test]
@@ -74,7 +73,7 @@ fn slice_draws_a_level_sets_plane_as_png() {
 
 #[test]
 fn convert_writes_a_grid_as_vdb_and_as_vtu() {
-    let cache = brodo_file("cache_v1.bin");
+    let cache = brodo_file("cache_v2.bin");
     let path = cache.to_str().unwrap();
     assert_eq!(written(&["convert", path, "--grid", "density"], &fresh("c.vdb")), VDB);
     assert_eq!(written(&["convert", path, "--grid", "density"], &fresh("c.vtu")), VTU);
@@ -82,7 +81,7 @@ fn convert_writes_a_grid_as_vdb_and_as_vtu() {
 
 #[test]
 fn what_a_format_does_not_hold_is_refused_by_name() {
-    let cache = brodo_file("cache_v1.bin");
+    let cache = brodo_file("cache_v2.bin");
     let run = |words: &[&str], out: &str| {
         let mut all = args(words);
         all.extend([OsString::from("-o"), fresh(out).into_os_string()]);
@@ -112,13 +111,13 @@ fn what_a_format_does_not_hold_is_refused_by_name() {
 fn a_file_of_no_kind_read_and_a_bare_grid_are_refused() {
     let run =
         |name: &str| mestolo::run(&Command::Info(Input::new(brodo_file(name))), &mut Vec::new());
-    assert!(matches!(run("frozen_v1_f32.bin"), Err(MestoloError::BareGrid(_))));
+    assert!(matches!(run("frozen_v2_f32.bin"), Err(MestoloError::BareGrid(_))));
     assert!(matches!(run("slice_sphere.png"), Err(MestoloError::UnknownKind(_))));
 }
 
 #[test]
 fn the_limit_bounds_each_kind_of_file() {
-    for name in ["cache_v1.bin", "archive_v1.bin", "vdb_by14_v225.bin"] {
+    for name in ["cache_v2.bin", "archive_v2_grids.bin", "vdb_by14_v225.bin"] {
         let words = ["info", "--limit", "1024"];
         let mut all = args(&words);
         all.push(brodo_file(name).into_os_string());
@@ -163,7 +162,7 @@ fn the_command_line_is_parsed_and_what_it_does_not_take_named() {
 #[test]
 fn the_program_refuses_to_replace_a_file_but_by_force() {
     let exe = env!("CARGO_BIN_EXE_mestolo");
-    let cache = brodo_file("cache_v1.bin");
+    let cache = brodo_file("cache_v2.bin");
     let out = fresh("forced.vdb");
     std::fs::write(&out, b"kept").unwrap();
     let run = |extra: &[&str]| {
@@ -284,7 +283,7 @@ fn of_equal_extremes_the_first_is_written() {
 
 #[test]
 fn a_grid_is_found_by_its_name() {
-    let loaded = mestolo::load::load(&Input::new(brodo_file("cache_v1.bin"))).unwrap();
+    let loaded = mestolo::load::load(&Input::new(brodo_file("cache_v2.bin"))).unwrap();
     for name in ["density", "velocity"] {
         assert_eq!(loaded.grid(Some(name)).unwrap().meta.name, name);
     }

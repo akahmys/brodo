@@ -1,6 +1,6 @@
 //! Format tier (TESTING.md §1) for the cache profile: a written file reads back with the same
-//! metadata, bounds and values, the same grids give the same bytes, format version 1 keeps
-//! the bytes of a committed file (TESTING.md V6), and damaged files are refused, never read
+//! metadata, bounds and values, the same grids give the same bytes, the format keeps the
+//! bytes of a committed file (TESTING.md V6), and damaged files are refused, never read
 //! wrongly or with a panic.
 
 #![expect(
@@ -10,7 +10,7 @@
 
 use std::collections::BTreeMap;
 
-use brodo::cache::{CacheEntry, CacheFile, to_bytes, to_bytes_version, write};
+use brodo::cache::{CacheEntry, CacheFile, to_bytes, write};
 use brodo::error::{CacheError, FormatError, MetaError};
 use brodo::field::{Field, Stored, Value};
 use brodo::meta::{Bounds, GridMeta};
@@ -160,12 +160,11 @@ fn golden_entries() -> Vec<CacheEntry> {
     ]
 }
 
-/// The committed file's bytes at version 1, written on request.
+/// The bytes of a file of the committed file's grids alone.
 fn golden() -> Vec<u8> {
-    to_bytes_version(&golden_entries(), 1).unwrap()
+    to_bytes(&golden_entries()).unwrap()
 }
 
-const GOLDEN: &[u8] = include_bytes!("data/cache_v1.bin");
 const GOLDEN_2: &[u8] = include_bytes!("data/cache_v2.bin");
 
 /// The committed file of version 2: the same grids, and an entry of bytes between them.
@@ -177,7 +176,7 @@ fn golden_entries_v2() -> Vec<CacheEntry> {
 }
 
 /// Version 2 keeps its bytes: its grids' frozen buffers of layout version 2, an entry of
-/// bytes in its place in the directory, its bytes read back (docs/formats.md §3.5).
+/// bytes in its place in the directory, its bytes read back (docs/formats.md §3).
 #[test]
 fn format_version_2_keeps_its_bytes() {
     let bytes = to_bytes(&golden_entries_v2()).unwrap();
@@ -189,12 +188,11 @@ fn format_version_2_keeps_its_bytes() {
     assert_eq!((entries[0].name, entries[0].bytes), ("readme", &b"brodo, 2026"[..]));
     assert_eq!(entries[0].extra.get("kind").map(String::as_str), Some("notes"));
     assert_eq!(file.meta(1).unwrap().name, "velocity");
-    assert!(matches!(to_bytes_version(&golden_entries_v2(), 1), Err(CacheError::BytesAtVersion1)));
-    let one = CacheFile::from_bytes(GOLDEN).unwrap();
-    assert_eq!((one.version(), one.bytes_entries().len()), (1, 0));
+    let one = with_word(GOLDEN_2, 1, 1);
+    assert!(matches!(CacheFile::from_bytes(&one), Err(CacheError::UnsupportedVersion(1))));
 }
 
-/// An entry of bytes is padded to the next block and no further (docs/formats.md §3.5): its
+/// An entry of bytes is padded to the next block and no further (docs/formats.md §3): its
 /// length stated a block short of its payload is refused, a byte short is read.
 #[test]
 fn an_entry_of_bytes_padded_a_whole_block_is_refused() {
@@ -282,14 +280,8 @@ fn writes_at_once_each_replace_the_file_whole() {
 }
 
 #[test]
-fn format_version_1_keeps_its_bytes_and_a_file_round_trips() {
-    let bytes = golden();
-    assert_eq!(bytes.len(), GOLDEN.len(), "length");
-    assert!(
-        bytes == GOLDEN,
-        "the bytes of cache format version 1 changed; raise the version (TESTING.md V6)"
-    );
-    let path = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("cache_v1.brdc");
+fn a_file_round_trips() {
+    let path = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("round_trip.brdc");
     let t = build(&[[3, 3, 3]], &[]);
     let f = numbered(&t, 0.0_f64, f64::from);
     write(&path, &[CacheEntry::new(&meta("on disk", &[]), &t, &f).unwrap()]).unwrap();
@@ -357,9 +349,11 @@ fn each_check_refuses_its_damage() {
     let read = |b: &[u8]| CacheFile::from_bytes(b).map(|_| ());
     assert!(matches!(read(&with_word(&g, 0, 9)), Err(CacheError::BadMagic(9))));
     assert!(matches!(read(&with_word(&g, 1, 3)), Err(CacheError::UnsupportedVersion(3))));
-    // A file of version 2 whose grids' frozen buffers are of version 1.
+    assert!(matches!(read(&with_word(&g, 1, 1)), Err(CacheError::UnsupportedVersion(1))));
+    // A grid's frozen buffer of layout version 1 in a file of version 2.
+    let frozen = usize::try_from(word(&g, 10)).unwrap() * 8;
     assert!(matches!(
-        read(&with_word(&g, 1, 2)),
+        read(&with_word(&g, frozen + 1, 1)),
         Err(CacheError::Grid { index: 0, error: FormatError::UnsupportedVersion(1) })
     ));
     assert!(matches!(read(&g[..g.len() - 32]), Err(CacheError::Truncated("grid"))));
@@ -409,7 +403,8 @@ fn only_the_bytes_the_writer_puts_are_read() {
     assert!(matches!(read(&longer), Err(CacheError::Inconsistent("end"))));
     // The header's and the directory's unused words are zero.
     assert!(matches!(read(&with_word(&g, 3, 1)), Err(CacheError::Inconsistent("header"))));
-    assert!(matches!(read(&with_word(&g, 13, 1)), Err(CacheError::Inconsistent("directory"))));
+    assert!(matches!(read(&with_word(&g, 14, 1)), Err(CacheError::Inconsistent("directory"))));
+    assert!(matches!(read(&with_word(&g, 13, 2)), Err(CacheError::Inconsistent("directory"))));
     // No gap: the first metadata one block later, after the directory.
     assert!(matches!(
         read(&with_word(&g, 8, word(&g, 8) + 1)),

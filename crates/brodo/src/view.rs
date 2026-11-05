@@ -10,7 +10,7 @@ use crate::field::local_index;
 use crate::field::{Field, LEAF_VOXELS, Stored};
 use crate::frozen::{
     BLOCK, Header, LOWER_PLACES, LowerNode, MAGIC, ROOT_NODE, ROOT_TILE, RootEntry, UPPER_PLACES,
-    UpperNode, VERSION, VERSION_1, local, place,
+    UpperNode, VERSION, local, place,
 };
 use crate::topology::{Location, Topology, morton};
 use crate::tree::{Coord, TileLevel};
@@ -97,7 +97,7 @@ fn links_fit(children: &[U32], tiles: &[U32], first: [U32; 2], len: [usize; 2]) 
         && children.iter().zip(tiles).all(|(c, t)| c.get() & t.get() == 0)
 }
 
-/// A node of version 2 (docs/formats.md §2.7, rule 11): holding a child or a tile, its first
+/// A node (docs/formats.md §2.5, rule 11): holding a child or a tile, its first
 /// child and first tile the counts so far, or 0 for none, the counts then moved past its
 /// own; `None` where it breaks the rule.
 fn consecutive(
@@ -124,7 +124,7 @@ fn check_header<T: Stored>(h: &Header, len: usize) -> Result<(), FormatError> {
     if h.magic.get() != MAGIC {
         return Err(FormatError::BadMagic(h.magic.get()));
     }
-    if h.version.get() != VERSION && h.version.get() != VERSION_1 {
+    if h.version.get() != VERSION {
         return Err(FormatError::UnsupportedVersion(h.version.get()));
     }
     let size_ok = usize::try_from(h.value_size.get()).is_ok_and(|s| s == size_of::<T>());
@@ -238,14 +238,12 @@ impl<'a, T: Stored> GridView<'a, T> {
             version: h.version.get(),
         };
         view.check_links()?;
-        if h.version.get() == VERSION {
-            view.check_writer(h)?;
-        }
+        view.check_writer(h)?;
         Ok(view)
     }
 
-    /// Version 2's rules beyond version 1's (docs/formats.md §2.7, rules 7 to 11): every
-    /// rule the writer keeps.
+    /// The writer's rules beyond the links (docs/formats.md §2.5, rules 7 to 11): every rule
+    /// the writer keeps, so that each node, leaf and tile value is reached from one place.
     fn check_writer(&self, h: &Header) -> Result<(), FormatError> {
         let zero = |b: &[u8]| b.iter().all(|x| *x == 0);
         let background = h.background.as_bytes().get(size_of::<T>()..).unwrap_or_default();
@@ -301,7 +299,7 @@ impl<'a, T: Stored> GridView<'a, T> {
         for e in self.roots.iter().filter(|e| e.kind.get() == ROOT_NODE) {
             let slot = origins.get_mut(e.index.get() as usize).ok_or(lost("root"))?;
             if slot.replace(morton(e.key.map(|k| k.get()))).is_some() {
-                return Err(FormatError::Shared);
+                return Err(lost("root"));
             }
         }
         let mortons: Vec<u128> = origins.into_iter().collect::<Option<_>>().ok_or(lost("root"))?;
@@ -372,7 +370,7 @@ impl<'a, T: Stored> GridView<'a, T> {
         Ok(())
     }
 
-    /// The layout version of the bytes: 2, or 1 (docs/formats.md §2.7).
+    /// The layout version of the bytes: 2 (docs/formats.md §2).
     pub fn version(&self) -> u32 {
         self.version
     }
@@ -500,8 +498,7 @@ impl<'a, T: Stored> GridView<'a, T> {
     }
 
     /// The view's tree and values as an owned topology and field, the topology numbering
-    /// its leaves and tiles in its own order (ADR-0042). The nodes are walked once: a view
-    /// in which a node, a leaf or a tile value is reached twice is refused as `Shared`.
+    /// its leaves and tiles in its own order (ADR-0042), the nodes walked once.
     pub fn thaw(&self) -> Result<(Topology, Field<T>), FormatError> {
         let r = self.regions()?;
         let empty = Topology::new();
@@ -562,22 +559,18 @@ impl<'a, T: Stored> GridView<'a, T> {
     }
 
     /// Every leaf's origin, by leaf number, and every tile's level and origin with its
-    /// place among the tile values, found by walking the nodes once: a node, a leaf or a
-    /// tile value reached twice is refused as `Shared`, so that the walk costs what the
-    /// buffer holds, and a leaf never reached as `Inconsistent` (docs/formats.md §4.2,
-    /// rule 11).
+    /// place among the tile values, found by walking the nodes once; the writer's rules,
+    /// checked when the view was made, reach each from one place (docs/formats.md §2.5,
+    /// rule 11), so that the walk costs what the buffer holds.
     pub(crate) fn regions(&self) -> Result<Regions, FormatError> {
         let mut leaves = vec![None; self.leaf_count];
         let mut tiles = Vec::with_capacity(self.tiles.len());
-        let mut seen = Seen::new(self.uppers.len(), self.lowers.len(), self.tiles.len());
         for e in self.roots {
             let key = e.key.map(|k| k.get());
             if e.kind.get() == ROOT_TILE {
-                seen.tile(e.index.get())?;
                 tiles.push((TileLevel::Root, key, e.index.get()));
                 continue;
             }
-            seen.upper(e.index.get())?;
             let u = self.uppers.get(e.index.get() as usize).ok_or(lost("root"))?;
             // The places are walked in order, so each child's and tile's number is its
             // node's first plus those met so far, not counted again from the masks.
@@ -586,29 +579,24 @@ impl<'a, T: Stored> GridView<'a, T> {
                 let at = offset(key, unplace(p, 5), TileLevel::Upper.edge_log2());
                 if is_set(&u.tiles, p) {
                     let i = tile.take("upper node")?;
-                    seen.tile(i)?;
                     tiles.push((TileLevel::Upper, at, i));
                 }
                 if !is_set(&u.children, p) {
                     continue;
                 }
                 let n = child.take("upper node")?;
-                seen.lower(n)?;
                 let l = self.lowers.get(n as usize).ok_or(lost("upper node"))?;
                 let (mut tile, mut leaf) = (Next::from(l.first_tile), Next::from(l.first_child));
                 for q in 0..LOWER_PLACES {
                     let leaf_at = offset(at, unplace(q, 4), TileLevel::Lower.edge_log2());
                     if is_set(&l.tiles, q) {
                         let i = tile.take("lower node")?;
-                        seen.tile(i)?;
                         tiles.push((TileLevel::Lower, leaf_at, i));
                     }
                     if is_set(&l.children, q) {
                         let i = leaf.take("lower node")?;
                         let slot = leaves.get_mut(i as usize).ok_or(lost("lower node"))?;
-                        if slot.replace(leaf_at).is_some() {
-                            return Err(FormatError::Shared);
-                        }
+                        *slot = Some(leaf_at);
                     }
                 }
             }
@@ -621,9 +609,9 @@ impl<'a, T: Stored> GridView<'a, T> {
 #[cfg(feature = "archive")]
 impl<T: Stored> GridView<'_, T> {
     /// The number and origin of every leaf whose voxels meet the box from `min` to `max`,
-    /// inclusive, in leaf number order, found by walking only the nodes that meet it: a
-    /// node or a leaf reached twice is refused as `Shared`, so that the walk costs what the
-    /// nodes it walks hold (docs/formats.md §8.6, rule 6).
+    /// inclusive, in leaf number order, found by walking only the nodes that meet it, each
+    /// reached from one place (docs/formats.md §2.5, rule 11), so that the walk costs what
+    /// the nodes it walks hold.
     pub(crate) fn leaves_meeting(
         &self,
         min: Coord,
@@ -639,13 +627,11 @@ impl<T: Stored> GridView<'_, T> {
             })
         };
         let mut out = Vec::new();
-        let mut seen = Seen::new(self.uppers.len(), self.lowers.len(), 0);
         for e in self.roots {
             let key = e.key.map(|k| k.get());
             if e.kind.get() == ROOT_TILE || !meets(key, TileLevel::Root) {
                 continue;
             }
-            seen.upper(e.index.get())?;
             let u = self.uppers.get(e.index.get() as usize).ok_or(lost("root"))?;
             let mut child = Next::from(u.first_child);
             for p in 0..UPPER_PLACES {
@@ -657,7 +643,6 @@ impl<T: Stored> GridView<'_, T> {
                 if !meets(at, TileLevel::Upper) {
                     continue;
                 }
-                seen.lower(n)?;
                 let l = self.lowers.get(n as usize).ok_or(lost("upper node"))?;
                 let mut leaf = Next::from(l.first_child);
                 for q in 0..LOWER_PLACES {
@@ -672,9 +657,6 @@ impl<T: Stored> GridView<'_, T> {
             }
         }
         out.sort_unstable();
-        if out.windows(2).any(|w| matches!(w, [a, b] if a.0 == b.0)) {
-            return Err(FormatError::Shared);
-        }
         Ok(out)
     }
 }
@@ -694,40 +676,6 @@ impl Next {
         let n = self.0;
         self.0 = n.checked_add(1).ok_or(lost(what))?;
         Ok(n)
-    }
-}
-
-/// The upper nodes, lower nodes and tile values a walk has reached.
-struct Seen {
-    uppers: Vec<bool>,
-    lowers: Vec<bool>,
-    tiles: Vec<bool>,
-}
-
-impl Seen {
-    fn new(uppers: usize, lowers: usize, tiles: usize) -> Self {
-        Seen { uppers: vec![false; uppers], lowers: vec![false; lowers], tiles: vec![false; tiles] }
-    }
-
-    /// Marks entry `i` of `marks` reached, refusing one reached before.
-    fn mark(marks: &mut [bool], i: u32, section: &'static str) -> Result<(), FormatError> {
-        let mark = marks.get_mut(i as usize).ok_or(lost(section))?;
-        if std::mem::replace(mark, true) {
-            return Err(FormatError::Shared);
-        }
-        Ok(())
-    }
-
-    fn upper(&mut self, i: u32) -> Result<(), FormatError> {
-        Self::mark(&mut self.uppers, i, "root")
-    }
-
-    fn lower(&mut self, i: u32) -> Result<(), FormatError> {
-        Self::mark(&mut self.lowers, i, "upper node")
-    }
-
-    fn tile(&mut self, i: u32) -> Result<(), FormatError> {
-        Self::mark(&mut self.tiles, i, "tile value")
     }
 }
 
@@ -808,88 +756,39 @@ mod tests {
         u32::from_le_bytes([b[at], b[at + 1], b[at + 2], b[at + 3]])
     }
 
-    /// A grid frozen at layout version 1, whose reader leaves sharing to a walk.
-    fn v1(t: &Topology) -> Vec<u8> {
-        freeze(t, &Field::new(t, 0_u8)).unwrap().with_version(1).unwrap().as_bytes().to_vec()
-    }
-
-    /// `mixed`'s frozen bytes, of version 1, with the second root entry of `kind` naming
-    /// the first's index: an upper node, or a tile value, two entries share.
-    fn shared(kind: u32) -> Vec<crate::frozen::Block> {
+    /// `mixed`'s frozen bytes with the second root entry of `kind` naming the first's index:
+    /// an upper node, or a tile value, two entries share.
+    fn shared(kind: u32) -> Vec<u8> {
         let t = mixed();
-        let mut b = v1(&t);
+        let mut b = freeze(&t, &Field::new(&t, 0_u8)).unwrap().as_bytes().to_vec();
         let (count, roots) = (word(&b, 16) as usize, word(&b, 36) as usize * 32);
         let at: Vec<usize> =
             (0..count).map(|i| roots + 32 * i).filter(|e| word(&b, e + 12) == kind).collect();
         let index = word(&b, at[0] + 16).to_le_bytes();
         b[at[1] + 16..at[1] + 20].copy_from_slice(&index);
-        crate::frozen::aligned(&b)
-    }
-
-    /// Two tiles of `level`, each alone in its node in its own root region, frozen at
-    /// version 1; then the second's node, or the upper node above it, names the first's,
-    /// which is emptied, so that nothing beneath the node reached twice is reached twice
-    /// (docs/formats.md §2.3).
-    fn empty_node_shared(level: TileLevel) -> Vec<crate::frozen::Block> {
-        let empty = Topology::new();
-        let mut e = empty.edit();
-        e.add_tile(level, [0, 0, 0]).unwrap();
-        e.add_tile(level, [4096, 0, 0]).unwrap();
-        let t = e.commit().unwrap().0;
-        let mut b = v1(&t);
-        let at = |section: usize| word(&b, 36 + 4 * section) as usize * 32;
-        let (roots, uppers, lowers) = (at(0), at(1), at(2));
-        if level == TileLevel::Upper {
-            b[roots + 32 + 16..roots + 32 + 20].fill(0);
-            b[uppers + 4096..uppers + 4100].fill(0);
-        } else {
-            b[uppers + 8224 + 8192..uppers + 8224 + 8196].fill(0);
-            b[lowers + 512..lowers + 516].fill(0);
-        }
-        crate::frozen::aligned(&b)
+        b
     }
 
     #[test]
-    fn an_empty_node_reached_twice_is_refused() {
-        for level in [TileLevel::Upper, TileLevel::Lower] {
-            let b = empty_node_shared(level);
-            let view = GridView::<u8>::new(b.as_bytes()).unwrap();
-            assert_eq!(view.regions().err(), Some(FormatError::Shared), "{level:?}");
-        }
-    }
-
-    #[test]
-    fn a_node_or_tile_value_two_root_entries_share_is_refused_by_the_walk() {
-        // Each entry names an index the counts allow, so the view's checks pass (§2.5);
-        // walking the tree reaches the shared one twice (§4.2, rule 11).
+    fn a_node_or_tile_value_two_root_entries_share_is_refused() {
+        // Each entry names an index the counts allow, so the links pass (§2.5); the writer's
+        // rules 9 and 11 refuse the sharing, so that no walk reaches one twice.
         for kind in [ROOT_NODE, ROOT_TILE] {
-            let b = shared(kind);
-            let view = GridView::<u8>::new(b.as_bytes()).unwrap();
-            assert_eq!(view.regions(), Err(FormatError::Shared), "kind {kind}");
-            assert_eq!(view.thaw().err(), Some(FormatError::Shared), "kind {kind}");
-            let t = mixed();
-            assert_eq!(view.thaw_on(&t).err(), Some(FormatError::Shared), "kind {kind}");
+            refused("a shared root entry", &shared(kind), FormatError::Inconsistent("root"));
         }
         let t = mixed();
         let frozen = freeze(&t, &Field::new(&t, 0_u8)).unwrap();
         assert!(frozen.view::<u8>().unwrap().regions().is_ok());
     }
 
-    /// `mixed`'s bytes at version 2 with one writer rule broken, by `damage`, refused; the
-    /// same bytes at version 1 read, so that version 1's reading is unchanged
-    /// (docs/formats.md §2.7, rules 7 to 11).
-    fn refused_at_2_alone(what: &str, b: &[u8], expected: FormatError) {
-        let mut one = b.to_vec();
-        one[4..8].copy_from_slice(&1_u32.to_le_bytes());
-        let at = |bytes: &[u8]| {
-            GridView::<u8>::new(crate::frozen::aligned(bytes).as_bytes()).map(|_| ())
-        };
-        assert_eq!(at(b), Err(expected), "{what}");
-        assert_eq!(at(&one), Ok(()), "{what}, at version 1");
+    /// Bytes with one writer rule broken refused for it (docs/formats.md §2.5, rules 7 to 11).
+    fn refused(what: &str, b: &[u8], expected: FormatError) {
+        let at = GridView::<u8>::new(crate::frozen::aligned(b).as_bytes()).map(|_| ());
+        assert_eq!(at, Err(expected), "{what}");
     }
 
     #[test]
-    fn version_2_refuses_each_writer_rule_version_1_leaves() {
+    fn each_writer_rule_broken_is_refused() {
         let t = mixed();
         let good = freeze(&t, &Field::new(&t, 0_u8)).unwrap().as_bytes().to_vec();
         assert_eq!(word(&good, 4), 2);
@@ -940,14 +839,14 @@ mod tests {
             FormatError::Inconsistent("lower node"),
         ));
         for (what, b, expected) in damaged {
-            refused_at_2_alone(what, &b, expected);
+            refused(what, &b, expected);
         }
     }
 
     /// A lower node holding neither child nor tile, its counts and links else consistent,
-    /// is refused at version 2 (docs/formats.md §2.7, rule 11).
+    /// is refused (docs/formats.md §2.5, rule 11).
     #[test]
-    fn an_empty_node_is_refused_at_version_2() {
+    fn an_empty_node_is_refused() {
         let empty = Topology::new();
         let mut e = empty.edit();
         e.activate([0, 0, 0]).unwrap();
@@ -962,33 +861,7 @@ mod tests {
         let blocks = word(&b, 56) - 1;
         b[56..60].copy_from_slice(&blocks.to_le_bytes());
         b.truncate(b.len() - 32);
-        refused_at_2_alone("an empty lower node", &b, FormatError::Inconsistent("lower node"));
-    }
-
-    /// A region's walk refuses an upper node two root entries share, a lower node two
-    /// upper places share, and a leaf two lower nodes share (docs/formats.md §8.6, rule 6).
-    #[cfg(feature = "archive")]
-    #[test]
-    fn a_node_or_leaf_reached_twice_is_refused_by_a_regions_walk() {
-        let all = |b: &[crate::frozen::Block]| {
-            GridView::<u8>::new(b.as_bytes())
-                .unwrap()
-                .leaves_meeting([-8192; 3], [8191; 3])
-                .map(|_| ())
-        };
-        assert_eq!(all(&shared(ROOT_NODE)), Err(FormatError::Shared));
-        assert_eq!(all(&empty_node_shared(TileLevel::Lower)), Err(FormatError::Shared));
-        let empty = Topology::new();
-        let mut e = empty.edit();
-        e.activate([0, 0, 0]).unwrap();
-        e.activate([128, 0, 0]).unwrap();
-        let t = e.commit().unwrap().0;
-        let mut b = v1(&t);
-        assert_eq!(all(&crate::frozen::aligned(&b)), Ok(()));
-        // The second lower node's first child.
-        let at = word(&b, 44) as usize * 32 + 1056 + 1024;
-        b[at..at + 4].fill(0);
-        assert_eq!(all(&crate::frozen::aligned(&b)), Err(FormatError::Shared));
+        refused("an empty lower node", &b, FormatError::Inconsistent("lower node"));
     }
 
     /// A view of the nodes alone refuses a part off a 32-byte boundary, the other aligned,

@@ -95,13 +95,13 @@ def morton(c):
 
 
 class Grid:
-    """A frozen buffer, §2, checked as §2.5 says, and at version 2 as §2.7 says."""
+    """A frozen buffer, §2, checked as §2.5 says."""
 
     def __init__(self, b, value_type=None):
         need(len(b) % BLOCK == 0 and len(b) >= 96, "length")
         need(b[0:4] == b"BRDG", "magic")
         self.version = u32(b, 4)
-        need(self.version in (1, 2), "version")
+        need(self.version == 2, "version")
         code, size = u32(b, 8), u32(b, 12)
         need(code in TYPES and TYPES[code][0] == size, "value type")
         need(value_type is None or code == value_type, "value type")
@@ -136,11 +136,10 @@ class Grid:
             self.roots.append((key, kind, index))
         self.uppers = [self.node(u + UPPER_NODE * i, 1024, nl) for i in range(nu)]
         self.lowers = [self.node(lo + LOWER_NODE * i, 128, self.nleaves) for i in range(nl)]
-        if self.version == 2:
-            self.writer_rules(counts, offsets, entry, (r, u, lo))
+        self.writer_rules(counts, offsets, entry, (r, u, lo))
 
     def writer_rules(self, counts, offsets, entry, at):
-        """§2.7 rules 7 to 11."""
+        """§2.5 rules 7 to 11."""
         b, (r, u, lo) = self.b, at
         zero = lambda x: x == b"\0" * len(x)
         need(zero(b[84:96]) and zero(b[60 + self.size : 84]), "padding")
@@ -203,30 +202,21 @@ class Grid:
 
     def meeting(self, lo, hi):
         """§8.6 rule 6: the leaves whose voxels meet the box `lo` to `hi`, by number, each
-        with its origin, walking from the root table into the regions meeting it alone, no
-        upper node, lower node or leaf reached twice."""
+        with its origin, walking from the root table into the regions meeting it alone."""
         meets = lambda o, edge: all(o[k] <= hi[k] and lo[k] < o[k] + edge for k in range(3))
-        seen, out = set(), []
-
-        def once(what, i):
-            need((what, i) not in seen, "shared " + what)
-            seen.add((what, i))
-
+        out = []
         for key, kind, index in self.roots:
             if kind == 0 or not meets(key, 4096):
                 continue
-            once("upper", index)
             children, _, fc, _ = self.uppers[index]
             for p in set_bits(children):
                 at = [key[k] + 128 * c for k, c in enumerate(unplace(p, 5))]
                 if not meets(at, 128):
                     continue
-                once("lower", fc + below(children, p))
                 lch, _, lfc, _ = self.lowers[fc + below(children, p)]
                 for q in set_bits(lch):
                     leaf_at = [at[k] + 8 * c for k, c in enumerate(unplace(q, 4))]
                     if meets(leaf_at, 8):
-                        once("leaf", lfc + below(lch, q))
                         out.append((lfc + below(lch, q), leaf_at))
         return sorted(out)
 
@@ -271,39 +261,27 @@ class Grid:
         return self.background
 
     def regions(self):
-        """Every leaf's origin by number, and every tile's (level, origin, place); §4.2
-        rule 11: no node, leaf or tile value reached twice."""
+        """Every leaf's origin by number, and every tile's (level, origin, place), each
+        reached from one place (§2.5, rule 11)."""
         leaves, tiles = [None] * self.nleaves, []
-        seen = set()
-
-        def once(what, i):
-            need((what, i) not in seen, "shared " + what)
-            seen.add((what, i))
-
         for key, kind, index in self.roots:
             if kind == 0:
-                once("tile", index)
                 tiles.append(("root", key, index))
                 continue
-            once("upper", index)
             children, utiles, fc, ft = self.uppers[index]
             for p in range(32 ** 3):
                 if not (bit(children, p) or bit(utiles, p)):
                     continue
                 at = [key[k] + 128 * c for k, c in enumerate(unplace(p, 5))]
                 if bit(utiles, p):
-                    once("tile", ft + below(utiles, p))
                     tiles.append(("upper", at, ft + below(utiles, p)))
                     continue
-                once("lower", fc + below(children, p))
                 lch, ltiles, lfc, lft = self.lowers[fc + below(children, p)]
                 for q in range(16 ** 3):
                     leaf_at = [at[k] + 8 * c for k, c in enumerate(unplace(q, 4))]
                     if bit(ltiles, q):
-                        once("tile", lft + below(ltiles, q))
                         tiles.append(("lower", leaf_at, lft + below(ltiles, q)))
                     if bit(lch, q):
-                        once("leaf", lfc + below(lch, q))
                         leaves[lfc + below(lch, q)] = leaf_at
         return leaves, tiles
 
@@ -359,7 +337,7 @@ def metadata(b):
 
 
 def bytes_metadata(b):
-    """§3.5: an entry of bytes' metadata: its name, its byte length and its pairs."""
+    """§3: an entry of bytes' metadata: its name, its byte length and its pairs."""
     c = Cursor(b)
     m = {"name": c.string(), "length": struct.unpack("<Q", c.take(8))[0]}
     pairs = []
@@ -372,12 +350,12 @@ def bytes_metadata(b):
 
 
 def cache(b, entries=None):
-    """§3, checked as §3.4 and §3.5 say: a list of (metadata, grid); each entry of bytes,
+    """§3, checked as §3.4 says: a list of (metadata, grid); each entry of bytes,
     (metadata, bytes), is added to `entries`."""
     need(len(b) % BLOCK == 0, "length")
     need(len(b) >= BLOCK and b[0:4] == b"BRDC", "magic")
     version = u32(b, 4)
-    need(version in (1, 2), "version")
+    need(version == 2, "version")
     count = u32(b, 8)
     need(b[12:32] == b"\0" * 20, "header")
     after, out = (count + 1) * BLOCK, []
@@ -386,7 +364,7 @@ def cache(b, entries=None):
         need(d + 32 <= len(b), "directory")
         meta_at, meta_len, grid_at, grid_blocks, code, kind = (u32(b, d + 4 * k) for k in range(6))
         need(b[d + 24 : d + 32] == b"\0" * 8, "directory")
-        need(kind == 0 or (version == 2 and kind == 1), "directory")
+        need(kind in (0, 1), "directory")
         start = meta_at * BLOCK
         need(start == after and start + meta_len <= len(b), "metadata place")
         meta_end = start + meta_len
@@ -407,7 +385,7 @@ def cache(b, entries=None):
         need(code in TYPES, "value type")
         g = Grid(b[grid_start:grid_end], code)
         need(g.version == version, "grid version")
-        need(version == 1 or m["bounds"] == g.bounds(), "bounds")
+        need(m["bounds"] == g.bounds(), "bounds")
         out.append((m, g))
     need(after == len(b), "end")
     return out
@@ -501,7 +479,7 @@ def parse(b):
     need(len(b) % BLOCK == 0, "length")
     need(len(b) >= BLOCK and b[0:4] == b"BRDA", "magic")
     version = u32(b, 4)
-    need(version in (1, 2), "version")
+    need(version == 2, "version")
     count = u32(b, 8)
     need(u32(b, 12) == 1 and u32(b, 16) == 512 and b[20:32] == b"\0" * 12, "header")
     after, grids = (count + 1) * BLOCK, []
@@ -509,7 +487,7 @@ def parse(b):
     for i in range(count):
         d = 32 * (1 + i)
         meta_at, meta_len, table_at, chunks, grid_blocks, code, encoding, kind = (u32(b, d + 4 * k) for k in range(8))
-        need(kind == 0 or (version == 2 and kind == 1 and code == 0 and encoding == 0), "directory")
+        need(kind == 0 or (kind == 1 and code == 0 and encoding == 0), "directory")
         need(encoding in (0, 1, 2), "encoding")
         need(encoding == 0 or code in FLOATING, "directory")
         comps = FLOATING[code][2] if encoding == 2 else 0
@@ -546,13 +524,13 @@ def leaf_chunk(c, raw, code, encoding, ranges):
 
 
 def archive(b, entries=None):
-    """§8, checked as §8.4 and §8.7 say: the cache file it decompresses into, and the
+    """§8, checked as §8.4 says: the cache file it decompresses into, and the
     chunks' lengths."""
     version, grids = parse(b)
     count = len(grids)
     # The cache file of the same entries, §3, its frozen buffers decompressed: each first
     # chunk, its header telling how the grid is cut, then the others, leaf values restored;
-    # an entry of bytes's chunks each as it is, every 512 × 512 bytes but the last (§8.7).
+    # an entry of bytes's chunks each as it is, every 512 × 512 bytes but the last (§8.3).
     head, body, at = [b"BRDC", struct.pack("<II", version, count), b"\0" * 20], [], 1 + count
     for meta, grid_blocks, code, encoding, ranges, listed, kind in grids:
         grid_at = at + -(-len(meta) // BLOCK)

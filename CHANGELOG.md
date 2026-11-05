@@ -7,9 +7,15 @@ are recorded here when they change (V6).
 ## Unreleased
 
 Format versions (TESTING.md V6): Hermite data is at version 3 and the SDF convention at
-version 2, their keys moved under `brodo.`; neither's earlier versions are read, the owner
-setting V6's rule aside for them before 1.0 (ADR-0053). The frozen layout and the cache
-and archive profiles are unchanged. Every change below breaks a user.
+version 2, their keys moved under `brodo.` (ADR-0053); the frozen layout and the cache and
+archive profiles stay at version 2, and version 1 of them is no longer read nor written
+(ADR-0054). No earlier version of any is read, the owner setting V6's rule aside before
+1.0. Every change below breaks a user.
+
+- `cache::to_bytes_version`, `cache::write_version`, `archive::to_bytes_version`,
+  `archive::write_version` and `FrozenGrid::with_version` are gone, with
+  `FreezeError::Version`, `CacheError::BytesAtVersion1` and `FormatError::Shared`; a file
+  or buffer of version 1 is refused with `UnsupportedVersion(1)`.
 
 - Keys beginning `brodo.` are reserved: `CacheEntry::new` refuses one but
   `brodo.sdf.version`, and `CacheEntry::bytes` and `Hermite::entries` every one, with
@@ -43,16 +49,19 @@ and archive profiles are unchanged. Every change below breaks a user.
   held sparsely, are gone. An edge whose ends' signs differ and that holds no crossing is
   refused for `Rule::NoCrossing`, not `Rule::Fraction`.
 
-A file written by 0.9.0 or earlier converts with this release alone, its grids and entries
-of bytes still read as a cache file (`CacheFile::view`, `GridView::thaw`,
-`CacheFile::bytes_entries`), and written again with each key renamed:
+A file of version 1, written by 0.8 or earlier or by 0.9.0 on request, is first read by
+0.9.0 and written again by it, at version 2. A file of version 2 then converts with this
+release alone, its grids and entries of bytes still read as a cache file
+(`CacheFile::view`, `GridView::thaw`, `CacheFile::bytes_entries`), and written again with
+each key renamed:
 
 - a Hermite set of version 2: the sign grid and the entry of crossings, each `hermite.*`
   key renamed `brodo.hermite.*` and `brodo.hermite.version` set to `3`, written with
   `CacheEntry::with_reserved_keys` and `CacheEntry::bytes_with_reserved_keys`;
-- a Hermite set of version 1: its ten grids thawed, every leaf value other than fraction
-  −1, normal zero and group 0 given to `Crossings::builder` leaf by leaf, the set made by `Hermite::new`
-  with the sign grid and the `hermite.group.<id>` names, and written by `Hermite::entries`;
+- a Hermite set of version 1, ten dense grids in a cache file 0.9.0 wrote again: its grids
+  thawed, every leaf value other than fraction −1, normal zero and group 0 given to
+  `Crossings::builder` leaf by leaf, the set made by `Hermite::new` with the sign grid and
+  the `hermite.group.<id>` names, and written by `Hermite::entries`;
 - an SDF: `sdf.version` renamed `brodo.sdf.version`, its value `2`, the grid written again.
 
 ## 0.9.0 (2026-11-04)
@@ -64,8 +73,8 @@ crossings held sparsely (ADR-0051, ADR-0052). Every change below breaks a user.
 
 Format versions (TESTING.md V6): the frozen layout, the cache profile, the archive profile
 and Hermite data are each at version 2, written; version 1 of each is read, and written on
-request. A reader of an earlier release refuses a file of version 2 (docs/formats.md §2.7,
-§3.5, §4.3, §8.7; ADR-0051, ADR-0052).
+request. A reader of an earlier release refuses a file of version 2 (docs/formats.md §2.5,
+§3, §4.1, §8; ADR-0051, ADR-0052).
 
 - `freeze`, `cache::to_bytes`, `cache::write`, `archive::to_bytes` and the archive's other
   writers write version 2. Version 1 is written by `FrozenGrid::with_version(1)`,
