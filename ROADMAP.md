@@ -714,6 +714,11 @@ No spike is running.
 - The API reference is not hosted: the crates are not on crates.io, so docs.rs holds
   none, and a reader builds it with `cargo doc` (README.md). Hosting it, on GitHub Pages
   from each release tag, is the owner's to decide.
+- `scripts/hooks/provenance_guard.py` blocks a spike's C++ `#include` of OpenVDB's main
+  header, a path naming OpenVDB at no tag, though building against the installed library
+  reads none of its source; `spikes/vdbclass/`'s line was added by the owner by hand
+  (2026-11-06). Letting such a line pass is a change to a rule, the owner's to decide
+  (AGENTS.md, "Changing the rules"), with ADR-0044 amended and the check shown to fire.
 - Gaps T14's survey found before 1.0 that a later MINOR adds without breaking a user
   (2026-11-05), held until one is asked for or a milestone takes it: a frozen grid's
   leaves and tiles walked in place; an archive's grids listed without decompressing them,
