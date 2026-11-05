@@ -318,7 +318,14 @@ fastest. A neighbour beyond the `i32` coordinate range is the background.
   default, as docs/formats.md §9.7 states (ADR-0047): each float and double grid with its
   name, transform, voxel size, string metadata and a unit the caller gives; every leaf
   voxel's value, active or not, and each tile that is active or whose value's bits differ
-  from the background's. Other grids, half-float and instanced ones among them, are
+  from the background's. A float grid whose `class` is `level set` is read as stating the
+  SDF convention (docs/formats.md §5), `class` replaced by `brodo.sdf.version` = `2`, when
+  its three voxel sizes lie within 16 ε (`f64::EPSILON`) of each other, relative to the
+  least, its background is positive and finite, every leaf value lies within ±background,
+  none NaN, and every tile kept is ±background; any other grid keeps `class`, a double
+  level set among them, so that an SDF brodo writes reads back stating the convention.
+  That the values are signed distances, negative inside, is not checked, and is taken
+  from OpenVDB's convention for level sets. Other grids, half-float and instanced ones among them, are
   skipped and their names returned; a file §9.7 does not take is refused. The limit
   `vdb::from_bytes` and `vdb::read` take bounds what reading makes, besides the file's bytes,
   counted before it is made: a leaf twice its values' bytes and 1024 more, a tile kept 256,

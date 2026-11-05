@@ -86,6 +86,10 @@ archive profiles stay at version 2, and version 1 of them is no longer read nor 
   `Unrepresentable` only with `archive`.
 - `manifest::LeafManifest` no longer implements `Default`: one belonging to no topology
   meant nothing (ADR-0059). A topology's is `Topology::manifest`.
+- `vdb::from_bytes` and `vdb::read` read a float grid of `class` `level set` meeting
+  ARCHITECTURE.md §4.7's conditions as stating the SDF convention: its free pairs hold
+  `brodo.sdf.version` = `2` in place of `class`, an SDF brodo wrote among them (ADR-0047,
+  amended). Code that took such a grid for a level set by `class` finds `SDF_KEY`.
 
 A file of version 1, written by 0.8 or earlier or by 0.9.0 on request, is first read by
 0.9.0 and written again by it, at version 2. A file of version 2 then converts with this

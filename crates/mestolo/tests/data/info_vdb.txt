@@ -16,7 +16,7 @@ grid 0: "sdf"
   background: 2
   least: -2
   greatest: 2
-  metadata: "class" = "level set"
+  metadata: "brodo.sdf.version" = "2"
 
 grid 1: "dsdf"
   type: f64

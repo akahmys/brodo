@@ -606,7 +606,8 @@ breaks them; of several broken rules, which is named is not promised.
 3. **Compression flags**: 0, 2, 4 or 6. Zip (1) and any other bit are refused.
 4. **Metadata.** Every entry's bytes are skipped by its count. Of entries of type
    `string`, `name` and those whose name begins `file_` are dropped, and the others kept,
-   as UTF-8, among the grid's free pairs.
+   as UTF-8, among the grid's free pairs, but for a level set's `class`, which rule 8 may
+   replace by `brodo.sdf.version` (§5).
 5. **Transform**, one of four maps by its name, each read into OpenVDB's 4×4 matrix M of
    §9.3: `AffineMap`, sixteen `f64`, M itself, whose last column is (0, 0, 0, 1);
    `ScaleMap` and `UniformScaleMap`, fifteen `f64`, a scale s, then twelve derived values

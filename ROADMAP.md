@@ -15,9 +15,9 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   grown by accretion taken whole (ADR-0054 to ADR-0058), users' requests taken as issues
   the owner labels `owner-approved` (ADR-0049, amended), P9's retrospective (ADR-0001,
   ADR-0033, ADR-0035, amended), T14's survey of what each crate lacks, and its gaps in
-  brodo's core (ADR-0059) and formats (ADR-0060) taken.
-- **Next**: the gaps T14's survey found that 1.0 takes, a `.vdb` level set's `SDF_KEY`
-  put to the owner, then mestolo's;
+  brodo's core (ADR-0059) and formats (ADR-0060) taken, and a `.vdb` level set read as
+  an SDF (ADR-0047, amended).
+- **Next**: the last gaps T14's survey found that 1.0 takes, mestolo's;
   then the rest of P9 in the order put to the owner (2026-11-04), the rules for versions
   after 1.0 first.
 
@@ -586,8 +586,9 @@ since crates.io yanks a version but never deletes it.
 - [x] brodo's formats: a cache file's grid names stated not unique; `CacheEntry::copy`
       and `copy_bytes`, an entry read written again as it was, its keys beginning `brodo.`
       kept (ADR-0060)
-- [ ] a `.vdb` level set read back with `SDF_KEY`, which ADR-0047 decided against, put
-      back to the owner (2026-11-06)
+- [x] a `.vdb` level set read back with `SDF_KEY`: a float level set meeting the SDF
+      convention's checkable conditions, voxel sizes within 16 ε among them, read as
+      stating it, `class` kept otherwise (ADR-0047's amendment of 2026-11-06)
 - [ ] mestolo: a slice beyond the grid refused, the `.vdb` writer's refusal naming the
       grids it cannot write, no arguments exiting 2, and `convert` writing a cache file or
       an archive (`--as`)
@@ -689,6 +690,8 @@ Questions answered, each by its spike and ADR:
 - `spikes/vdb/`: the writing step (ADR-0046)
 - `spikes/vdbread/`: the reading step (ADR-0047)
 - `spikes/vdbmemory/`: the memory `vdb::read` makes (ADR-0047's amendment of 2026-11-02)
+- `spikes/vdbclass/`: a `.vdb` level set read as an SDF (ADR-0047's amendment of
+  2026-11-06)
 - No spike: B-003 and B-004, both no, questions of scope (ADR-0012's amendment of
   2026-11-02)
 

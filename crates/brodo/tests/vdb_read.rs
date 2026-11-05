@@ -6,6 +6,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
+use brodo::cache::CacheEntry;
 use brodo::error::VdbError;
 use brodo::field::AnyField;
 use brodo::field::Field;
@@ -85,17 +86,24 @@ fn listing_of(file: &VdbFile) -> Listing {
     (grids, file.skipped.iter().cloned().collect())
 }
 
+/// OpenVDB's listing as brodo is to read it: a float grid of `class` `level set` stating
+/// the SDF convention in its place, as each such grid of these files meets ARCHITECTURE.md
+/// §4.7's conditions (ADR-0047).
 fn listing_expected(text: &str) -> Listing {
     let (mut grids, mut skipped) = (BTreeMap::new(), BTreeSet::new());
-    let mut name = String::new();
+    let (mut name, mut float) = (String::new(), false);
+    let level_set = format!("meta class {}", hex(b"level set"));
+    let sdf = format!("meta {SDF_KEY} {}", hex(SDF_VERSION.as_bytes()));
     for line in text.lines() {
         if let Some(n) = line.strip_prefix("skipped ") {
             skipped.insert(n.to_owned());
         } else {
             if let Some(rest) = line.strip_prefix("grid ") {
                 name = rest.split(' ').next().unwrap().to_owned();
+                float = rest.ends_with(" Tree_float_5_4_3");
             }
-            grids.entry(name.clone()).or_insert_with(Vec::new).push(line.to_owned());
+            let line = if float && line == level_set { sdf.clone() } else { line.to_owned() };
+            grids.entry(name.clone()).or_insert_with(Vec::new).push(line);
         }
     }
     (grids, skipped)
@@ -182,6 +190,125 @@ fn a_grid_brodo_writes_reads_back_the_same() {
         lines_of(&file.grids[0].meta, &file.grids[0].topology, g2),
         lines_of(&file.grids[0].meta, &t, &g)
     );
+}
+
+/// A level set brodo writes, of `f32`: voxel size 0.25 and a translation, background `bg`,
+/// a leaf of `leaf`'s values by index, and a lower and an upper tile of `tiles`.
+fn level_set(
+    bg: f32,
+    leaf: impl Fn(usize) -> f32,
+    tiles: [f32; 2],
+) -> (GridMeta, Topology, Field<f32>) {
+    let empty = Topology::new();
+    let mut e = empty.edit();
+    e.activate([0, 0, 0]).unwrap();
+    e.add_tile(TileLevel::Lower, [8, 8, 8]).unwrap();
+    e.add_tile(TileLevel::Upper, [128, 0, 0]).unwrap();
+    let t = e.commit().unwrap().0;
+    let mut f = Field::new(&t, bg);
+    for n in t.leaf_numbers() {
+        for (k, v) in f.leaf_mut(&t, n).unwrap().iter_mut().enumerate() {
+            *v = leaf(k);
+        }
+    }
+    for (n, v) in t.tile_numbers().zip(tiles) {
+        f.set_tile(&t, n, v).unwrap();
+    }
+    let mut m = GridMeta::new("ls", [0.25; 3], "mm").unwrap();
+    for (row, o) in m.transform.iter_mut().zip([-3.5, 0.75, 12.0]) {
+        row[3] = o;
+    }
+    m.extra.insert(SDF_KEY.to_owned(), SDF_VERSION.to_owned());
+    (m, t, f)
+}
+
+/// Leaf values from −0.75 to 0.75 by index, both ends among them.
+fn banded(k: usize) -> f32 {
+    (k as f32 / 511.0).mul_add(1.5, -0.75)
+}
+
+/// Whether a grid read states the SDF convention, `class` gone, or keeps `class` as
+/// `level set` without it: one of the two, ARCHITECTURE.md §4.7.
+fn states_sdf(m: &GridMeta) -> bool {
+    match (m.extra.get(SDF_KEY), m.extra.get("class")) {
+        (Some(v), None) if v == SDF_VERSION => true,
+        (None, Some(c)) if c == "level set" => false,
+        other => panic!("neither the convention nor class level set: {other:?}"),
+    }
+}
+
+#[test]
+fn an_sdf_brodo_writes_reads_back_stating_the_convention() {
+    let (m, t, f) = level_set(0.75, banded, [0.75, -0.75]);
+    let file = round_trip(&m, &t, &f);
+    let g = &file.grids[0];
+    let AnyField::F32(f2) = &g.field else { panic!("not a float grid") };
+    assert!(states_sdf(&g.meta));
+    assert_eq!(g.meta, m);
+    assert_eq!(lines_of(&g.meta, &g.topology, f2), lines_of(&m, &t, &f));
+    // CacheEntry::new takes the convention's key, and no other of brodo's (ADR-0047).
+    CacheEntry::new(&g.meta, &g.topology, f2).unwrap();
+}
+
+#[test]
+fn a_level_set_breaking_one_condition_keeps_its_class() {
+    let next = |x: f32| x.next_up();
+    let cases = [
+        ("background 0", level_set(0.0, |_| 0.0, [0.0, 0.0])),
+        ("background negative", level_set(-1.0, |_| 0.0, [1.0, -1.0])),
+        (
+            "background infinite",
+            level_set(f32::INFINITY, banded, [f32::INFINITY, f32::NEG_INFINITY]),
+        ),
+        (
+            "a leaf value above it",
+            level_set(0.75, |k| if k == 300 { next(0.75) } else { banded(k) }, [0.75, -0.75]),
+        ),
+        (
+            "a leaf value below its negation",
+            level_set(0.75, |k| if k == 3 { -next(0.75) } else { banded(k) }, [0.75, -0.75]),
+        ),
+        (
+            "a leaf value NaN",
+            level_set(0.75, |k| if k == 9 { f32::NAN } else { banded(k) }, [0.75, -0.75]),
+        ),
+        ("a tile neither", level_set(0.75, banded, [0.75, 0.5])),
+    ];
+    for (why, (m, t, f)) in cases {
+        assert!(!states_sdf(&round_trip_meta(&m, &t, &f)), "{why}");
+    }
+    let (m, t, _) = level_set(0.75, banded, [0.75, -0.75]);
+    let g = Field::new(&t, 0.75_f64);
+    assert!(!states_sdf(&round_trip_meta(&m, &t, &g)), "of f64");
+    let (mut m, t, f) = level_set(0.75, banded, [0.75, -0.75]);
+    m.extra.clear();
+    let read = round_trip_meta(&m, &t, &f);
+    assert_eq!(read.extra, BTreeMap::from([("class".to_owned(), "unknown".to_owned())]));
+}
+
+#[test]
+fn voxel_sizes_apart_by_16_epsilon_are_equal_and_by_more_are_not() {
+    // x's column of length 1 + 2⁻⁴⁸, exact, against 1 along y and z: 16 ε apart.
+    for (scale, sdf) in [(1.0 + 16.0 * f64::EPSILON, true), (1.0 + 32.0 * f64::EPSILON, false)] {
+        let (mut m, t, f) = level_set(0.75, banded, [0.75, -0.75]);
+        m.voxel_size = [scale, 1.0, 1.0];
+        m.transform = [[scale, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0]];
+        let read = round_trip_meta(&m, &t, &f);
+        assert_eq!(
+            read.voxel_size.map(f64::to_bits),
+            [scale, 1.0, 1.0].map(f64::to_bits),
+            "the sizes measured are the ones meant"
+        );
+        assert_eq!(states_sdf(&read), sdf, "x's size {scale}");
+    }
+}
+
+fn round_trip_meta<T: VdbValue + PartialEq + std::fmt::Debug>(
+    m: &GridMeta,
+    t: &Topology,
+    f: &Field<T>,
+) -> GridMeta {
+    round_trip(m, t, f).grids.remove(0).meta
 }
 
 /// Where the first grid's body starts, and its compression flags with it.

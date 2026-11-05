@@ -14,7 +14,7 @@ use crate::cache::read_within;
 use crate::error::VdbError;
 use crate::field::local_index;
 use crate::field::{AnyField, Field, LEAF_VOXELS};
-use crate::meta::GridMeta;
+use crate::meta::{GridMeta, SDF_KEY, SDF_VERSION};
 use crate::topology::Topology;
 use crate::tree::{Coord, TileLevel};
 use crate::tree::{LEAF_LOG2, LOWER_DIM_LOG2, LOWER_SPAN_LOG2, UPPER_DIM_LOG2, UPPER_SPAN_LOG2};
@@ -45,6 +45,13 @@ const ROOT_EDGE: i32 = 1 << UPPER_SPAN_LOG2;
 const TILE: u64 = 256;
 const LOWER_NODE: u64 = 2 * 1024 + 512;
 const UPPER_NODE: u64 = 2 * 8192 + 2048;
+/// OpenVDB's metadata entry naming a grid's class, and the class of a level set.
+const CLASS: &str = "class";
+const LEVEL_SET: &str = "level set";
+/// How far apart, relative to the least, a level set's three voxel sizes may lie to be
+/// equal (ARCHITECTURE.md §4.7): 3.6 times the most measured under a rotated map, 4.38 ε
+/// (`spikes/vdbclass/`, 2026-11-06).
+const SPREAD: f64 = 16.0 * f64::EPSILON;
 
 /// One grid read from an OpenVDB file (docs/formats.md §9.7).
 #[derive(Debug, Clone)]
@@ -75,10 +82,12 @@ pub struct VdbFile {
 /// no unit, so `unit` is every grid's. The leaves, tiles and nodes it makes are counted as
 /// ARCHITECTURE.md §4.7 states, and more than `limit` bytes is refused before it is made.
 ///
-/// A grid's string metadata is kept in its free pairs as the file holds it, so a key
-/// beginning `brodo.` there, but `SDF_KEY`, makes `CacheEntry::new` refuse the grid with
-/// `ReservedKey` (docs/formats.md §3.3): remove such a key before writing the grid to a
-/// cache file.
+/// A grid's string metadata is kept in its free pairs as the file holds it, but for a level
+/// set's `class`, which a float grid meeting ARCHITECTURE.md §4.7's conditions has
+/// replaced by `SDF_KEY` = `SDF_VERSION`; any other grid keeps `class`, and states the SDF
+/// convention only if the file holds `SDF_KEY` itself. A key beginning `brodo.` there, but
+/// `SDF_KEY`, makes `CacheEntry::new` refuse the grid with `ReservedKey` (docs/formats.md
+/// §3.3): remove such a key before writing the grid to a cache file.
 pub fn from_bytes(bytes: &[u8], unit: &str, limit: u64) -> Result<VdbFile, VdbError> {
     let mut budget = Budget { left: limit, limit };
     let mut c = Cursor { bytes, at: 0 };
@@ -120,6 +129,8 @@ pub fn read(path: &Path, unit: &str, limit: u64) -> Result<VdbFile, VdbError> {
 /// A value type read: its bytes, its negation and its bits.
 trait Scalar: VdbValue + std::ops::Neg<Output = Self> {
     const SIZE: usize;
+    /// Whether a grid of the type may state the SDF convention (docs/formats.md §5).
+    const SDF: bool;
     /// What a leaf is counted to make (ARCHITECTURE.md §4.7): its values twice, in the
     /// reader's map and the field, and 1024 bytes for its mask, origin and numbers.
     const LEAF: u64;
@@ -128,10 +139,14 @@ trait Scalar: VdbValue + std::ops::Neg<Output = Self> {
 
     /// Whether two values have the same bits.
     fn same(self, other: Self) -> bool;
+
+    /// The value as `f64`, exactly.
+    fn wide(self) -> f64;
 }
 
 impl Scalar for f32 {
     const SIZE: usize = 4;
+    const SDF: bool = true;
     const LEAF: u64 = 2 * 512 * 4 + 1024;
 
     fn get(bytes: &[u8]) -> Option<Self> {
@@ -141,10 +156,15 @@ impl Scalar for f32 {
     fn same(self, other: Self) -> bool {
         self.to_bits() == other.to_bits()
     }
+
+    fn wide(self) -> f64 {
+        f64::from(self)
+    }
 }
 
 impl Scalar for f64 {
     const SIZE: usize = 8;
+    const SDF: bool = false;
     const LEAF: u64 = 2 * 512 * 8 + 1024;
 
     fn get(bytes: &[u8]) -> Option<Self> {
@@ -153,6 +173,10 @@ impl Scalar for f64 {
 
     fn same(self, other: Self) -> bool {
         self.to_bits() == other.to_bits()
+    }
+
+    fn wide(self) -> f64 {
+        self
     }
 }
 
@@ -331,8 +355,29 @@ fn grid<T: Scalar>(
     if c.at != d.end {
         return Err(VdbError::Malformed("leaf buffers' end"));
     }
+    if T::SDF
+        && meta.extra.get(CLASS).is_some_and(|c| c == LEVEL_SET)
+        && is_sdf(meta.voxel_size, &tree, background)
+    {
+        meta.extra.remove(CLASS);
+        meta.extra.insert(SDF_KEY.to_owned(), SDF_VERSION.to_owned());
+    }
     let (t, f) = build(&tree, background)?;
     Ok((meta, t, f))
+}
+
+/// Whether a level set meets the conditions under which it is read as stating the SDF
+/// convention (ARCHITECTURE.md §4.7): voxel sizes within `SPREAD` of each other, a positive
+/// finite background, every leaf value within ±background, and every tile kept ±background.
+fn is_sdf<T: Scalar>(size: [f64; 3], tree: &Tree<T>, background: T) -> bool {
+    let b = background.wide();
+    let [x, y, z] = size;
+    let (least, most) = (x.min(y).min(z), x.max(y).max(z));
+    most - least <= SPREAD * least
+        && b > 0.0
+        && b.is_finite()
+        && tree.leaves.values().all(|l| l.iter().all(|v| v.wide().abs() <= b))
+        && tree.tiles.values().all(|v| v.same(background) || v.same(-background))
 }
 
 /// A leaf's values from OpenVDB's place order, z fastest, to brodo's, x fastest.

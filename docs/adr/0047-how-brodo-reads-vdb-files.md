@@ -105,3 +105,29 @@ and the field holding them, and 1024 more; a tile 256, against about 160 made; a
 two masks twice, the editor's tree and the one it commits, and room for the rest, 2560 a
 lower node and 18 432 an upper node. Each case made less than it was counted, beside the
 file's bytes, the least margin on upper nodes, 617 MB made against 696 MB counted.
+
+## Amendment: a level set read as an SDF
+
+- **Date**: 2026-11-06
+
+T14's survey (2026-11-05) found that an SDF brodo writes to a `.vdb`, marked `class` =
+`level set` (docs/formats.md §9.3), read back without `brodo.sdf.version`, which the
+decision above withheld from every grid, and that a level set OpenVDB wrote, read and
+written again by brodo, became `class` = `unknown`, since the writer derives `class` from
+that key alone. The spike `spikes/vdbclass/` (2026-11-06, `spikes/vdbclass/REPORT.md`) had
+OpenVDB 14.0.0's tools make fifteen level sets, of spheres, a cube, an icosahedron, CSG,
+two filters, a rebuild and meshes of up to 101 760 triangles under uniform, translated,
+rotated and non-uniform maps. Every one held its leaf values within ±background, not one
+by a step outside, and its tiles at ±background; the thirteen of `f32` with uniform maps
+met every condition below. Under 2000 rotated maps OpenVDB wrote, and 100 000 brodo wrote,
+the three voxel sizes brodo reads were exactly equal for 45% and 25% of grids, and at most
+2.25 ε and 4.38 ε apart, relative to the least.
+
+The owner decided, on 2026-11-06, as proposed: a grid of `f32` whose `class` is
+`level set` is read as stating the convention, `class` replaced by `brodo.sdf.version` =
+`2`, when its voxel sizes lie within 16 ε of each other, relative to the least, 3.6 times
+the most measured; its background is positive and finite; every leaf value lies within
+±background, none NaN; and every tile kept is ±background. Any other grid keeps `class`
+as before, a level set of `f64` among them, since §5 holds `f32` alone. That the values
+are signed distances, negative inside, cannot be checked, and is taken from OpenVDB's
+convention for level sets. ARCHITECTURE.md §4.7 states the conditions.
