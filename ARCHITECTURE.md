@@ -237,7 +237,10 @@ fastest. A neighbour beyond the `i32` coordinate range is the background.
   name, value type, voxel size and unit, affine transform, bounding box and free
   key-value metadata, the topology and the values; and entries of bytes, each a name,
   free pairs and bytes the profile does not read, for a format built on it,
-  Hermite data's crossings among them (`CacheEntry::bytes`, `CacheFile::bytes_entries`). A
+  Hermite data's crossings among them (`CacheEntry::bytes`). A file read gives its grids
+  and its entries of bytes each as a list in the file's order, `CacheFile::grids` and
+  `CacheFile::bytes_entries`, a grid's facts, view and thawing reached from its
+  `GridEntry` (ADR-0057). A
   bare frozen buffer, a file of its own, holds one grid's header, topology and values
   (docs/formats.md §2).
 - A grid's metadata is a `GridMeta`, apart from `Grid<T>`, so that any topology and field
@@ -259,9 +262,9 @@ fastest. A neighbour beyond the `i32` coordinate range is the background.
   eight bytes, its magic number (`kind::FileKind::of`), whatever features are built; that
   the rest is of the kind is its reader's to check (ADR-0056).
 - A cache file's or an archive's grid thaws whole into its topology and an `AnyField` of
-  the type the file states (`CacheFile::thaw`), refused if what thawing it is counted to
+  the type the file states (`GridEntry::thaw`), refused if what thawing it is counted to
   make passes the limit given: each leaf its values' bytes and 1024 more, each tile 256
-  (`CacheFile::thaw_size`). Its nodes are not counted, and make about twice the bytes they
+  (`GridEntry::thaw_size`). Its nodes are not counted, and make about twice the bytes they
   take in the file (`spikes/thawmemory/`, 2026-11-03; ADR-0050, ADR-0056).
 - A file brodo writes at a path, a cache file, an archive, a `.vdb`, a `.vtu` or a PNG, is
   written whole: to a hidden file beside it, flushed and renamed over it, so that a
@@ -495,7 +498,7 @@ Rust. It uses no GPU and no window.
   file are refused by name. Every file is read whole through brodo's readers, under a
   limit of 4 GiB that `--limit` changes, which bounds the file and what reading makes as
   each reader's does (§4.7); a cache file is read, not mapped. A cache file's or an
-  archive's grids are then thawed by `CacheFile::thaw`, what thawing each is counted to
+  archive's grids are then thawed by `GridEntry::thaw`, what thawing each is counted to
   make (§4.7) counted first against the same limit, all the grids' together. A `.vdb`'s grids take the unit `unstated`, OpenVDB stating
   none, and its grids brodo does not read are listed as skipped.
 - **`info`** writes to standard output, one fact a line, a cache file's or an archive's

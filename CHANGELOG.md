@@ -61,25 +61,32 @@ archive profiles stay at version 2, and version 1 of them is no longer read nor 
   before reading it. `ReadError` gains `Io` and no longer derives `Clone`, `PartialEq` or
   `Eq`.
 - A stored value type is named by `field::ValueType` (ADR-0056): `Stored::TYPE_CODE` is
-  `Stored::VALUE_TYPE`; `CacheFile::value_type` and `Region::value_type` return a
+  `Stored::VALUE_TYPE`; a grid's and a region's `value_type` return a
   `ValueType`; `FormatError::WrongValueType` holds two, and a header of the type asked for
   but another size is `Inconsistent("header")`; `CacheError::NotQuantised` holds an
   `Option<ValueType>`, `None` for an entry of bytes.
 - `vdb::VdbField` is gone: `VdbGrid::field` is a `field::AnyField`, which holds a field of
-  any stored type. `CacheFile::thaw` and `CacheFile::thaw_size` thaw a grid of the type its
+  any stored type. `GridEntry::thaw` and `GridEntry::thaw_size` thaw a grid of the type its
   file states within a limit, refused as `CacheError::ThawTooLarge`. `kind::FileKind::of`
   tells a file's kind by its first bytes.
 - mestolo's `MestoloError::ValueType`, `NotScalar` and `NotWritten` name a `ValueType`.
+- A cache file's grids are reached as its entries of bytes are (ADR-0057):
+  `CacheFile::grids` gives a `GridEntry` for each, with `index`, `meta`, `bounds`,
+  `value_type`, `view`, `thaw_size` and `thaw`; `CacheFile::grid_count`, `meta`, `bounds`,
+  `value_type` and `view`, which took a grid's number, are gone. `grids().len()` counts
+  them.
+- `CacheEntry::with_reserved_keys` and `CacheEntry::bytes_with_reserved_keys` are
+  `#[doc(hidden)]`: they stay for brodo's own formats and for tests, and promise nothing.
 
 A file of version 1, written by 0.8 or earlier or by 0.9.0 on request, is first read by
 0.9.0 and written again by it, at version 2. A file of version 2 then converts with this
 release alone, its grids and entries of bytes still read as a cache file
-(`CacheFile::view`, `GridView::thaw`, `CacheFile::bytes_entries`), and written again with
+(`GridEntry::view`, `GridView::thaw`, `CacheFile::bytes_entries`), and written again with
 each key renamed:
 
 - a Hermite set of version 2: the sign grid and the entry of crossings, each `hermite.*`
   key renamed `brodo.hermite.*` and `brodo.hermite.version` set to `3`, written with
-  `CacheEntry::with_reserved_keys` and `CacheEntry::bytes_with_reserved_keys`;
+  the hidden `CacheEntry::with_reserved_keys` and `CacheEntry::bytes_with_reserved_keys`;
 - a Hermite set of version 1, ten dense grids in a cache file 0.9.0 wrote again: its grids
   thawed, every leaf value other than fraction −1, normal zero and group 0 given to
   `Crossings::builder` leaf by leaf, the set made by `Hermite::new` with the sign grid and

@@ -103,18 +103,18 @@ pub fn load(input: &Input) -> Result<Loaded, MestoloError> {
 }
 
 /// Each grid thawed, refused once what thawing the grids is counted to make
-/// (`CacheFile::thaw_size`) passes `limit` (ADR-0050).
+/// (`GridEntry::thaw_size`) passes `limit` (ADR-0050).
 fn from_cache(file: CacheFile, kind: Kind, limit: u64) -> Result<Loaded, MestoloError> {
     let mut grids = Vec::new();
     let mut left = limit;
-    for i in 0..file.grid_count() {
-        let need = file.thaw_size(i)?;
+    for g in file.grids() {
+        let need = g.thaw_size()?;
         left = left.checked_sub(need).ok_or(MestoloError::TooMuchToThaw {
             counted: (limit - left).saturating_add(need),
             limit,
         })?;
-        let (topology, field) = file.thaw(i, need)?;
-        grids.push(Grid { meta: file.meta(i)?.clone(), topology, field });
+        let (topology, field) = g.thaw(need)?;
+        grids.push(Grid { meta: g.meta().clone(), topology, field });
     }
     let bytes = file.bytes_entries().iter().map(|b| (b.name.to_owned(), b.bytes.len())).collect();
     Ok(Loaded { kind, grids, skipped: Vec::new(), bytes })

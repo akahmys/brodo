@@ -561,8 +561,8 @@ since crates.io yanks a version but never deletes it.
         readers and mestolo's output with them (ADR-0055)
   - [x] a value type named by an enum, and a field of any stored type, a cache file's
         grid thawed as one within a limit and a file's kind told by brodo (ADR-0056)
-  - [ ] a cache file's grids reached as its entries of bytes are; the reserved-key writers
-        hidden
+  - [x] a cache file's grids reached as its entries of bytes are; the reserved-key writers
+        hidden (ADR-0057)
   - [ ] the errors' shapes, places and features made even
 - [x] One prefix of metadata keys reserved for the formats brodo builds on the cache
       profile after 1.0, such as `brodo.`, `hermite.` kept as it is, so that each later

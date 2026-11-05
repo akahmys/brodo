@@ -766,7 +766,7 @@ impl Region {
     }
 
     /// The bounds the archive states for the grid, not checked against it, as
-    /// `CacheFile::bounds` gives them.
+    /// `GridEntry::bounds` gives them.
     pub fn bounds(&self) -> Bounds {
         self.bounds
     }

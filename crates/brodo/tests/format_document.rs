@@ -152,10 +152,10 @@ fn same_grid(bytes: &[u8], code: u32, lines: &[String]) {
 fn same_cache_grid(file: &CacheFile, i: usize, lines: &[String]) {
     macro_rules! values {
         ($t:ty) => {
-            same_values(&file.view::<$t>(i).unwrap(), lines)
+            same_values(&file.grids()[i].view::<$t>().unwrap(), lines)
         };
     }
-    let m = file.meta(i).unwrap();
+    let m = file.grids()[i].meta();
     let mut pairs = Vec::new();
     for line in lines {
         let w: Vec<&str> = line.split(' ').collect();
@@ -173,7 +173,7 @@ fn same_cache_grid(file: &CacheFile, i: usize, lines: &[String]) {
                 assert_eq!(w[1..], ours, "transform");
             }
             "bounds" => {
-                let ours = match file.bounds(i).unwrap() {
+                let ours = match file.grids()[i].bounds() {
                     Bounds::Empty => vec!["empty".to_owned()],
                     Bounds::Box { min, max } => {
                         min.iter().chain(&max).map(ToString::to_string).collect()
@@ -188,7 +188,7 @@ fn same_cache_grid(file: &CacheFile, i: usize, lines: &[String]) {
     let ours: Vec<_> =
         m.extra.iter().map(|(k, v)| (hex(k.as_bytes()), hex(v.as_bytes()))).collect();
     assert_eq!(pairs, ours, "free pairs");
-    match file.value_type(i).unwrap().code() {
+    match file.grids()[i].value_type().code() {
         1 => values!(f32),
         2 => values!(f64),
         3 => values!(u8),
@@ -228,9 +228,9 @@ fn crates_read(bytes: &[u8]) -> Vec<String> {
     }
     let Ok(file) = cache_file(bytes) else { return vec!["refused".to_owned()] };
     let mut out = vec!["accepted".to_owned()];
-    let mut sets: Vec<String> = (0..file.grid_count())
+    let mut sets: Vec<String> = (0..file.grids().len())
         .filter_map(|i| {
-            let extra = &file.meta(i).unwrap().extra;
+            let extra = &file.grids()[i].meta().extra;
             extra.get("brodo.hermite.set").or_else(|| extra.get("hermite.set")).cloned()
         })
         .collect();
@@ -279,9 +279,9 @@ fn the_document_s_reader_reads_every_golden_file_as_the_crates_do() {
             continue;
         }
         let file = cache_file(&bytes).unwrap();
-        assert_eq!(grids.len(), file.grid_count(), "{name}: grid count");
+        assert_eq!(grids.len(), file.grids().len(), "{name}: grid count");
         for (i, (code, lines)) in grids.iter().enumerate() {
-            assert_eq!(*code, file.value_type(i).unwrap().code(), "{name}: grid {i}'s type");
+            assert_eq!(*code, file.grids()[i].value_type().code(), "{name}: grid {i}'s type");
             same_cache_grid(&file, i, lines);
         }
         let hermite: Vec<String> =
@@ -404,7 +404,7 @@ fn the_document_s_reader_reads_every_region_of_the_archives_as_the_crates_do() {
     for golden in ARCHIVES {
         let path = data(golden).display().to_string();
         let bytes = std::fs::read(&path).unwrap();
-        for index in 0..cache_file(&bytes).unwrap().grid_count() {
+        for index in 0..cache_file(&bytes).unwrap().grids().len() {
             for b in BOXES {
                 let mut args = region_args(index, b);
                 args.push(path.clone());

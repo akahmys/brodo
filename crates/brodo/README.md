@@ -88,8 +88,9 @@ assert_eq!(euler(&t, &solid, inside, Connectivity::TwentySix)?, 1);
 let meta = GridMeta::new("ball", [0.1; 3], "millimeter")?;
 let bytes = to_bytes(&[CacheEntry::new(&meta, &t, &solid)?])?;
 let file = brodo::cache::from_bytes(&bytes)?;
-assert_eq!(file.meta(0)?.name, "ball");
-assert_eq!(file.view::<u8>(0)?.get([8, 4, 4])?, 1);
+let grid = file.grids()[0];
+assert_eq!(grid.meta().name, "ball");
+assert_eq!(grid.view::<u8>()?.get([8, 4, 4])?, 1);
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 

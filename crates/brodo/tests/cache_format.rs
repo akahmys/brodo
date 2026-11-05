@@ -81,11 +81,11 @@ proptest! {
         let bytes = to_bytes(&entries).unwrap();
         prop_assert_eq!(&to_bytes(&entries).unwrap(), &bytes, "same grids, same bytes");
         let file = brodo::cache::from_bytes(&bytes).unwrap();
-        prop_assert_eq!(file.grid_count(), 2);
-        prop_assert_eq!(file.meta(0).unwrap(), &m);
-        prop_assert_eq!(file.bounds(0).unwrap(), Bounds::of(&t).unwrap());
-        prop_assert_eq!(file.value_type(1).unwrap(), ValueType::U8);
-        let (a, b) = (file.view::<f32>(0).unwrap(), file.view::<u8>(1).unwrap());
+        prop_assert_eq!(file.grids().len(), 2);
+        prop_assert_eq!(file.grids()[0].meta(), &m);
+        prop_assert_eq!(file.grids()[0].bounds(), Bounds::of(&t).unwrap());
+        prop_assert_eq!(file.grids()[1].value_type(), ValueType::U8);
+        let (a, b) = (file.grids()[0].view::<f32>().unwrap(), file.grids()[1].view::<u8>().unwrap());
         for n in t.leaf_numbers() {
             let o = t.leaf_origin(n).unwrap();
             for v in [o, [o[0] + 7, o[1] + 3, o[2] + 5], [o[0] - 1, o[1], o[2]]] {
@@ -93,7 +93,7 @@ proptest! {
                 prop_assert_eq!(b.get(v).unwrap(), g.value_at(&t, v).unwrap());
             }
         }
-        let wrong = matches!(file.view::<f64>(0), Err(CacheError::Grid { index: 0, error: FormatError::WrongValueType { .. } }));
+        let wrong = matches!(file.grids()[0].view::<f64>(), Err(CacheError::Grid { index: 0, error: FormatError::WrongValueType { .. } }));
         prop_assert!(wrong, "a view of the wrong type is refused");
     }
 }
@@ -103,6 +103,32 @@ fn bounds_cover_leaves_and_tiles_and_an_empty_grid_has_none() {
     assert_eq!(Bounds::of(&Topology::new()).unwrap(), Bounds::Empty);
     let t = build(&[[-1, 0, 0]], &[(TileLevel::Upper, [128, 0, 0])]);
     assert_eq!(Bounds::of(&t).unwrap(), Bounds::Box { min: [-8, 0, 0], max: [255, 127, 127] });
+}
+
+/// A file's grids are listed in its order, numbered among themselves past its entries of
+/// bytes, each handle naming its number in the errors it gives.
+#[test]
+fn grids_are_listed_in_order_past_the_entries_of_bytes() {
+    let t = build(&[[0, 0, 0]], &[]);
+    let entries = [
+        CacheEntry::bytes("a", BTreeMap::new(), vec![1, 2, 3]).unwrap(),
+        CacheEntry::new(&meta("first", &[]), &t, &Field::new(&t, 1.0_f32)).unwrap(),
+        CacheEntry::bytes("b", BTreeMap::new(), vec![4]).unwrap(),
+        CacheEntry::new(&meta("second", &[]), &t, &Field::new(&t, 2_u8)).unwrap(),
+    ];
+    let file = brodo::cache::from_bytes(&to_bytes(&entries).unwrap()).unwrap();
+    let grids = file.grids();
+    let names: Vec<_> = grids.iter().map(|g| (g.index(), g.meta().name.as_str())).collect();
+    assert_eq!(names, [(0, "first"), (1, "second")]);
+    assert_eq!((grids[0].value_type(), grids[1].value_type()), (ValueType::F32, ValueType::U8));
+    assert_eq!(grids[1].bounds(), Bounds::Box { min: [0; 3], max: [7; 3] });
+    assert_eq!(grids[1].view::<u8>().unwrap().get([1, 2, 3]).unwrap(), 2);
+    assert!(matches!(
+        grids[1].view::<f32>(),
+        Err(CacheError::Grid { index: 1, error: FormatError::WrongValueType { .. } })
+    ));
+    let bytes: Vec<_> = file.bytes_entries().iter().map(|b| (b.name, b.bytes.to_vec())).collect();
+    assert_eq!(bytes, [("a", vec![1, 2, 3]), ("b", vec![4])]);
 }
 
 /// Keys beginning `brodo.` are brodo's formats' (U1 of P5's review, ADR-0053): refused by
@@ -182,12 +208,12 @@ fn format_version_2_keeps_its_bytes() {
     let bytes = to_bytes(&golden_entries_v2()).unwrap();
     assert!(bytes == GOLDEN_2, "the bytes of cache format version 2 changed; raise the version");
     let file = brodo::cache::from_bytes(GOLDEN_2).unwrap();
-    assert_eq!((file.version(), file.grid_count()), (2, 2));
+    assert_eq!((file.version(), file.grids().len()), (2, 2));
     let entries = file.bytes_entries();
     assert_eq!(entries.len(), 1);
     assert_eq!((entries[0].name, entries[0].bytes), ("readme", &b"brodo, 2026"[..]));
     assert_eq!(entries[0].extra.get("kind").map(String::as_str), Some("notes"));
-    assert_eq!(file.meta(1).unwrap().name, "velocity");
+    assert_eq!(file.grids()[1].meta().name, "velocity");
     let one = with_word(GOLDEN_2, 1, 1);
     assert!(matches!(brodo::cache::from_bytes(&one), Err(CacheError::UnsupportedVersion(1))));
 }
@@ -290,7 +316,7 @@ fn a_file_round_trips() {
     write(&path, &[CacheEntry::new(&meta("on disk", &[]), &t, &f).unwrap()]).unwrap();
     let file = brodo::cache::read(&path, u64::MAX).unwrap();
     assert_eq!(
-        file.view::<f64>(0).unwrap().get([3, 3, 3]).unwrap().to_bits(),
+        file.grids()[0].view::<f64>().unwrap().get([3, 3, 3]).unwrap().to_bits(),
         f.value_at(&t, [3, 3, 3]).unwrap().to_bits()
     );
 }
@@ -310,7 +336,7 @@ fn word(bytes: &[u8], w: usize) -> u32 {
 fn a_file_of_no_grid_is_its_header() {
     let bytes = to_bytes(&[]).unwrap();
     assert_eq!(bytes.len(), 32);
-    assert_eq!(brodo::cache::from_bytes(&bytes).unwrap().grid_count(), 0);
+    assert_eq!(brodo::cache::from_bytes(&bytes).unwrap().grids().len(), 0);
     let mut longer = bytes.clone();
     longer.extend([0; 32]);
     assert!(matches!(brodo::cache::from_bytes(&longer), Err(CacheError::Inconsistent("end"))));
@@ -462,9 +488,9 @@ proptest! {
             bytes.truncate(c.index(bytes.len()));
         }
         if let Ok(file) = brodo::cache::from_bytes(&bytes) {
-            for i in 0..file.grid_count() {
-                let _meta = file.meta(i);
-                if let Ok(view) = file.view::<f32>(i) {
+            for g in file.grids() {
+                let _meta = g.meta();
+                if let Ok(view) = g.view::<f32>() {
                     let _read = view.get([0, 0, 0]);
                 }
             }
@@ -490,15 +516,19 @@ fn a_mapped_file_reads_as_a_copied_one() {
         .unwrap(),
         brodo::cache::from_bytes(&bytes).unwrap(),
     );
-    assert_eq!(mapped.grid_count(), copied.grid_count());
-    for i in 0..copied.grid_count() {
-        assert_eq!(mapped.meta(i).unwrap(), copied.meta(i).unwrap());
-        assert_eq!(mapped.bounds(i).unwrap(), copied.bounds(i).unwrap());
-        assert_eq!(mapped.value_type(i).unwrap(), copied.value_type(i).unwrap());
+    assert_eq!(mapped.grids().len(), copied.grids().len());
+    for i in 0..copied.grids().len() {
+        assert_eq!(mapped.grids()[i].meta(), copied.grids()[i].meta());
+        assert_eq!(mapped.grids()[i].bounds(), copied.grids()[i].bounds());
+        assert_eq!(mapped.grids()[i].value_type(), copied.grids()[i].value_type());
     }
     let voxels = [[-1, 0, 0], [4096, 7, 9], [9, 9, 9], [0, 8200, 3], [50, 50, 50], [4100, 3, 15]];
-    let (a, b) = (mapped.view::<f32>(0).unwrap(), copied.view::<f32>(0).unwrap());
-    let (c, d) = (mapped.view::<[f32; 3]>(1).unwrap(), copied.view::<[f32; 3]>(1).unwrap());
+    let (a, b) =
+        (mapped.grids()[0].view::<f32>().unwrap(), copied.grids()[0].view::<f32>().unwrap());
+    let (c, d) = (
+        mapped.grids()[1].view::<[f32; 3]>().unwrap(),
+        copied.grids()[1].view::<[f32; 3]>().unwrap(),
+    );
     for v in voxels {
         assert_eq!(a.get(v).unwrap().to_bits(), b.get(v).unwrap().to_bits(), "at {v:?}");
         assert_eq!(
@@ -533,13 +563,13 @@ fn a_grid_of_f64_vectors_reads_copied_and_mapped() {
         .unwrap(),
         brodo::cache::from_bytes(&bytes).unwrap(),
     ] {
-        assert_eq!(file.value_type(1).unwrap(), ValueType::F64x3);
-        assert_eq!(file.meta(1).unwrap(), &meta("velocity", &[("precision", "double")]));
-        let view = file.view::<[f64; 3]>(1).unwrap();
+        assert_eq!(file.grids()[1].value_type(), ValueType::F64x3);
+        assert_eq!(file.grids()[1].meta(), &meta("velocity", &[("precision", "double")]));
+        let view = file.grids()[1].view::<[f64; 3]>().unwrap();
         for v in [[-1, 0, 0], [4100, 3, 15], [130, 5, 5], [50, 50, 50], [-9, 0, 0]] {
             assert_eq!(bits(view.get(v).unwrap()), bits(f.value_at(&t, v).unwrap()), "at {v:?}");
         }
-        let wrong = file.view::<[f32; 3]>(1).map(|_| ());
+        let wrong = file.grids()[1].view::<[f32; 3]>().map(|_| ());
         assert!(
             matches!(
                 wrong,
@@ -607,25 +637,25 @@ fn a_grid_thaws_as_its_type_within_its_limit() {
         CacheEntry::new(&m, &t, &numbered(&t, [0.0_f64; 3], |n| [f64::from(n); 3])).unwrap(),
     ];
     let file = brodo::cache::from_bytes(&to_bytes(&entries).unwrap()).unwrap();
+    let grids = file.grids();
     let sizes = [3 * (512 * 4 + 1024) + 256, 3 * (512 * 24 + 1024) + 256];
     for (i, need) in sizes.into_iter().enumerate() {
-        assert_eq!(file.thaw_size(i).unwrap(), need);
+        assert_eq!(grids[i].thaw_size().unwrap(), need);
         assert!(matches!(
-            file.thaw(i, need - 1),
+            grids[i].thaw(need - 1),
             Err(CacheError::ThawTooLarge { index, need: n, limit }) if index == i && n == need && limit == need - 1
         ));
     }
-    let (t0, f0) = file.thaw(0, sizes[0]).unwrap();
-    let (t1, f1) = file.thaw(1, u64::MAX).unwrap();
+    let (t0, f0) = grids[0].thaw(sizes[0]).unwrap();
+    let (t1, f1) = grids[1].thaw(u64::MAX).unwrap();
     assert_eq!((f0.value_type(), f1.value_type()), (ValueType::F32, ValueType::F64x3));
     let (AnyField::F32(f0), AnyField::F64x3(f1)) = (f0, f1) else { panic!("other types") };
-    let (v0, v1) = (file.view::<f32>(0).unwrap(), file.view::<[f64; 3]>(1).unwrap());
+    let (v0, v1) = (grids[0].view::<f32>().unwrap(), grids[1].view::<[f64; 3]>().unwrap());
     for v in [[0, 0, 0], [9, 1, 2], [0, 70, 0], [130, 0, 0], [500, 0, 0]] {
         assert_eq!(f0.value_at(&t0, v).unwrap().to_bits(), v0.get(v).unwrap().to_bits());
         assert!(f1.value_at(&t1, v).unwrap().same_bits(&v1.get(v).unwrap()));
     }
-    assert!(matches!(file.thaw_size(2), Err(CacheError::NoGrid(2))));
-    assert!(matches!(file.thaw(2, u64::MAX), Err(CacheError::NoGrid(2))));
+    assert_eq!(grids.len(), 2);
 }
 
 fn entries_u8(t: &Topology) -> Field<u8> {
@@ -659,14 +689,20 @@ fn every_value_type_is_written_and_read_back() {
     write(&path, &entries).unwrap();
     assert_eq!(std::fs::read(&path).ok(), Some(to_bytes(&entries).unwrap()));
     let file = brodo::cache::read(&path, u64::MAX).unwrap();
-    let codes: Vec<u32> = (0..6).map(|i| file.value_type(i).unwrap().code()).collect();
+    let codes: Vec<u32> = (0..6).map(|i| file.grids()[i].value_type().code()).collect();
     assert_eq!(codes, [1, 2, 3, 4, 5, 6]);
     let (u8s, u32s, f64s) =
         (entries_u8(&t), numbered(&t, 9_u32, |n| n * 3), numbered(&t, -1.0_f64, k));
     for v in [[-1, 0, 0], [4100, 7, 9], [9, 9, 9], [500, 0, 0]] {
-        assert_eq!(file.view::<u8>(2).unwrap().get(v).unwrap(), u8s.value_at(&t, v).unwrap());
-        assert_eq!(file.view::<u32>(3).unwrap().get(v).unwrap(), u32s.value_at(&t, v).unwrap());
-        let got = file.view::<f64>(1).unwrap().get(v).unwrap();
+        assert_eq!(
+            file.grids()[2].view::<u8>().unwrap().get(v).unwrap(),
+            u8s.value_at(&t, v).unwrap()
+        );
+        assert_eq!(
+            file.grids()[3].view::<u32>().unwrap().get(v).unwrap(),
+            u32s.value_at(&t, v).unwrap()
+        );
+        let got = file.grids()[1].view::<f64>().unwrap().get(v).unwrap();
         assert_eq!(got.to_bits(), f64s.value_at(&t, v).unwrap().to_bits(), "at {v:?}");
     }
 }

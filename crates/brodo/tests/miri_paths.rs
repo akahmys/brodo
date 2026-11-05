@@ -72,8 +72,8 @@ fn miri_a_cache_files_bytes_read_in_place() {
     let meta = GridMeta::new("probe", [1.0; 3], "voxel").unwrap();
     let bytes = to_bytes(&[CacheEntry::new(&meta, &t, &f).unwrap()]).unwrap();
     let file = brodo::cache::from_bytes(&bytes).unwrap();
-    assert_eq!(file.meta(0).unwrap(), &meta);
-    reads_as(&file.view::<f32>(0).unwrap(), &t, &f);
+    assert_eq!(file.grids()[0].meta(), &meta);
+    reads_as(&file.grids()[0].view::<f32>().unwrap(), &t, &f);
 }
 
 #[test]

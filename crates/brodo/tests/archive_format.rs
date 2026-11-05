@@ -98,11 +98,11 @@ fn format_version_2_keeps_its_bytes() {
     assert!(bytes == GOLDEN_2, "the bytes of archive format version 2 changed; raise the version");
     let file = from_bytes(GOLDEN_2, u64::MAX).unwrap();
     let cached = brodo::cache::from_bytes(&cache::to_bytes(&e).unwrap()).unwrap();
-    assert_eq!((file.version(), file.grid_count()), (cached.version(), cached.grid_count()));
+    assert_eq!((file.version(), file.grids().len()), (cached.version(), cached.grids().len()));
     assert!(file.bytes_entries()[0].bytes == b"brodo, 2026");
     assert_eq!(file.bytes_entries()[0].name, cached.bytes_entries()[0].name);
     for i in 0..2 {
-        assert_eq!(file.meta(i).unwrap(), cached.meta(i).unwrap());
+        assert_eq!(file.grids()[i].meta(), cached.grids()[i].meta());
     }
     let large: Vec<u8> = (0..600_000_u32).map(|i| (i % 251) as u8).collect();
     let big = [CacheEntry::bytes("large", Default::default(), large.clone()).unwrap()];
@@ -150,13 +150,13 @@ fn row(leaves: i32) -> Vec<CacheEntry> {
 
 /// Two files read alike: every grid's metadata, bounds, type and values at its leaves.
 fn same(a: &CacheFile, b: &CacheFile, t: &Topology) {
-    assert_eq!(a.grid_count(), b.grid_count());
-    for i in 0..a.grid_count() {
-        assert_eq!(a.meta(i).unwrap(), b.meta(i).unwrap());
-        assert_eq!(a.bounds(i).unwrap(), b.bounds(i).unwrap());
-        assert_eq!(a.value_type(i).unwrap(), b.value_type(i).unwrap());
+    assert_eq!(a.grids().len(), b.grids().len());
+    for i in 0..a.grids().len() {
+        assert_eq!(a.grids()[i].meta(), b.grids()[i].meta());
+        assert_eq!(a.grids()[i].bounds(), b.grids()[i].bounds());
+        assert_eq!(a.grids()[i].value_type(), b.grids()[i].value_type());
     }
-    let (x, y) = (a.view::<f32>(0).unwrap(), b.view::<f32>(0).unwrap());
+    let (x, y) = (a.grids()[0].view::<f32>().unwrap(), b.grids()[0].view::<f32>().unwrap());
     for n in t.leaf_numbers() {
         let o = t.leaf_origin(n).unwrap();
         for v in [o, [o[0] + 7, o[1] + 3, o[2] + 5], [o[0] - 1, o[1], o[2]]] {
@@ -226,7 +226,7 @@ fn word(bytes: &[u8], w: usize) -> u32 {
 fn a_file_of_no_grid_is_its_header() {
     let bytes = to_bytes(&[]).unwrap();
     assert_eq!(bytes.len(), 32);
-    assert_eq!(from_bytes(&bytes, u64::MAX).unwrap().grid_count(), 0);
+    assert_eq!(from_bytes(&bytes, u64::MAX).unwrap().grids().len(), 0);
     let mut longer = bytes.clone();
     longer.extend([0; 32]);
     assert!(matches!(from_bytes(&longer, u64::MAX), Err(CacheError::Inconsistent("end"))));
@@ -388,9 +388,9 @@ proptest! {
             bytes.truncate(c.index(bytes.len()));
         }
         if let Ok(file) = from_bytes(&bytes, 1 << 24) {
-            for i in 0..file.grid_count() {
-                let _meta = file.meta(i);
-                if let Ok(view) = file.view::<f32>(i) {
+            for g in file.grids() {
+                let _meta = g.meta();
+                if let Ok(view) = g.view::<f32>() {
                     let _read = view.get([0, 0, 0]);
                 }
             }
@@ -427,8 +427,9 @@ fn quantised_values_keep_their_bytes_and_read_back_within_their_bounds() {
         &[[-1, 0, 0], [4096, 7, 9]],
         &[(TileLevel::Lower, [8, 8, 8]), (TileLevel::Root, [0, 8192, 0])],
     );
-    let (a, x) = (file.view::<f32>(0).unwrap(), exact.view::<f32>(0).unwrap());
-    let (b, y) = (file.view::<[f32; 3]>(1).unwrap(), exact.view::<[f32; 3]>(1).unwrap());
+    let (a, x) = (file.grids()[0].view::<f32>().unwrap(), exact.grids()[0].view::<f32>().unwrap());
+    let (b, y) =
+        (file.grids()[1].view::<[f32; 3]>().unwrap(), exact.grids()[1].view::<[f32; 3]>().unwrap());
     // Within (hi − lo) / 510 of x, to the rounding of `f64` and of `f32`, half a step of x'.
     let eight_bit = |c: usize, x: f32| {
         EIGHT_BIT_RANGES[c] * (1.0 / EIGHT_BIT_DIVISOR + EIGHT_BIT_F64_ROUNDING)
@@ -518,8 +519,8 @@ fn quantised_grids_give_the_same_bytes_whatever_the_threads() {
     let one = on(1);
     assert_eq!(on(8), one);
     let back = from_bytes(&one, u64::MAX).unwrap();
-    let (t, f) = back.view::<f32>(0).unwrap().thaw().unwrap();
-    let again = CacheEntry::new(back.meta(0).unwrap(), &t, &f).unwrap();
+    let (t, f) = back.grids()[0].view::<f32>().unwrap().thaw().unwrap();
+    let again = CacheEntry::new(back.grids()[0].meta(), &t, &f).unwrap();
     let first = to_bytes_with(&[(&e[0], Encoding::Binary16)]).unwrap();
     assert_eq!(to_bytes_with(&[(&again, Encoding::Binary16)]).unwrap(), first);
 }
@@ -582,8 +583,8 @@ fn a_region_answers_within_its_box_as_the_whole_grid_does() {
         let region =
             region_from_bytes(&bytes, 1, Bounds::Box { min: [0; 3], max: [9; 3] }, u64::MAX);
         let v = region.unwrap();
-        assert_eq!(v.value_type(), whole.value_type(1).unwrap());
-        let (r, w) = (v.view::<[f64; 3]>().unwrap(), whole.view::<[f64; 3]>(1).unwrap());
+        assert_eq!(v.value_type(), whole.grids()[1].value_type());
+        let (r, w) = (v.view::<[f64; 3]>().unwrap(), whole.grids()[1].view::<[f64; 3]>().unwrap());
         assert_eq!(
             r.get([8, 0, 8]).unwrap().map(f64::to_bits),
             w.get([8, 0, 8]).unwrap().map(f64::to_bits)
@@ -601,12 +602,12 @@ fn a_region_answers_within_its_box_as_the_whole_grid_does() {
 /// The region `min` to `max` of grid 0 of `bytes`, whose whole read is `whole` and whose
 /// topology is `t`, answers as `whole` does within it and refuses what lies outside.
 fn same_within(bytes: &[u8], whole: &CacheFile, t: &Topology, min: Coord, max: Coord) {
-    let w = whole.view::<f32>(0).unwrap();
+    let w = whole.grids()[0].view::<f32>().unwrap();
     let region = region_from_bytes(bytes, 0, Bounds::Box { min, max }, u64::MAX).unwrap();
-    assert_eq!(region.meta(), whole.meta(0).unwrap());
-    assert_eq!(region.bounds(), whole.bounds(0).unwrap());
+    assert_eq!(region.meta(), whole.grids()[0].meta());
+    assert_eq!(region.bounds(), whole.grids()[0].bounds());
     assert_eq!(region.extent(), Bounds::Box { min, max });
-    assert_eq!(region.value_type(), whole.value_type(0).unwrap());
+    assert_eq!(region.value_type(), whole.grids()[0].value_type());
     let r = region.view::<f32>().unwrap();
     let want: Vec<(u32, Coord)> = t
         .leaf_numbers()
@@ -718,7 +719,11 @@ fn a_region_checks_the_archives_structure() {
     let r = full.view::<f32>().unwrap();
     assert_eq!(
         r.locate([8, 8, 8]).unwrap(),
-        from_bytes(&g, u64::MAX).unwrap().view::<f32>(0).unwrap().locate([8, 8, 8]).unwrap()
+        from_bytes(&g, u64::MAX).unwrap().grids()[0]
+            .view::<f32>()
+            .unwrap()
+            .locate([8, 8, 8])
+            .unwrap()
     );
     assert!(matches!(r.locate([8, 8, 8]).unwrap(), ViewLocation::Tile(..)));
     assert_eq!(r.background().to_bits(), (-1.0_f32).to_bits());
@@ -768,7 +773,7 @@ fn each_grid_is_restored_by_its_own_cut() {
         row_topology(1300),
     );
     let bits = |file: &CacheFile, i: usize, t: &Topology| -> Vec<u32> {
-        let v = file.view::<f32>(i).unwrap();
+        let v = file.grids()[i].view::<f32>().unwrap();
         t.leaf_numbers().flat_map(|n| v.leaf(n.get()).unwrap().map(f32::to_bits)).collect()
     };
     for encoding in [Encoding::Binary16, Encoding::EightBit] {

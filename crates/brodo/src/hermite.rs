@@ -742,19 +742,15 @@ fn group_table(meta: &GridMeta) -> Result<Vec<String>, HermiteError> {
 }
 
 /// Every key/value set of `file`'s entries, grids first, then entries of bytes.
-fn extras(file: &CacheFile) -> Result<Vec<&BTreeMap<String, String>>, HermiteError> {
-    let mut out = Vec::with_capacity(file.grid_count() + file.bytes_entries().len());
-    for i in 0..file.grid_count() {
-        out.push(&file.meta(i)?.extra);
-    }
-    out.extend(file.bytes_entries().into_iter().map(|b| b.extra));
-    Ok(out)
+fn extras(file: &CacheFile) -> Vec<&BTreeMap<String, String>> {
+    let grids = file.grids().into_iter().map(|g| &g.meta().extra);
+    grids.chain(file.bytes_entries().into_iter().map(|b| b.extra)).collect()
 }
 
 /// Checks that every entry of the set named `set` in `file` states this version, and that
 /// no set of that name was written by an earlier one, whose keys began `hermite.`.
 fn check_version(file: &CacheFile, set: &str) -> Result<(), HermiteError> {
-    for extra in extras(file)? {
+    for extra in extras(file) {
         if extra.get(KEY_SET).map(String::as_str) == Some(set) {
             let v = extra.get(KEY_VERSION).map(String::as_str).unwrap_or_default();
             if v != VERSION {
@@ -776,8 +772,8 @@ impl<'a> HermiteView<'a> {
     pub fn find(file: &'a CacheFile, set: &str) -> Result<HermiteView<'a>, HermiteError> {
         check_version(file, set)?;
         let mut sign = None;
-        for i in 0..file.grid_count() {
-            let extra = &file.meta(i)?.extra;
+        for g in file.grids() {
+            let extra = &g.meta().extra;
             if extra.get(KEY_SET).map(String::as_str) != Some(set) {
                 continue;
             }
@@ -785,7 +781,7 @@ impl<'a> HermiteView<'a> {
             if field != "sign" {
                 return Err(HermiteError::UnknownField(field));
             }
-            if sign.replace(i).is_some() {
+            if sign.replace(g).is_some() {
                 return Err(HermiteError::Twice("sign"));
             }
         }
@@ -810,11 +806,11 @@ impl<'a> HermiteView<'a> {
             }
         }
         let crossings = crossings.ok_or(HermiteError::Missing(CROSSINGS))?;
-        let signs: GridView<'a, u8> = file.view(sign)?;
+        let signs: GridView<'a, u8> = sign.view()?;
         let view = HermiteView {
             crossings: sparse(crossings, signs.leaf_count())?,
             signs,
-            group_names: group_table(file.meta(sign)?)?,
+            group_names: group_table(sign.meta())?,
         };
         let regions = view.signs.regions()?;
         check(&Viewed { set: &view, regions }, &view.group_names)?;

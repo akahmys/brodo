@@ -264,7 +264,7 @@ impl Data {
             repeated(
                 "cache_read",
                 16,
-                Box::new(|| Ok(brodo::cache::read(&self.file, u64::MAX)?.grid_count() as f64)),
+                Box::new(|| Ok(brodo::cache::read(&self.file, u64::MAX)?.grids().len() as f64)),
             ),
             repeated(
                 "cache_map",
@@ -274,7 +274,8 @@ impl Data {
                         // SAFETY: no process changes this benchmark's own files while they are mapped.
                         unsafe { CacheFile::map(&self.file) }
                     }?
-                    .grid_count() as f64)
+                    .grids()
+                    .len() as f64)
                 }),
             ),
         ]
@@ -296,12 +297,12 @@ impl Data {
             repeated(
                 "archive_read",
                 8,
-                Box::new(move || Ok(archive::read(exact, u64::MAX)?.grid_count() as f64)),
+                Box::new(move || Ok(archive::read(exact, u64::MAX)?.grids().len() as f64)),
             ),
             repeated(
                 "archive_read_8bit",
                 8,
-                Box::new(move || Ok(archive::read(eight, u64::MAX)?.grid_count() as f64)),
+                Box::new(move || Ok(archive::read(eight, u64::MAX)?.grids().len() as f64)),
             ),
             repeated(
                 "archive_region",

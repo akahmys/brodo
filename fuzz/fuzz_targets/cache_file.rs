@@ -4,7 +4,7 @@
 
 #![no_main]
 
-use brodo::cache::CacheFile;
+use brodo::cache::{CacheFile, GridEntry};
 use brodo::field::Stored;
 use brodo::topology::Topology;
 use libfuzzer_sys::fuzz_target;
@@ -13,11 +13,11 @@ use libfuzzer_sys::fuzz_target;
 mod probes;
 use probes::PROBES;
 
-/// Reads, thaws and compares grid `i` of `file` as a grid of `T`, if it is one: a voxel, its
+/// Reads, thaws and compares grid `g` of `file` as a grid of `T`, if it is one: a voxel, its
 /// leaves and one beyond them, its values on its own topology and on an empty one, and
 /// whether every grid of `T` holds its tree.
-fn exercise<T: Stored>(file: &CacheFile, i: usize) {
-    let Ok(view) = file.view::<T>(i) else { return };
+fn exercise<T: Stored>(file: &CacheFile, g: GridEntry<'_>) {
+    let Ok(view) = g.view::<T>() else { return };
     for v in PROBES {
         let _read = view.get(v);
     }
@@ -29,8 +29,8 @@ fn exercise<T: Stored>(file: &CacheFile, i: usize) {
         let _again = view.thaw_on(&t);
     }
     let _on_empty = view.thaw_on(&Topology::new());
-    for j in 0..file.grid_count() {
-        if let Ok(other) = file.view::<T>(j) {
+    for other in file.grids() {
+        if let Ok(other) = other.view::<T>() {
             let _same = view.same_topology(&other);
         }
     }
@@ -38,17 +38,18 @@ fn exercise<T: Stored>(file: &CacheFile, i: usize) {
 
 fuzz_target!(|data: &[u8]| {
     if let Ok(file) = brodo::cache::from_bytes(data) {
-        for i in 0..file.grid_count() {
-            let _meta = file.meta(i);
-            let _bounds = file.bounds(i);
-            let _type = file.value_type(i);
+        for g in file.grids() {
+            let _meta = g.meta();
+            let _bounds = g.bounds();
+            let _type = g.value_type();
+            let _size = g.thaw_size();
             // Every value type docs/formats.md §1.1 allows.
-            exercise::<f32>(&file, i);
-            exercise::<f64>(&file, i);
-            exercise::<u8>(&file, i);
-            exercise::<u32>(&file, i);
-            exercise::<[f32; 3]>(&file, i);
-            exercise::<[f64; 3]>(&file, i);
+            exercise::<f32>(&file, g);
+            exercise::<f64>(&file, g);
+            exercise::<u8>(&file, g);
+            exercise::<u32>(&file, g);
+            exercise::<[f32; 3]>(&file, g);
+            exercise::<[f64; 3]>(&file, g);
         }
     }
 });

@@ -6,7 +6,7 @@
 #![no_main]
 
 use brodo::archive::{Region, from_bytes, region_from_bytes};
-use brodo::cache::CacheFile;
+use brodo::cache::{CacheFile, GridEntry};
 use brodo::field::Stored;
 use brodo::meta::Bounds;
 use brodo::topology::Topology;
@@ -21,11 +21,11 @@ use probes::PROBES;
 
 const LIMIT: u64 = 1 << 26;
 
-/// Reads, thaws and compares grid `i` of `file` as a grid of `T`, if it is one: the probes, its
+/// Reads, thaws and compares grid `g` of `file` as a grid of `T`, if it is one: the probes, its
 /// leaves and one beyond them, its values on its own topology and on an empty one, and
 /// whether every grid of `T` holds its tree.
-fn whole<T: Stored>(file: &CacheFile, i: usize) {
-    let Ok(view) = file.view::<T>(i) else { return };
+fn whole<T: Stored>(file: &CacheFile, g: GridEntry<'_>) {
+    let Ok(view) = g.view::<T>() else { return };
     for v in PROBES {
         let _read = view.get(v);
     }
@@ -37,8 +37,8 @@ fn whole<T: Stored>(file: &CacheFile, i: usize) {
         let _again = view.thaw_on(&t);
     }
     let _on_empty = view.thaw_on(&Topology::new());
-    for j in 0..file.grid_count() {
-        if let Ok(other) = file.view::<T>(j) {
+    for other in file.grids() {
+        if let Ok(other) = other.view::<T>() {
             let _same = view.same_topology(&other);
         }
     }
@@ -60,16 +60,18 @@ fn region<T: Stored>(region: &Region) {
 
 fuzz_target!(|data: &[u8]| {
     if let Ok(file) = from_bytes(data, LIMIT) {
-        for i in 0..file.grid_count() {
-            let _meta = file.meta(i);
-            let _bounds = file.bounds(i);
+        for g in file.grids() {
+            let _meta = g.meta();
+            let _bounds = g.bounds();
+            let _type = g.value_type();
+            let _size = g.thaw_size();
             // Every value type docs/formats.md §1.1 allows.
-            whole::<f32>(&file, i);
-            whole::<f64>(&file, i);
-            whole::<u8>(&file, i);
-            whole::<u32>(&file, i);
-            whole::<[f32; 3]>(&file, i);
-            whole::<[f64; 3]>(&file, i);
+            whole::<f32>(&file, g);
+            whole::<f64>(&file, g);
+            whole::<u8>(&file, g);
+            whole::<u32>(&file, g);
+            whole::<[f32; 3]>(&file, g);
+            whole::<[f64; 3]>(&file, g);
         }
     }
     // Every grid the header states, as many as a directory entry a block each could hold,

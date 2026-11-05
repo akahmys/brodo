@@ -257,12 +257,12 @@ pub enum CacheError {
     #[error("grid {0} holds a leaf value its encoding cannot hold")]
     Unrepresentable(usize),
     /// Thawing a grid is counted to make more bytes than the limit given
-    /// (`CacheFile::thaw`), and it was not thawed.
+    /// (`GridEntry::thaw`), and it was not thawed.
     #[error("grid {index} would thaw to {need} bytes or more, more than the limit of {limit}")]
     ThawTooLarge {
         /// The grid's place in the file.
         index: usize,
-        /// The bytes thawing it is counted to make (`CacheFile::thaw_size`).
+        /// The bytes thawing it is counted to make (`GridEntry::thaw_size`).
         need: u64,
         /// The limit given.
         limit: u64,

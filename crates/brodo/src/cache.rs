@@ -63,7 +63,9 @@ impl CacheEntry {
     }
 
     /// As `new`, the metadata free to hold keys beginning `brodo.`: for a Hermite set's own
-    /// grids, or a file made on purpose to break its format, as a test of a reader.
+    /// grids, or a file made on purpose to break its format, as a test of a reader. Hidden,
+    /// it promises nothing to a user (ADR-0057).
+    #[doc(hidden)]
     pub fn with_reserved_keys<T: Stored>(
         meta: &GridMeta,
         t: &Topology,
@@ -95,7 +97,9 @@ impl CacheEntry {
     }
 
     /// As `bytes`, the pairs free to hold keys beginning `brodo.`: for a Hermite set's own
-    /// entry, or a file made on purpose to break its format, as a test of a reader.
+    /// entry, or a file made on purpose to break its format, as a test of a reader. Hidden,
+    /// it promises nothing to a user (ADR-0057).
+    #[doc(hidden)]
     pub fn bytes_with_reserved_keys(
         name: &str,
         extra: BTreeMap<String, String>,
@@ -732,19 +736,27 @@ pub fn from_bytes(bytes: &[u8]) -> Result<CacheFile, CacheError> {
 }
 
 impl CacheFile {
-    fn entry(&self, i: usize) -> Result<&Entry, CacheError> {
-        self.index.grids.get(i).ok_or(CacheError::NoGrid(i))
-    }
-
     /// The file's format version: 2 (docs/formats.md §3).
     pub fn version(&self) -> u32 {
         self.index.version
     }
 
-    /// The number of grids; an entry of bytes is not one, and grids are numbered among
-    /// themselves, in the file's order.
-    pub fn grid_count(&self) -> usize {
-        self.index.grids.len()
+    /// The grids, in the file's order, numbered among themselves: an entry of bytes is not
+    /// one.
+    pub fn grids(&self) -> Vec<GridEntry<'_>> {
+        let all = self.storage.bytes();
+        self.index
+            .grids
+            .iter()
+            .enumerate()
+            .map(|(index, e)| GridEntry {
+                index,
+                meta: &e.meta,
+                bounds: e.bounds,
+                value_type: e.value_type,
+                bytes: all.get(e.grid.clone()).unwrap_or_default(),
+            })
+            .collect()
     }
 
     /// The entries of bytes, in the file's order.
@@ -760,39 +772,54 @@ impl CacheFile {
             })
             .collect()
     }
+}
 
-    /// A grid's metadata.
-    pub fn meta(&self, i: usize) -> Result<&GridMeta, CacheError> {
-        Ok(&self.entry(i)?.meta)
+/// A grid a cache file holds (`CacheFile::grids`), checked whole when the file was read.
+#[derive(Debug, Clone, Copy)]
+pub struct GridEntry<'a> {
+    index: usize,
+    meta: &'a GridMeta,
+    bounds: Bounds,
+    value_type: ValueType,
+    bytes: &'a [u8],
+}
+
+impl<'a> GridEntry<'a> {
+    /// Its place among the file's grids, which `CacheError::Grid` names.
+    pub fn index(&self) -> usize {
+        self.index
     }
 
-    /// The bounds the file states for a grid: the box of the voxels its leaves and tiles
-    /// cover, checked against them (docs/formats.md §3.4).
-    pub fn bounds(&self, i: usize) -> Result<Bounds, CacheError> {
-        Ok(self.entry(i)?.bounds)
+    /// Its metadata.
+    pub fn meta(&self) -> &'a GridMeta {
+        self.meta
     }
 
-    /// The type of a grid's values.
-    pub fn value_type(&self, i: usize) -> Result<ValueType, CacheError> {
-        Ok(self.entry(i)?.value_type)
+    /// The bounds the file states for it: the box of the voxels its leaves and tiles cover,
+    /// checked against them (docs/formats.md §3.4).
+    pub fn bounds(&self) -> Bounds {
+        self.bounds
     }
 
-    /// A view of a grid's values of type `T`.
-    pub fn view<T: Stored>(&self, i: usize) -> Result<GridView<'_, T>, CacheError> {
-        let e = self.entry(i)?;
-        let bytes =
-            self.storage.bytes().get(e.grid.clone()).ok_or(CacheError::Truncated("grid"))?;
-        GridView::new(bytes).map_err(|error| CacheError::Grid { index: i, error })
+    /// The type of its values.
+    pub fn value_type(&self) -> ValueType {
+        self.value_type
     }
 
-    /// The bytes thawing a grid is counted to make (ARCHITECTURE.md §4.7): each leaf its
-    /// values' bytes and 1024 more, each tile 256. Its nodes are not counted.
-    pub fn thaw_size(&self, i: usize) -> Result<u64, CacheError> {
-        struct Size<'a>(&'a CacheFile, usize);
+    /// A view of its values of type `T`; another type is refused as `CacheError::Grid` with
+    /// `FormatError::WrongValueType`.
+    pub fn view<T: Stored>(&self) -> Result<GridView<'a, T>, CacheError> {
+        GridView::new(self.bytes).map_err(|error| CacheError::Grid { index: self.index, error })
+    }
+
+    /// The bytes thawing it is counted to make (ARCHITECTURE.md §4.7): each leaf its values'
+    /// bytes and 1024 more, each tile 256. Its nodes are not counted.
+    pub fn thaw_size(&self) -> Result<u64, CacheError> {
+        struct Size<'a>(GridEntry<'a>);
         impl ForType for Size<'_> {
             type Out = Result<u64, CacheError>;
             fn run<T: Stored>(self) -> Self::Out {
-                let view = self.0.view::<T>(self.1)?;
+                let view = self.0.view::<T>()?;
                 let values = u64::try_from(LEAF_VOXELS * size_of::<T>()).unwrap_or(u64::MAX);
                 let count =
                     |n: usize, each: u64| u64::try_from(n).unwrap_or(u64::MAX).saturating_mul(each);
@@ -800,30 +827,30 @@ impl CacheFile {
                     .saturating_add(count(view.tile_count(), THAW_TILE)))
             }
         }
-        with_type(self.entry(i)?.value_type, Size(self, i))
+        with_type(self.value_type, Size(*self))
     }
 
-    /// A grid thawed into its topology and a field of the type the file states, refused as
+    /// It thawed into its topology and a field of the type the file states, refused as
     /// `CacheError::ThawTooLarge` if thawing it is counted (`thaw_size`) to make more than
     /// `limit` bytes.
-    pub fn thaw(&self, i: usize, limit: u64) -> Result<(Topology, AnyField), CacheError> {
-        struct Thaw<'a>(&'a CacheFile, usize);
+    pub fn thaw(&self, limit: u64) -> Result<(Topology, AnyField), CacheError> {
+        struct Thaw<'a>(GridEntry<'a>);
         impl ForType for Thaw<'_> {
             type Out = Result<(Topology, AnyField), CacheError>;
             fn run<T: Stored>(self) -> Self::Out {
                 let (t, f) = self
                     .0
-                    .view::<T>(self.1)?
+                    .view::<T>()?
                     .thaw()
-                    .map_err(|error| CacheError::Grid { index: self.1, error })?;
+                    .map_err(|error| CacheError::Grid { index: self.0.index, error })?;
                 Ok((t, f.into()))
             }
         }
-        let need = self.thaw_size(i)?;
+        let need = self.thaw_size()?;
         if need > limit {
-            return Err(CacheError::ThawTooLarge { index: i, need, limit });
+            return Err(CacheError::ThawTooLarge { index: self.index, need, limit });
         }
-        with_type(self.entry(i)?.value_type, Thaw(self, i))
+        with_type(self.value_type, Thaw(*self))
     }
 }
 
