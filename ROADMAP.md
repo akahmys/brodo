@@ -15,11 +15,10 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   grown by accretion taken whole (ADR-0054 to ADR-0058), users' requests taken as issues
   the owner labels `owner-approved` (ADR-0049, amended), P9's retrospective (ADR-0001,
   ADR-0033, ADR-0035, amended), T14's survey of what each crate lacks, and its gaps in
-  brodo's core (ADR-0059) and formats (ADR-0060) taken, and a `.vdb` level set read as
-  an SDF (ADR-0047, amended).
-- **Next**: the last gaps T14's survey found that 1.0 takes, mestolo's;
-  then the rest of P9 in the order put to the owner (2026-11-04), the rules for versions
-  after 1.0 first.
+  brodo's core (ADR-0059) and formats (ADR-0060) taken, a `.vdb` level set read as an SDF
+  (ADR-0047, amended), and mestolo's (ADR-0050, amended).
+- **Next**: the rest of P9 in the order put to the owner (2026-11-04), the rules for
+  versions after 1.0 first.
 
 ## 2. Milestones
 
@@ -589,9 +588,9 @@ since crates.io yanks a version but never deletes it.
 - [x] a `.vdb` level set read back with `SDF_KEY`: a float level set meeting the SDF
       convention's checkable conditions, voxel sizes within 16 ε among them, read as
       stating it, `class` kept otherwise (ADR-0047's amendment of 2026-11-06)
-- [ ] mestolo: a slice beyond the grid refused, the `.vdb` writer's refusal naming the
+- [x] mestolo: a slice beyond the grid refused, the `.vdb` writer's refusal naming the
       grids it cannot write, no arguments exiting 2, and `convert` writing a cache file or
-      an archive (`--as`)
+      an archive (`--as`), entries copied as they were (ADR-0050, amended)
 - [x] One prefix of metadata keys reserved for the formats brodo builds on the cache
       profile after 1.0, such as `brodo.`, `hermite.` kept as it is, so that each later
       one is not a breaking change to `CacheEntry::new` and `CacheEntry::bytes`, which
@@ -730,7 +729,8 @@ No spike is running.
   numbers; `Field<T>` taken from an `AnyField` by `TryFrom`; colino's `Limits::default`,
   a `Converted` built from a read grid, and one reader for any mesh format; mestolo's
   `--version`, help per command, Hermite data and an archive's encodings shown by `info`,
-  more `slice` options, and a `.vdb` written skipping the grids it cannot hold.
+  more `slice` options, a `.vdb` written skipping the grids it cannot hold, and
+  `convert --as archive` choosing a quantised encoding.
 - Requests from users. Held until one asks: merging into a root tile (ADR-0014); a public
   way to read a bare frozen buffer, a file of its own, into an aligned buffer, which only
   tests now do (P5's review, S1, 2026-10-27); a bound on a conversion's leaves, refused

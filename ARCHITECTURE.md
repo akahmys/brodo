@@ -531,18 +531,22 @@ Rust. It uses no GPU and no window.
   value, is written quoted and escaped as Rust's `{:?}` escapes it, so that none moves a
   terminal or makes a line; an error naming one escapes it too.
 - **`slice`** draws a plane of a scalar grid as PNG by §6.1's slice, across the grid's
-  bounds in the plane's two other axes, refusing an image above 2²⁶ pixels. A level set,
+  bounds in the plane's two other axes, refusing an image above 2²⁶ pixels and a plane
+  beyond the bounds along its axis, one at either end drawn. A level set,
   by brodo's `brodo.sdf.version` or OpenVDB's `class` of `level set`, takes the diverging map
   saturated at its background's magnitude; another grid the sequential map from its least
   value to its greatest.
-- **`convert`** writes, by the output's name, every grid or the one `--grid` names as
-  `.vdb` (§4.7), refusing a grid of a type it does not hold by name, or one grid as `.vtu`
-  (§6.1).
+- **`convert`** writes, in the format `--as` names or else by the output's name, `.vdb`
+  or `.vtu`: every grid or the one `--grid` names as `.vdb` (§4.7), refused naming every
+  grid of a type it does not hold, with its value type; one grid as `.vtu` (§6.1); or, by
+  `--as cache` or `--as archive`, a cache file or an archive of exact values (§4.7), a
+  cache file's or an archive's entries copied as they were, its grids and then its
+  entries of bytes, and a `.vdb`'s grids as read, or the one grid `--grid` names.
 - **Output**: a file at the output's path, or a path naming no file, is refused before the
   input is read, unless `--force` is given for the first; the file is written by brodo's
   writers, whole (§4.7). A
-  command line refused exits with status 2, a command failing with 1, its error on
-  standard error.
+  command line refused, none given among them, exits with status 2, a command failing
+  with 1, its error on standard error; `help` writes the usage to standard output.
 
 ## 7. Compatibility
 

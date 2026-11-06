@@ -31,7 +31,9 @@ commands:
   info <file>                          what a cache file, an archive or a .vdb holds
   slice <file> --axis x|y|z --at <n> -o <out.png>
                                        a plane of a scalar grid, as PNG
-  convert <file> -o <out.vdb|out.vtu>  the grids as .vdb, or one grid as .vtu
+  convert <file> -o <out.vdb|out.vtu> [--as vdb|vtu|cache|archive]
+                                       the grids as .vdb, a cache file or an archive,
+                                       or one grid as .vtu
   help                                 this text
 
 options:
@@ -52,9 +54,9 @@ pub fn run(command: &Command, out: &mut impl Write) -> Result<(), MestoloError> 
             let loaded = load::load(input)?;
             draw::slice(loaded.grid(grid.as_deref())?, *axis, *at, &output.path)
         }
-        Command::Convert { input, grid, output } => {
+        Command::Convert { input, grid, format, output } => {
             output::check(output)?;
-            convert::convert(&load::load(input)?, grid.as_deref(), &output.path)
+            convert::convert(input, grid.as_deref(), *format, &output.path)
         }
     }
 }

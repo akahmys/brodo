@@ -6,12 +6,14 @@ use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::process::Command as Process;
 
-use brodo::cache::CacheEntry;
+use brodo::cache::{CacheEntry, CacheFile};
 use brodo::field::{Field, ValueType};
-use brodo::meta::GridMeta;
+use brodo::kind::FileKind;
+use brodo::meta::{GridMeta, SDF_KEY, SDF_VERSION};
+use brodo::slice::Axis;
 use brodo::topology::Topology;
 use brodo::tree::TileLevel;
-use mestolo::args::{Command, DEFAULT_LIMIT, Input, Output, parse};
+use mestolo::args::{Command, DEFAULT_LIMIT, Format, Input, Output, parse};
 use mestolo::error::MestoloError;
 use mestolo::info::extremes;
 
@@ -90,7 +92,7 @@ fn what_a_format_does_not_hold_is_refused_by_name() {
     let p = cache.to_str().unwrap();
     assert!(matches!(
         run(&["convert", p], "all.vdb"),
-        Err(MestoloError::NotWritten { value_type: ValueType::F32x3, .. })
+        Err(MestoloError::NotWritten(grids)) if grids == [("velocity".to_owned(), ValueType::F32x3)]
     ));
     assert!(matches!(run(&["convert", p], "all.vtu"), Err(MestoloError::WhichGrid(2))));
     assert!(matches!(
@@ -134,8 +136,18 @@ fn the_command_line_is_parsed_and_what_it_does_not_take_named() {
     };
     assert_eq!((input.path, input.limit), (PathBuf::from("f"), DEFAULT_LIMIT));
     assert_eq!((output.path, output.force), (PathBuf::from("s.png"), true));
-    assert_eq!(parse(args(&[])).unwrap(), Command::Help);
+    assert_eq!(parse(args(&["help"])).unwrap(), Command::Help);
     let refused = |words: &[&str]| parse(args(words)).unwrap_err();
+    assert!(matches!(parse(args(&[])), Err(MestoloError::NoCommand)));
+    let convert = parse(args(&["convert", "f", "-o", "o", "--as", "archive"]));
+    assert!(matches!(convert, Ok(Command::Convert { format: Some(Format::Archive), .. })));
+    assert!(matches!(
+        refused(&["convert", "f", "-o", "o", "--as", "png"]),
+        MestoloError::BadValue { option: "--as", .. }
+    ));
+    assert!(
+        matches!(refused(&["info", "f", "--as", "cache"]), MestoloError::UnknownOption(o) if o == "--as")
+    );
     assert!(matches!(refused(&["look"]), MestoloError::UnknownCommand(c) if c == "look"));
     assert!(
         matches!(refused(&["info", "f", "-o", "x"]), MestoloError::UnknownOption(o) if o == "-o")
@@ -182,8 +194,12 @@ fn the_program_refuses_to_replace_a_file_but_by_force() {
     let usage = Process::new(exe).arg("look").output().unwrap();
     assert_eq!(usage.status.code(), Some(2));
     assert!(String::from_utf8_lossy(&usage.stderr).contains("usage: mestolo"));
-    let help = Process::new(exe).output().unwrap();
+    let help = Process::new(exe).arg("help").output().unwrap();
     assert_eq!((help.status.code(), help.stdout.as_slice()), (Some(0), mestolo::USAGE.as_bytes()));
+    let none = Process::new(exe).output().unwrap();
+    assert_eq!((none.status.code(), none.stdout.as_slice()), (Some(2), &b""[..]));
+    let said = String::from_utf8_lossy(&none.stderr);
+    assert!(said.starts_with("mestolo: no command is given") && said.contains(mestolo::USAGE));
 }
 
 #[test]
@@ -191,8 +207,12 @@ fn an_output_is_refused_before_its_input_is_read() {
     let out = fresh("there.png");
     std::fs::write(&out, b"kept").unwrap();
     let output = Output::new(out.clone(), false);
-    let command =
-        Command::Convert { input: Input::new(PathBuf::from("/no/such/file")), grid: None, output };
+    let command = Command::Convert {
+        input: Input::new(PathBuf::from("/no/such/file")),
+        grid: None,
+        format: None,
+        output,
+    };
     assert!(matches!(mestolo::run(&command, &mut Vec::new()), Err(MestoloError::Exists(_))));
 }
 
@@ -287,4 +307,125 @@ fn a_grid_is_found_by_its_name() {
     for name in ["density", "velocity"] {
         assert_eq!(loaded.grid(Some(name)).unwrap().meta.name, name);
     }
+}
+
+/// The sdf grid of OpenVDB's file spans x from 8 to 23 and z from 0 to 23: a plane at
+/// either end is drawn, and one a voxel beyond either is refused, naming the span.
+#[test]
+fn a_slice_beyond_the_grid_is_refused_and_one_at_its_edge_drawn() {
+    let vdb = brodo_file("vdb_by14_v225.bin");
+    let run = |axis: &str, at: i32| {
+        let out = fresh("edge.png");
+        let at = at.to_string();
+        let words = ["slice", vdb.to_str().unwrap(), "--grid", "sdf", "--axis", axis, "--at", &at];
+        let mut all = args(&words);
+        all.extend([OsString::from("-o"), out.into_os_string()]);
+        mestolo::run(&parse(all).unwrap(), &mut Vec::new())
+    };
+    for (axis, a, min, max) in [("z", Axis::Z, 0, 23), ("x", Axis::X, 8, 23)] {
+        assert!(run(axis, min).is_ok() && run(axis, max).is_ok(), "{axis}");
+        for at in [min - 1, max + 1] {
+            let refused = run(axis, at);
+            assert!(
+                matches!(&refused, Err(MestoloError::OutsideGrid { grid, axis: got, at: a2, min: m0, max: m1 })
+                    if grid == "sdf" && *got == a && *a2 == at && *m0 == min && *m1 == max),
+                "{axis} {at}: {refused:?}"
+            );
+        }
+    }
+}
+
+/// A cache file of three grids, two of types `.vdb` does not hold.
+#[test]
+fn every_grid_vdb_does_not_hold_is_named() {
+    let empty = Topology::new();
+    let mut e = empty.edit();
+    e.activate([0, 0, 0]).unwrap();
+    let t = e.commit().unwrap().0;
+    let meta = |name: &str| GridMeta::new(name, [1.0; 3], "m").unwrap();
+    let path = fresh("three.cache");
+    let entries = [
+        CacheEntry::new(&meta("labels"), &t, &Field::new(&t, 1_u8)).unwrap(),
+        CacheEntry::new(&meta("density"), &t, &Field::new(&t, 0.5_f32)).unwrap(),
+        CacheEntry::new(&meta("flow"), &t, &Field::new(&t, [0.0_f64; 3])).unwrap(),
+    ];
+    brodo::cache::write(&path, &entries).unwrap();
+    let mut all = args(&["convert", path.to_str().unwrap(), "-o"]);
+    all.push(fresh("three.vdb").into_os_string());
+    let refused = mestolo::run(&parse(all).unwrap(), &mut Vec::new());
+    let want = vec![("labels".to_owned(), ValueType::U8), ("flow".to_owned(), ValueType::F64x3)];
+    assert!(
+        matches!(&refused, Err(MestoloError::NotWritten(grids)) if *grids == want),
+        "{refused:?}"
+    );
+    let said = refused.unwrap_err().to_string();
+    assert!(said.contains("\"labels\"") && said.contains("\"flow\""), "{said}");
+}
+
+/// Each entry of a file as bytes: a grid's metadata, bounds, type and frozen buffer, or an
+/// entry of bytes' name, pairs and bytes, the grids first.
+fn entries_of(file: &CacheFile) -> Vec<Vec<u8>> {
+    let copies: Vec<CacheEntry> = file
+        .grids()
+        .into_iter()
+        .map(CacheEntry::copy)
+        .chain(file.bytes_entries().into_iter().map(CacheEntry::copy_bytes))
+        .collect();
+    copies.iter().map(|c| brodo::cache::to_bytes(std::slice::from_ref(c)).unwrap()).collect()
+}
+
+/// Runs `convert` on `input` with `--as` and the extra words, giving the file written.
+fn converted(input: &Path, extra: &[&str], out: &str) -> PathBuf {
+    let out = fresh(out);
+    let mut all = args(&["convert", input.to_str().unwrap()]);
+    all.extend(args(extra));
+    all.extend([OsString::from("-o"), out.clone().into_os_string()]);
+    mestolo::run(&parse(all).unwrap(), &mut Vec::new()).unwrap();
+    out
+}
+
+#[test]
+fn convert_writes_a_cache_file_and_an_archive_holding_the_entries_as_they_were() {
+    let cache = brodo_file("cache_v2.bin");
+    let archive = brodo_file("archive_v2_grids.bin");
+    let original = entries_of(&brodo::cache::read(&cache, u64::MAX).unwrap());
+    assert_eq!(original.len(), 3, "two grids and an entry of bytes");
+    let in_archive = entries_of(&brodo::archive::read(&archive, u64::MAX).unwrap());
+    assert_eq!(in_archive.len(), 2, "two grids");
+    for (input, held) in [(&cache, &original), (&archive, &in_archive)] {
+        let as_cache = converted(input, &["--as", "cache"], "as.cache");
+        let as_archive = converted(input, &["--as", "archive"], "as.archive");
+        let head = std::fs::read(&as_archive).unwrap();
+        assert_eq!(FileKind::of(&head), Some(FileKind::Archive), "{input:?}");
+        let from_archive = brodo::archive::read(&as_archive, u64::MAX).unwrap();
+        assert_eq!(&entries_of(&brodo::cache::read(&as_cache, u64::MAX).unwrap()), held);
+        assert_eq!(&entries_of(&from_archive), held);
+    }
+    // One grid by name; and --as names the format whatever the output's name.
+    let one = brodo::cache::read(
+        &converted(&cache, &["--as", "cache", "--grid", "velocity"], "v.vdb"),
+        u64::MAX,
+    )
+    .unwrap();
+    assert_eq!(entries_of(&one), [original[1].clone()]);
+    let head = std::fs::read(converted(&cache, &["--as", "archive"], "a.vtu")).unwrap();
+    assert_eq!(FileKind::of(&head), Some(FileKind::Archive));
+}
+
+/// A `.vdb`'s grids are written to a cache file as read: `info` gives the same facts of
+/// each, an SDF stating the convention and another level set keeping OpenVDB's `class`.
+#[test]
+fn convert_writes_a_vdbs_grids_to_a_cache_file() {
+    let vdb = brodo_file("vdb_by14_v225.bin");
+    let path = converted(&vdb, &["--as", "cache"], "vdb.cache");
+    let mut out = Vec::new();
+    mestolo::run(&Command::Info(Input::new(path)), &mut out).unwrap();
+    let want: String = INFO_VDB
+        .replacen("kind: OpenVDB file", "kind: cache file", 1)
+        .lines()
+        .filter(|l| !l.starts_with("skipped: "))
+        .map(|l| format!("{l}\n"))
+        .collect();
+    assert_eq!(String::from_utf8(out).unwrap(), want);
+    assert!(want.contains(&format!("{SDF_KEY:?} = {SDF_VERSION:?}")));
 }

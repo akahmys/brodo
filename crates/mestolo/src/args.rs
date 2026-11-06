@@ -46,6 +46,20 @@ impl Output {
     }
 }
 
+/// The format `convert` writes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum Format {
+    /// An OpenVDB file, of every grid or the one named.
+    Vdb,
+    /// An ASCII `.vtu` of one grid.
+    Vtu,
+    /// brodo's cache profile.
+    Cache,
+    /// brodo's archive profile.
+    Archive,
+}
+
 /// What to do.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
@@ -67,12 +81,14 @@ pub enum Command {
         /// The PNG written.
         output: Output,
     },
-    /// Write a file's grids as `.vdb`, or one as `.vtu`, by the output's name.
+    /// Write a file's grids as `.vdb`, a cache file or an archive, or one as `.vtu`.
     Convert {
         /// The file read.
         input: Input,
         /// The grid's name: the one grid converted.
         grid: Option<String>,
+        /// The format written, by `--as`; with none, by the output's name, `.vdb` or `.vtu`.
+        format: Option<Format>,
         /// The file written.
         output: Output,
     },
@@ -88,20 +104,22 @@ struct Given {
     output: Option<PathBuf>,
     force: bool,
     limit: Option<u64>,
+    format: Option<Format>,
 }
 
-/// The command the arguments after the program's name give.
+/// The command the arguments after the program's name give; none is refused, as
+/// `NoCommand`.
 pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Command, MestoloError> {
     let mut args = args.into_iter();
     let Some(name) = args.next() else {
-        return Ok(Command::Help);
+        return Err(MestoloError::NoCommand);
     };
     let name = text(name, "the command")?;
     let takes: &[&str] = match name.as_str() {
         "help" | "-h" | "--help" => return Ok(Command::Help),
         "info" => &["--limit"],
         "slice" => &["--limit", "--grid", "--axis", "--at", "-o", "--force"],
-        "convert" => &["--limit", "--grid", "-o", "--force"],
+        "convert" => &["--limit", "--grid", "--as", "-o", "--force"],
         _ => return Err(MestoloError::UnknownCommand(name)),
     };
     let given = options(args, takes)?;
@@ -115,7 +133,7 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Command, Mestol
     }
     let output = output.ok_or(MestoloError::Missing("-o"))?;
     if name == "convert" {
-        return Ok(Command::Convert { input, grid: given.grid, output });
+        return Ok(Command::Convert { input, grid: given.grid, format: given.format, output });
     }
     Ok(Command::Slice {
         input,
@@ -169,6 +187,7 @@ fn set(
         "--grid" => once(&mut given.grid, text(value(args, "--grid")?, "--grid")?, twice)?,
         "--axis" => once(&mut given.axis, axis(&text(value(args, "--axis")?, "--axis")?)?, twice)?,
         "--at" => once(&mut given.at, number(value(args, "--at")?, "--at")?, twice)?,
+        "--as" => once(&mut given.format, format(&text(value(args, "--as")?, "--as")?)?, twice)?,
         _ => once(&mut given.limit, number(value(args, "--limit")?, "--limit")?, twice)?,
     }
     Ok(())
@@ -196,6 +215,16 @@ fn text(arg: OsString, what: &'static str) -> Result<String, MestoloError> {
 fn number<T: std::str::FromStr>(arg: OsString, option: &'static str) -> Result<T, MestoloError> {
     let s = text(arg, option)?;
     s.parse().map_err(|_| MestoloError::BadValue { option, value: s })
+}
+
+fn format(s: &str) -> Result<Format, MestoloError> {
+    match s {
+        "vdb" => Ok(Format::Vdb),
+        "vtu" => Ok(Format::Vtu),
+        "cache" => Ok(Format::Cache),
+        "archive" => Ok(Format::Archive),
+        _ => Err(MestoloError::BadValue { option: "--as", value: s.to_owned() }),
+    }
 }
 
 fn axis(s: &str) -> Result<Axis, MestoloError> {

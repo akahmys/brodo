@@ -90,6 +90,16 @@ archive profiles stay at version 2, and version 1 of them is no longer read nor 
   ARCHITECTURE.md §4.7's conditions as stating the SDF convention: its free pairs hold
   `brodo.sdf.version` = `2` in place of `class`, an SDF brodo wrote among them (ADR-0047,
   amended). Code that took such a grid for a level set by `class` finds `SDF_KEY`.
+- `mestolo` run with no argument exits 2, the usage on standard error: `args::parse` of
+  none is `MestoloError::NoCommand`, where it was `Command::Help`. `mestolo help` still
+  writes the usage and exits 0 (ADR-0050, amended).
+- `mestolo slice` refuses a plane beyond the grid along its axis, as
+  `MestoloError::OutsideGrid`, where it drew the background.
+- `MestoloError::NotWritten` holds every grid `.vdb` does not hold, each its name and
+  value type, where it held the first.
+- `Command::Convert` has `format`, the format `--as` names: `mestolo convert --as cache`
+  and `--as archive` write a cache file or an archive, a cache file's or an archive's
+  entries copied as they were.
 
 A file of version 1, written by 0.8 or earlier or by 0.9.0 on request, is first read by
 0.9.0 and written again by it, at version 2. A file of version 2 then converts with this

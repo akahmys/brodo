@@ -14,7 +14,8 @@ use crate::load::Grid;
 /// The most pixels a slice is drawn with: 2²⁶, a 256 MiB image of four bytes a pixel.
 pub const MOST_PIXELS: i64 = 1 << 26;
 
-/// Writes grid `g`'s plane perpendicular to `axis` at `at` as PNG at `path`.
+/// Writes grid `g`'s plane perpendicular to `axis` at `at` as PNG at `path`, refusing a
+/// plane beyond the grid's leaves and tiles along `axis`.
 pub fn slice(g: &Grid, axis: Axis, at: i32, path: &Path) -> Result<(), MestoloError> {
     let image = match &g.field {
         AnyField::F32(f) => draw(g, f, axis, at)?,
@@ -37,11 +38,15 @@ where
     let Bounds::Box { min: [x0, y0, z0], max: [x1, y1, z1] } = Bounds::of(&g.topology)? else {
         return Err(MestoloError::EmptyGrid(g.meta.name.clone()));
     };
-    let (min, max) = match axis {
-        Axis::X => ([y0, z0], [y1, z1]),
-        Axis::Y => ([x0, z0], [x1, z1]),
-        Axis::Z => ([x0, y0], [x1, y1]),
+    let (min, max, span) = match axis {
+        Axis::X => ([y0, z0], [y1, z1], (x0, x1)),
+        Axis::Y => ([x0, z0], [x1, z1], (y0, y1)),
+        Axis::Z => ([x0, y0], [x1, y1], (z0, z1)),
     };
+    if at < span.0 || at > span.1 {
+        let grid = g.meta.name.clone();
+        return Err(MestoloError::OutsideGrid { grid, axis, at, min: span.0, max: span.1 });
+    }
     size(min, max)?;
     Ok(render(&g.topology, f, Slice::new(axis, at, min, max), colors(g, f)?)?)
 }

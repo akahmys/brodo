@@ -94,3 +94,31 @@ would make each a promise under semantic versioning, though they are public only
 tests. The owner decided, on 2026-11-05, that its promises be `run`, `USAGE`, `args` and
 `error`, and that `convert`, `draw`, `info`, `load` and `output` stay public but
 `#[doc(hidden)]`, promising nothing, as its README says.
+
+## Amendment: the gaps T14's survey found
+
+- **Date**: 2026-11-06
+
+T14's survey (2026-11-05), by running the program, found four gaps that 1.0 takes: a slice
+at a plane beyond the grid drew an image of the background alone and succeeded;
+`convert` to `.vdb` named only the first grid of a type `.vdb` does not hold; the program
+run with no argument wrote the usage and exited 0; and `convert` wrote no cache file or
+archive. The owner decided, on 2026-11-06, as proposed:
+
+- A slice at a plane beyond the grid's leaves and tiles along its axis is refused, as
+  `OutsideGrid`, naming the grid, the plane and the span, and the command fails; a plane
+  at either end of the span is drawn.
+- `convert` to `.vdb` refuses naming every grid of a type it does not hold, with its value
+  type, in the file's order: `NotWritten` holds them all. Writing the others and skipping
+  those stays a request a later MINOR may take (ROADMAP.md §4).
+- No argument is a command line refused, `NoCommand`: the usage on standard error and
+  status 2; `help` writes it to standard output and succeeds.
+- `--as vdb|vtu|cache|archive` names the format `convert` writes, before the output's
+  name, which with no `--as` gives `.vdb` or `.vtu` as before; a cache file and an
+  archive have no name of their own, so `--as` names them. A cache file's or an archive's
+  entries are copied as they were (`CacheEntry::copy`, `CacheEntry::copy_bytes`,
+  ADR-0060), its grids and then its entries of bytes, not thawed, so that a Hermite set or
+  an SDF passes whole; a `.vdb`'s grids are written as read, an SDF read as stating the
+  convention among them (ADR-0047). `--grid` writes the one grid it names. An archive's
+  grids are written exact; choosing a quantised encoding is a request a later MINOR may
+  take (ROADMAP.md §4).

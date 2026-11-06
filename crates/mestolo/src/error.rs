@@ -2,6 +2,7 @@
 //! output not written.
 
 use brodo::field::ValueType;
+use brodo::slice::Axis;
 use std::path::PathBuf;
 
 use brodo::error::{
@@ -12,6 +13,9 @@ use brodo::error::{
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum MestoloError {
+    /// No argument is given, so no command.
+    #[error("no command is given")]
+    NoCommand,
     /// The first argument names no command.
     #[error("there is no command {0:?}")]
     UnknownCommand(String),
@@ -66,6 +70,20 @@ pub enum MestoloError {
     /// The grid has no leaf or tile, so there is nothing to draw.
     #[error("grid {0:?} has no leaf or tile to draw")]
     EmptyGrid(String),
+    /// A slice's plane lies beyond the grid's leaves and tiles along its axis.
+    #[error("grid {grid:?} spans {min} to {max} along {}, so there is no plane at {at}", axis_name(*.axis))]
+    OutsideGrid {
+        /// The grid's name.
+        grid: String,
+        /// The axis the slice is perpendicular to.
+        axis: Axis,
+        /// The plane asked for.
+        at: i32,
+        /// The least voxel coordinate of the grid's leaves and tiles along the axis.
+        min: i32,
+        /// The greatest.
+        max: i32,
+    },
     /// A slice of a grid whose values are not scalars.
     #[error("a slice of {0} values is not drawn: they are not scalars")]
     NotScalar(ValueType),
@@ -79,17 +97,13 @@ pub enum MestoloError {
         /// The most pixels drawn.
         most: i64,
     },
-    /// The output's name ends in no format mestolo writes.
-    #[error("{0:?} ends in neither .vdb nor .vtu")]
+    /// The output's name ends in no format mestolo writes, and `--as` names none.
+    #[error("{0:?} ends in neither .vdb nor .vtu: name the format with --as")]
     OutputKind(PathBuf),
-    /// A grid whose value type the output's format does not hold.
-    #[error("grid {grid:?} holds {value_type} values, which .vdb does not hold")]
-    NotWritten {
-        /// The grid's name.
-        grid: String,
-        /// Its value type.
-        value_type: ValueType,
-    },
+    /// The grids whose value types `.vdb` does not hold, each its name and value type, in
+    /// the file's order.
+    #[error(".vdb does not hold the values of {}", not_written(.0))]
+    NotWritten(Vec<(String, ValueType)>),
     /// A file is at the output's path, and `--force` was not given.
     #[error("{0:?} exists: give --force to replace it")]
     Exists(PathBuf),
@@ -124,7 +138,8 @@ impl MestoloError {
     pub fn is_usage(&self) -> bool {
         matches!(
             self,
-            Self::UnknownCommand(_)
+            Self::NoCommand
+                | Self::UnknownCommand(_)
                 | Self::UnknownOption(_)
                 | Self::Repeated(_)
                 | Self::Missing(_)
@@ -133,4 +148,17 @@ impl MestoloError {
                 | Self::NotText(_)
         )
     }
+}
+
+fn axis_name(axis: Axis) -> &'static str {
+    match axis {
+        Axis::X => "x",
+        Axis::Y => "y",
+        Axis::Z => "z",
+    }
+}
+
+/// Each grid as `"name" (type)`, joined by commas.
+fn not_written(grids: &[(String, ValueType)]) -> String {
+    grids.iter().map(|(name, t)| format!("{name:?} ({t})")).collect::<Vec<_>>().join(", ")
 }

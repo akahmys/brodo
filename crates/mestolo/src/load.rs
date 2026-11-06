@@ -4,13 +4,13 @@
 //! what brodo counts thawing to make, and refused if they pass the limit.
 
 use std::io::Read;
-use std::path::Path;
 
 use brodo::cache::CacheFile;
 use brodo::field::AnyField;
 use brodo::kind::FileKind;
 use brodo::meta::GridMeta;
 use brodo::topology::Topology;
+use brodo::vdb::VdbFile;
 
 use crate::args::Input;
 use crate::error::MestoloError;
@@ -84,21 +84,47 @@ impl Loaded {
     }
 }
 
-/// Reads `input` whole, within its limit, by the kind its first bytes name.
-pub fn load(input: &Input) -> Result<Loaded, MestoloError> {
+/// A file read, its grids not thawed.
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum Opened {
+    /// A cache file or an archive, read as a cache file.
+    Cache {
+        /// Which of the two.
+        kind: Kind,
+        /// Its entries.
+        file: CacheFile,
+    },
+    /// An OpenVDB file.
+    Vdb(VdbFile),
+}
+
+/// Reads `input` whole, within its limit, by the kind its first bytes name, its grids not
+/// thawed.
+pub fn open(input: &Input) -> Result<Opened, MestoloError> {
     let path = input.path.as_path();
     let mut head = Vec::new();
     std::fs::File::open(path)?.take(FileKind::HEAD as u64).read_to_end(&mut head)?;
     match FileKind::of(&head) {
         Some(FileKind::Cache) => {
-            from_cache(brodo::cache::read(path, input.limit)?, Kind::Cache, input.limit)
+            Ok(Opened::Cache { kind: Kind::Cache, file: brodo::cache::read(path, input.limit)? })
         }
-        Some(FileKind::Archive) => {
-            from_cache(brodo::archive::read(path, input.limit)?, Kind::Archive, input.limit)
-        }
-        Some(FileKind::Vdb) => from_vdb(path, input.limit),
+        Some(FileKind::Archive) => Ok(Opened::Cache {
+            kind: Kind::Archive,
+            file: brodo::archive::read(path, input.limit)?,
+        }),
+        Some(FileKind::Vdb) => Ok(Opened::Vdb(brodo::vdb::read(path, VDB_UNIT, input.limit)?)),
         Some(FileKind::Grid) => Err(MestoloError::BareGrid(path.to_path_buf())),
         _ => Err(MestoloError::UnknownKind(path.to_path_buf())),
+    }
+}
+
+/// Reads `input` whole, within its limit, by the kind its first bytes name, each grid
+/// thawed.
+pub fn load(input: &Input) -> Result<Loaded, MestoloError> {
+    match open(input)? {
+        Opened::Cache { kind, file } => from_cache(file, kind, input.limit),
+        Opened::Vdb(file) => Ok(from_vdb(file)),
     }
 }
 
@@ -120,12 +146,11 @@ fn from_cache(file: CacheFile, kind: Kind, limit: u64) -> Result<Loaded, Mestolo
     Ok(Loaded { kind, grids, skipped: Vec::new(), bytes })
 }
 
-fn from_vdb(path: &Path, limit: u64) -> Result<Loaded, MestoloError> {
-    let file = brodo::vdb::read(path, VDB_UNIT, limit)?;
+fn from_vdb(file: VdbFile) -> Loaded {
     let grids = file
         .grids
         .into_iter()
         .map(|g| Grid { meta: g.meta, topology: g.topology, field: g.field })
         .collect();
-    Ok(Loaded { kind: Kind::Vdb, grids, skipped: file.skipped, bytes: Vec::new() })
+    Loaded { kind: Kind::Vdb, grids, skipped: file.skipped, bytes: Vec::new() }
 }

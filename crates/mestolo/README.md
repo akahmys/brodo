@@ -11,6 +11,7 @@ mestolo info grids.cache                                   # what the file holds
 mestolo slice grids.cache --grid sdf --axis z --at 0 -o z0.png
 mestolo convert grids.cache -o grids.vdb                   # for Blender, Houdini
 mestolo convert grids.cache --grid sdf -o sdf.vtu          # for ParaView
+mestolo convert grids.vdb --as archive -o grids.archive     # brodo's compressed archive
 ```
 
 - A file's kind is told by its first bytes, not its name, and it is read whole within
@@ -20,7 +21,10 @@ mestolo convert grids.cache --grid sdf -o sdf.vtu          # for ParaView
   terminal.
 - `--grid` names the grid where a file holds more than one.
 - A file already at the output's path is refused unless `--force` is given.
-- A command line refused exits with status 2, a command failing with 1.
+- `convert` writes the format `--as` names, `vdb`, `vtu`, `cache` or `archive`, or else
+  the one the output's name ends in, `.vdb` or `.vtu`.
+- A command line refused, none given among them, exits with status 2, a command failing
+  with 1.
 
 ## As a library
 
