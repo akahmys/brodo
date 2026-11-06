@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Checks on the workspace manifests and the layout (CODING.md Rules 4, 11, 19, 20, L1, L3 and
-L4; TESTING.md V1, V3, T6).
+L4; TESTING.md V1, V3, V7, T6).
 
 1. Every member sits in `crates/` or is `xtask`, so `spikes/` never joins the build.
 2. Every member declares `[lints] workspace = true`. Without it a crate escapes every lint
@@ -8,8 +8,11 @@ L4; TESTING.md V1, V3, T6).
 3. Dependencies point only down the layer order (Rule 11), in every dependency kind.
    A member missing from the order fails, so a new crate is placed before it is built.
    The order is in `project.py`.
-4. Every member takes `version.workspace = true` and `license.workspace = true` (V1), and the workspace version is the
-   newest released version in CHANGELOG.md, or 0.0.0 while there is none (V3).
+4. Every member takes `version.workspace = true` and `license.workspace = true` (V1), the
+   workspace version is `MAJOR.MINOR.PATCH` with no pre-release or build part (V1),
+   and it is the newest released version in CHANGELOG.md, or 0.0.0 while there is none
+   (V3). A version whose PATCH is above 0 states the `rust-version` that tag
+   `vMAJOR.MINOR.0`'s `Cargo.toml` states (V7); the tag missing fails.
 5. Every dependency of a member is inherited from `[workspace.dependencies]` (Rule 20).
 6. No cargo configuration in the repository sets `rustflags`, which can switch any lint
    off without a trace in the code (Rule 19). The audit also runs with `RUSTFLAGS` empty,
@@ -39,6 +42,8 @@ VERSION_INHERITED = re.compile(r"^version\.workspace\s*=\s*true\s*$", re.MULTILI
 LICENSE_INHERITED = re.compile(r"^license\.workspace\s*=\s*true\s*$", re.MULTILINE)
 WORKSPACE_VERSION = re.compile(r'^version\s*=\s*"([^"]+)"', re.MULTILINE)
 RELEASE = re.compile(r"^## (\d+\.\d+\.\d+) ", re.MULTILINE)
+VERSION_FORM = re.compile(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$")
+RUST_VERSION = re.compile(r'^rust-version\s*=\s*"([^"]+)"', re.MULTILINE)
 DEP_SECTION = re.compile(r"^\[(?:target\.[^\]]+\.)?(?:dev-|build-)?dependencies\]\s*$")
 DEP_SUBTABLE = re.compile(r"^\[(?:target\.[^\]]+\.)?(?:dev-|build-)?dependencies\.([\w-]+)\]\s*$")
 DEP_LINE = re.compile(r"^([\w-]+)(\.workspace)?\s*=\s*(.*)$")
@@ -134,6 +139,30 @@ def release_table() -> list[str]:
     return []
 
 
+def version_rules() -> list[str]:
+    """The version's form (V1), and `rust-version` unchanged within a MINOR (V7)."""
+    text = (ROOT / "Cargo.toml").read_text()
+    stated = WORKSPACE_VERSION.search(text)
+    version = stated.group(1) if stated else "none"
+    form = VERSION_FORM.match(version)
+    if not form:
+        return [f"  Cargo.toml version {version} is not MAJOR.MINOR.PATCH (V1)"]
+    major, minor, patch = form.groups()
+    if patch == "0":
+        return []
+    tag = f"v{major}.{minor}.0"
+    shown = subprocess.run(
+        ["git", "show", f"refs/tags/{tag}:Cargo.toml"], cwd=ROOT, capture_output=True, text=True
+    )
+    if shown.returncode != 0:
+        return [f"  version {version} is a PATCH, and tag {tag} is not here to compare its rust-version with (V7)"]
+    now, then = RUST_VERSION.search(text), RUST_VERSION.search(shown.stdout)
+    now, then = (now.group(1) if now else "none"), (then.group(1) if then else "none")
+    if now != then:
+        return [f"  version {version} is a PATCH, and its rust-version {now} is not {tag}'s {then} (V7)"]
+    return []
+
+
 def fuzzer() -> list[str]:
     fuzzed = sorted({crate_of(module) for module in UNTRUSTED_INPUT})
     if not fuzzed:
@@ -182,7 +211,7 @@ def layout() -> list[str]:
 
 
 def main() -> int:
-    failures = release_table() + cargo_config() + fuzzer() + layout()
+    failures = release_table() + version_rules() + cargo_config() + fuzzer() + layout()
     for pkg in metadata()["packages"]:
         failures += check_package(pkg)
     if failures:

@@ -16,9 +16,9 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   the owner labels `owner-approved` (ADR-0049, amended), P9's retrospective (ADR-0001,
   ADR-0033, ADR-0035, amended), T14's survey of what each crate lacks, and its gaps in
   brodo's core (ADR-0059) and formats (ADR-0060) taken, a `.vdb` level set read as an SDF
-  (ADR-0047, amended), and mestolo's (ADR-0050, amended).
-- **Next**: the rest of P9 in the order put to the owner (2026-11-04), the rules for
-  versions after 1.0 first.
+  (ADR-0047, amended), and mestolo's (ADR-0050, amended), and the rules for versions
+  after 1.0 (ADR-0011, ADR-0040, amended).
+- **Next**: the rest of P9 in the order put to the owner (2026-11-04).
 
 ## 2. Milestones
 
@@ -599,10 +599,12 @@ since crates.io yanks a version but never deletes it.
       (ADR-0053)
 - [x] Patents and licences judged again by the owner, for registration on crates.io:
       unchanged (2026-11-04; ADR-0007)
-- [ ] The rules for versions after 1.0, with their ADRs (AGENTS.md, "Changing the
-      rules"): TESTING.md V1's `0.MINOR.PATCH` and V2's breaking MINOR, a breaking change
-      raising MAJOR; V4 publishing each release to crates.io; ADR-0040's pinned tag;
-      ARCHITECTURE.md §7's "Before 1.0"; `rust-version`'s rise, a MINOR or a MAJOR
+- [x] The rules for versions after 1.0, with their ADRs (AGENTS.md, "Changing the
+      rules"): one version for the three crates and its form checked (V1), semantic
+      versioning over the promises from 1.0 (V2), the owner publishing each release to
+      crates.io (V4), users depending by version from 1.0, and `rust-version` raised only
+      with MAJOR or MINOR, checked against the MINOR's tag (V7) (the owner, 2026-11-07;
+      ADR-0011, ADR-0040); README.md's dependency by version written when 1.0 is published
 - [ ] Packaging: `publish` set; each crate's keywords naming its function (sparse volume,
       VDB, SDF, level set, voxel) and its categories; colino's dependency on brodo by
       version as well as path; what each package holds, listed by `cargo package --list`;

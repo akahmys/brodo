@@ -31,7 +31,7 @@ grep -E '^echo "\[' scripts/audit/verify_compliance.sh
 | Step | Rules |
 | :--- | :--- |
 | Toolchain: `rust-version`, `rust-toolchain.toml` and the running `rustc` agree | — |
-| `scripts/audit/workspace.py`: members, lint inheritance, layer order, version and licence inheritance, CHANGELOG.md's version, dependency inheritance, `rustflags`, the fuzzer's reach, the root's entries against ARCHITECTURE.md §3, where scripts lie | 4, 11, 19, 20, L1, L3, L4, V1, V3, T6 |
+| `scripts/audit/workspace.py`: members, lint inheritance, layer order, version and licence inheritance, the version's form, CHANGELOG.md's version, `rust-version` unchanged in a PATCH, dependency inheritance, `rustflags`, the fuzzer's reach, the root's entries against ARCHITECTURE.md §3, where scripts lie | 4, 11, 19, 20, L1, L3, L4, V1, V3, V7, T6 |
 | `cargo clippy --workspace --all-targets -- -D warnings`, with the lints in `Cargo.toml` and the bans in `clippy.toml` | 1, 4, 6, 7, 9, 10, 16, 17, 18, 19 |
 | `cargo clippy --all-targets -D warnings` per member with no default features and with each feature alone | 10 |
 | clippy's panic lints over `--lib --bins` with every feature, filtered by `scripts/audit/lint_filter.py` | 2 |

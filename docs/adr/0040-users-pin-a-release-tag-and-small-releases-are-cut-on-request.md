@@ -40,3 +40,21 @@ release. The human decided that 0.7.0 gets one, the versions before it none, and
 version after it one too: made once its tag is pushed, titled with the version, its notes
 the version's CHANGELOG.md section as it stands, as proposed. TESTING.md V4 says so. The
 gate runs before the tag is pushed, so nothing checks that the release is made.
+
+## Amendment: depending by version, and publishing, from 1.0
+
+- **Date**: 2026-11-07
+
+The crates go to crates.io at 1.0.0 (ADR-0011's amendment of 2026-11-03), where cargo
+resolves every crate of a program within one MAJOR to one copy, which a pinned tag had
+given before. The owner decided, on 2026-11-07, as proposed:
+
+- **What users depend on.** From 1.0, a version from crates.io, `brodo = "1"`, in place of
+  a tag (decision a). README.md says so once 1.0 is published, and says to pin a tag
+  until then. A small release on a user's request stays (decision b), raising MINOR, or
+  PATCH for a fix alone (TESTING.md V2).
+- **Publishing.** From 1.0, each release is published to crates.io once its GitHub
+  release is made: brodo, then colino, then mestolo, each depending on the one before. The
+  owner runs `cargo publish` on the owner's machine, since publishing takes the owner's
+  token and cannot be undone (crates.io yanks a version but never deletes it); an agent
+  runs `cargo publish --dry-run` alone (TESTING.md V4). Nothing checks it.

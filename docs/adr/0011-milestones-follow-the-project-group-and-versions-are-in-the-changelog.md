@@ -48,3 +48,38 @@ the formats.
 
 The decision on 1.0 itself is still an ADR of its own when P9 closes (V5); the rules P9
 changes are each changed through the ADR on their topic, with the owner's approval.
+
+## Amendment: versions after 1.0
+
+- **Date**: 2026-11-07
+
+TESTING.md V1 and V2 were written for versions before 1.0, `0.MINOR.PATCH` with a MINOR
+free to break the API, and no rule said when `rust-version` may rise. P9 publishes the
+three crates to crates.io as 1.0.0 (the amendment above), where cargo resolves versions by
+semantic versioning. The owner decided, on 2026-11-07, as proposed:
+
+- **One version for the three crates.** brodo, colino and mestolo keep the one workspace
+  version (V1), released together; separate versions were not taken now. Its cost: a
+  release breaking only colino's or mestolo's promises raises brodo's MAJOR too. Moving
+  to separate versions later breaks no user, and separate versions now would let colino's
+  stated dependency on brodo fall behind the brodo it builds against in the workspace,
+  unless a check of its least versions were added; colino's API carries brodo's types, so
+  that its MAJOR follows brodo's whatever is chosen. V1's form, `MAJOR.MINOR.PATCH` with
+  no pre-release or build part, is checked by `scripts/audit/workspace.py`; cargo itself
+  refuses a version that is not semantic versioning's, such as `1.0`.
+- **Semantic versioning from 1.0** over the promises: those of AGENTS.md's three homes and
+  of `mestolo`'s command line and output as ARCHITECTURE.md §6.3 states them, a hidden
+  item promising nothing. A release breaking one raises MAJOR, adding to them MINOR, only
+  fixing the last version PATCH; a milestone's close raises MINOR, or MAJOR if it breaks
+  one (V2). Whether a release breaks one is checked by nothing yet (ROADMAP.md P9's
+  cargo-semver-checks item).
+- **`rust-version`** rises only in a release raising MAJOR or MINOR, its CHANGELOG.md
+  section saying so, as most crates on crates.io treat it; a MAJOR for each rise was
+  judged too heavy. A version whose PATCH is above 0 is checked to state the
+  `rust-version` of its MINOR's tag, `vMAJOR.MINOR.0`, read from git (V7, a new rule).
+
+Shown to fire (TESTING.md T3, 2026-11-07): the workspace version set to `1.0.0-rc.1` and
+to `0.9.0+build.5` failed V1's check; `0.9.1` with `rust-version` raised to 1.99 failed
+V7's against tag `v0.9.0`, and with it unchanged passed it; `0.10.1`, whose tag `v0.10.0`
+does not exist, failed V7's. `1.0` and `0.09.0` were refused by `cargo metadata` before
+the check ran.
