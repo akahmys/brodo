@@ -17,7 +17,8 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   ADR-0033, ADR-0035, amended), T14's survey of what each crate lacks, and its gaps in
   brodo's core (ADR-0059) and formats (ADR-0060) taken, a `.vdb` level set read as an SDF
   (ADR-0047, amended), and mestolo's (ADR-0050, amended), and the rules for versions
-  after 1.0 (ADR-0011, ADR-0040, amended).
+  after 1.0 (ADR-0011, ADR-0040, amended), and the packaging of the three crates
+  (ADR-0040, amended).
 - **Next**: the rest of P9 in the order put to the owner (2026-11-04).
 
 ## 2. Milestones
@@ -605,15 +606,16 @@ since crates.io yanks a version but never deletes it.
       crates.io (V4), users depending by version from 1.0, and `rust-version` raised only
       with MAJOR or MINOR, checked against the MINOR's tag (V7) (the owner, 2026-11-07;
       ADR-0011, ADR-0040); README.md's dependency by version written when 1.0 is published
-- [ ] Packaging: `publish` set; each crate's keywords naming its function (sparse volume,
-      VDB, SDF, level set, voxel) and its categories; colino's dependency on brodo by
-      version as well as path; what each package holds, listed by `cargo package --list`;
-      `cargo publish --dry-run` of each; docs.rs's features set; both names unregistered
-      (checked 2026-10-16 and 2026-11-03)
-- [ ] mestolo published as well, installed by `cargo install mestolo` (the owner,
-      2026-11-04): its name checked unregistered, its dependency on brodo by version as
-      well as path, and what its command line and output promise from 1.0 stated where
-      they are held
+- [x] Packaging: `publish` set to crates.io; each crate's keywords naming its function
+      (sparse volume, VDB, SDF, level set, voxel) and its categories; colino's dependency
+      on brodo by version as well as path; what each package holds, listed by `cargo
+      package --list`, and checked (V8); `cargo publish --workspace --dry-run` of the
+      three; docs.rs's features set; both names unregistered (checked 2026-10-16,
+      2026-11-03 and 2026-11-07) (the owner, 2026-11-07; ADR-0040)
+- [x] mestolo published as well, installed by `cargo install mestolo` (the owner,
+      2026-11-04): its name unregistered (checked 2026-11-07), its dependency on brodo by
+      version as well as path (V8), and what its command line and output promise from 1.0
+      held in ARCHITECTURE.md §6.3 (ADR-0011)
 - [x] The gate's tests run on macOS and Windows as well as Linux in CI (the owner,
       2026-11-04), the `mmap` feature, paths and `mestolo`'s refusal of a file already
       there among what Windows has not run; README.md states what brodo builds for, the

@@ -58,3 +58,43 @@ given before. The owner decided, on 2026-11-07, as proposed:
   owner runs `cargo publish` on the owner's machine, since publishing takes the owner's
   token and cannot be undone (crates.io yanks a version but never deletes it); an agent
   runs `cargo publish --dry-run` alone (TESTING.md V4). Nothing checks it.
+
+## Amendment: what each crate publishes
+
+- **Date**: 2026-11-07
+
+The crates were set `publish = false`, colino and mestolo depended on brodo by path alone,
+which crates.io refuses, and each package, listed by `cargo package --list`, held its
+tests, benchmarks and their data (812 KiB of it in brodo's) but neither licence, which sat
+at the root only. The owner decided, on 2026-11-07, as proposed:
+
+- **Where.** `publish = ["crates-io"]` in the workspace, each crate taking it, so that no
+  other registry is reached by mistake; `repository` set in the workspace too.
+- **colino's and mestolo's dependency on brodo.** By a range, `version = "X.Y.Z"`, the
+  workspace version, beside the path, rather than pinned by `=X.Y.Z`. Pinned, a program
+  depending on brodo 1.1 and colino 1.0 would hold two copies of brodo whose types do not
+  mix, colino's API carrying brodo's; by a range cargo resolves one. The range starting
+  at the version released with them keeps the stated dependency from falling behind the
+  brodo they are built against, the concern of ADR-0011's amendment of 2026-11-07.
+- **What a package holds.** `src/`, `examples/`, README.md, which `lib.rs` reads in, and
+  both licences, by `include`; tests, benchmarks, their data and `test-list.txt` left
+  out, run in this repository rather than by a user. Each crate's licences are symbolic
+  links to the root's, which cargo packages as the files they name; the gate's tests on
+  Windows read neither.
+- **keywords and categories.** brodo `sparse-volume`, `vdb`, `sdf`, `level-set`, `voxel`;
+  colino `sdf`, `signed-distance`, `mesh`, `level-set`, `voxel`; mestolo `vdb`, `sdf`,
+  `voxel`, `level-set`, `cli`. Categories from crates.io's list (read from its API,
+  2026-11-07): brodo `data-structures`, `graphics`, `rendering::data-formats`; colino
+  `graphics`, `mathematics`, `rendering::data-formats`; mestolo
+  `command-line-utilities`, `rendering::data-formats`, `visualization`. None names a
+  user's field (AGENTS.md S4).
+- **docs.rs.** brodo and colino documented with every feature, none of which excludes
+  another; mestolo with its default.
+
+TESTING.md V8 states the first three, `scripts/audit/workspace.py` checking them from the
+manifests and `cargo package --list`. Shown to fire (TESTING.md T3, 2026-11-07): `publish
+= true` in the workspace, brodo's dependency at `0.8.0` and with no version, colino with
+`publish` of its own, colino's `tests/**` included, its `LICENSE-MIT` left out, and
+mestolo's `LICENSE-MIT` other bytes than the root's, each failed it. `cargo publish
+--workspace --dry-run` packaged and built the three, colino and mestolo against brodo's
+package (2026-11-07).

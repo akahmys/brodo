@@ -109,11 +109,6 @@ even by translation or from memory (AGENTS.md S1). Of code written elsewhere, th
 be shown, however good the code, so none is taken: a fix is written here from an issue's
 steps and expected result, never from code the issue carries (AGENTS.md S5).
 
-## Licence
-
-Licensed under either of [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your
-option.
-
 ## Working on brodo
 
 Contributors, human or agent, start with [AGENTS.md](AGENTS.md). To build and test:
@@ -144,3 +139,8 @@ To set up a clone that can land a change:
    ```bash
    ./scripts/audit/verify_compliance.sh
    ```
+
+## Licence
+
+Licensed under either of [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your
+option.

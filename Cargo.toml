@@ -10,13 +10,15 @@ version = "0.9.0"
 edition = "2024"
 rust-version = "1.98"
 license = "MIT OR Apache-2.0"
-# Registration on crates.io is a later decision (ROADMAP.md §4).
-publish = false
+repository = "https://github.com/akahmys/brodo"
+# crates.io alone, published by the owner (TESTING.md V4, V8; ADR-0040).
+publish = ["crates-io"]
 
 # Every dependency, internal or external, is declared here once and inherited by
 # `name.workspace = true` (CODING.md Rule 20).
 [workspace.dependencies]
-brodo = { path = "crates/brodo", default-features = false }
+# By version as well as path, the version the workspace's own (TESTING.md V8, ADR-0040).
+brodo = { path = "crates/brodo", version = "0.9.0", default-features = false }
 colino = { path = "crates/colino" }
 lz4_flex = { version = "0.14.0", default-features = false, features = ["std", "safe-encode", "safe-decode", "checked-decode"] }
 memmap2 = "0.9.11"

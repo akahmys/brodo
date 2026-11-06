@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Checks on the workspace manifests and the layout (CODING.md Rules 4, 11, 19, 20, L1, L3 and
-L4; TESTING.md V1, V3, V7, T6).
+L4; TESTING.md V1, V3, V7, V8, T6).
 
 1. Every member sits in `crates/` or is `xtask`, so `spikes/` never joins the build.
 2. Every member declares `[lints] workspace = true`. Without it a crate escapes every lint
@@ -24,6 +24,11 @@ L4; TESTING.md V1, V3, V7, T6).
 8. Every entry at the root is named in ARCHITECTURE.md §3's tree (L3), and every script, a
    `.py` or `.sh` file or an executable one, lies under `SCRIPT_HOMES` (L4). The files read
    are those git tracks or would add, so a new one is checked before it is staged.
+9. What is published (V8): the workspace publishes to crates.io alone, every crate takes
+   `publish.workspace = true`, the workspace's dependency on brodo states the workspace
+   version as well as its path, and each crate's package, as `cargo package --list`
+   gives it, holds its `Cargo.toml`, README.md and both licences, the licences the root's
+   bytes, and nothing beyond them, `src/` and `examples/`.
 """
 
 import json
@@ -47,6 +52,14 @@ RUST_VERSION = re.compile(r'^rust-version\s*=\s*"([^"]+)"', re.MULTILINE)
 DEP_SECTION = re.compile(r"^\[(?:target\.[^\]]+\.)?(?:dev-|build-)?dependencies\]\s*$")
 DEP_SUBTABLE = re.compile(r"^\[(?:target\.[^\]]+\.)?(?:dev-|build-)?dependencies\.([\w-]+)\]\s*$")
 DEP_LINE = re.compile(r"^([\w-]+)(\.workspace)?\s*=\s*(.*)$")
+PUBLISH_INHERITED = re.compile(r"^publish\.workspace\s*=\s*true\s*$", re.MULTILINE)
+PUBLISH_CRATES_IO = re.compile(r'^publish\s*=\s*\["crates-io"\]\s*$', re.MULTILINE)
+BRODO_DEPENDENCY = re.compile(r"^brodo\s*=\s*\{([^}\n]*)\}", re.MULTILINE)
+DEP_VERSION = re.compile(r'\bversion\s*=\s*"([^"]+)"')
+LICENCES = ("LICENSE-APACHE", "LICENSE-MIT")
+# What a package holds besides `src/` and `examples/` (V8); cargo writes the last three.
+PACKAGE_FILES = {"Cargo.toml", "README.md", *LICENCES, "Cargo.toml.orig", "Cargo.lock", ".cargo_vcs_info.json"}
+PACKAGE_DIRS = ("src/", "examples/")
 LINTS = re.compile(r"^\[lints\]\s*\nworkspace\s*=\s*true\s*$", re.MULTILINE)
 LAYOUT_TREE = re.compile(r"^## 3\. Repository layout\n.*?^```\n(.*?)^```", re.DOTALL | re.MULTILINE)
 # Where a script may lie (L4); a spike's own code is the spike's (PLANNING.md §3).
@@ -163,6 +176,45 @@ def version_rules() -> list[str]:
     return []
 
 
+def publishing(packages: list[dict]) -> list[str]:
+    """Where and what each crate publishes (V8)."""
+    text = (ROOT / "Cargo.toml").read_text()
+    out = []
+    if not PUBLISH_CRATES_IO.search(text):
+        out.append('  Cargo.toml does not set `publish = ["crates-io"]` for the workspace (V8)')
+    stated = WORKSPACE_VERSION.search(text)
+    dep = BRODO_DEPENDENCY.search(text)
+    version = DEP_VERSION.search(dep.group(1)) if dep else None
+    if not version or not stated or version.group(1) != stated.group(1):
+        found = version.group(1) if version else "none"
+        workspace = stated.group(1) if stated else "none"
+        out.append(f"  the workspace's dependency on brodo states version {found}, not the workspace's {workspace} (V8)")
+    for pkg in packages:
+        name = pkg["name"]
+        if name in TOOLS:
+            continue
+        manifest = Path(pkg["manifest_path"])
+        if not PUBLISH_INHERITED.search(manifest.read_text()):
+            out.append(f"  {name}: does not declare `publish.workspace = true` (V8)")
+        for licence in LICENCES:
+            held = manifest.parent / licence
+            if not held.is_file() or held.read_bytes() != (ROOT / licence).read_bytes():
+                out.append(f"  {name}: {licence} is not the root's (V8)")
+        listed = subprocess.run(
+            ["cargo", "package", "--list", "--allow-dirty", "-p", name],
+            cwd=ROOT, capture_output=True, text=True,
+        )
+        if listed.returncode != 0:
+            out.append(f"  {name}: `cargo package --list` failed: {listed.stderr.strip()} (V8)")
+            continue
+        held = set(listed.stdout.split())
+        for missing in sorted({"Cargo.toml", "README.md", *LICENCES} - held):
+            out.append(f"  {name}: its package does not hold {missing} (V8)")
+        for extra in sorted(f for f in held if f not in PACKAGE_FILES and not f.startswith(PACKAGE_DIRS)):
+            out.append(f"  {name}: its package holds {extra} (V8)")
+    return out
+
+
 def fuzzer() -> list[str]:
     fuzzed = sorted({crate_of(module) for module in UNTRUSTED_INPUT})
     if not fuzzed:
@@ -211,8 +263,10 @@ def layout() -> list[str]:
 
 
 def main() -> int:
+    packages = metadata()["packages"]
     failures = release_table() + version_rules() + cargo_config() + fuzzer() + layout()
-    for pkg in metadata()["packages"]:
+    failures += publishing(packages)
+    for pkg in packages:
         failures += check_package(pkg)
     if failures:
         print("\n".join(failures))

@@ -116,6 +116,10 @@ each key renamed:
   the `hermite.group.<id>` names, and written by `Hermite::entries`;
 - an SDF: `sdf.version` renamed `brodo.sdf.version`, its value `2`, the grid written again.
 
+The three crates are set to be published to crates.io (TESTING.md V8, ADR-0040): each
+package holds its sources, examples, README and both licences, its tests and benchmarks
+left out. Nothing a user builds against changes.
+
 ## 0.9.0 (2026-11-04)
 
 Closes P8: `mestolo`, a command that looks inside brodo's files without Rust (`info`,

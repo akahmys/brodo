@@ -7,6 +7,11 @@ rust-version.workspace = true
 license.workspace = true
 publish.workspace = true
 readme = "README.md"
+repository.workspace = true
+keywords = ["vdb", "sdf", "voxel", "level-set", "cli"]
+categories = ["command-line-utilities", "rendering::data-formats", "visualization"]
+# What the package holds (TESTING.md V8): no tests, benchmarks or their data.
+include = ["src/**", "examples/**", "README.md", "LICENSE-APACHE", "LICENSE-MIT"]
 
 [dependencies]
 # Every reader and writer it uses, and not `mmap`: a file received is read, never mapped

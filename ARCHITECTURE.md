@@ -61,6 +61,7 @@ The dependency order between crates is CODING.md Rule 11, listed in
 ├── scripts/audit/               # the audit, and project.py, its settings
 ├── scripts/hooks/               # git and Claude Code hooks
 ├── crates/brodo/, crates/colino/, crates/mestolo/, crates/piatto/ (if built)
+│                                # each crate's LICENSE-MIT and LICENSE-APACHE link to the root's
 ├── xtask/                       # project tooling, when there is any
 ├── spikes/                      # throwaway prototypes, never in the build
 ├── fuzz/                        # cargo-fuzz targets, outside the workspace (ADR-0006)
