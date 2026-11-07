@@ -18,7 +18,8 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   brodo's core (ADR-0059) and formats (ADR-0060) taken, a `.vdb` level set read as an SDF
   (ADR-0047, amended), and mestolo's (ADR-0050, amended), and the rules for versions
   after 1.0 (ADR-0011, ADR-0040, amended), the packaging of the three crates
-  (ADR-0040, amended), and a vulnerability reported privately (ADR-0049, amended).
+  (ADR-0040, amended), a vulnerability reported privately (ADR-0049, amended), and the
+  check of a release's API against the last one (TESTING.md V9; ADR-0011, amended).
 - **Next**: the rest of P9 in the order put to the owner (2026-11-04).
 
 ## 2. Milestones
@@ -629,13 +630,13 @@ since crates.io yanks a version but never deletes it.
 - [x] Version 2's media types stated in docs/formats.md §3, §4.1 and §8, `version=2`
       beside version 1's, and ADR-0041 amended (the owner, 2026-11-04); §6's versions with
       them, version 2 written since 0.9.0
-- [ ] A check that a release after 1.0 breaks no public API its version does not allow,
-      asked by the owner (2026-11-04): cargo-semver-checks, which compares the API's
-      rustdoc JSON with a baseline's, a published version or a tag, every feature on, is
-      an agent's reading of its documentation (2026-11-04), measured by nothing; it misses
-      a field's or argument's type changed, generics and lifetimes, and what only some
-      features show, so review stays; its version is pinned to one that reads the pinned
-      toolchain's rustdoc JSON; it reads a library, not `mestolo`'s command line
+- [x] A check that a release after 1.0 breaks no promise its version does not allow,
+      asked by the owner (2026-11-04): cargo-semver-checks 0.51.0, which reads the pinned
+      toolchain's rustdoc JSON, against the newest release tag, with no feature, each
+      alone and every one, and the tag's `mestolo` tests run on the current code, from
+      1.0, a break for the next MAJOR declared in CHANGELOG.md (TESTING.md V9); what the
+      tool misses, measured, left to review; `ReadError`'s lost `UnwindSafe`, found by
+      it against `v0.9.0`, added to CHANGELOG.md (the owner, 2026-11-07; ADR-0011)
 - [x] Golden files of version 2's bare frozen buffers, `f32` and three `f64` as version
       1's (docs/formats.md §7), held by the Format tests, so that the fuzz round's seeds
       of `grid_view` come from `tests/data/` as TESTING.md T6 says; P8's were made by hand

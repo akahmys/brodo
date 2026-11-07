@@ -1,0 +1,178 @@
+#!/usr/bin/env python3
+"""A release from 1.0 breaks no promise its version does not allow (TESTING.md V9; ADR-0011).
+
+1. `cargo-semver-checks` is the version pinned here, which reads the rustdoc JSON of the
+   toolchain `rust-toolchain.toml` pins, and `.github/workflows/audit.yml` installs it.
+2. The baseline is the newest release tag, `vMAJOR.MINOR.PATCH`, merged into HEAD. The
+   check runs only while the workspace version and the baseline are both 1.0 or above and
+   of one MAJOR, and CHANGELOG.md's `## Unreleased` has no `### Breaking`: a break
+   declared there is the decision that the next version raises MAJOR. Otherwise it says
+   why it is skipped.
+3. Each member's library is compared with the baseline's by `cargo semver-checks`, with no
+   feature, each feature the baseline has alone, and every feature, so that an item moved
+   behind a feature is seen; a version equal to the baseline's is judged a MINOR.
+4. `mestolo`'s command line and output, which no rustdoc shows, are held by the baseline's
+   `crates/mestolo/tests/`, run against the current code in a copy of the tree under
+   `target/semver/`.
+5. A version whose CHANGELOG.md section has `### Breaking` raises MAJOR over the baseline,
+   from a baseline of 1.0 on.
+
+What the tool does not see, a type changed, a bound or a lifetime narrowed, a constant's
+value, a behaviour, is left to review (ADR-0011).
+"""
+
+import json
+import re
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+from paths import committable
+
+ROOT = Path(__file__).resolve().parent.parent.parent
+VERSION = "0.51.0"
+TAG = re.compile(r"^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$")
+WORKSPACE_VERSION = re.compile(r'^version\s*=\s*"([^"]+)"', re.MULTILINE)
+FEATURES = re.compile(r"^\[features\]\s*$(.*?)(?=^\[|\Z)", re.MULTILINE | re.DOTALL)
+FEATURE = re.compile(r"^([\w-]+)\s*=", re.MULTILINE)
+SECTION = re.compile(r"^## (.+?)$(.*?)(?=^## |\Z)", re.MULTILINE | re.DOTALL)
+BREAKING = re.compile(r"^### Breaking\s*$", re.MULTILINE)
+COPY = ROOT / "target" / "semver" / "release-tests"
+
+
+def run(args: list[str], cwd: Path = ROOT) -> subprocess.CompletedProcess:
+    return subprocess.run(args, cwd=cwd, capture_output=True, text=True)
+
+
+def tool() -> list[str]:
+    """The pinned version runs, and CI installs it."""
+    out = []
+    shown = run(["cargo", "semver-checks", "--version"])
+    found = shown.stdout.split()[-1] if shown.returncode == 0 and shown.stdout.split() else "none"
+    if found != VERSION:
+        out.append(f"  cargo-semver-checks {found} runs, {VERSION} is pinned: "
+                   f"cargo install --locked cargo-semver-checks@{VERSION}")
+    workflow = (ROOT / ".github" / "workflows" / "audit.yml").read_text()
+    if f"cargo-semver-checks@{VERSION}" not in workflow:
+        out.append(f"  .github/workflows/audit.yml does not install cargo-semver-checks@{VERSION}")
+    return out
+
+
+def version_of(text: str) -> tuple:
+    m = WORKSPACE_VERSION.search(text)
+    parts = m.group(1).split(".") if m else []
+    return tuple(int(p) for p in parts) if len(parts) == 3 and all(p.isdigit() for p in parts) else ()
+
+
+def baseline() -> tuple:
+    """The newest release tag merged into HEAD, and its version; none, ("", ())."""
+    tags = run(["git", "tag", "--merged", "HEAD", "--list", "v*"]).stdout.split()
+    versions = [(tuple(int(g) for g in m.groups()), t) for t in tags if (m := TAG.match(t))]
+    if not versions:
+        return "", ()
+    version, tag = max(versions)
+    return tag, version
+
+
+def sections() -> dict:
+    return {m.group(1).split(" ")[0]: m.group(2) for m in SECTION.finditer((ROOT / "CHANGELOG.md").read_text())}
+
+
+def features(text: str) -> list[str]:
+    m = FEATURES.search(text)
+    return [f for f in FEATURE.findall(m.group(1)) if f != "default"] if m else []
+
+
+def members() -> list[dict]:
+    meta = run(["cargo", "metadata", "--no-deps", "--format-version", "1"])
+    return json.loads(meta.stdout)["packages"] if meta.returncode == 0 else []
+
+
+def library(pkg: dict, tag: str) -> list[str]:
+    """`cargo semver-checks` on one member, with no feature, each alone, and every one."""
+    if not any("lib" in t["kind"] for t in pkg["targets"]):
+        return []
+    name = pkg["name"]
+    manifest = Path(pkg["manifest_path"]).relative_to(ROOT).as_posix()
+    shown = run(["git", "show", f"refs/tags/{tag}:{manifest}"])
+    if shown.returncode != 0:
+        return []  # a crate the baseline does not have promises nothing yet
+    now = set(pkg["features"]) - {"default"}
+    sets = [["--only-explicit-features"]]
+    sets += [["--only-explicit-features", "--features", f] for f in features(shown.stdout) if f in now]
+    sets += [["--all-features"]]
+    out = []
+    for flags in sets:
+        checked = run(["cargo", "semver-checks", "-p", name, "--baseline-rev", tag, *flags])
+        if checked.returncode != 0:
+            said = [line for line in (checked.stdout + checked.stderr).splitlines()
+                    if line.startswith(("--- failure", "error")) or line.strip().startswith(("Summary", "Failed in"))
+                    or re.match(r"^\s{2}\S", line)]
+            out.append(f"  {name} {' '.join(flags)} breaks {tag}'s API:")
+            out += [f"    {line.strip()}" for line in said[:30]]
+    return out
+
+
+def commands(tag: str) -> list[str]:
+    """The baseline's `crates/mestolo/tests/` against the current code."""
+    if run(["git", "cat-file", "-e", f"refs/tags/{tag}:crates/mestolo/tests"]).returncode != 0:
+        return []
+    shutil.rmtree(COPY, ignore_errors=True)
+    for path in committable():
+        rel = path.relative_to(ROOT)
+        if rel.parts[:3] == ("crates", "mestolo", "tests"):
+            continue
+        (COPY / rel).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(path, COPY / rel)
+    archive = subprocess.run(["git", "archive", f"refs/tags/{tag}", "crates/mestolo/tests"],
+                             cwd=ROOT, capture_output=True)
+    unpacked = subprocess.run(["tar", "-x", "-C", str(COPY)], input=archive.stdout, capture_output=True)
+    if archive.returncode != 0 or unpacked.returncode != 0:
+        return [f"  {tag}'s crates/mestolo/tests could not be read"]
+    tested = run(["cargo", "test", "--quiet", "-p", "mestolo", "--all-features", "--test", "*",
+                  "--target-dir", str(ROOT / "target" / "semver" / "target")], cwd=COPY)
+    if tested.returncode != 0:
+        said = [line for line in (tested.stdout + tested.stderr).splitlines()
+                if re.match(r"^(test .* FAILED|error|---- )", line) or "panicked" in line]
+        return [f"  {tag}'s mestolo tests fail on the current code (ARCHITECTURE.md §6.3):"] + \
+               [f"    {line}" for line in said[:20]]
+    return []
+
+
+def main() -> int:
+    failures = tool()
+    current = version_of((ROOT / "Cargo.toml").read_text())
+    tag, base = baseline()
+    notes = sections()
+    skipped = None
+    if not current or current[0] == 0:
+        skipped = "before 1.0"
+    elif not tag or base[0] == 0:
+        skipped = f"no release tag of 1.0 or above merged into HEAD (newest: {tag or 'none'})"
+    else:
+        stated = ".".join(map(str, current))
+        if current != base and stated in notes and BREAKING.search(notes[stated]) and current[0] <= base[0]:
+            failures.append(f"  {stated} declares a break (### Breaking) and does not raise {tag}'s MAJOR")
+        if current[0] != base[0]:
+            skipped = f"{'.'.join(map(str, current))} raises {tag}'s MAJOR"
+        elif BREAKING.search(notes.get("Unreleased", "")):
+            skipped = "CHANGELOG.md's Unreleased declares a break, for the next MAJOR"
+    if failures or skipped:
+        if failures:
+            print("\n".join(failures))
+        if skipped:
+            print(f"  SKIPPED: {skipped}")
+        return 1 if failures else 0
+    for pkg in members():
+        failures += library(pkg, tag)
+    failures += commands(tag)
+    if failures:
+        print("\n".join(failures))
+        return 1
+    print(f"  PASS (against {tag})")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

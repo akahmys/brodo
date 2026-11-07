@@ -27,7 +27,7 @@ jobs:
       - name: Tools, at the versions the owner's machine runs
         run: |
           rustup toolchain install
-          cargo install --locked cargo-deny@0.20.2 cargo-mutants@27.1.0
+          cargo install --locked cargo-deny@0.20.2 cargo-mutants@27.1.0 cargo-semver-checks@0.51.0
           # betterleaks 1.9.0, its release archive checked against the checksum it was
           # published with (2026-10-24), as the owner's machine runs it.
           curl -sSfL -o betterleaks.tar.gz https://github.com/betterleaks/betterleaks/releases/download/v1.9.0/betterleaks_1.9.0_linux_x64.tar.gz

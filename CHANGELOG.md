@@ -59,7 +59,8 @@ archive profiles stay at version 2, and version 1 of them is no longer read nor 
 - colino's `stl::read`, `obj::read` and `threemf::read`, which took bytes, are
   `from_bytes`; `read` now takes a path, refusing a file longer than `Limits::bytes`
   before reading it. `ReadError` gains `Io` and no longer derives `Clone`, `PartialEq` or
-  `Eq`.
+  `Eq`, nor is `UnwindSafe` or `RefUnwindSafe`, since the `std::io::Error` it may hold is
+  neither.
 - A stored value type is named by `field::ValueType` (ADR-0056): `Stored::TYPE_CODE` is
   `Stored::VALUE_TYPE`; a grid's and a region's `value_type` return a
   `ValueType`; `FormatError::WrongValueType` holds two, and a header of the type asked for

@@ -5,9 +5,9 @@
 
 One script runs every check, then the tests, then the check that every test is listed: [`scripts/audit/verify_compliance.sh`](scripts/audit/verify_compliance.sh).
 It must end `=== AUDIT PASSED ===`. It needs `cargo`, `cargo-deny`, `cargo-mutants`,
-`betterleaks`, `python3` and `git`, and stops if one is missing. It runs with `RUSTFLAGS` empty, which
-overrides `rustflags` in any cargo configuration, so no configuration outside the
-repository can switch a lint off.
+`cargo-semver-checks`, `betterleaks`, `python3` and `git`, and stops if one is missing.
+It runs with `RUSTFLAGS` empty, which overrides `rustflags` in any cargo configuration, so
+no configuration outside the repository can switch a lint off.
 
 Not in it: the fuzzer and Miri, which build on nightly, and the mutation run, which takes
 hours, its verdict by `scripts/audit/mutants.py` holding a run's or a sharded run's reports
@@ -43,6 +43,7 @@ grep -E '^echo "\[' scripts/audit/verify_compliance.sh
 | test files in `src/`, and, by `scripts/audit/source.py --ignores`, `#[ignore]` reasons, direct or under `cfg_attr`, however their lines break, found in the code and not its strings, in every target | T1 |
 | `scripts/audit/documents.py`, and `cargo doc` with every feature and warnings denied | AGENTS.md writing rules 1, 2, 6, S3, the ADR index, no `CLAUDE.md`, each crate's README read in, and no `#[doc(hidden)]` item named by another file's doc comment, a crate README, ARCHITECTURE.md or docs/formats.md; Rule 10 |
 | `scripts/audit/mutants.py` with no argument: `.cargo/mutants.toml` holds no setting, read by its shape, one `exclude_re = [` list and comments, and each pattern in its `exclude_re` has a comment above it ending in its kind and, for `open` and `unreached`, where, and excludes a mutant | T11 |
+| `scripts/audit/semver.py`: `cargo-semver-checks` at its pinned version, installed by `audit.yml`; from 1.0, against the newest release tag merged into HEAD while of one MAJOR and no break declared, each crate's library by `cargo semver-checks` with no feature, each alone and every one, the tag's `crates/mestolo/tests/` on the current code, and a version declaring a break raising MAJOR | V9 |
 | `cargo deny check` | 13 |
 | `scripts/hooks/provenance_guard.py --check`: the local list of forbidden sources exists and names a project | S1 |
 | hooks installed; betterleaks over the tree and the history, personal rules, `scripts/audit/paths.py` (also: each of `OUTPUT_DIRS` git-ignored and in betterleaks' allow-list) | 14, L2 |
