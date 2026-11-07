@@ -62,3 +62,33 @@ decided, as proposed:
   neither; S5 says so.
 - A vulnerability is not reported in a public issue. How it is reported privately is
   ROADMAP.md P9's item on `SECURITY.md`, decided by the owner in that item's turn.
+
+## Amendment: a vulnerability reported privately
+
+- **Date**: 2026-11-07
+
+S5 said a vulnerability is not taken in a public issue, and left how it is reported to
+ROADMAP.md P9. brodo, colino and mestolo read files they cannot trust (TESTING.md T6),
+and GitHub's private vulnerability reporting was off for the repository (read from
+`gh api repos/akahmys/brodo/private-vulnerability-reporting`, 2026-11-07). The owner
+decided, on 2026-11-07, as proposed:
+
+- **The way.** GitHub's private vulnerability reporting alone, no address of the owner's
+  published; the owner turned it on, read as `enabled: true` the same day.
+- **Its home.** `SECURITY.md` at the root, where GitHub's Security tab shows it, a row in
+  AGENTS.md's table; README.md and S5 link to it.
+- **What is in scope.** Untrusted bytes making a crate panic or abort, reach undefined
+  behaviour, read or write out of bounds, run without end, or use memory or time out of
+  all proportion to the input, in place of returning a value or an error.
+  `CacheFile::map` on a file changed while it is mapped, which breaks its stated safety
+  condition, is out of it.
+- **What is fixed.** The latest release alone, by a PATCH of it (TESTING.md V2).
+- **What is promised.** An answer once a report is read, and no time: one person
+  maintains brodo.
+- **Disclosure.** A fix made in the report's private advisory and released, then the
+  advisory published with a CVE GitHub assigns, and the vulnerability filed with RustSec.
+  The owner does each of these on GitHub and RustSec; an agent does none of them (S5).
+
+No check of its own was added: `scripts/audit/documents.py` fails a link that does not
+resolve, so README.md's and AGENTS.md's links fail the gate without `SECURITY.md`. Shown
+to fire (TESTING.md T3, 2026-11-07): `SECURITY.md` moved away failed it.

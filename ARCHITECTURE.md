@@ -49,7 +49,7 @@ The dependency order between crates is CODING.md Rule 11, listed in
 ./
 ├── AGENTS.md, ARCHITECTURE.md, ROADMAP.md, README.md
 ├── PLANNING.md, CODING.md, TESTING.md, AUDITING.md
-├── PROVENANCE.md, CHANGELOG.md, LICENSE-MIT, LICENSE-APACHE
+├── PROVENANCE.md, CHANGELOG.md, SECURITY.md, LICENSE-MIT, LICENSE-APACHE
 ├── Cargo.toml, Cargo.lock, rust-toolchain.toml, clippy.toml, rustfmt.toml,
 │   deny.toml, .betterleaks.toml, .gitignore, .gitattributes
 ├── .cargo/mutants.toml          # cargo-mutants: the equivalent mutants (TESTING.md T11)

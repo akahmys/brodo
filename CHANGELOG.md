@@ -118,7 +118,8 @@ each key renamed:
 
 The three crates are set to be published to crates.io (TESTING.md V8, ADR-0040): each
 package holds its sources, examples, README and both licences, its tests and benchmarks
-left out. Nothing a user builds against changes.
+left out. Nothing a user builds against changes. A vulnerability is reported privately,
+as SECURITY.md says.
 
 ## 0.9.0 (2026-11-04)
 

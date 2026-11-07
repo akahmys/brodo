@@ -17,8 +17,8 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   ADR-0033, ADR-0035, amended), T14's survey of what each crate lacks, and its gaps in
   brodo's core (ADR-0059) and formats (ADR-0060) taken, a `.vdb` level set read as an SDF
   (ADR-0047, amended), and mestolo's (ADR-0050, amended), and the rules for versions
-  after 1.0 (ADR-0011, ADR-0040, amended), and the packaging of the three crates
-  (ADR-0040, amended).
+  after 1.0 (ADR-0011, ADR-0040, amended), the packaging of the three crates
+  (ADR-0040, amended), and a vulnerability reported privately (ADR-0049, amended).
 - **Next**: the rest of P9 in the order put to the owner (2026-11-04).
 
 ## 2. Milestones
@@ -622,9 +622,10 @@ since crates.io yanks a version but never deletes it.
       64-bit, little-endian targets `lib.rs` and `frozen.rs` hold it to; the `platforms`
   job of `audit.yml` (ADR-0034), whose first run, on 18a7c3c, passed 407 tests on macOS
   and 404 on Windows, the three that need `mkfifo` not built there (2026-11-05)
-- [ ] A way to report a vulnerability privately, decided by the owner before anything is
+- [x] A way to report a vulnerability privately, decided by the owner before anything is
       published (2026-11-04), since brodo reads untrusted files (TESTING.md T6): a
-      `SECURITY.md`, and GitHub's private vulnerability reporting, a setting the owner makes
+      `SECURITY.md`, and GitHub's private vulnerability reporting, a setting the owner made
+      (read as on, 2026-11-07) (the owner, 2026-11-07; ADR-0049, amended)
 - [x] Version 2's media types stated in docs/formats.md §3, §4.1 and §8, `version=2`
       beside version 1's, and ADR-0041 amended (the owner, 2026-11-04); §6's versions with
       them, version 2 written since 0.9.0

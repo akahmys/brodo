@@ -100,8 +100,8 @@ in names it as a co-author.
 [Issues](https://github.com/akahmys/brodo/issues) are welcome: a bug with the steps that
 show it and the result you expected, or a request for something the crates do not do. One
 is worked on once the owner labels it `owner-approved`, and is closed by the owner
-(AGENTS.md S5). Do not report a vulnerability in a public issue: a private way to report
-one is to be stated before 1.0 (ROADMAP.md P9).
+(AGENTS.md S5). Do not report a vulnerability in a public issue: report it privately, as
+[SECURITY.md](SECURITY.md) says.
 
 Pull requests are not accepted, and only collaborators can open one. brodo is MIT or
 Apache-2.0, and must hold no code derived from a project under a copyleft licence, not
