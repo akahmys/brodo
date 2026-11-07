@@ -10,8 +10,13 @@ Why a rule or the design is the way it is. The design itself is in
   `Amended`. A new record is for a new topic, or for reversing an old one.
 - **Past tense** for the context and the amendments; a decision may be stated in the
   present. What the design is now belongs in ARCHITECTURE.md, not in a record.
-- A record is not deleted. A reversed one is marked `Superseded by ADR-NNNN`; one reversed
-  or narrowed in part is amended to name the record that did it.
+- A record is not deleted, nor its number reused. A reversed one is marked
+  `Superseded by ADR-NNNN`; one reversed or narrowed in part is amended to name the record
+  that did it.
+- A record is a decision, not a report of a run (PLANNING.md §2). One grown long may be
+  condensed once, as the owner decides: its decisions kept with their dates, reasons and
+  the options set aside, a line under its header naming the commit that holds the text
+  before (ADR-0001).
 
 ```
 # ADR-NNNN: <the decision, as a statement>

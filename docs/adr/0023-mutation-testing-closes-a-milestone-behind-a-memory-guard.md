@@ -3,6 +3,9 @@
 - **Status**: Amended
 - **Date**: 2026-10-18
 
+Condensed on 2026-11-08 (ADR-0001): each decision is kept with its reason and what it set
+aside; the runs that led to them are in git, this file as of `53f69d5`.
+
 ## Context
 
 The audit review before P1 closed (proposal C) asked whether brodo's tests catch the
@@ -16,370 +19,79 @@ the kernel panicked. macOS enforces neither `ulimit -v`, `-d` nor `-m`.
 
 ## Decision
 
-- TESTING.md T11: before a milestone closes, every mutant of the workspace is run, by
-  `scripts/audit/mutants.py --run`. It sets `scripts/audit/rss_guard.py` as cargo's runner
-  for the host, which kills a test binary past 1 GiB (thirty times the largest peak of the
-  unmodified tests, 32 MiB), keeps cargo-mutants' copies under `target/`, and runs two
-  jobs. It fails on a missed mutant, and on a timeout before any test failed.
-- A missed mutant is killed by a new test, or excluded as equivalent in
+- **The run.** TESTING.md T11: before a milestone closes, every mutant of the workspace is
+  run, by `scripts/audit/mutants.py --run` and never without it, with `--all-features` as
+  the gate's tests build (2026-10-25: run with the default features, the code behind
+  opt-in features was mutated but its tests not built, and 148 mutants were missed). The
+  milestones from P5 on close with the checks the human chooses (ADR-0033).
+- **The guard.** `mutants.py` sets `scripts/audit/rss_guard.py` as cargo's runner for the
+  host, which kills a test binary past 1 GiB (thirty times the unmodified tests' largest
+  peak, 32 MiB), keeps cargo-mutants' copies under `target/`, and runs two jobs. The guard
+  sums the binary with every process descended from it and kills those left when it ends
+  (2026-10-18); it gives the binary no session of its own, since cargo-mutants ends a
+  timed-out test by `killpg` on cargo's process group, which a new session would escape.
+  A mutant applied by hand, to show a test fails on it (T3), runs behind the guard too, as
+  TESTING.md §3 states (2026-10-27): one run unguarded took the machine down.
+- **The timeout** is twice the unmutated suite's time. A mutant timing out before any test
+  failed is run again by `mutants.py --run --patient`, under 1800 s and chosen by name
+  (2026-10-22): one caught is killed; one whose tests all pass is equivalent, only slower,
+  and excluded with that reason; one still timing out fails the run. Stopping a binary at
+  its first failure needs a nightly harness flag, so a binary's remaining tests run on
+  after one fails, which is what outruns the timeout.
+- **The verdict** is the last report's missed mutants and the patient run's, and fails on
+  a missed mutant, a timeout before any test failed, a baseline that failed or is missing,
+  a list of none, and an argument it does not know (2026-11-02). Reports given with `--`
+  and the run's arguments must report every mutant `cargo mutants --list` gives, naming
+  how many are in none (2026-10-27: two shards cut off at six hours went unseen); a shard
+  with no `outcomes.json` and an empty `mutants.json` reports none, and one with mutants
+  listed and no outcomes is a lost report (2026-10-28). A report of mutants run needs the
+  guard's log beside it, and a patient run unparted reports every timeout it was given.
+- **Exclusions.** A missed mutant is killed by a new test or excluded in
   `.cargo/mutants.toml`'s `exclude_re`, a regex without line numbers under a comment
-  saying why. Like `#[expect]`, an exclusion needs no ADR; its reason is reviewed with
-  the diff. The gate (`mutants.py` with no argument) fails on an exclusion without a
-  comment, and on one that no longer excludes a mutant, by cargo-mutants' own regex
-  engine, so cargo-mutants joins the audit's tools.
-- Not the attribute `#[mutants::skip]`, which needs the `mutants` crate as a regular
-  dependency.
-- The timeout is twice the unmutated suite's time (`timeout_multiplier`). In the spike,
-  each of the 7 mutants still running then had already failed 18 to 29 tests; libtest runs
-  a binary's remaining tests after a failure, and a labelling test on a broken topology
-  outran the 431 s timeout each time. Stopping a binary at its first failure needs a
-  nightly harness flag.
-
-Shown to fire: the gate's check failed on a pattern with its comment removed, on a
-pattern matching no mutant, and on a double-quoted pattern; `--report` failed on the
-spike's report, with its 2 missed mutants, and on a timeout whose log had its failures
-removed, and passed with neither; `--run` on `manifest.rs` excluded its equivalent mutant,
-ran the other 42 in 7 minutes under a 168 s timeout with every test binary logged by the
-guard, and passed, and failed once the runner was not set; `rss_guard.py` killed a
-process allocating 4 GiB under a 1 GiB limit, and during the spike 5 mutants at 1025 to
-1121 MiB.
+  giving its reason and ending in its kind, `[same]`, `[open: WHERE]` or
+  `[unreached: WHERE]`, an equivalence under the contract, not the implementation
+  (ADR-0043, 2026-10-28). Not `#[mutants::skip]`, which needs the `mutants` crate as a
+  regular dependency. The gate (`mutants.py` alone) fails on an exclusion without a
+  comment or a kind, a WHERE naming no document or item (an item found in its type's
+  definition and `impl` blocks alone), and one no longer excluding a mutant by
+  cargo-mutants' own regex engine.
+- **The exclusions file is a rule file** (2026-10-28): AGENTS.md lists it, and every
+  exclusion is approved by the human, its date listed below. It holds the exclusions alone,
+  read by its shape: one `exclude_re = [` line, its patterns and comments, a `]`, and
+  outside them blank lines and comments (2026-10-18, 2026-11-02); the run's settings live
+  in `mutants.py`, so that none changes without an ADR.
+- **A property test** kills a mutant only as soundly as it is steady: a run follows a gate
+  in which every test passes, and a property test failing in a run is investigated before
+  the run is trusted (2026-10-25).
 
 ## Consequences
 
-Closing a milestone takes hours more, run at rest. A mutant that only exhausts memory
-counts as caught, since the guard's kill fails the test binary. Doctests run through
-rustdoc, outside the guard; brodo has none. Nothing checks that the run happened; the
-milestone's checklist lists it.
-
-## Amendment
-
-- **Date**: 2026-10-18
-
-A review found two gaps, and the human decided both.
-
-- `.cargo/mutants.toml` held the run's settings (`timeout_multiplier`, `output`) beside
-  the exclusions, so a setting of a rule could change with no ADR, since the file is not
-  a rule file. The settings moved into `mutants.py`, which passes them on the command
-  line; the file holds the exclusions only, and the gate fails on any other key or table.
-  Shown to fire: a `timeout_multiplier` line and a `[profile]` table each failed it.
-- `rss_guard.py` measured and killed the test binary alone, so a process it started
-  could grow unwatched and outlive it. The guard now sums and kills the binary with
-  every process descended from it, followed by parent pid, and kills those left when the
-  binary ends. It does not give the binary a session of its own: cargo-mutants puts cargo
-  in a process group and ends a timed-out test by `killpg(SIGTERM)` on that group
-  (`process/unix.rs` in 27.1.0), which a new session would escape. Shown to fire: a
-  grandchild allocating 3 GiB was killed with its parent at 1292 MiB, where the previous
-  guard let it reach 3084048 KiB; a `sleep` left by a parent that exited was killed, where
-  the previous guard left it running. No test of brodo starts a process: `cargo test` runs
-  13 binaries, none of them the benchmark, which does. `--run` on `manifest.rs` passed
-  again: 42 mutants in 7 minutes, the timeout 162 s from the command line's multiplier,
-  every binary logged by the guard.
-
-## Amendment
-
-- **Date**: 2026-10-22 (slow mutants)
-
-P2's run found mutants that leave every result as it was but make a search exhaustive: a
-bounding-volume test that never prunes, a partition that never splits. Run again on a
-machine at rest, 33 of colino's and 3 of brodo's still timed out before any test failed,
-and T11 gave them no way to pass. The human decided:
-
-- `mutants.py --run --patient` runs again, under a timeout of 1800 s, only the mutants the
-  last report shows timing out before any test failed, chosen by name. One caught is
-  killed. One whose tests all pass is equivalent, only slower, and goes into
-  `.cargo/mutants.toml` with that reason. One still timing out fails the run. cargo-mutants'
-  `--re` lets a deleted struct field through whatever its name, so only the named count.
-- The run's verdict is the last report's missed mutants and the patient run's.
-
-Shown to fire on P2's run: of brodo's 3, one passed only slower and two still timed out;
-of colino's 33, 17 were caught, 14 passed only slower and two still timed out.
-
-## Amendment
-
-- **Date**: 2026-10-25
-
-P3's full run counted as caught seven mutants of `colino::intersect` that no test could
-kill: the property test of crossings fails at random on a case it happens to draw, and
-until 2026-10-25 a real defect, a crossing at a segment's end rounded off, sometimes made
-it fail under any mutant. With the defect fixed, the run of that file's mutants left the
-seven missed. Four were killed by a unit test of ties at three sizes; the human decided
-that three are equivalent and listed them with their reasons: the axis taken on a tie of
-the largest components, `limit`'s sign where it cannot be zero, and a division by a zero
-denominator left out by the range check. A mutant's kill by a property test is only as
-sound as that test is steady: a run follows a gate in which every test passes, and a
-property test that fails in a run is investigated before the run is trusted.
-
-## Amendment: every feature
-
-- **Date**: 2026-10-25
-
-P4's run, on GitHub Actions in 60 shards at `63fcbe1`, missed 89 mutants in
-`brodo/src/slice.rs` and 59 in `brodo/src/vtk.rs`: ADR-0036 had made `slice-png` and
-`vtk` opt-in, and cargo-mutants, run with the default features, still mutated that code but
-no longer built the tests behind those features. The gate's tests ran with every feature;
-the run did not. The owner decided that `mutants.py` passes `--all-features`, as the gate's
-`cargo test` builds, and TESTING.md T11 says so. Shown to fire: without it, the 148 were
-missed; with it, run again on the owner's machine, 146 were caught and 2 were unviable.
-
-The same run missed 7 mutants of `colino/src/hermite.rs` that no test reached: a triangle
-with no area nearest an unhit edge, an edge outside at its lower end crossed more than once,
-and a normal perpendicular to its edge. Three tests in `hermite_reference.rs` now build
-each case, and caught all 7. Its 16 timeouts before any failed test, in `winding.rs` and
-`bvh.rs`, ran again under 1800 s on the owner's machine and were all caught, the slowest
-of them in about 13 minutes: GitHub's runners had made them outrun twice the unmutated
-suite's time.
-
-## Amendment: two exclusions withdrawn
-
-- **Date**: 2026-10-27
-
-P5's review rewrote `euler`'s sum over the tiles' edges (M1): each tile sums, in
-parallel, the vertices on its edges that it is the first meeting tile to hold. Two
-mutants had been excluded as equivalent, each leaving a tile's far edges unvisited, on
-the ground that another tile touching such an edge visits it on its near side. That no
-longer holds: the vertex is the first tile's to sum, and a small tile touching a large
-one's far edge mid-way is lost. A test of that case kills both, and the human decided
-that the two exclusions are withdrawn.
-
-## Amendment: P5's missed mutants
-
-- **Date**: 2026-10-27
-
-The run on `9940bd5` (2026-10-26 to 27) missed 72 mutants, all in code P5 wrote or rewrote.
-Most are now killed by tests written for them, each shown to fail with its mutant applied
-by hand; the hand-applied runs went behind `rss_guard.py` once one, a voxel of no size let
-through, grew until the machine went down. Dead code that held others is gone: the level-3
-arm of the labelling's `classify` and the early return of its `inside`, a guard on a
-section's height never met, the parity lines' growth of the box. The human decided that
-twelve that no test can tell from the original are excluded, each with its reason, and
-that the exclusion for `inside`'s early return, gone, is withdrawn.
-
-## Amendment: every mutant reported
-
-- **Date**: 2026-10-27
-
-The run on `9940bd5` (2026-10-26 to 27) had results from 78 shards of 80: two were cut off at
-the six hours a job may run, and the verdict, taking the reports it was given, did not see
-them missing. The human decided that a verdict on a sharded run's reports, `mutants.py
---report` and `--patient --from`, fails unless they report every mutant `cargo mutants
---list` gives with the run's arguments, `--shard` aside, naming how many are in no report.
-Shown to fire by two reports made by hand of `grid.rs`'s twelve mutants, one dropped.
-
-## Amendment: a mutant applied by hand
-
-- **Date**: 2026-10-27
-
-Showing that a new test fails on a mutant (TESTING.md T3), P5's fixes applied mutants by
-hand and ran the tests unguarded: one, a voxel of no size let through, sampled a triangle
-without end and took the machine down (2026-10-27). The human decided that a mutant
-applied by hand runs behind `rss_guard.py` too, set as cargo's runner as `mutants.py`
-sets it, the command stated in TESTING.md §3; held by nothing. Run so, the same mutant
-was stopped at 1086 MiB.
-
-## Amendment: when reports are held to every mutant
-
-- **Date**: 2026-10-27
-
-The re-review of P5's fixes found that `--report` held any reports to the whole
-workspace's list, so a report of one file's run, or of `--iterate`, always failed, and
-that a part of the timeouts run again with none of them to run might write no report and
-fail reading it. The human decided that `--report` holds the reports to every mutant only
-when given `--`, the whole run's arguments after it, as the workflow gives them, and that
-a part with none of the timeouts passes with the missed mutants alone.
-
-## Amendment: a shard given no mutant
-
-- **Date**: 2026-10-28
-
-The run on `fa72208` (2026-10-27) split 3573 mutants into 160 shards, and the last four
-were given none: cargo-mutants wrote them no `outcomes.json`, only an empty
-`mutants.json`, and every part of the timeouts run again failed reading one, so the run
-gave no verdict. The human decided that a report with no `outcomes.json` and an empty
-`mutants.json` reports no mutant, and that one with no `outcomes.json` and mutants listed
-still fails, as a lost report. Shown to fire on that run's reports: shard 156 failed
-before and passes after, and shard 155 with its `outcomes.json` removed still fails.
-
-## Amendment: the final run's missed mutants, and exclusions as rules
-
-- **Date**: 2026-10-28
-
-The run on `fa72208` (2026-10-27) missed 58 mutants. Run again under the guard on the
-tests written for them (2026-10-28), all but seven were caught; tests of a large tile's far
-edge from the origin and of a cube near 1 at h = 10⁻⁵ kill three more, each shown to fail
-with its mutant applied by hand. Some of the tests written for them held the code to more
-than it promises, a tolerance of 10⁻¹³ where none is documented among them, so the human
-decided how a test and an exclusion are held to the contract (ADR-0043), and that:
-
-- an exclusion is excluded as equivalent under the contract, its comment ending in its
-  kind, `[same]`, `[open: WHERE]` or `[unreached: WHERE]`, which `mutants.py` checks;
-- `.cargo/mutants.toml` is a rule file, as practice had kept it, every exclusion being
-  approved by the human and recorded here: AGENTS.md lists it and the `commit-msg` hook
-  asks an ADR of a commit that touches it, where an exclusion had needed no ADR;
-- the other four of the seven are excluded: `fill`'s growth, the order of
-  `edge_vertices`' corners, which of the tiles meeting the condition sums a vertex
-  as the same result, and the ray's start within a factor of two, as open by the
-  documentation of `resolves`;
-- five that the tests brought to their promises no longer tell apart are excluded: two
-  passing over a tile's edge beyond the range, refused elsewhere (ARCHITECTURE.md §4.9),
-  two letting a voxel size through to a later check that refuses it for another reason,
-  and one moving a measured distance within twice the ray's start.
-
-Shown to fire: a comment's kind removed failed the check for its pattern and those `As
-above.` after it, and a kind naming no document or item failed it.
-
-## Amendment: P6's missed mutants
-
-- **Date**: 2026-10-31
-
-The run on `b179b2a` (2026-10-30, GitHub Actions) reported all 3949 mutants and missed 30,
-in the archive, its quantisation and the region's walk, and one, a ray measured as always
-thin, still timed out after the patient run's 1800 s. 29 are now killed by tests written
-for them, each shown to fail with its mutant applied by hand behind `rss_guard.py`; one
-test wrote a file a run before had left, so that a write doing nothing passed, and now
-removes it first. The human decided that the two left, which no test can tell from the
-original, are excluded, each with its reason.
-
-## Amendment: P7's missed mutants
-
-- **Date**: 2026-11-01
-
-The run on `a7022af` (2026-11-01, GitHub Actions, 4 h 22 min to its last shard) reported
-all 4307 mutants and missed 36, all in P7's `.vdb` reader and writer; the timeouts run again
-were caught. 30 are now killed by tests that make, from OpenVDB's files and brodo's, what
-those files do not hold: descriptors whose offsets disagree, a limit above the file, an
-inactive root tile of another value, a root origin off its edge, a map not affine, an
-instance of a double grid, indicator 1, a node without active-mask not at indicator 6, and
-Blosc chunks stored in ways OpenVDB did not use or beyond docs/formats.md §9.8; all 36 were
-run by hand behind `rss_guard.py` against them, and 30 caught. The human decided that the
-six left, which no test can tell from the original, are excluded, each with its reason:
-three `|` over bits shared by none, and three indicator arms giving what the last arm gives.
-
-## Amendment: which checks a milestone closes with
-
-- **Date**: 2026-11-02
-
-From P5 on, the human chooses which of the closing checks this record holds a milestone
-to, by its content, and the milestone's checklist lists them (ADR-0033).
-
-## Amendment: the run's verdict holds its baseline, its guard and its list
-
-- **Date**: 2026-11-02
-
-The second review of the whole repository found `mutants.py --run` passing a run whose
-unmutated baseline failed, which tests no mutant; never holding a local run's report to the
-mutants listed; passing a list of none; not checking the guard's log behind `--report` or
-`--patient --from`; and the patient run not checking that every timeout it was given ran
-again. The owner decided, on 2026-11-02, that every verdict fails on a failed baseline and a
-list of none, a run's but with `--iterate` is held to its list, a report of mutants run needs
-the guard's log beside it, and an unparted patient run reports every timeout. Shown to fire:
-a report with a failed baseline, one with no guard log and a list of none each passed the
-old verdict and failed the new.
-
-With it, the fix of a sliver's distance moved the comparison of `on_triangle`'s
-candidates into `nearest_edge`, which the face's candidate joins, so that the exclusion of
-`<` made `<=` there, `[same]` while only a flat triangle's edges met in it, matched no
-mutant. The owner approved, on 2026-11-02, excluding the same mutant in `nearest_edge` as
-`[open: `colino::distance::on_triangle`]`, whose documentation now says which of two
-points as near, apart by rounding alone, is given is not promised.
-That fix compares the edges only where the triangle's normal is shorter than √ε of its
-edges' product, since comparing them always made colino's conversions 22 to 42 % slower.
-Of the mutants of that test, three only compare the edges more often, which changes a
-point only by rounding: `<` made `<=`, and either `*` made `+`. The owner approved, on
-2026-11-02, excluding them as `[open: `colino::distance::on_triangle`]`; the two making
-the test depend on the coordinates' size are killed by slivers a million times larger.
-An outside review then made the face's point the projection on the plane and a thin
-triangle's point its edges' alone (ADR-0027). Those three mutants then send triangles to
-the edges that the face would answer within rounding, are killed by a point on a thin
-triangle's edge, and their exclusions, matching no mutant, were withdrawn. Of the new
-test's mutants one alone lived: `<` made `<=`, which differs only at a normal exactly at
-the threshold, where either point lies within the triangle's width of the nearest. The
-owner approved, on 2026-11-02, excluding it as `[open: `colino::distance::on_triangle`]`,
-whose documentation now says which point within a thin triangle's width is given is not
-promised.
-
-## Amendment: a promise found in its own type, a missing baseline, and arguments refused
-
-- **Date**: 2026-11-02
-
-An outside review found that `mutants.py` looked for an exclusion's `Type::member` from the
-type's definition to the end of its file, so that another type's member of that name, or a
-call at a line's start, stood for it, and an `impl` above the definition was never read; that
-a report with no unmutated baseline passed; and that an argument it did not know, a
-misspelt `--report`, ran the gate's check and passed. The owner decided, on 2026-11-02, that
-all of it be fixed, and it was: the member is found in the type's definition and its `impl`
-blocks alone, wherever they lie; a report must hold a baseline that passed; and any other
-argument is refused. Shown to fire: on a scratch crate the old lookup found another type's
-member and missed one in an `impl` above its type, and the new one the reverse; a report of
-mutants with no baseline and `--rpeort` passed before and fail now.
-
-## Amendment: the exclusions file read by its whole shape
-
-- **Date**: 2026-11-02
-
-The survey of the whole repository found `.cargo/mutants.toml` held to its exclusions by a
-pattern for a bare key, so that `"exclude_globs" = [...]`, quoted, which cargo-mutants reads
-as the same key, passed and could exclude a whole crate with no reason. The owner decided,
-on 2026-11-02, that the file be read by its shape: one `exclude_re = [` line, its patterns
-and comments, a `]`, and outside them blank lines and comments alone. Shown to fire: a
-quoted key, a single-quoted one and a table after the list each passed the old check and
-fail the new.
-
-## Amendment: 0.8.2's missed mutants
-
-- **Date**: 2026-11-02
-
-The run on the lines 0.8.2 changed (227 mutants, 2026-11-02) missed 16 and timed out on 3.
-Ten, in a triangle's area and in turning its largest angle first, were killed by tests
-written for them, each shown to fail with its mutant applied by hand, those of the
-turning since gone with it (ADR-0027); two, a guard on a
-root tile that could never fail, went with the guard, a root tile's region holding no leaf.
-The human decided, on 2026-11-02, that four mutants of the tree's margins be excluded as
-`[open: ARCHITECTURE.md §5.1]`, beside the segment query's, and that two of the nearest
-query's that still timed out after the patient run's 1800 s, each making the walk a scan
-of every triangle, be excluded as only slower. Seven exclusions no longer matching any
-mutant, their code moved or gone, were removed.
-
-## Amendment: P8's missed mutants
-
-- **Date**: 2026-11-04
-
-The run on `1599360` (2026-11-04, GitHub Actions run 41713041735) reported every mutant and
-missed 9; of the timeouts run again by the patient run, three, each making the walk over a
-mask's places endless, still timed out after 1800 s. A run before it, on `3954ed5`, left
-99 of its 160 shards without a baseline, a test copying a frozen grid into bytes not on a
-block, and was run again once the test borrowed them. The walk now takes from each word as
-many places as it has bits set, and its eight mutants, applied by hand, each fail a test;
-three missed mutants are killed by tests written for them, each shown to fail with its
-mutant applied by hand. The human decided, on 2026-11-04, that the six left, which no test
-can tell from the original, are excluded as `[same]`, each with its reason: a restamp to
-the version a grid holds, a read's room grown as it is for a longer file, a value the
-original returns, a crossing told by its fraction alone, a bound `check_links` already
-holds, and a box's margin narrowed beside its other three.
-
-## Amendment: exclusions gone with their code before 1.0
-
-- **Date**: 2026-11-05
-
-Two mutants excluded as equivalent in P8's amendment went with the code they were in:
-`Owned::crossing_tile`'s, when Hermite data's earlier versions stopped being read
-(ADR-0053), and `HermiteView::crossing`'s comparison with `NO_CROSSING`, when the reader
-returned a crossing or none in place of that value (the survey before 1.0, ROADMAP.md P9).
-
-## Amendment: P9's missed mutants
-
-- **Date**: 2026-11-07
-
-The run on `0d15bca` (2026-11-07, GitHub Actions run 42332503810, 160 shards) reported
-every one of 4588 mutants and missed 36; of three timeouts the patient run ran again, two
-were caught and one, `tile_source` taking the walk over a lower node's 4096 regions for
-every new tile, still timed out after 1800 s: its wrong result, a merge read as the
-background, failed a test only in a binary run after the slowed ones. A unit test, run
-first, now holds that merge, so that it fails in seconds. Twenty-eight missed mutants are
-killed by tests written for them, each shown to fail with its mutant applied by hand, and
-the 39 run again by `mutants.py --run` on the new tests missed only the 8 below. The human
-decided, on 2026-11-07, that they are excluded: two of a frozen buffer's root checks and
-three of a cache file's bounds check as `[open]`, another check refusing the same damage
-by the same name and only several, of which which is named is not promised, telling them
-apart; and three of a `.vdb` reader's widening of `f64` as `[same]`, never called. The
-same decision added to `cache::read`'s documentation that the bytes are checked as
-`from_bytes` checks them, which of several broken rules is named not promised.
+- Closing a milestone takes hours more, run at rest or on GitHub Actions in shards
+  (ADR-0034). Nothing checks that the run happened; the milestone's checklist lists it.
+- A mutant that only exhausts memory counts as caught, since the guard's kill fails the
+  test binary. Doctests run through rustdoc, outside the guard.
+- A mutant that slows the tests of one binary and breaks only a later one's can time out
+  first; a test of it in a binary run earlier, the crate's unit tests, fails it in seconds
+  (P9).
+
+## Exclusions approved
+
+Each by the human, on the date given, the reasons in `.cargo/mutants.toml`; those since
+gone with their code were removed with it.
+
+- 2026-10-22: P2's mutants found only slower by the patient run, 1 of brodo's and 14 of
+  colino's.
+- 2026-10-25: three in `colino::intersect`.
+- 2026-10-27: twelve of P5's; three exclusions withdrawn, their equivalence or code gone.
+- 2026-10-28: nine left by the final run of P5's fixes.
+- 2026-10-31: two of P6's.
+- 2026-11-01: six of P7's `.vdb` reader and writer.
+- 2026-11-02: those of `colino::distance::on_triangle`'s thin triangles, as `[open]`, its
+  documentation saying which point within rounding or a thin triangle's width is given is
+  not promised; and four of the tree's margins and two of the nearest query's, only
+  slower, left by 0.8.2's run, seven no longer matching removed.
+- 2026-11-04: six of P8's, as `[same]`.
+- 2026-11-07: eight of P9's: five of a frozen buffer's root checks and a cache file's
+  bounds check as `[open]`, and three of a `.vdb` reader's widening of `f64` as `[same]`;
+  `cache::read`'s documentation then saying which of several broken rules is named is not
+  promised.

@@ -185,3 +185,24 @@ nothing having checked it. The owner decided, on
 commit that adds an ADR or ticks a box in ROADMAP.md without changing §1. Run on the
 commits since P8's close, it named five: ccc36bf, 637d9cd, 4105baf, 9eec928 and 36b26be; the audit holds it to
 the commits not yet pushed alone, so they stand. Whether §1 is true, nothing checks.
+
+## Amendment: an ADR records decisions, and may be condensed
+
+- **Date**: 2026-11-08
+
+At 1.0 the 61 records held 338 KB. ADR-0023 had 21 amendments and ADR-0019 15, eleven of
+them a milestone's run reported: its figures, the mutants killed, a baseline recorded
+again. Their decisions applied a rule already recorded, and the same facts stood in the
+commit, ROADMAP.md and `.cargo/mutants.toml`, against writing rule 1; a decision was found
+only by reading every amendment. The owner decided, on 2026-11-08:
+
+- **An ADR records a decision** that changes the design or a rule, with its reason and
+  what it set aside (PLANNING.md §2). What applies a rule, a run's results, a test written
+  for a mutant, a baseline kept or recorded again, is stated in the commit and, while
+  open, in ROADMAP.md. An exclusion approved for `.cargo/mutants.toml`, a rule file, adds
+  one line to ADR-0023's list of approvals.
+- **A record may be condensed**, once, as the owner decides: its decisions kept, each with
+  its date, reason and the options set aside, and its reports of runs left to git, the
+  record naming the commit that holds the text before. Its number, title and file stay, so
+  that every reference to it holds. ADR-0019 and ADR-0023 were condensed first, from 20
+  and 23 KB to 6 KB each.

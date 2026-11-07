@@ -3,6 +3,9 @@
 - **Status**: Amended
 - **Date**: 2026-10-17
 
+Condensed on 2026-11-08 (ADR-0001): each decision is kept with its reason and what it set
+aside; the runs that led to them are in git, this file as of `53f69d5`.
+
 ## Context
 
 TESTING.md T5 asks a performance comparison for the fastest of many runs of each variant,
@@ -17,314 +20,68 @@ Absolute times drifted by up to 7.9 % within one session of about 40 minutes.
 
 ## Decision
 
-- The benchmarks are `harness = false` targets in `crates/brodo/benches/`, on std only,
-  with no dependency added. The runner that compares them with their baselines is part of
-  the same benches, not a separate tool.
-- Each comparison runs in pairs of fresh processes; each process runs every variant once
-  per round, in turn, for 20 rounds, writing over a 256 MiB buffer before each run, and
-  keeps each variant's fastest time.
-- A benchmark fails its baseline when it is more than 10 % slower. The human chose 10 %
-  above the drift measured in one session (7.9 %).
+- **The harness.** The benchmarks are `harness = false` targets on std only, with no
+  dependency added; the runner that compares them with their baselines is part of them.
+  It lives in `crates/brodo/benches/harness/mod.rs`, colino's benchmark including it by
+  `#[path]` rather than a second harness (2026-10-20); each crate writes to
+  `out/bench/<crate>/`.
+- **A comparison.** Pairs of fresh processes; each runs every variant once per round, in
+  turn, for 20 rounds, writing over a 256 MiB buffer before each run, and keeps each
+  variant's fastest time.
+- **The tolerance.** An item fails its baseline when both runs of a pair are more than
+  10 % slower. The human chose 10 % above the drift measured in one session (7.9 %).
+- **Short items repeated** (2026-10-17). An item under 3 ms is repeated until a run lasts
+  3 ms, the count in its name (`cache_map_x256`), so that a baseline taken at another
+  count is not compared: under 3 ms, a pair disagreed by up to 14 %.
+- **At rest** (2026-10-17, 2026-10-26). Benchmarks run on a machine doing nothing else. A
+  run, comparison or record, waits while the one-minute load average is above 3.0
+  (`BUSY_LOAD`) or the five-minute above 4.0 (`SETTLED_LOAD`), up to ten minutes, then
+  refuses. A baseline recorded while other work ran had failed an unchanged item by 21 to
+  27 %, its two children slow alike, so the spread within a pair could not see it; 0.5 was
+  tried and refused a run after one wait. The five-minute load was added after runs that
+  started below 3.0 just after a build, the system still scanning new binaries, disagreed
+  by 16.9 %. The report's header names both loads, the hardware and the date in UTC
+  (2026-10-25).
+- **A pair that disagrees is refused** (2026-10-30). The harness refuses a pair whose two
+  children disagree on an item by more than 10 % (`SPREAD`), comparing or recording, and
+  judges nothing from it: a load read at the start cannot see work that begins during a
+  run, and at rest pairs agreed within 7.8 %. A refused pair is run again.
+- **Recording one item** (2026-10-20). `--record NAME` replaces or adds that item's row
+  alone, with the faster of the pair, the other rows kept with their dates; an unknown name
+  is refused. `--record` alone records every item. Recording every row to add one would
+  reset the rows drift is measured against.
+- **Every feature** (2026-10-30). Every benchmark runs with every feature, as the gate's
+  tests do (`cargo bench -p <crate> --bench <crate> --all-features`, TESTING.md T10), so
+  that an item behind a non-default feature, the archive's, is not left out unseen.
+- **Threads** (2026-10-31). A benchmark's children run on as many rayon threads as the
+  machine has performance cores (`hw.perflevel0.logicalcpu` on macOS; every processor where
+  the system names no core types), the pool built before an item's data. On ten threads of
+  an M5's four performance and six efficiency cores, the leaf-parallel update varied with
+  the time its threads waited for a processor (correlation +0.96) and `convert_slab_320`
+  by up to 32 % with instructions per cycle lost on both core types, no cause the counters
+  showed; on four threads both agreed within 1.3 % (`spikes/parvar/`, B-024). A spike, not
+  a benchmark, compares thread counts.
+- **When benchmarks run** (2026-10-17, 2026-11-04). A change to `src/` on a path a benchmark
+  times is benchmarked before it lands (TESTING.md T10), after a refactoring made gather
+  50 % slower unseen. `commit_msg_check.py` holds part of it: a commit changing a crate's
+  `src/` has a line beginning `Benchmarks`, and in the hook, unless it says
+  `Benchmarks: not on a timed path`, the crate's last report is newer than the staged
+  files and every item `ok`. Version 2's reads had landed without a benchmark and the
+  cache map was found 28 times slower at the milestone's close.
+- **A baseline moved** only by the human, an item at a time with `--record NAME`, when a
+  change's cost is accepted or a drift is judged. Each such run and its figures are
+  stated in the commit and ROADMAP.md (ADR-0001).
 
 ## Consequences
 
-The drift between days, between the performance and efficiency cores, and with the
-machine's temperature was not measured, so 10 % may fail a change that made nothing
-slower; such a failure is a reason to measure the drift again and amend this record. A
-slowdown under 10 % passes unseen by a baseline comparison; comparing variants in turn in one process remains the way to
-see one. The eviction size was measured on one machine only.
-
-## Amendment
-
-- **Date**: 2026-10-17
-
-The first baseline was recorded while other work ran on the machine. Compared with it,
-with no change to the code, the leaf-parallel update failed twice in a row at +21 to
-+27 % in both children, then passed four times. With the other work stopped, six
-comparisons passed, but items whose run took under 3 ms (the cache map at 0.06 ms, the
-parallel update at 0.2 ms) disagreed within a pair by up to 14 %. So:
-
-- An item that runs in under 3 ms is repeated until a run lasts 3 ms or more, and the
-  count is part of its name (`cache_map_x256`), so that a baseline taken at another count
-  is not compared.
-- Benchmarks are run and recorded on a machine doing nothing else; the benches say so.
-
-Recorded again at rest, every item took 3.0 to 5.5 ms per run. All six comparisons that
-followed passed; pairs agreed within 3.4 % except the parallel update, within 10.7 % (its
-ten threads share four performance and six efficiency cores), whose change from its
-baseline ranged from −5.5 to +11.3 %, the other items' from −1 to +6 %. The parallel update therefore sits near the tolerance and may fail without
-cause; it passed each time because a failure needs both children slower.
-
-## Amendment
-
-- **Date**: 2026-10-17
-
-P1's retrospective asked for a check against a baseline recorded on a busy machine. A
-refusal by the spread within a pair would not have caught the first one: while other work
-ran, the parallel update's two children agreed within 3.2 % and 1.2 %, slow alike. The
-one-minute load average was read instead, on the Apple M5: 1.53 to 2.13 over five idle
-minutes, about 2.0 before and during benchmarks run back to back, 3.86 just after a build
-and the tests. So a run, comparison or `--record`, first reads it and, while it is above
-3.0, waits ten seconds and reads again, up to two minutes, then refuses. The load during
-the other work of the first incident was not measured, so whether 3.0 would have caught
-it is not known; nor was any machine but the M5 measured. A threshold of 0.5 refused a
-run after one wait.
-
-## Amendment
-
-- **Date**: 2026-10-17 (when benchmarks run)
-
-The benchmarks ran only when someone chose to. A refactoring that moved the leaf index into
-another module made gather 50 % slower, caught only because the benchmarks were run by
-hand. The audit review asked for a rule: TESTING.md T10, a change to `src/` on a path a
-benchmark times is benchmarked before it lands and does not land while an item fails. It
-is held by review: nothing checks that a commit was benchmarked.
-
-
-## Amendment
-
-- **Date**: 2026-10-20
-
-colino's conversion needed watching after it was measured at scale: at a sphere radius
-of 400 voxels it took 33 s and labelling 9.5 s, at 200 voxels 6.9 s and 2.4 s, the
-winding number 77 % of the conversion's values (ADR-0027). The human chose to measure
-before changing it, and to share the harness rather than write a second (PLANNING.md §2).
-
-- The harness moved, unchanged in what it does, to `crates/brodo/benches/harness/mod.rs`;
-  each member's benchmark includes it, colino's by `#[path]`, and calls `run` with its
-  data and items. Each writes to `out/bench/<crate>/`, so that two members' children do
-  not overwrite each other's files.
-- colino's items: a sphere of radius 50 voxels, 8192 triangles, converted with a band of 3
-  (325 ms), and labelled (165 ms), recorded on 2026-10-20 at rest.
-- brodo's items gave the same verdicts through the shared harness: all within their
-  baselines at rest, the leaf-parallel update at +2.7 and +9.9 %. A first run, with
-  another program using more than one core, failed that item at +16 % in both children
-  though the load average let it start: one more reading for the open question on the
-  load average (ROADMAP.md §1).
-
-Including a file outside the crate means colino's benchmark cannot be packaged as it
-stands; before colino is published, its benchmark is excluded or the harness becomes a
-crate of its own.
-
-## Amendment
-
-- **Date**: 2026-10-20
-
-`gather_w3` was added after the baselines of 2026-10-17. `--record` replaces every row of
-the hardware model, so recording the new item would have reset the rest, against which
-drift is measured; its row was added by hand instead. P2's retrospective proposed, and
-the human decided:
-
-- `--record NAME` replaces or adds that item's row alone, with the faster of the pair, the
-  other rows kept with their dates; a name no item has is refused. `--record` alone
-  records every item, as before.
-
-Shown, at a load average of 2.5 to 2.6: with the name ignored, `--record gather_w3`
-rewrote all ten rows; `--record nosuch` was refused and changed nothing; `--record
-gather_w3` changed its row alone, 4437000 to 4358416 ns, the other nine keeping
-2026-10-17.
-
-## Amendment: the load a run starts at
-
-- **Date**: 2026-10-25
-
-P4's retrospective found that whether a run was at rest was measured, the harness waiting
-while the one-minute load average was above `BUSY_LOAD`, but not kept. The owner decided
-that the report keeps it: `report.tsv`'s header names the load average the run started at,
-beside the hardware and the date, recorded only, the run still refused above
-`BUSY_LOAD`. Shown: colino's benchmark at rest wrote `load 2.93` in its header.
-
-
-## Amendment: the five-minute load
-
-- **Date**: 2026-10-26
-
-P5's retrospective found runs that started at rest by the one-minute load average while the
-five-minute stayed high, after a build, when the system's own scans of the new binaries
-held the machine busy for minutes: at 2.48 and 10.12 a pair disagreed by 16.9 %; at 2.43
-and 3.46, Hermite data's items read 8 to 13 % slow, which back-to-back runs at 2.34 and 4.40,
-and 1.93 and 3.92, put down to the machine; P5's closing runs, at 1.72 and 3.83 and at 1.50
-and 3.16, agreed within 7.8 %. The owner decided that the harness waits while the
-five-minute load average is above 4.0 as well, `SETTLED_LOAD`, for up to ten minutes rather
-than two, the report's header naming both loads, and that its documentation says dates are
-UTC. A five-minute load of 4.0 would not have held back the run at 3.46. Shown to fire:
-with `SETTLED_LOAD` at 0.5, a run at loads of 2.51 and 4.13 was refused, naming both.
-
-## Amendment: two baselines moved at P5's close
-
-- **Date**: 2026-10-28
-
-P5's closing run failed two of brodo's items in both runs, `cache_write_x8` at +689 and
-+678 % and `gather` at +15.0 and +14.9 %, against baselines of 2026-10-17. Benchmarked
-commit by commit from `9940bd5`, the last run within them, at five-minute loads of 3.2 to
-4.0, each moved at one commit, none of which recorded a benchmark as T10 asks:
-
-- `cache_write_x8`, 5.2 to 43 ms at `e25e1a9`: `cache::write` syncs the hidden file to the
-  disk before renaming it over the path, as the owner chose for review G1, `sync_all`
-  being `F_FULLFSYNC` on macOS, about 4.6 ms a file. Unsynced, a crash could leave the
-  renamed file without its bytes in place of a good one.
-- `gather`, 3.09 to 3.58 ms at `68543d9`, which touched no code on its path: `gather` and
-  `sources` disassembled, at the two commits, to the same 287 lines, only their addresses
-  differing, the first moving from 4 to 52 bytes past a 64-byte boundary. A change in code
-  placement, not in the code.
-
-The owner decided that the sync stays and both rows are recorded again, `--record
-cache_write_x8` and `--record gather`, at loads of 1.44 and 1.41: 43 486 750 and
-3 468 083 ns. A run then put every item within its baseline, the two at +0.8 and −2.0 %,
-and −0.6 and −0.2 %. Code placement alone moves an item by as much as 15 %, which the
-10 % tolerance cannot tell from a change in the code; it is read by disassembling, as here.
-
-## Amendment: a pair that disagrees is refused
-
-- **Date**: 2026-10-30
-
-P6's retrospective found a spike's run that started at rest, at a one-minute load below
-2.5 and a five-minute below 4.0, and read 1.3 to 2.5 times slower than two later runs,
-which agreed within 15 % (spikes/region/REPORT.md). A load read at the start cannot see
-work that begins during a run, and one read at the end cannot tell it from the run's own:
-ten busy threads, as many as the machine's processors, took the one-minute load from 2.40
-to 9.02 in 90 s, above `BUSY_LOAD` with nothing else running. The owner decided that the
-harness refuses a pair whose two children disagree on an item by more than 10 %,
-`SPREAD`, comparing or recording, and judges and records nothing from it, the report still
-written: at rest pairs agreed within 7.8 % (P5's close) and 4.2 % at most in the last
-reports of 2026-10-28, and a pair disturbed by other work disagreed by 16.9 %. The
-refusal is checked by the harness; a spike's timings, which do not run on it, are held by
-review alone. Shown to fire: with `SPREAD` at 0, colino's run at loads of 1.82 and 1.50
-was refused, naming every item.
-
-At 10 %, at rest, colino's `convert_slab_320` alone was refused, at 17.2 % and 20.5 % in
-two runs of three, while its other items agreed within 3.8 %. Ten children run one after
-another put its fastest time at 154 to 191 ms, a different one each process, the other
-items within 6 %; on 4 threads at 227 to 232 ms. Timed by step, the leaf-parallel values
-step held all of it, 156.8 to 179.5 ms, the serial steps within 0.6 ms; no other process
-used 5 % of a processor for more than one 2-s sample in a child. The owner decided that the
-limit stays at 10 %, a refused pair run again, and the item's variation is an open question
-(ROADMAP.md B-024).
-
-## Amendment: every feature
-
-- **Date**: 2026-10-30
-
-P6's closing checks found no benchmark item for the archive, whose feature is not a
-default one, so that an item behind it would be left out, unseen, by T10's command. The
-owner decided that brodo's benchmark gains `archive_write`, `archive_read`,
-`archive_read_8bit` and `archive_region`, the last refused before it is timed if its box
-holds no leaf (PLANNING.md §3), and that every benchmark runs with every feature, as the
-gate's tests do: `cargo bench -p <crate> --bench <crate> --all-features` (TESTING.md T10).
-
-P6's closing benchmarks, at rest, at one-minute loads of 1.81 to 2.03: two pairs were
-refused, `leaf_parallel_update_x32` at 12.5 and 10.3 % (ROADMAP.md B-024's question), and
-the third put every item within its baseline. Children of `6013b72`, before P6's
-refactoring, and of `644fe47`, after it, run in turn three times each:
-
-| Item | `6013b72` | `644fe47` | Baseline |
-| :--- | ---: | ---: | ---: |
-| `cache_read_x16` | 2.76 to 2.89 ms | 2.78 to 2.86 ms | 3.98 ms, 2026-10-17 |
-| `cache_map_x256` | 4.35 to 4.53 ms | 3.97 to 4.09 ms | 3.86 ms, 2026-10-17 |
-| `gather` | 3.46 to 3.54 ms | 3.02 to 3.09 ms | 3.47 ms, 2026-10-28 |
-
-`cache_read_x16` had grown faster before the refactoring, its baseline left 28 % slow;
-`gather`, whose code the refactoring did not touch, moved by 13 % between the two builds,
-as code placement moved it at P5's close; `cache_map_x256`, whose path the refactoring
-touched, by 9 %, its cause not told apart. `cache_write_x8`'s slow first child did not
-recur in four pairs, within 2.6 %. The owner decided that the archive's four items and
-`cache_read_x16` are recorded, one `--record NAME` each, at one-minute loads of 1.39 to
-1.97: `archive_write` 5 140 417, `archive_read_x8` 3 948 083, `archive_read_8bit_x8`
-3 167 167, `archive_region_x8` 3 471 458 and `cache_read_x16` 2 850 416 ns; that
-`gather` and `cache_map_x256` keep theirs, which a build's placement moves both ways; and
-that the two cache items leave ROADMAP.md's unresolved problems with these figures.
-
-## Amendment: the threads a benchmark runs on
-
-- **Date**: 2026-10-31
-
-The spike `spikes/parvar/` answered B-024 on an Apple M5, ten processors of which four are
-performance cores, at rest (`spikes/parvar/REPORT.md`). On ten threads the leaf-parallel
-update varied with the CPU time other processes took: in 20 children at one-minute loads
-of 2.3 to 2.5, the fastest time went with the time its threads were ready but had no
-processor (correlation +0.96) and with fewer threads taking a leaf (−0.95), a call of under
-100 µs waiting for any worker displaced; at loads of 1.3 to 2.4 its pairs agreed within
-3.7 %. `convert_slab_320` varied with its value step's instructions per cycle, both core
-types losing them together when its threads ran on both, the instructions and the clocks
-the same in every run: 158 to 212 ms in twelve children at rest, pairs apart by up to
-32 %. Neither waiting for a processor, idle spinning, power (controls that touch no memory
-kept their instructions per cycle at every thread count) nor the code's layout (children
-with address randomisation off and on agreed) explained it; what in the chip takes the
-cycles is not seen by the counters the spike read. On four threads, the performance
-cores, both items' pairs agreed within 1.3 % over twelve children, the slab at 229 to
-233 ms.
-
-The owner decided that a benchmark's children run on as many rayon threads as the machine
-has performance cores, `hw.perflevel0.logicalcpu` on macOS and every processor where the
-system names no core types (TESTING.md T5); the harness builds rayon's global pool so
-before an item's data, a dependency both crates already have. A benchmark no longer
-measures a parallel item on every processor; a spike that compares thread counts does.
-Shown to fire: with the pool built after the data, the child failed, "The global thread
-pool has already been initialized".
-
-The first run on four threads, at one-minute loads of 1.83 and 1.85, refused no pair, the
-widest `convert_slab_320` at 7.1 %; the items that run on rayon were slower than their
-baselines on ten threads, `leaf_parallel_update_x32` by 23 %, `archive_read_x8` by 12 to
-14 %, colino's conversions and Hermite items by 26 to 47 %, and the others within 8 % or
-faster. The nine items whose paths run on rayon were recorded again, one `--record NAME` each, the
-others keeping theirs: `leaf_parallel_update_x32` 3 080 250, `archive_write` 5 533 709,
-`archive_read_x8` 4 630 167, `archive_read_8bit_x8` 3 330 833, `archive_region_x8`
-3 326 000, `convert_slab_320` 231 949 875, `convert_sphere_r50` 418 750 334,
-`hermite_sphere_r50` 406 291 542 and `hermite_holed_r50` 407 224 750 ns. One record of
-`convert_slab_320` was refused, every colino item apart by 16 to 17 %, and run again.
-`leaf_parallel_update_x32` read 3.69 ms in the first run and 3.08 ms in its record, 20 %
-apart between runs a few minutes apart, the first pair within 0.3 % and the record's
-within 10 %: drift between processes on four threads, its cause not measured.
-
-## Amendment: the leaf-parallel update recorded again at P7's close
-
-- **Date**: 2026-11-01
-
-P7's closing run, every feature, at one-minute loads of 1.71 to 1.92, found
-`leaf_parallel_update_x32` slower than its baseline of 3 080 250 ns by 12 to 21 % in every
-pair, every other item of both crates within it. P7 changed no path the item times: the
-commit before P7, `11e13a6`, benchmarked in turn with P7's, twice each, read 3.45 to
-3.72 ms against P7's 3.49 to 3.73 ms. The baseline was the faster of the two readings the
-amendment above records, 3.08 ms against 3.69 ms. The owner had the item recorded again,
-the cause still not measured: `--record leaf_parallel_update_x32` at a one-minute load of
-1.20 gave 3 398 084 ns.
-
-## Amendment: the cache map recorded again at P8's close
-
-- **Date**: 2026-11-03
-
-P8's closing run found the cache and archive reads of version 2 slower than their
-baselines: `cache_map_x256` by 2770 %, `cache_read_x16` by 240 %, and the archive's reads
-by 66 to 98 %, `3954ed5` having landed without a benchmark, as T10 asks. Each read of
-version 2 checks the grid's bounds against its leaves and tiles (ADR-0052, b), which the
-first reader found by walking every place of every node. Walking only the places set, the
-reads came back within their baselines, `cache_map_x256` aside, at +103 and +104 %: a map
-of the benchmark's grid, 2606 leaves, took 16.6 µs at version 1 and 31 µs at version 2,
-17.3 µs with the bounds left unchecked, so the check costs about 5 ns a leaf. The owner
-had the item recorded again as the cost of that check: `--record cache_map_x256`, the
-one-minute load 1.73 just after it, gave 7 724 166 ns.
-
-## Amendment: the benchmarks of a change checked as it is committed
-
-- **Date**: 2026-11-04
-
-P8's version 2 (`3954ed5`) landed without its benchmarks, T10 held by nothing, and the
-closing benchmarks found the cache map 28 times slower. The owner decided, on 2026-11-04,
-that `commit_msg_check.py` hold it: a commit changing the `src/` of a crate with a
-benchmark has a line beginning `Benchmarks`, checked by the hook and, on the commits a push
-brings, by the audit; and in the hook, unless the line is `Benchmarks: not on a timed path`,
-the crate's last report, `out/bench/<crate>/report.tsv`, is newer than each of its staged
-`src/` files and gives every item `ok`. The audit cannot read the report, which is not
-committed; whether a path is timed, and the machine at rest, nothing checks.
-
-## Amendment: the leaf-parallel update left as it was at P9's close
-
-- **Date**: 2026-11-08
-
-P9's closing run, every feature, began at a one-minute load of 1.25: colino's items and
-brodo's were within their baselines but `leaf_parallel_update_x32`, refused at 3.76 ms in
-both runs, +10.8 % over 3 398 084 ns. The commit closing P8, `60950bc`, benchmarked in
-turn with P9's, twice each at one-minute loads of 2.25 to 2.34, read 3.54 to 3.73 ms
-against P9's 3.70 to 3.76 ms, the pairs 6 to 10 % apart within themselves: the item's
-drift between processes, as at P7's close. The owner left the baseline as it was, the
-cause still not measured.
+- A slowdown under 10 % passes unseen by a baseline comparison; comparing variants in turn
+  in one process remains the way to see one.
+- Code placement alone moves an item by about 15 %: at P5's close `gather` went from 3.09
+  to 3.58 ms between two builds whose code on its path disassembled the same, only its
+  addresses moved. The tolerance cannot tell this from a change in the code; disassembling can.
+- `leaf_parallel_update_x32` drifts between processes on four threads by up to 20 %, its
+  cause not measured: it was found 10 to 21 % slow at P7's and P9's closes with the code
+  on its path unchanged, recorded again at the first and left at the second (2026-11-08).
+- The eviction size, the loads and the thread count were measured on one Apple M5 alone.
+- colino's benchmark, including a file outside its crate, cannot be packaged; the packages
+  leave benchmarks out (TESTING.md V8).

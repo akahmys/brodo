@@ -33,6 +33,11 @@ before any of these:
 4. **A second mechanism for a purpose one already serves.** The ADR removes one of them.
 5. **A change to a rule** (AGENTS.md, "Changing the rules").
 
+What only applies a rule is not an ADR nor an amendment: a run's results, a test written
+for a mutant, a baseline kept or recorded again go in the commit and, while open, in
+ROADMAP.md; an exclusion approved for `.cargo/mutants.toml` adds one line to ADR-0023's
+list (ADR-0001). Held by review alone.
+
 An ADR's claims about the code as it is (a size, a layout, what a function returns or what
 can be counted) are established by running something before the human decides, as
 AGENTS.md's "Measurement outranks documentation" asks; a claim found wrong while
