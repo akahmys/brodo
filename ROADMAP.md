@@ -19,9 +19,10 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   (ADR-0047, amended), and mestolo's (ADR-0050, amended), and the rules for versions
   after 1.0 (ADR-0011, ADR-0040, amended), the packaging of the three crates
   (ADR-0040, amended), a vulnerability reported privately (ADR-0049, amended), the
-  check of a release's API against the last one (TESTING.md V9; ADR-0011, amended), and
-  the gate on GitHub Actions passing again, betterleaks pinned there at the owner's
-  version and held to it on the owner's machine (ADR-0034, amended).
+  check of a release's API against the last one (TESTING.md V9; ADR-0011, amended), the
+  gate on GitHub Actions passing again, betterleaks pinned there at the owner's version
+  and held to it on the owner's machine, every pinned tool held so, and the last push's
+  run read before the next commit (ADR-0034, amended).
 - **Next**: the rest of P9 in the order put to the owner (2026-11-04).
 
 ## 2. Milestones

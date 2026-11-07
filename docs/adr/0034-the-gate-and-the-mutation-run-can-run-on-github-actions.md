@@ -196,3 +196,29 @@ The owner decided, on 2026-11-07, as proposed:
 Shown to fire (TESTING.md T3, 2026-11-07): with the URL naming 1.9.0 the check failed,
 `betterleaks 1.10.0 runs, .github/workflows/audit.yml installs 1.9.0`, and with no version
 in it, `installs none`; as committed it passed.
+
+## Amendment: every pinned tool held, and the run read
+
+- **Date**: 2026-11-07
+
+P9's closing retrospective set the failure above against the rules: the gate on the
+owner's machine passed while the one on GitHub had failed ten times, and no one read the
+runs, a check found passing without checking. Only betterleaks was held to its version;
+`cargo-deny`, `cargo-mutants` and `cargo-semver-checks` could drift the same way, the last
+pinned a second time in `scripts/audit/semver.py`, and `mutants.yml` installs
+`cargo-mutants` apart from `audit.yml`. The owner decided, on 2026-11-07, as proposed:
+
+- **R1**: the last push's run on GitHub Actions, every job, is read before the next
+  commit lands, and a failure is fixed first (TESTING.md §4). Held by nothing, since the
+  gate needs no GitHub access.
+- **R2**: `audit.yml`'s `cargo install` line is the one home of each cargo tool's version;
+  the gate's `[Tools]` step fails where the running `cargo-deny`, `cargo-mutants` or
+  `cargo-semver-checks` is not the version it names, or where a workflow installs another
+  version of one. `semver.py`'s own pin is gone.
+
+Shown to fire (TESTING.md T3, 2026-11-07): `audit.yml` naming `cargo-deny@0.20.1` failed
+the step, `cargo-deny 0.20.2 runs, .github/workflows/audit.yml installs 0.20.1`;
+`cargo-mutants` left out of the line failed it, `installs none`; `cargo-semver-checks@0.50.0`
+failed it; one of `mutants.yml`'s three installs naming `cargo-mutants@27.0.0` failed it,
+`a workflow installs cargo-mutants@27.0.0 beside cargo-mutants@27.1.0`; as committed it
+passed.

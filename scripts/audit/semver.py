@@ -1,20 +1,21 @@
 #!/usr/bin/env python3
 """A release from 1.0 breaks no promise its version does not allow (TESTING.md V9; ADR-0011).
 
-1. `cargo-semver-checks` is the version pinned here, which reads the rustdoc JSON of the
-   toolchain `rust-toolchain.toml` pins, and `.github/workflows/audit.yml` installs it.
-2. The baseline is the newest release tag, `vMAJOR.MINOR.PATCH`, merged into HEAD. The
+The tool's version is the one `.github/workflows/audit.yml` installs, which the gate's
+`[Tools]` step holds the running one to.
+
+1. The baseline is the newest release tag, `vMAJOR.MINOR.PATCH`, merged into HEAD. The
    check runs only while the workspace version and the baseline are both 1.0 or above and
    of one MAJOR, and CHANGELOG.md's `## Unreleased` has no `### Breaking`: a break
    declared there is the decision that the next version raises MAJOR. Otherwise it says
    why it is skipped.
-3. Each member's library is compared with the baseline's by `cargo semver-checks`, with no
+2. Each member's library is compared with the baseline's by `cargo semver-checks`, with no
    feature, each feature the baseline has alone, and every feature, so that an item moved
    behind a feature is seen; a version equal to the baseline's is judged a MINOR.
-4. `mestolo`'s command line and output, which no rustdoc shows, are held by the baseline's
+3. `mestolo`'s command line and output, which no rustdoc shows, are held by the baseline's
    `crates/mestolo/tests/`, run against the current code in a copy of the tree under
    `target/semver/`.
-5. A version whose CHANGELOG.md section has `### Breaking` raises MAJOR over the baseline,
+4. A version whose CHANGELOG.md section has `### Breaking` raises MAJOR over the baseline,
    from a baseline of 1.0 on.
 
 What the tool does not see, a type changed, a bound or a lifetime narrowed, a constant's
@@ -31,7 +32,6 @@ from pathlib import Path
 from paths import committable
 
 ROOT = Path(__file__).resolve().parent.parent.parent
-VERSION = "0.51.0"
 TAG = re.compile(r"^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$")
 WORKSPACE_VERSION = re.compile(r'^version\s*=\s*"([^"]+)"', re.MULTILINE)
 FEATURES = re.compile(r"^\[features\]\s*$(.*?)(?=^\[|\Z)", re.MULTILINE | re.DOTALL)
@@ -43,20 +43,6 @@ COPY = ROOT / "target" / "semver" / "release-tests"
 
 def run(args: list[str], cwd: Path = ROOT) -> subprocess.CompletedProcess:
     return subprocess.run(args, cwd=cwd, capture_output=True, text=True)
-
-
-def tool() -> list[str]:
-    """The pinned version runs, and CI installs it."""
-    out = []
-    shown = run(["cargo", "semver-checks", "--version"])
-    found = shown.stdout.split()[-1] if shown.returncode == 0 and shown.stdout.split() else "none"
-    if found != VERSION:
-        out.append(f"  cargo-semver-checks {found} runs, {VERSION} is pinned: "
-                   f"cargo install --locked cargo-semver-checks@{VERSION}")
-    workflow = (ROOT / ".github" / "workflows" / "audit.yml").read_text()
-    if f"cargo-semver-checks@{VERSION}" not in workflow:
-        out.append(f"  .github/workflows/audit.yml does not install cargo-semver-checks@{VERSION}")
-    return out
 
 
 def version_of(text: str) -> tuple:
@@ -141,7 +127,7 @@ def commands(tag: str) -> list[str]:
 
 
 def main() -> int:
-    failures = tool()
+    failures = []
     current = version_of((ROOT / "Cargo.toml").read_text())
     tag, base = baseline()
     notes = sections()

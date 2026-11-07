@@ -40,6 +40,23 @@ if [ "${pin%.*}" != "$stated" ]; then fail "rust-version $stated, pin $pin"
 elif [ "$running" != "$pin" ]; then fail "rustc $running runs, $pin is pinned"
 else echo "  PASS ($pin)"; fi
 
+# The versions `audit.yml` installs are the one home of each cargo tool's pin, so that the
+# gate on GitHub and on the owner's machine run the same tools (ADR-0034); betterleaks' is
+# checked with its scans below.
+echo "[Tools] each cargo tool runs the version .github/workflows/audit.yml installs..."
+ERROR_BEFORE=$ERROR; ERROR=0
+installs=$(sed -nE 's/^ *cargo install --locked (.*)$/\1/p' .github/workflows/audit.yml | head -1)
+for tool in cargo-deny cargo-mutants cargo-semver-checks; do
+    pinned=$(tr ' ' '\n' <<<"$installs" | sed -nE "s/^$tool@([0-9][0-9.]*)$/\1/p")
+    running=$(cargo "${tool#cargo-}" --version 2>/dev/null | awk '{print $2}')
+    [ -n "$pinned" ] && [ "$running" = "$pinned" ] \
+        || fail "$tool ${running:-none} runs, .github/workflows/audit.yml installs ${pinned:-none}"
+    others=$(grep -ohE "$tool@[0-9][0-9.]*" .github/workflows/*.yml | sort -u | grep -vx "$tool@$pinned")
+    [ -z "$others" ] || fail "a workflow installs $(tr '\n' ' ' <<<"$others")beside $tool@$pinned"
+done
+[ $ERROR -eq 0 ] && echo "  PASS ($installs)"
+[ $ERROR_BEFORE -eq 0 ] || ERROR=1
+
 echo "[Rules 4, 11, 19, 20, L1, L3, L4, V1, V3, T6] Workspace members, lint inheritance, layer order, version, fuzzer, layout..."
 python3 scripts/audit/workspace.py || ERROR=1
 

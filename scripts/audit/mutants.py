@@ -405,7 +405,7 @@ def report(failures: list[str]) -> int:
 
 def main() -> int:
     if shutil.which("cargo-mutants") is None:
-        print("  cargo-mutants is not installed: cargo install --locked cargo-mutants@27.1.0")
+        print("  cargo-mutants is not installed: cargo install --locked cargo-mutants@<the version .github/workflows/audit.yml installs>")
         return 1
     if not sys.argv[1:]:
         return check()

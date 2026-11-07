@@ -31,6 +31,7 @@ grep -E '^echo "\[' scripts/audit/verify_compliance.sh
 | Step | Rules |
 | :--- | :--- |
 | Toolchain: `rust-version`, `rust-toolchain.toml` and the running `rustc` agree | — |
+| Tools: `cargo-deny`, `cargo-mutants` and `cargo-semver-checks` run the versions `audit.yml`'s `cargo install` line names, and no workflow installs another | TESTING.md §3 |
 | `scripts/audit/workspace.py`: members, lint inheritance, layer order, version and licence inheritance, the version's form, CHANGELOG.md's version, `rust-version` unchanged in a PATCH, dependency inheritance, `rustflags`, the fuzzer's reach, the root's entries against ARCHITECTURE.md §3, where scripts lie, where each crate is published, its dependency on brodo by version and what its package holds | 4, 11, 19, 20, L1, L3, L4, V1, V3, V7, V8, T6 |
 | `cargo clippy --workspace --all-targets -- -D warnings`, with the lints in `Cargo.toml` and the bans in `clippy.toml` | 1, 4, 6, 7, 9, 10, 16, 17, 18, 19 |
 | `cargo clippy --all-targets -D warnings` per member with no default features and with each feature alone | 10 |
@@ -43,7 +44,7 @@ grep -E '^echo "\[' scripts/audit/verify_compliance.sh
 | test files in `src/`, and, by `scripts/audit/source.py --ignores`, `#[ignore]` reasons, direct or under `cfg_attr`, however their lines break, found in the code and not its strings, in every target | T1 |
 | `scripts/audit/documents.py`, and `cargo doc` with every feature and warnings denied | AGENTS.md writing rules 1, 2, 6, S3, the ADR index, no `CLAUDE.md`, each crate's README read in, and no `#[doc(hidden)]` item named by another file's doc comment, a crate README, ARCHITECTURE.md or docs/formats.md; Rule 10 |
 | `scripts/audit/mutants.py` with no argument: `.cargo/mutants.toml` holds no setting, read by its shape, one `exclude_re = [` list and comments, and each pattern in its `exclude_re` has a comment above it ending in its kind and, for `open` and `unreached`, where, and excludes a mutant | T11 |
-| `scripts/audit/semver.py`: `cargo-semver-checks` at its pinned version, installed by `audit.yml`; from 1.0, against the newest release tag merged into HEAD while of one MAJOR and no break declared, each crate's library by `cargo semver-checks` with no feature, each alone and every one, the tag's `crates/mestolo/tests/` on the current code, and a version declaring a break raising MAJOR | V9 |
+| `scripts/audit/semver.py`: from 1.0, against the newest release tag merged into HEAD while of one MAJOR and no break declared, each crate's library by `cargo semver-checks` with no feature, each alone and every one, the tag's `crates/mestolo/tests/` on the current code, and a version declaring a break raising MAJOR | V9 |
 | `cargo deny check` | 13 |
 | `scripts/hooks/provenance_guard.py --check`: the local list of forbidden sources exists and names a project | S1 |
 | hooks installed; betterleaks the version `audit.yml` installs, and over the tree and the history, personal rules, `scripts/audit/paths.py` (also: each of `OUTPUT_DIRS` git-ignored and in betterleaks' allow-list) | 14, L2 |

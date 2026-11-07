@@ -127,10 +127,10 @@ To set up a clone that can land a change:
    ```
 
 2. Install what the gate needs: `rustup` (it selects the toolchain pinned in
-   `rust-toolchain.toml`), `cargo-deny`, `cargo-mutants` and `cargo-semver-checks` at the
-   versions TESTING.md §3 pins, `betterleaks` at the version `.github/workflows/audit.yml`
-   installs, `python3` and `git`; for the fuzzer and Miri, a nightly toolchain,
-   `cargo-fuzz` and the `miri` component (TESTING.md §3).
+   `rust-toolchain.toml`), `cargo-deny`, `cargo-mutants`, `cargo-semver-checks` and
+   `betterleaks` at the versions `.github/workflows/audit.yml` installs, `python3` and
+   `git`; for the fuzzer and Miri, a nightly toolchain, `cargo-fuzz` and the `miri`
+   component (TESTING.md §3).
 3. Write the personal rules, which match the owner's name and stay outside the repository
    (AUDITING.md §2), at `~/.config/betterleaks/personal.toml` or `$PERSONAL_LEAKS`; and
    the local list of forbidden sources (AGENTS.md S1), one project a line, at

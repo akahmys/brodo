@@ -102,8 +102,9 @@ MIRIFLAGS="-Zmiri-disable-isolation -Zmiri-tree-borrows -Zmiri-ignore-leaks" car
 cargo +nightly miri test -p colino --test miri_paths -- miri_
 ```
 
-Mutation testing (T11) needs `cargo install --locked cargo-mutants@27.1.0`, which the
-audit also needs. The run's settings (jobs, timeout, guard, output) are in
+Mutation testing (T11) needs `cargo-mutants`, which the audit also needs, at the version
+`.github/workflows/audit.yml` installs, the one home of each tool's version, which the
+gate holds the running one to (27.1.0 on 2026-11-07; ADR-0034). The run's settings (jobs, timeout, guard, output) are in
 `scripts/audit/mutants.py`, the equivalent mutants in `.cargo/mutants.toml`. The run
 takes hours: about 9 for the workspace's 4247 mutants (`cargo mutants --workspace
 --all-features --list | wc -l`, 2026-11-02) at the two jobs `mutants.py` runs, from 13 to
@@ -129,9 +130,9 @@ CARGO_TARGET_AARCH64_APPLE_DARWIN_RUNNER=$PWD/scripts/audit/rss_guard.py RSS_GUA
   RSS_GUARD_LOG=$PWD/target/hand-mutants-guard.log cargo test -p colino --lib thin
 ```
 
-The check of a release's API (V9) needs `cargo install --locked cargo-semver-checks@0.51.0`,
-which reads the rustdoc JSON, format 60, of the toolchain `rust-toolchain.toml` pins
-(measured 2026-11-07); a toolchain pin raised is measured against it again. The gate runs
+The check of a release's API (V9) needs `cargo-semver-checks` at the version `audit.yml`
+installs, 0.51.0, which reads the rustdoc JSON, format 60, of the toolchain
+`rust-toolchain.toml` pins (measured 2026-11-07); a toolchain pin raised is measured against it again. The gate runs
 it, from 1.0, in about 20 s with its builds cached and 2 min without (2026-11-07, a
 scratch tag `v1.0.0`); by hand:
 
@@ -150,6 +151,7 @@ listed (ADR-0034).
 | :--- | :--- |
 | `./scripts/audit/verify_compliance.sh` | ends `=== AUDIT PASSED ===`. It runs the tests as its last step. Run it with no edit in flight |
 | ROADMAP.md §1 | updated (PLANNING.md §1) |
+| The last push's run on GitHub Actions | read before the next commit lands, every job; one failed is fixed first, the failure recorded where its cause's rule lives (ADR-0034). Held by **nothing**: the gate needs no GitHub access |
 
 The gate also runs on GitHub Actions after each push to `main` (ADR-0034), and its tests
 on macOS (arm64) and Windows (x86-64) as well; the run on the owner's machine before the
@@ -167,4 +169,4 @@ push is the one a change lands on.
 | **V6** | The `GridView` byte layout and each file profile carry a format version of their own, independent of the crate version, raised by any change to the bytes and recorded in CHANGELOG.md with which older versions still read. A release that raises one still reads the version before it, and can write it on request; older ones are refused, the error naming them (ADR-0038). Before 1.0 alone, the owner may set this aside for a format, in an ADR, its earlier versions then refused as older ones are (ADR-0053) | the Format-tier tests comparing written bytes with the committed files of docs/formats.md §7 |
 | **V7** | The workspace's `rust-version` is raised only by a release raising MAJOR or MINOR, never PATCH, and its CHANGELOG.md section says so (ADR-0011) | `scripts/audit/workspace.py`: a version whose PATCH is above 0 states the `rust-version` of tag `vMAJOR.MINOR.0`; the CHANGELOG.md entry, **nothing** |
 | **V8** | Each crate is published to crates.io alone, `publish = ["crates-io"]` set once in the workspace `Cargo.toml` and taken by `publish.workspace = true`; the workspace's dependency on brodo states the workspace version as well as its path, so that colino and mestolo depend on the brodo released with them, by a range resolving to one copy; and each package holds its `Cargo.toml`, README.md, `LICENSE-APACHE` and `LICENSE-MIT`, the root's bytes, `src/` and `examples/`, and nothing else, its tests, benchmarks and their data left out (ADR-0040) | `scripts/audit/workspace.py`, reading `cargo package --list`; the keywords, categories and docs.rs's features, **nothing** |
-| **V9** | From 1.0, the code breaks no promise of the last release beyond what the workspace version allows (V2). The baseline is the newest release tag merged into HEAD; while it and the workspace version are 1.0 or above and of one MAJOR, each crate's library keeps the baseline's API, by cargo-semver-checks, with no feature, each feature alone and every feature, and the baseline's `crates/mestolo/tests/` pass on the current code. A break made for the next MAJOR is declared by `### Breaking` under CHANGELOG.md's `## Unreleased`, which suspends the check until that version, and a version whose section has `### Breaking` raises MAJOR. What the tool does not see, a type changed, a bound or a lifetime narrowed, a constant's value, a behaviour no test holds, is held by review (ADR-0011) | `scripts/audit/semver.py`, also the tool's pinned version and that CI installs it; what the tool misses, **nothing** |
+| **V9** | From 1.0, the code breaks no promise of the last release beyond what the workspace version allows (V2). The baseline is the newest release tag merged into HEAD; while it and the workspace version are 1.0 or above and of one MAJOR, each crate's library keeps the baseline's API, by cargo-semver-checks, with no feature, each feature alone and every feature, and the baseline's `crates/mestolo/tests/` pass on the current code. A break made for the next MAJOR is declared by `### Breaking` under CHANGELOG.md's `## Unreleased`, which suspends the check until that version, and a version whose section has `### Breaking` raises MAJOR. What the tool does not see, a type changed, a bound or a lifetime narrowed, a constant's value, a behaviour no test holds, is held by review (ADR-0011) | `scripts/audit/semver.py`, and the gate's `[Tools]` step the tool's version; what the tool misses, **nothing** |
