@@ -724,7 +724,8 @@ fn fill(source: &mut impl Read, blocks: &mut Vec<Block>) -> std::io::Result<usiz
 /// its length before any of it is read, and by the bytes read where its length says
 /// less than it holds, as a device's, a pipe's or a growing file's can: no more than
 /// `limit` + 1 bytes are read (ADR-0036). A read interrupted is tried again; another
-/// error ends it as `CacheError::Io`.
+/// error ends it as `CacheError::Io`. The bytes are checked as `from_bytes` checks them;
+/// of several broken rules, which is named is not promised.
 pub fn read(path: &Path, limit: u64) -> Result<CacheFile, CacheError> {
     let file = std::fs::File::open(path)?;
     let length = file.metadata()?.len();

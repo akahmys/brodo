@@ -776,4 +776,26 @@ mod tests {
         assert_eq!(r.leaf_sources(), &[LeafSource::Split(TileNumber(0))]);
         assert!(r.tile_sources().iter().all(|s| *s == TileSource::Tile(TileNumber(0))));
     }
+
+    /// An upper-level tile merged where the old lower node held leaves, but none at its
+    /// origin, merges them; held here as well as by `remap_reference`, since these tests run
+    /// first and a mutant taking the walk for every tile fails here before the slower ones
+    /// time out (TESTING.md T11).
+    #[test]
+    fn a_merge_whose_origin_was_empty_merges_the_leaves() {
+        let (t, _) = commit_with(&Topology::new(), |e| {
+            for i in 1..4096 {
+                e.activate([i % 16 * 8, i / 16 % 16 * 8, i / 256 * 8]).unwrap();
+            }
+        });
+        let (_, remap) = commit_with(&t, |e| {
+            e.activate([0, 0, 0]).unwrap();
+            e.merge(TileLevel::Upper, [0, 0, 0]).unwrap();
+        });
+        assert!(
+            matches!(remap.tile_sources(), [TileSource::Merged(_)]),
+            "{:?}",
+            remap.tile_sources()
+        );
+    }
 }

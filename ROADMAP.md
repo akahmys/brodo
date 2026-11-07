@@ -22,8 +22,14 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   check of a release's API against the last one (TESTING.md V9; ADR-0011, amended), the
   gate on GitHub Actions passing again, betterleaks pinned there at the owner's version
   and held to it on the owner's machine, every pinned tool held so, and the last push's
-  run read before the next commit (ADR-0034, amended).
-- **Next**: the rest of P9 in the order put to the owner (2026-11-04).
+  run read before the next commit (ADR-0034, amended), and P9's closing checks: a fuzz
+  round, a Miri run, a mutation run whose misses were killed or excluded (ADR-0023,
+  amended), and the benchmarks, `leaf_parallel_update_x32` left slower than its baseline
+  by the owner (ADR-0019, amended).
+- **Next**: 1.0 decided by the owner, in an ADR (TESTING.md V5), then 1.0.0 set, tagged
+  and published, each step with the owner's approval.
+- **Unresolved**: `leaf_parallel_update_x32` drifts between processes by up to 20 %, its
+  cause not measured (ADR-0019).
 
 ## 2. Milestones
 
@@ -645,9 +651,20 @@ since crates.io yanks a version but never deletes it.
       of `grid_view` come from `tests/data/` as TESTING.md T6 says; P8's were made by hand
       from version 1's (the owner, 2026-11-04); `frozen_v2_f32.bin` and `frozen_v2_f64x3.bin`,
       written 2026-11-05
-- [ ] The closing checks the owner chooses by P9's content (ADR-0033), the mutation run
+- [x] The closing checks the owner chooses by P9's content (ADR-0033), the mutation run
       among them, of the code P8 checked only by mutants applied by hand (the owner,
       2026-11-04)
+      - [x] Fuzz round: eight targets, 901 s each, no finding (2026-11-07)
+      - [x] Miri run: every `miri_*` test passes; the same warning from `crossbeam-epoch`
+            under Tree Borrows (ADR-0015, 2026-11-07)
+      - [x] Mutation run (ADR-0023): the run on `0d15bca` (GitHub Actions run
+            42332503810) missed 36 of 4588, and 1 timed out after the patient run's
+            1800 s; 28 killed by tests and the timeout by a unit test run first, each
+            mutant applied by hand, the 39 run again locally missing only 8, excluded with
+            the owner's approval (2026-11-07)
+      - [x] Benchmarks, every feature, at a one-minute load of 1.25: colino's within their
+            baselines, brodo's but `leaf_parallel_update_x32`, refused at +10.8 % and as
+            slow at 0.9.0, left unrecorded by the owner (ADR-0019, 2026-11-08)
 - [ ] 1.0 decided by the owner, in an ADR (TESTING.md V5); version 1.0.0 set and tagged,
       then brodo published, then colino, then mestolo, each with the owner's approval
 - [ ] **Accepted when** the three crates are on crates.io at 1.0.0, docs.rs builds the

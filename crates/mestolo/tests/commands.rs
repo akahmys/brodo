@@ -139,8 +139,18 @@ fn the_command_line_is_parsed_and_what_it_does_not_take_named() {
     assert_eq!(parse(args(&["help"])).unwrap(), Command::Help);
     let refused = |words: &[&str]| parse(args(words)).unwrap_err();
     assert!(matches!(parse(args(&[])), Err(MestoloError::NoCommand)));
-    let convert = parse(args(&["convert", "f", "-o", "o", "--as", "archive"]));
-    assert!(matches!(convert, Ok(Command::Convert { format: Some(Format::Archive), .. })));
+    for (word, format) in [
+        ("vdb", Format::Vdb),
+        ("vtu", Format::Vtu),
+        ("cache", Format::Cache),
+        ("archive", Format::Archive),
+    ] {
+        let convert = parse(args(&["convert", "f", "-o", "o", "--as", word]));
+        assert!(
+            matches!(&convert, Ok(Command::Convert { format: Some(f), .. }) if *f == format),
+            "{word}: {convert:?}"
+        );
+    }
     assert!(matches!(
         refused(&["convert", "f", "-o", "o", "--as", "png"]),
         MestoloError::BadValue { option: "--as", .. }
@@ -331,6 +341,8 @@ fn a_slice_beyond_the_grid_is_refused_and_one_at_its_edge_drawn() {
                     if grid == "sdf" && *got == a && *a2 == at && *m0 == min && *m1 == max),
                 "{axis} {at}: {refused:?}"
             );
+            let said = refused.unwrap_err().to_string();
+            assert!(said.contains(&format!(" along {axis}, ")), "{said}");
         }
     }
 }
@@ -428,4 +440,113 @@ fn convert_writes_a_vdbs_grids_to_a_cache_file() {
         .collect();
     assert_eq!(String::from_utf8(out).unwrap(), want);
     assert!(want.contains(&format!("{SDF_KEY:?} = {SDF_VERSION:?}")));
+}
+
+/// A topology of one leaf at the origin.
+fn one_leaf() -> Topology {
+    let empty = Topology::new();
+    let mut e = empty.edit();
+    e.activate([0, 0, 0]).unwrap();
+    e.commit().unwrap().0
+}
+
+/// A field of `t`'s one leaf, its values `value(i)` by place in the leaf.
+fn filled<T: brodo::field::Stored + Copy>(
+    t: &Topology,
+    background: T,
+    value: impl Fn(usize) -> T,
+) -> Field<T> {
+    let n = t.leaf_numbers().next().unwrap();
+    let mut f = Field::new(t, background);
+    for (i, v) in f.leaf_mut(t, n).unwrap().iter_mut().enumerate() {
+        *v = value(i);
+    }
+    f
+}
+
+/// Runs `words` on `input`, writing at `out`, and gives the file written.
+fn run_on(input: &Path, words: &[&str], out: &str) -> Vec<u8> {
+    let out = fresh(out);
+    let mut all = args(&words[..1]);
+    all.push(input.as_os_str().to_owned());
+    all.extend(args(&words[1..]));
+    all.extend([OsString::from("-o"), out.clone().into_os_string()]);
+    mestolo::run(&parse(all).unwrap(), &mut Vec::new()).unwrap();
+    std::fs::read(out).unwrap()
+}
+
+/// A grid of each value type is described, written as `.vtu` as brodo's writer writes it,
+/// and, of a scalar type, drawn as the same values of `f32` are.
+#[test]
+fn a_grid_of_every_value_type_is_described_converted_and_drawn() {
+    let meta = |name: &str| GridMeta::new(name, [1.0; 3], "m").unwrap();
+    let value = |i: usize| u8::try_from(i % 8 + i / 8 % 8 + i / 64).unwrap();
+    let t = one_leaf();
+    let f32s = filled(&t, 0.0_f32, |i| f32::from(value(i)));
+    let f64s = filled(&t, 0.0_f64, |i| f64::from(value(i)));
+    let u8s = filled(&t, 0_u8, value);
+    let u32s = filled(&t, 0_u32, |i| u32::from(value(i)));
+    let f32x3 = filled(&t, [0.0_f32; 3], |i| [f32::from(value(i)), 1.0, 2.0]);
+    let f64x3 = filled(&t, [0.0_f64; 3], |i| [f64::from(value(i)), 1.0, 2.0]);
+    let path = fresh("types.cache");
+    let entries = [
+        CacheEntry::new(&meta("f32"), &t, &f32s).unwrap(),
+        CacheEntry::new(&meta("f64"), &t, &f64s).unwrap(),
+        CacheEntry::new(&meta("u8"), &t, &u8s).unwrap(),
+        CacheEntry::new(&meta("u32"), &t, &u32s).unwrap(),
+        CacheEntry::new(&meta("f32x3"), &t, &f32x3).unwrap(),
+        CacheEntry::new(&meta("f64x3"), &t, &f64x3).unwrap(),
+    ];
+    brodo::cache::write(&path, &entries).unwrap();
+
+    let mut out = Vec::new();
+    mestolo::run(&Command::Info(Input::new(path.clone())), &mut out).unwrap();
+    let text = String::from_utf8(out).unwrap();
+    for (i, t) in ["f32", "f64", "u8", "u32", "[f32; 3]", "[f64; 3]"].iter().enumerate() {
+        assert!(text.contains(&format!("\n  type: {t}\n")), "grid {i}: {text}");
+    }
+
+    let want = |name: &str, write: &dyn Fn(&Path)| {
+        let expected = fresh(&format!("{name}.expected.vtu"));
+        write(&expected);
+        let got = run_on(&path, &["convert", "--grid", name], &format!("{name}.vtu"));
+        assert!(got == std::fs::read(&expected).unwrap(), "{name}");
+    };
+    want("f32", &|p| brodo::vtk::write(p, &t, &f32s, "f32").unwrap());
+    want("f64", &|p| brodo::vtk::write(p, &t, &f64s, "f64").unwrap());
+    want("u8", &|p| brodo::vtk::write(p, &t, &u8s, "u8").unwrap());
+    want("u32", &|p| brodo::vtk::write(p, &t, &u32s, "u32").unwrap());
+    want("f32x3", &|p| brodo::vtk::write(p, &t, &f32x3, "f32x3").unwrap());
+    want("f64x3", &|p| brodo::vtk::write(p, &t, &f64x3, "f64x3").unwrap());
+
+    let draw = |name: &str| {
+        run_on(
+            &path,
+            &["slice", "--grid", name, "--axis", "z", "--at", "3"],
+            &format!("{name}.png"),
+        )
+    };
+    let of_f32 = draw("f32");
+    for name in ["f64", "u8", "u32"] {
+        assert!(draw(name) == of_f32, "{name}");
+    }
+}
+
+/// A grid whose `class` is not "level set" is drawn as one with none, and one whose `class`
+/// is, as a level set (docs/formats.md §9).
+#[test]
+fn a_grid_is_drawn_as_a_level_set_by_its_class() {
+    let t = one_leaf();
+    let f = filled(&t, 4.0_f32, |i| f32::from(u8::try_from(i % 8 + i / 8 % 8).unwrap()) - 7.0);
+    let drawn = |name: &str, class: Option<&str>| {
+        let mut m = GridMeta::new("g", [1.0; 3], "m").unwrap();
+        if let Some(c) = class {
+            m.extra.insert("class".to_owned(), c.to_owned());
+        }
+        let path = cache_file(&format!("{name}.cache"), &m, &t, &f);
+        run_on(&path, &["slice", "--axis", "z", "--at", "3"], &format!("{name}.png"))
+    };
+    let plain = drawn("plain", None);
+    assert!(drawn("fog", Some("fog volume")) == plain);
+    assert!(drawn("level", Some("level set")) != plain);
 }

@@ -777,3 +777,13 @@ fn the_fuzz_seeds_are_committed_and_read() {
         assert_eq!(m.triangles.len(), 12, "{name}");
     }
 }
+
+/// A file at a path reads as its bytes do.
+#[test]
+fn a_file_at_a_path_reads_as_its_bytes() {
+    let path =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/threemf_seed_stored.3mf");
+    let read = colino::threemf::read(&path, ROOMY).unwrap();
+    assert_eq!(read.triangles.len(), 12);
+    assert_eq!(read, from_bytes(&std::fs::read(&path).unwrap(), ROOMY).unwrap());
+}

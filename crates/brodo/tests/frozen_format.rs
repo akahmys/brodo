@@ -360,6 +360,7 @@ fn layout_version_2_keeps_its_bytes() {
     );
     let copy = aligned(GOLDEN);
     let view = GridView::<f32>::new(copy.as_bytes()).unwrap();
+    assert_eq!(view.version(), 2);
     let (t, f) = golden_grid();
     for v in
         [[-1, 0, 0], [4095, 7, 9], [4096, 7, 9], [9, 9, 9], [130, 5, 5], [0, 8200, 3], [50, 50, 50]]
@@ -488,4 +489,50 @@ fn each_link_check_refuses_its_damage() {
         read(&with_words(&[(upper(1, 1024 + w), tiles | overlap), (upper(1, 2049), 0)])),
         lost("upper node")
     );
+    // The same place both a child and a tile, the node's one tile moved there: every count
+    // and first still as the writer's rules want, only the masks overlap.
+    let (t, held) = (1024..2048).map(|t| (t, word(upper(1, t)))).find(|(_, b)| *b != 0).unwrap();
+    assert_eq!(held.count_ones(), 1);
+    let moved = if t == 1024 + w {
+        vec![(upper(1, t), overlap)]
+    } else {
+        vec![(upper(1, t), 0), (upper(1, 1024 + w), overlap)]
+    };
+    assert_eq!(read(&with_words(&moved)), lost("upper node"));
+}
+
+/// Two grids hold the same tree only if their nodes are the same: leaves as many, in
+/// another place of one root region, or in another region alike.
+#[test]
+fn grids_of_as_many_leaves_elsewhere_hold_other_trees() {
+    let frozen = |v: Coord| {
+        let t = build(&[Op::Activate(v)]);
+        freeze(&t, &field(&t)).unwrap()
+    };
+    let grids = [frozen([0, 0, 0]), frozen([8, 0, 0]), frozen([4096, 0, 0])];
+    let copies: Vec<Vec<Block>> = grids.iter().map(|g| aligned(g.as_bytes())).collect();
+    let views: Vec<GridView<f32>> =
+        copies.iter().map(|c| GridView::new(c.as_bytes()).unwrap()).collect();
+    for (i, a) in views.iter().enumerate() {
+        for (j, b) in views.iter().enumerate() {
+            assert_eq!(a.same_topology(b), i == j, "{i} {j}");
+        }
+    }
+}
+
+/// A section moved back onto the one before it, by one block, is refused by its name.
+#[test]
+fn a_section_overlapping_the_one_before_is_refused() {
+    let g = golden();
+    let read = |b: &[Block]| GridView::<f32>::new(b.as_bytes()).map(|_| ());
+    let names = ["upper node", "lower node", "leaf value", "tile value"];
+    for (k, name) in names.into_iter().enumerate() {
+        let at = 10 + k;
+        let offset = u32::from_le_bytes(g.as_bytes()[at * 4..at * 4 + 4].try_into().unwrap());
+        assert_eq!(
+            read(&with_word(at, offset - 1)),
+            Err(FormatError::Inconsistent(name)),
+            "{name}"
+        );
+    }
 }

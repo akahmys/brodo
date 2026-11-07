@@ -288,18 +288,23 @@ fn a_level_set_breaking_one_condition_keeps_its_class() {
 
 #[test]
 fn voxel_sizes_apart_by_16_epsilon_are_equal_and_by_more_are_not() {
-    // x's column of length 1 + 2⁻⁴⁸, exact, against 1 along y and z: 16 ε apart.
-    for (scale, sdf) in [(1.0 + 16.0 * f64::EPSILON, true), (1.0 + 32.0 * f64::EPSILON, false)] {
-        let (mut m, t, f) = level_set(0.75, banded, [0.75, -0.75]);
-        m.voxel_size = [scale, 1.0, 1.0];
-        m.transform = [[scale, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0]];
-        let read = round_trip_meta(&m, &t, &f);
-        assert_eq!(
-            read.voxel_size.map(f64::to_bits),
-            [scale, 1.0, 1.0].map(f64::to_bits),
-            "the sizes measured are the ones meant"
-        );
-        assert_eq!(states_sdf(&read), sdf, "x's size {scale}");
+    // x's column of length s(1 + 2⁻⁴⁸), exact, against s along y and z: 16 ε apart relative
+    // to the least, for a least of 1 and of 1/4.
+    for s in [1.0, 0.25] {
+        for (scale, sdf) in [(1.0 + 16.0 * f64::EPSILON, true), (1.0 + 32.0 * f64::EPSILON, false)]
+        {
+            let x = s * scale;
+            let (mut m, t, f) = level_set(0.75, banded, [0.75, -0.75]);
+            m.voxel_size = [x, s, s];
+            m.transform = [[x, 0.0, 0.0, 0.0], [0.0, s, 0.0, 0.0], [0.0, 0.0, s, 0.0]];
+            let read = round_trip_meta(&m, &t, &f);
+            assert_eq!(
+                read.voxel_size.map(f64::to_bits),
+                [x, s, s].map(f64::to_bits),
+                "the sizes measured are the ones meant"
+            );
+            assert_eq!(states_sdf(&read), sdf, "x's size {x} against {s}");
+        }
     }
 }
 

@@ -364,3 +364,22 @@ Two mutants excluded as equivalent in P8's amendment went with the code they wer
 `Owned::crossing_tile`'s, when Hermite data's earlier versions stopped being read
 (ADR-0053), and `HermiteView::crossing`'s comparison with `NO_CROSSING`, when the reader
 returned a crossing or none in place of that value (the survey before 1.0, ROADMAP.md P9).
+
+## Amendment: P9's missed mutants
+
+- **Date**: 2026-11-07
+
+The run on `0d15bca` (2026-11-07, GitHub Actions run 42332503810, 160 shards) reported
+every one of 4588 mutants and missed 36; of three timeouts the patient run ran again, two
+were caught and one, `tile_source` taking the walk over a lower node's 4096 regions for
+every new tile, still timed out after 1800 s: its wrong result, a merge read as the
+background, failed a test only in a binary run after the slowed ones. A unit test, run
+first, now holds that merge, so that it fails in seconds. Twenty-eight missed mutants are
+killed by tests written for them, each shown to fail with its mutant applied by hand, and
+the 39 run again by `mutants.py --run` on the new tests missed only the 8 below. The human
+decided, on 2026-11-07, that they are excluded: two of a frozen buffer's root checks and
+three of a cache file's bounds check as `[open]`, another check refusing the same damage
+by the same name and only several, of which which is named is not promised, telling them
+apart; and three of a `.vdb` reader's widening of `f64` as `[same]`, never called. The
+same decision added to `cache::read`'s documentation that the bytes are checked as
+`from_bytes` checks them, which of several broken rules is named not promised.

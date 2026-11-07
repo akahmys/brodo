@@ -128,3 +128,35 @@ proptest! {
         }
     }
 }
+
+/// A leaf's region of the background enclosed by 26 leaves none of whose voxels meets the
+/// condition is a component of its own, apart from the outside, however far into its lower
+/// node it lies.
+#[test]
+fn an_enclosed_region_of_the_background_is_its_own_component() {
+    let empty = Topology::new();
+    let mut e = empty.edit();
+    for z in 1..=3 {
+        for y in 1..=3 {
+            for x in 1..=3 {
+                if [x, y, z] != [2, 2, 2] {
+                    e.activate([8 * x, 8 * y, 8 * z]).unwrap();
+                }
+            }
+        }
+    }
+    let (t, _) = e.commit().unwrap();
+    let mut f = Field::new(&t, 1.0_f32);
+    for n in t.leaf_numbers().collect::<Vec<_>>() {
+        f.leaf_mut(&t, n).unwrap().fill(-1.0);
+    }
+    let labels = label(&t, &f, |v: f32| v > 0.0, Connectivity::Six).unwrap();
+    assert_eq!(labels.count(), 2);
+    let inside = labels.label_at(&t, [16, 16, 16]).unwrap();
+    assert!(matches!(inside, Label::Component(_)), "{inside:?}");
+    assert!(!labels.reaches_outside(inside));
+    assert_eq!(labels.label_at(&t, [23, 23, 23]).unwrap(), inside);
+    let outside = labels.label_at(&t, [0, 0, 0]).unwrap();
+    assert!(labels.reaches_outside(outside) && outside != inside);
+    assert_eq!(labels.label_at(&t, [8, 8, 8]).unwrap(), Label::Excluded);
+}

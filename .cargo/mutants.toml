@@ -293,4 +293,22 @@ exclude_re = [
     # have distinct Morton codes, so no two upper nodes' are equal here.
     # [same]
     'view\.rs:.*: replace < with <= in GridView<.*>::check_order$',
+    # An index equal to its section's count is refused later as `"root"` by the writer's
+    # rules, an upper node's having no root entry to hold it and a root tile's not being
+    # the next number; only with other damage, which of several is named being not
+    # promised, does another check speak first.
+    # [open: `brodo::view::GridView::new`]
+    'view\.rs:\d+:73: replace < with <= in GridView<.a, T>::check_links$',
+    # A box whose least corner passes its greatest never equals the bounds a grid's leaves
+    # and tiles cover, so it is refused as `"bounds"` once the grid is checked; only with
+    # other damage, which of several is named being not promised, does another check speak
+    # first.
+    # [open: `brodo::cache::from_bytes`]
+    'cache\.rs:.*: replace match guard x0 <= x1 && y0 <= y1 && z0 <= z1 with true in decode_meta$',
+    # As above.
+    'cache\.rs:.*: replace && with \|\| in decode_meta$',
+    # `is_sdf` is called only for a type whose `SDF` is true, which `f64` is not, so its
+    # `wide` is never called.
+    # [same]
+    'vdb_read\.rs:.*: replace <impl Scalar for f64>::wide -> f64 with ',
 ]

@@ -140,6 +140,17 @@ fn each_damage_is_its_own_error() {
     );
 }
 
+/// A file at a path reads as its bytes do.
+#[test]
+fn a_file_at_a_path_reads_as_its_bytes() {
+    let text = "v 0 0 0\nv 1 0 0\nv 0 1 0\nv 0 0 1\nf 1 2 3\nf 1 2 4\n";
+    let path = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("tetrahedron.obj");
+    std::fs::write(&path, text).unwrap();
+    let read = colino::obj::read(&path, ROOMY).unwrap();
+    assert_eq!(read.triangles.len(), 2);
+    assert_eq!(read, read_str(text).unwrap());
+}
+
 fn coordinate() -> impl Strategy<Value = f64> {
     prop_oneof![Just(0.0), Just(-0.0), Just(1.5), Just(-2.0), Just(1e-9), Just(123456.789)]
 }

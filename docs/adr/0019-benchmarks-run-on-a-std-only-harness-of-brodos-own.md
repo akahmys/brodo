@@ -316,3 +316,15 @@ brings, by the audit; and in the hook, unless the line is `Benchmarks: not on a 
 the crate's last report, `out/bench/<crate>/report.tsv`, is newer than each of its staged
 `src/` files and gives every item `ok`. The audit cannot read the report, which is not
 committed; whether a path is timed, and the machine at rest, nothing checks.
+
+## Amendment: the leaf-parallel update left as it was at P9's close
+
+- **Date**: 2026-11-08
+
+P9's closing run, every feature, began at a one-minute load of 1.25: colino's items and
+brodo's were within their baselines but `leaf_parallel_update_x32`, refused at 3.76 ms in
+both runs, +10.8 % over 3 398 084 ns. The commit closing P8, `60950bc`, benchmarked in
+turn with P9's, twice each at one-minute loads of 2.25 to 2.34, read 3.54 to 3.73 ms
+against P9's 3.70 to 3.76 ms, the pairs 6 to 10 % apart within themselves: the item's
+drift between processes, as at P7's close. The owner left the baseline as it was, the
+cause still not measured.
