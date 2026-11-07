@@ -165,6 +165,12 @@ echo "[Rules 14, L2] Secrets, personal data and paths outside the project..."
 ERROR_BEFORE=$ERROR; ERROR=0
 [ "$(git config core.hooksPath)" = "scripts/hooks" ] \
     || fail "the commit hooks are not installed: git config core.hooksPath scripts/hooks"
+# The version `audit.yml` installs is the one that runs here, so that the gate on GitHub and
+# on the owner's machine read `.betterleaks.toml` alike (ADR-0034).
+pinned=$(sed -nE 's#.*/releases/download/v([0-9][0-9.]*)/betterleaks_.*#\1#p' .github/workflows/audit.yml | head -1)
+running=$(betterleaks version 2>&1 | head -1)
+[ -n "$pinned" ] && [ "$running" = "$pinned" ] \
+    || fail "betterleaks ${running:-none} runs, .github/workflows/audit.yml installs ${pinned:-none}"
 # betterleaks reads `.betterleaks.toml` only when given it (`-c`), from 1.10.0, so every
 # scan by the project's rules names it, and the project's rules are counted beyond the
 # default ones its `[extend]` loads (ADR-0003).

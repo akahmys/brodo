@@ -170,3 +170,29 @@ the gate's `cargo test --workspace --all-features` on `macos-15` (arm64) and
 does not depend on the platform and runs on Linux alone, as do fuzzing, Miri, the mutation
 run and the benchmarks. TESTING.md V4 asks that the commit setting a version pass them all
 before its tag; that it does, nothing checks.
+
+## Amendment: betterleaks 1.10.0, and the version held
+
+- **Date**: 2026-11-07
+
+The gate on GitHub Actions failed on every push from 4f04316 (2026-11-05) to d4ef64a
+(2026-11-07), ten runs, at one check: `betterleaks loaded 464 rules from .betterleaks.toml, its default 464`.
+Homebrew had raised the owner's betterleaks to 1.10.0 on 2026-11-05, and ADR-0003's
+amendment of that day made the gate name `-c .betterleaks.toml` and count more rules from
+it than the default holds, measured on 1.10.0, which reads the file only when given it
+(466 rules without it, 467 with it). `audit.yml` still installed 1.9.0, which reads the
+file from the working directory unasked, so that both counts were the file's. Nothing
+held the two machines to one version, and the failure went unseen for two days.
+
+The owner decided, on 2026-11-07, as proposed:
+
+- `audit.yml` installs betterleaks 1.10.0, published 2026-11-04, the owner's version, its
+  archive checked against the SHA-256 GitHub states for the release's asset,
+  `betterleaks_1.10.0_linux_x64.tar.gz`, read through its API.
+- The gate fails where the betterleaks that runs is not the version `audit.yml`'s URL
+  names, so that an upgrade on either side fails the gate at once; the URL is the
+  version's one home.
+
+Shown to fire (TESTING.md T3, 2026-11-07): with the URL naming 1.9.0 the check failed,
+`betterleaks 1.10.0 runs, .github/workflows/audit.yml installs 1.9.0`, and with no version
+in it, `installs none`; as committed it passed.

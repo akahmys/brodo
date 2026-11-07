@@ -46,7 +46,7 @@ grep -E '^echo "\[' scripts/audit/verify_compliance.sh
 | `scripts/audit/semver.py`: `cargo-semver-checks` at its pinned version, installed by `audit.yml`; from 1.0, against the newest release tag merged into HEAD while of one MAJOR and no break declared, each crate's library by `cargo semver-checks` with no feature, each alone and every one, the tag's `crates/mestolo/tests/` on the current code, and a version declaring a break raising MAJOR | V9 |
 | `cargo deny check` | 13 |
 | `scripts/hooks/provenance_guard.py --check`: the local list of forbidden sources exists and names a project | S1 |
-| hooks installed; betterleaks over the tree and the history, personal rules, `scripts/audit/paths.py` (also: each of `OUTPUT_DIRS` git-ignored and in betterleaks' allow-list) | 14, L2 |
+| hooks installed; betterleaks the version `audit.yml` installs, and over the tree and the history, personal rules, `scripts/audit/paths.py` (also: each of `OUTPUT_DIRS` git-ignored and in betterleaks' allow-list) | 14, L2 |
 | `cargo test --workspace --all-features`, a crate README's code among the doctests, and `format_document.rs` and `vdb_format.rs` running `scripts/audit/formats.py` | TESTING.md §4; AGENTS.md, crate READMEs; `docs/formats.md` and TESTING.md T13 (ADR-0037) |
 | `scripts/audit/tests.py`: every test, with every feature, of each member's library, binaries, tests and examples, and every doctest by its item, is in its `test-list.txt`, and every listed test exists | T2 |
 
