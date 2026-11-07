@@ -551,11 +551,7 @@ Rust. It uses no GPU and no window.
 
 ## 7. Compatibility
 
-- Before 1.0 the API may break; every break is in CHANGELOG.md (TESTING.md V3), and users
-  pin a release tag; a user needing a change before its milestone gets a small release
-  rather than a revision, so that crates sharing one process can agree on one tag
-  (ADR-0040).
-- From 1.0 a promise breaks only in a release raising MAJOR (TESTING.md V2), and users
+- A promise breaks only in a release raising MAJOR (TESTING.md V2), and users
   depend on a version from crates.io, `brodo = "1"`, within which cargo resolves one copy
   for every crate of a program; brodo, colino and mestolo share one version (TESTING.md
   V1), and `rust-version` rises only with MAJOR or MINOR (V7; ADR-0011, ADR-0040).

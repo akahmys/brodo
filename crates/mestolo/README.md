@@ -5,7 +5,7 @@ someone who receives a cache file, an archive or a `.vdb` and writes no Rust. It
 GPU and no window. ARCHITECTURE.md §6.3 says what each command gives.
 
 ```bash
-cargo install --git https://github.com/akahmys/brodo mestolo
+cargo install mestolo
 
 mestolo info grids.cache                                   # what the file holds
 mestolo slice grids.cache --grid sdf --axis z --at 0 -o z0.png

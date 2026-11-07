@@ -25,13 +25,12 @@ Each crate's README has an example that runs as a test.
 
 ## Using it
 
-The crates are not on crates.io. Depend on them from Git, pinning a release tag rather
-than a branch or a revision:
+Depend on the crates from crates.io:
 
 ```toml
 [dependencies]
-brodo = { git = "https://github.com/akahmys/brodo", tag = "v0.9.0" }
-colino = { git = "https://github.com/akahmys/brodo", tag = "v0.9.0" }
+brodo = "1"
+colino = "1"
 ```
 
 - zerocopy 0.8 is a public dependency: a type of your own that a field holds implements
@@ -39,19 +38,16 @@ colino = { git = "https://github.com/akahmys/brodo", tag = "v0.9.0" }
 - They need Rust 1.98 or later, and build for 64-bit, little-endian targets alone, which
   the frozen layout reads in place. Their tests run on Linux (x86-64), macOS (arm64) and
   Windows (x86-64) after each push.
-- Pin the same tag in every crate of one program that uses brodo: two different revisions
-  build two copies of brodo whose types do not mix. If you need a change before the next
-  release, ask for a small release rather than pinning a revision (ADR-0040).
-- Until 1.0, a minor version (0.8 to 0.9) may break the API, and a patch version (0.9.0
-  to 0.9.1) is meant only to fix. [CHANGELOG.md](CHANGELOG.md) lists what each release
-  changes and anything it breaks.
+- They follow semantic versioning: a minor version (1.0 to 1.1) adds and a patch version
+  (1.0.0 to 1.0.1) only fixes, and only a major version (1 to 2) breaks what they promise.
+  [CHANGELOG.md](CHANGELOG.md) lists what each release changes and anything it breaks.
 
 ## Looking inside
 
 A cache file, an archive or a `.vdb` can be looked at without writing Rust:
 
 ```bash
-cargo install --git https://github.com/akahmys/brodo mestolo
+cargo install mestolo
 mestolo info grids.cache                           # its grids, bounds, values, metadata
 mestolo slice grids.cache --grid sdf --axis z --at 0 -o z0.png
 mestolo convert grids.cache -o grids.vdb           # every f32 and f64 grid
@@ -72,12 +68,9 @@ What was checked, and what other tools' documentation says:
 
 ## Documentation
 
-- The API reference, built from the code with every feature and opened in a browser
-  (docs.rs has none, the crates not being on crates.io):
-
-  ```bash
-  cargo doc --workspace --no-deps --all-features --open
-  ```
+- The API reference, on docs.rs:
+  [brodo](https://docs.rs/brodo), [colino](https://docs.rs/colino) and
+  [mestolo](https://docs.rs/mestolo).
 
 - What the crates do and promise: [ARCHITECTURE.md](ARCHITECTURE.md), its scope in §1,
   brodo in §4 and colino in §5.

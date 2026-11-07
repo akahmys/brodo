@@ -4,7 +4,11 @@ Each version, newest first, with the milestones it closed and every change that 
 user (TESTING.md V2, V3). Format versions of the `GridView` layout and the file profiles
 are recorded here when they change (V6).
 
-## Unreleased
+## 1.0.0 (2026-11-08)
+
+Closes P9, the first release on crates.io (ADR-0061): the formats settled, the public API
+reviewed and reshaped, the rules for versions after 1.0, and the packages. From this
+version the promises follow semantic versioning (TESTING.md V2).
 
 Format versions (TESTING.md V6): Hermite data is at version 3 and the SDF convention at
 version 2, their keys moved under `brodo.` (ADR-0053); the frozen layout and the cache and

@@ -25,9 +25,11 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   run read before the next commit (ADR-0034, amended), and P9's closing checks: a fuzz
   round, a Miri run, a mutation run whose misses were killed or excluded (ADR-0023,
   amended), and the benchmarks, `leaf_parallel_update_x32` left slower than its baseline
-  by the owner (ADR-0019, amended).
-- **Next**: 1.0 decided by the owner, in an ADR (TESTING.md V5), then 1.0.0 set, tagged
-  and published, each step with the owner's approval.
+  by the owner (ADR-0019, amended); and 1.0 decided by the owner (ADR-0061), the workspace
+  version set to 1.0.0.
+- **Next**: tag `v1.0.0` once the gate passes on GitHub Actions, then its GitHub release,
+  then brodo, colino and mestolo published by the owner (TESTING.md V4), each step with
+  the owner's approval.
 - **Unresolved**: `leaf_parallel_update_x32` drifts between processes by up to 20 %, its
   cause not measured (ADR-0019).
 
