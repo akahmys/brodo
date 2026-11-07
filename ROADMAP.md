@@ -8,28 +8,14 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: P9's first units: B-018 and B-019 kept, patents and licences judged unchanged
-  (ADR-0007), version 2's media types stated (ADR-0041), golden files of version 2's
-  bare frozen buffers written, the tests run on macOS and Windows (ADR-0034), keys
-  beginning `brodo.` reserved (ADR-0053), the public API reviewed, the survey of designs
-  grown by accretion taken whole (ADR-0054 to ADR-0058), users' requests taken as issues
-  the owner labels `owner-approved` (ADR-0049, amended), P9's retrospective (ADR-0001,
-  ADR-0033, ADR-0035, amended), T14's survey of what each crate lacks, and its gaps in
-  brodo's core (ADR-0059) and formats (ADR-0060) taken, a `.vdb` level set read as an SDF
-  (ADR-0047, amended), and mestolo's (ADR-0050, amended), and the rules for versions
-  after 1.0 (ADR-0011, ADR-0040, amended), the packaging of the three crates
-  (ADR-0040, amended), a vulnerability reported privately (ADR-0049, amended), the
-  check of a release's API against the last one (TESTING.md V9; ADR-0011, amended), the
-  gate on GitHub Actions passing again, betterleaks pinned there at the owner's version
-  and held to it on the owner's machine, every pinned tool held so, and the last push's
-  run read before the next commit (ADR-0034, amended), and P9's closing checks: a fuzz
-  round, a Miri run, a mutation run whose misses were killed or excluded (ADR-0023,
-  amended), and the benchmarks, `leaf_parallel_update_x32` left slower than its baseline
-  by the owner (ADR-0019, amended); and 1.0 decided by the owner (ADR-0061), the workspace
-  version set to 1.0.0.
-- **Next**: tag `v1.0.0` once the gate passes on GitHub Actions, then its GitHub release,
-  then brodo, colino and mestolo published by the owner (TESTING.md V4), each step with
-  the owner's approval.
+- **Done**: P9 released as 1.0.0, the first release on crates.io (ADR-0061): brodo,
+  colino and mestolo published by the owner, docs.rs building their reference, each
+  README's example run from a new crate depending on them by version, and `cargo install
+  mestolo` installing the command (2026-11-08).
+- **Next**: no milestone is scheduled; the owner chooses the next work. §2's "Later" and
+  §4 hold what is open, and the owner's question, raised 2026-11-08, whether an ADR
+  records only a decision changing a rule or the design, a run's results going to the
+  commit and this file, is undecided.
 - **Unresolved**: `leaf_parallel_update_x32` drifts between processes by up to 20 %, its
   cause not measured (ADR-0019).
 
@@ -667,11 +653,14 @@ since crates.io yanks a version but never deletes it.
       - [x] Benchmarks, every feature, at a one-minute load of 1.25: colino's within their
             baselines, brodo's but `leaf_parallel_update_x32`, refused at +10.8 % and as
             slow at 0.9.0, left unrecorded by the owner (ADR-0019, 2026-11-08)
-- [ ] 1.0 decided by the owner, in an ADR (TESTING.md V5); version 1.0.0 set and tagged,
+- [x] 1.0 decided by the owner, in an ADR (TESTING.md V5); version 1.0.0 set and tagged,
       then brodo published, then colino, then mestolo, each with the owner's approval
-- [ ] **Accepted when** the three crates are on crates.io at 1.0.0, docs.rs builds the
+      (ADR-0061, `64806c8`, 2026-11-08)
+- [x] **Accepted when** the three crates are on crates.io at 1.0.0, docs.rs builds the
       libraries' reference, a new crate depending on them by version alone builds and runs
-      each README's example, and `cargo install mestolo` installs the command
+      each README's example, and `cargo install mestolo` installs the command: docs.rs
+      built all three, and the examples ran and the command installed on Rust 1.98.1,
+      Rust 1.97.1 refused by `rust-version` (2026-11-08)
 
 ### Later
 
