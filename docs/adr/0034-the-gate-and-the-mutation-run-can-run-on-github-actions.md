@@ -3,222 +3,76 @@
 - **Status**: Amended
 - **Date**: 2026-10-24
 
+Condensed on 2026-11-08 (ADR-0001): each decision is kept with its reason and what it set
+aside; the text before is in git, this file as of `53f69d5`.
+
 ## Context
 
 P3's mutation run took about 45 hours on the owner's machine, two jobs at a time, and
 82 of brodo's 96 timeouts came before any test failed, the machine's other work slowing
-the suite past its timeout (2026-10-23). Milestones had closed about every two days.
-GitHub's documents (2026-10-24) gave: a job runs six hours at most; a private
-repository's standard Linux runner has 2 cores and 8 GB, a public one's 4 and 16 GB;
-2,000 free minutes a month on GitHub Free, then $0.006 a minute for 2-core Linux x64;
-standard runners free for public repositories. cargo-mutants' `--shard k/n` runs one of n
-parts of the mutants, each part finding them itself, and leaves taking the parts together
-to the caller. Two of the gate's checks read files kept only on the owner's machine: the
-local list of forbidden sources (AGENTS.md S1) and the personal rules (AUDITING.md §2),
-which cannot be put on a remote machine without leaking what they guard.
+the suite past its timeout (2026-10-23). GitHub's documents (2026-10-24) gave: a job runs
+six hours at most; standard runners are free for a public repository, a private one's
+2,000 minutes a month then $0.006 a minute. cargo-mutants' `--shard k/n` runs one of n
+parts of the mutants, leaving their reports to be taken together. Two of the gate's checks
+read files kept only on the owner's machine: the local list of forbidden sources
+(AGENTS.md S1) and the personal rules (AUDITING.md §2), which cannot be put on a remote
+machine without leaking what they guard.
 
 ## Decision
 
-The owner decided, on 2026-10-24, to prepare remote runs while the repository stays
-private and its publication is decided later:
+The owner decided, on 2026-10-24 unless dated otherwise.
 
-- `.github/workflows/audit.yml` runs the gate, and `.github/workflows/mutants.yml` the
-  mutation run in n shards with a last job taking their reports together and, when asked,
-  running the patient timeouts. Both start by hand only, so that they spend nothing until
-  asked and run for no pull request from a fork.
-- On GitHub Actions the gate skips the two checks that read the owner's local files and
-  prints that it did; the gate run on the owner's machine before every push still runs
-  them, so no check is lost.
-- `scripts/audit/mutants.py --report` and `--patient --from` take several reports, the
-  shards of one run.
-- Tools are installed at the versions the owner's machine runs.
-- The workflows are rules: AGENTS.md lists `.github/workflows/` among them, and the
-  `commit-msg` hook asks an ADR of a commit touching them. Shown to fire: a commit of
-  `audit.yml` with no ADR named was refused, naming the file.
-- Shown to work on the owner's machine: `--report` over P3's brodo report and P2's colino
-  report gave 115 failures, their 99 and 16, and over brodo's report twice gave 99.
+- **Two workflows.** `.github/workflows/audit.yml` runs the gate, and
+  `.github/workflows/mutants.yml` the mutation run in shards, a last part taking their
+  reports together. On GitHub Actions the gate skips the two checks that read the owner's
+  local files and says so; the gate run on the owner's machine before every push still
+  runs them, so no check is lost (shown, 2026-10-25, by the gate with `GITHUB_ACTIONS=true`
+  passing and failing at exactly those two without it).
+- **When they run.** `audit.yml` runs on each push to `main` and by hand, from
+  2026-10-25, when the repository went public and standard runners became free; it passes
+  the gate the commits the push brought, `COMMIT_RANGE`, held to `commit_msg_check.py`
+  (2026-11-02). `mutants.yml` runs by hand only. No pull request starts either, so no
+  fork's code runs on the repository's runners. Before going public, the owner had the
+  history rewritten by `git filter-repo --replace-text`, the names of the local list's
+  projects and of one project's component leaving every commit, and force-pushed `main`
+  and the tags.
+- **Other platforms** (2026-11-04). `audit.yml`'s job `platforms` runs the gate's
+  `cargo test --workspace --all-features` on `macos-15` (arm64) and `windows-2025`
+  (x86-64), each to its end whatever the other gives: the `mmap` feature, paths and
+  `mestolo`'s refusals had never run on Windows. The rest of the gate does not depend on
+  the platform and runs on Linux alone, as do fuzzing, Miri, the mutation run and the
+  benchmarks.
+- **The mutation run's shape.** 160 shards by default, about 23 mutants each, within six
+  hours (2026-10-27: at 80 two of colino's heaviest were cut off); the timeouts run again
+  under 1800 s in a matrix of 20 parts, `--shard k/20`, since GitHub Free runs 20 jobs at
+  once and one job running them all was cut off. A part lists the mutants it is dealt and
+  fails unless it reports each timeout among them (2026-11-02); a deleted struct field,
+  which `--re` lets through, is run but not judged. Further arguments reach `mutants.py`
+  through `MUTANTS_ARGS`, split as a shell splits words with nothing expanded, and each
+  shard keeps `rss_guard.log` beside its report (2026-11-02: unquoted, a glob was
+  expanded by the shell). `mutants.py --report` and `--patient --from` take the shards'
+  reports (ADR-0023).
+- **What runs is pinned** (2026-10-24, after a review by Anthropic's article on
+  attack-surface reduction found two ways in for someone controlling a dependency of the
+  build). Each action is pinned to a release's commit, the release named beside it, not a
+  movable tag. betterleaks is fetched from its release and checked against the SHA-256
+  GitHub states for the asset.
+- **One version of each tool** (2026-11-07). The gate fails where the betterleaks that runs
+  is not the version `audit.yml`'s URL names, or the running `cargo-deny`,
+  `cargo-mutants` or `cargo-semver-checks` not the version `audit.yml`'s `cargo install`
+  line names, or where a workflow installs another version of one: those lines are each
+  version's one home. The gate on GitHub had failed ten times in two days, unread, after
+  Homebrew raised the owner's betterleaks to 1.10.0 while `audit.yml` installed 1.9.0,
+  which read the configuration file unasked.
+- **The run read** (2026-11-07). The last push's run, every job, is read before the next
+  commit lands, and a failure fixed first (TESTING.md §4), held by nothing since the gate
+  needs no GitHub access.
+- **The workflows are rules**: AGENTS.md lists `.github/workflows/`, and the `commit-msg`
+  hook asks an ADR of a commit touching them.
 
 ## Consequences
 
-Whether the workflows work is shown only by a first run, which spends minutes of the free
-allowance; it is held until the local mutation run no longer needs the machine. Moving a
-milestone's mutation run there, and how often, is decided with P4 and ADR-0033.
-
-## Amendment
-
-- **Date**: 2026-10-24
-
-Anthropic's article on attack-surface reduction (2026) argued for shrinking what an
-attacker can reach rather than chasing each bug, and a review of the workflows by it found
-two ways in for someone controlling a dependency of the build: actions named by a movable
-release tag, and betterleaks installed at whatever version Homebrew held. The owner
-decided:
-
-- Each action is pinned to the commit of a release, the release named beside it:
-  `actions/checkout` v7.0.1, `actions/upload-artifact` v7.0.2,
-  `actions/download-artifact` v8.0.2, looked up through GitHub's API on 2026-10-24.
-- betterleaks 1.9.0, as on the owner's machine, is fetched from its release and checked
-  against the SHA-256 published in its `checksums.txt` before it is installed.
-- The rest of the review, which touches the public API, goes to P4.
-
-## Amendment
-
-- **Date**: 2026-10-25
-
-The gate's GitHub mode was shown to work on the owner's machine before any run on GitHub:
-with `GITHUB_ACTIONS=true` and the two local files pointed at nothing, the gate passed,
-saying it skipped the list and the personal rules; without it, the same run failed at
-exactly those two checks.
-
-## Amendment
-
-- **Date**: 2026-10-25
-
-The first runs on GitHub held. `audit.yml` passed in 27 minutes, saying it skipped the two
-local checks, 211 tests passing. `mutants.yml`, over `mesh.rs` in two shards, caught all
-19 mutants in 57 minutes, the memory guard logging on Linux, and its last job took the two
-reports together and passed. A private repository's 2-core runner took about 5.3 minutes a
-mutant, against about 2 on the owner's machine at two jobs: a whole run of some 2950
-mutants would take about 260 runner hours, 15 600 minutes, some $82 beyond the free 2000
-at $0.006 a minute, and at least 45 shards to keep each within six hours, about 13 hours
-at 20 jobs at once. Where a milestone's run goes is decided when it closes.
-
-## Amendment: the gate on every push
-
-- **Date**: 2026-10-25
-
-Before making the repository public, the owner had its history rewritten: the names of the
-projects in the local list of forbidden sources, and of one project's component, left
-every commit by `git filter-repo --replace-text`, the table kept outside the repository;
-`HEAD`'s tree and those of `v0.3.0` and `v0.4.0` stayed the same; the owner force-pushed
-`main` and the tags, and the two workflow runs on the old commits were deleted. Standard
-runners being free for a public repository, the owner then decided that `audit.yml` runs
-on each push to `main` as well as by hand; no pull request starts it, so no fork's code
-runs on the repository's runners. `mutants.yml` still starts by hand only.
-
-## Amendment: the mutation run's defaults
-
-- **Date**: 2026-10-25
-
-P4's run, the first whole one here, at 60 shards of 50 mutants: the shards took 7 min to over
-five hours, the heaviest those of the 3MF reader, whose mutants each run colino's whole
-suite, near the jobs' 350 min limit; and 16 mutants timed out before any failed test, all
-caught when run again under the patient timeout on the owner's machine, the slowest in
-about 13 minutes (ADR-0023). The owner decided that `mutants.yml` defaults to 80 shards,
-about four hours for the heaviest, and to running the patient timeouts in its last job.
-Whether 1800 s suffices on GitHub's runners, slower than the owner's machine, the next
-run shows.
-
-## Amendment: 160 shards, and the timeouts in 20 parts
-
-- **Date**: 2026-10-27
-
-At 80 shards, about 46 mutants each, the run on `9940bd5` (2026-10-26 to 27) lost two shards of
-colino's heaviest to the six hours a job may run, and the one last job running the
-timeouts again under 1800 s each was cut off too. GitHub Free runs 20 jobs at once, six
-hours each, a matrix of 256 jobs at most (docs.github.com, Actions limits, read
-2026-10-27). The human decided that `mutants.yml` defaults to 160 shards, about 23
-mutants each, and runs the timeouts again in a matrix of 20 jobs, each one twentieth of
-them by `--shard k/20` and each holding the shards' reports to every mutant listed
-(ADR-0023); the timeout multiplier stays 2.0. With 20 jobs at once, a run's wall time
-stays near its whole work over 20.
-
-## Amendment: arguments by variable, and the guard's log kept
-
-- **Date**: 2026-11-02
-
-The second review of the whole repository found the workflow passing its further arguments
-unquoted, so that `-f 'crates/colino/src/**'` reached cargo-mutants with its quotes and its
-glob expanded by the shell, and each shard keeping its report without the guard's log. The
-owner decided, on 2026-11-02, that the arguments reach `mutants.py` through `MUTANTS_ARGS`,
-split as a shell splits words with nothing expanded, and that each shard keeps
-`rss_guard.log` beside its report, which `--report` and `--patient --from` read.
-
-## Amendment: each part of the timeouts holds its own
-
-- **Date**: 2026-11-02
-
-An outside review found that a part of the timeouts run again, `--patient` with `--shard
-k/20`, checked none of them ran: a timeout lost from every part failed no job, and a part
-said it ran them all. The owner decided, on 2026-11-02, that it be fixed: a part lists the
-mutants cargo-mutants deals it, `--list` with the same `--re` and `--shard`, and fails unless
-it reports each timeout among them, saying how many of all it ran. Since `--re` lets a
-deleted struct field through, a part runs those too, at the patient timeout; they are
-listed and run but not judged. Shown to fire: with cargo-mutants replaced by a stand-in
-whose part ran a deleted field but not the timeout dealt it, the old part passed and the new
-one fails.
-
-## Amendment: the commits a push brought
-
-- **Date**: 2026-11-02
-
-With the backstop made whole (ADR-0003), `audit.yml` passes the gate the range of commits
-the push brought, `COMMIT_RANGE`, so that each is held to `commit_msg_check.py`; a push
-starting a branch holds its head alone, and a run by hand none.
-
-## Amendment: the tests on macOS and Windows
-
-- **Date**: 2026-11-05
-
-The review after 0.9.0 found the tests run on Linux alone, so that the `mmap` feature,
-paths and `mestolo`'s refusal of a file already there had never run on Windows, nor
-anything on macOS but the owner's machine. The repository is public, and GitHub's macOS and
-Windows standard runners are free for it. The owner decided, on 2026-11-04, that they be
-added, and approved the plan on 2026-11-05: `audit.yml` gains a job, `platforms`, running
-the gate's `cargo test --workspace --all-features` on `macos-15` (arm64) and
-`windows-2025` (x86-64), each to its end whatever the other gives. The rest of the gate
-does not depend on the platform and runs on Linux alone, as do fuzzing, Miri, the mutation
-run and the benchmarks. TESTING.md V4 asks that the commit setting a version pass them all
-before its tag; that it does, nothing checks.
-
-## Amendment: betterleaks 1.10.0, and the version held
-
-- **Date**: 2026-11-07
-
-The gate on GitHub Actions failed on every push from 4f04316 (2026-11-05) to d4ef64a
-(2026-11-07), ten runs, at one check: `betterleaks loaded 464 rules from .betterleaks.toml, its default 464`.
-Homebrew had raised the owner's betterleaks to 1.10.0 on 2026-11-05, and ADR-0003's
-amendment of that day made the gate name `-c .betterleaks.toml` and count more rules from
-it than the default holds, measured on 1.10.0, which reads the file only when given it
-(466 rules without it, 467 with it). `audit.yml` still installed 1.9.0, which reads the
-file from the working directory unasked, so that both counts were the file's. Nothing
-held the two machines to one version, and the failure went unseen for two days.
-
-The owner decided, on 2026-11-07, as proposed:
-
-- `audit.yml` installs betterleaks 1.10.0, published 2026-11-04, the owner's version, its
-  archive checked against the SHA-256 GitHub states for the release's asset,
-  `betterleaks_1.10.0_linux_x64.tar.gz`, read through its API.
-- The gate fails where the betterleaks that runs is not the version `audit.yml`'s URL
-  names, so that an upgrade on either side fails the gate at once; the URL is the
-  version's one home.
-
-Shown to fire (TESTING.md T3, 2026-11-07): with the URL naming 1.9.0 the check failed,
-`betterleaks 1.10.0 runs, .github/workflows/audit.yml installs 1.9.0`, and with no version
-in it, `installs none`; as committed it passed.
-
-## Amendment: every pinned tool held, and the run read
-
-- **Date**: 2026-11-07
-
-P9's closing retrospective set the failure above against the rules: the gate on the
-owner's machine passed while the one on GitHub had failed ten times, and no one read the
-runs, a check found passing without checking. Only betterleaks was held to its version;
-`cargo-deny`, `cargo-mutants` and `cargo-semver-checks` could drift the same way, the last
-pinned a second time in `scripts/audit/semver.py`, and `mutants.yml` installs
-`cargo-mutants` apart from `audit.yml`. The owner decided, on 2026-11-07, as proposed:
-
-- **R1**: the last push's run on GitHub Actions, every job, is read before the next
-  commit lands, and a failure is fixed first (TESTING.md §4). Held by nothing, since the
-  gate needs no GitHub access.
-- **R2**: `audit.yml`'s `cargo install` line is the one home of each cargo tool's version;
-  the gate's `[Tools]` step fails where the running `cargo-deny`, `cargo-mutants` or
-  `cargo-semver-checks` is not the version it names, or where a workflow installs another
-  version of one. `semver.py`'s own pin is gone.
-
-Shown to fire (TESTING.md T3, 2026-11-07): `audit.yml` naming `cargo-deny@0.20.1` failed
-the step, `cargo-deny 0.20.2 runs, .github/workflows/audit.yml installs 0.20.1`;
-`cargo-mutants` left out of the line failed it, `installs none`; `cargo-semver-checks@0.50.0`
-failed it; one of `mutants.yml`'s three installs naming `cargo-mutants@27.0.0` failed it,
-`a workflow installs cargo-mutants@27.0.0 beside cargo-mutants@27.1.0`; as committed it
-passed.
+- A private repository's 2-core runner took about 5.3 minutes a mutant against about 2 on
+  the owner's machine (2026-10-25); public, the runs cost nothing, and a whole run takes
+  about its work over 20 jobs.
+- What the gate checks on Linux alone is assumed not to depend on the platform.

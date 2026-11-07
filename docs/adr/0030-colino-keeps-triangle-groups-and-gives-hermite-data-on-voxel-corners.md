@@ -3,23 +3,17 @@
 - **Status**: Amended
 - **Date**: 2026-10-20
 
+Condensed on 2026-11-08 (ADR-0001): each decision is kept with its reason and what it set
+aside; the text before is in git, this file as of `53f69d5`.
+
 ## Context
 
-A user building cut cells on brodo's grid asked for two things (ROADMAP.md §4, R11). The
-first was a group per triangle, read from the file. The second was Hermite data on a
-lattice: for each lattice edge the surface crosses, where it crosses, the surface's normal
-there, and the crossed triangle's group. A sampled SDF cannot hold the kink where two
-groups meet. The user answered brodo's questions on 2026-10-20.
-
-The code as it stood:
-
-- `Mesh` held vertices, triangles and a unit, with public fields.
-- The OBJ reader skipped `g` and `o`.
-- The 3MF reader kept no object identity once items were placed.
-- A cache file held grids only, each a `CacheEntry` of metadata, topology and field, so a
-  table that is not a grid had no place in one.
-- The value types were `f32`, `f64`, `u8`, `u32`, `[f32; 3]` and `[f64; 3]`, codes 1 to 6
-  (ADR-0029).
+A user building cut cells on brodo's grid asked for two things (ROADMAP.md §4, R11): a
+group per triangle, read from the file, and Hermite data on a lattice: for each lattice
+edge the surface crosses, where, the surface's normal there, and the crossed triangle's
+group. A sampled SDF cannot hold the kink where two groups meet. The user answered
+brodo's questions on 2026-10-20. `Mesh` then held vertices, triangles and a unit; the OBJ
+reader skipped `g` and `o`; the 3MF reader kept no object identity once items were placed.
 
 Read for this record:
 
@@ -31,275 +25,91 @@ Read for this record:
 
 ## Decision
 
-The human decided, on 2026-10-20:
+The human decided, on 2026-10-20 unless dated otherwise.
 
 **Groups**
 
-- `Mesh` gains `groups`: either empty, meaning every triangle is in group 0, or one `u32`
-  per triangle. It also gains `group_names`, a name per id. Group 0 is always named `""`
-  (no group). A group is identified by its name, so ids are given in the order each name
-  first appears. Any other length of `groups`, or an id with no name, is a `MeshError`.
-- **OBJ**: a triangle takes the names of the last `g`, joined by one space. Where no `g`
-  precedes it, it takes the name of the last `o`; failing that, group 0.
-- **ASCII STL**: each `solid` block is a group, named by the block's name. Binary STL is
-  all group 0.
-- **3MF**: each object is a group, named by its `name` attribute, or by its `id` as
-  written when it has no name. Every placement of an object shares its group.
-  Per-triangle properties are not read.
-- `Mesh::welded` and every placement keep each triangle's group. A breaking change,
-  recorded in CHANGELOG.md.
+- `Mesh` gains `groups`, empty (every triangle in group 0) or one `u32` per triangle, and
+  `group_names`, indexed by id, empty standing for `[""]`. Group 0 is `""`, no group; a
+  group is its name, ids given in the order names first appear. Another length, an id
+  with no name, or a first name other than `""` is a `MeshError` (2026-10-22).
+- **OBJ**: a triangle takes the names of the last `g`, joined by one space; with no `g`,
+  or after a `g` naming none, the last `o`'s name; failing that, group 0 (2026-10-27: the
+  specification says only that group information is optional).
+- **ASCII STL**: each `solid` block is a group, named by the rest of its line after
+  `solid`; on that line the name ends before a `facet` followed by `normal` or `outer`, or
+  before an `endsolid` ending the line, so that a solid on one line reads; a name after
+  `endsolid` ends with its line or before a `solid` on it. A line ends at `\n`, `\r\n` or
+  a lone `\r` (2026-10-27: the Library of Congress's description, fdd000506, says a name
+  may follow `solid`, not where it ends; the first rule refused names holding `facet` and
+  lost solids written on one line). Binary STL is all group 0.
+- **3MF**: each object is a group, named by its `name`, or its `id` as written. Every
+  placement of an object shares its group. Per-triangle properties are not read.
+- `Mesh::welded` and every placement keep each triangle's group.
 
-**Lattice and ownership**
+**Hermite data, as colino produces it**
 
-- The lattice is the corners of an SDF conversion's voxels: point v lies at origin + h·v,
-  the SDF's sampling lattice shifted by −h/2. It is not set apart from the SDF.
-- The data lives on that conversion's topology, under the same grid metadata. Point v
-  owns its +x, +y and +z edges, which are edges of voxel v.
-- A crossing on an edge of voxel v lies within √3/2·h of the voxel's centre. The voxel's
-  stored distance is therefore below N·h for any band N ≥ 1, so every crossed edge has
-  its owner in a leaf. This claim is held by a brute-force test, not by this record.
+The lattice, the edges' owners, what signs, fractions, normals and groups mean, an edge
+with no crossing, the types and the cache entries are brodo's format since 2026-10-22
+(ADR-0032), which replaced this record's first API; what follows is colino's as a
+producer. `colino::hermite` holds it, `colino::intersect` the edge test and an edge's
+distance to a triangle; it returns brodo's set with its `unhit` count beside it.
 
-**Signs and crossings**
-
-- **Signs**: each leaf point's sign is the winding number's, at the conversion's accuracy.
-  Inside tiles count as inside, and the background as outside.
-- **Which edges have a crossing**: an edge has one exactly when the stored signs of its
-  two ends differ. This uses the stored signs, including those of tiles and background.
-- **Finding it**: the edge is tested against every triangle with area, by Woop et al.'s
-  watertight test. The hit nearest the edge's inside end is kept; on a tie, the lowest
-  triangle index in file order wins.
-- **Fraction**: the crossing's position from the edge's lower end.
-- **Normal**: the triangle's unit normal, flipped where needed so that it points from
-  the inside end toward the outside end. Where the normal is perpendicular to the edge,
-  it is kept as the triangle's own.
-- **Group**: the crossed triangle's group.
-- **When no triangle is hit**: possible near a hole, an overlap, or an approximate
-  winding number. The data then comes from the triangle with area nearest the edge, the
-  crossing placed at the point of the edge nearest that triangle. Such edges are counted
-  in the output; no flag is put in the data.
-- **Degenerate cases**:
-  - A lattice point whose computed distance to its nearest triangle is zero counts as
-    inside, and its crossing then lies at a fraction of exactly 0 or 1.
-  - Zero-area triangles are never crossed.
-- **Determinism**: each point and edge is computed on its own, signs first and edges
-  after. The bytes therefore do not depend on the thread count.
-
-**Storage**
-
-- **Fields**: per axis, an `f32` fraction, an `[f32; 3]` normal and a `u32` group; plus
-  one `u8` sign field (1 inside, 0 outside). Values are computed in `f64` and stored in
-  `f32`.
-- **Size**: 3 × (4 + 12 + 4) + 1 = 61 bytes per leaf voxel, against 4 for the SDF.
-- **Edges with no crossing, and tiles**: fraction −1, normal zero, group 0.
-- **Cache file**: the ten fields go as ten grids, each with its own copy of the topology.
-- **What it costs**: a per-triangle table with an `f64` fraction would have been exact
-  and smaller (37 bytes), but needs a section the cache file lacks. The user accepted
-  `f32`, being below their discretisation error.
-- **One crossing per edge**: an edge crossed twice has ends of one sign and shows
-  nothing. The user measured such edges at 0.3 to 1.2 % of crossed edges on a turned box,
-  fewer as the grid is refined, and did not ask for them.
-
-**Placement**
-
-`colino::hermite` holds it. `colino::intersect` holds the edge test and the distance
-between an edge and a triangle.
+- **Signs** are the winding number's, at the conversion's accuracy; inside tiles are
+  inside, the background outside. A point whose distance to its nearest triangle is zero
+  is inside.
+- **A sign changing beyond the band** (2026-10-22). On a badly oriented mesh the winding
+  number's inside can change where no leaf owns the edge: a cube with one face turned in,
+  at a band of 3, put a false surface 4.07 voxels from the mesh. `hermite` refuses such a
+  mesh, `HermiteError::SignOutsideBand`, naming the point; within the band the false
+  surface's edges count as unhit. Adding leaves there, which would change conversion
+  (ADR-0027), and answering B-016 first were set aside.
+- **Finding a crossing**: an edge whose stored signs differ is tested against every
+  triangle with area by Woop et al.'s watertight test; the hit nearest the edge's inside
+  end is kept, the lowest triangle index on a tie. An inside end on the mesh takes the
+  triangle holding it, the lowest-numbered with area at distance 0 (2026-11-02: it had
+  taken a farther triangle's normal). The normal is the triangle's unit normal turned to
+  point from the inside end outward, its own where perpendicular to the edge, divided by
+  its largest component before its length (2026-11-02: the squared length underflowed
+  below edges of about 10⁻⁸¹ and overflowed above 10⁷⁷).
+- **The test in `f64`** (2026-10-22). Woop et al. compute in `f32`, recomputing an edge
+  value of exactly 0 in `f64`; no wider type holds an `f64` product exactly, so an edge
+  value whose two products round equal is decided by their rounding errors, each found
+  exactly by `f64::mul_add`, and where the products are too small for that, the value is 0
+  and counts as hit, as the paper counts a 0. Computing in `f32`, which could not give
+  crossings exact to `f32` rounding, and counting every 0 a hit with no recomputation,
+  further from the paper, were set aside. The third coordinate is compared unscaled with
+  det·D, one division at the end (2026-10-25: scaling by 1/D put a hit at a segment's end
+  past it). A triangle whose corners lie on a line, its own cross product zero, is refused
+  before the test, as the parity count's is (2026-11-02: moved to the segment's start its
+  corners rounded off the line, and 32 835 of 222 630 were crossed).
+- **The search's margins are derived** (2026-11-02), not chosen by a test failing with one
+  less: a corner moved by an edge's start rounds by at most 8ε of twice the largest
+  coordinate, and an edge's box is widened by twice that (rounding had put 737 of 200 000
+  triangles drawn one ulp past an edge's end inside it); a distance found falls short by at
+  most √ε of the largest coordinate, and the nearest query's margin is twice that
+  (ADR-0027).
+- **No triangle hit**, near a hole, an overlap or an approximate winding number: the data
+  comes from the triangle with area nearest the edge, at the edge's point nearest it, and
+  the edge is counted, not flagged. Of triangles equally near within their distances'
+  rounding, any one may be taken (2026-10-28; ARCHITECTURE.md §5.1).
+- **Values** are computed in `f64` and stored in `f32`. A per-triangle table with an `f64`
+  fraction, exact and smaller, needed a section the cache file lacks; the user accepted
+  `f32`, below their discretisation error. One crossing per edge: an edge crossed twice
+  shows nothing, 0.3 to 1.2 % of crossed edges on a turned box by the user's measure, and
+  was not asked for.
+- **Determinism**: each point and edge is computed on its own, signs first, so that the
+  bytes do not depend on the thread count.
+- **The set's metadata** (2026-10-27) is the conversion's voxel size, transform and unit,
+  named `hermite`, without the SDF convention, so that its grids are not taken for SDFs;
+  `Hermite::entries` refuses metadata claiming it (`ClaimsSdf`). Its reserved keys are
+  ADR-0053's.
 
 ## Consequences
 
-- colino's output gains a second kind of data beside the SDF, and ARCHITECTURE.md §5.1
-  says so once this record is accepted.
-- The three readers change, so each gets a fuzz round.
-- Acceptance tests:
-  - a cube turned about two axes, each face its own group: every crossing exact to
-    `f32` rounding, every normal its face's, every group right;
-  - a closed mesh converted at two thread counts gives the same bytes;
-  - signs and crossings agree on every band edge of a torus;
-  - by brute force, every crossed edge has its owner in a leaf;
-  - an open mesh counts its edges with no triangle hit.
-- Two things wait for a user's request: a table in the cache file, and every crossing
-  along an edge.
-
-## Amendment
-
-- **Date**: 2026-10-22
-
-The record left the API's shape and the cache file's grid names open. The human decided:
-
-- `colino::hermite::hermite(mesh, &Converted, accuracy)` returns a `Hermite` or a
-  `HermiteError`. `Hermite` holds `signs`, a `Field<u8>`; `axes`, three `Crossings`, for
-  x, y and z; and `unhit`, the count of crossed edges with no triangle hit. `Crossings`
-  holds `fraction`, a `Field<f32>`; `normal`, a `Field<[f32; 3]>`; and `group`, a
-  `Field<u32>`. Every field lies on the conversion's topology, under its `GridMeta`.
-- `Hermite::entries(&meta)` gives the ten `CacheEntry`s, named `sign`, then `x.fraction`,
-  `x.normal`, `x.group`, and the same for `y` and `z`, in that order; the rest of each
-  entry's metadata is `meta`'s. The names are part of colino's API, held by a Format-tier
-  test against a committed file.
-- `group_names` is indexed by group id. Empty, it stands for `[""]`; otherwise a first
-  name other than `""` is a `MeshError`, as are the two cases above.
-
-## Amendment
-
-- **Date**: 2026-10-22
-
-ADR-0032 made Hermite data a brodo format that any producer writes. What this record says
-of the lattice, the edges' owners, the meaning of signs, fractions, normals and groups, the
-values of an edge with no crossing, the types and the cache file is that format's, and is
-held there. What stays here is colino's as a producer: signs by the winding number, the
-watertight test, the tie rule, edges no triangle hit and their count, the degenerate cases,
-`f64` arithmetic and determinism. The first amendment's API is replaced: the type, its
-check and its cache entries are brodo's, set apart by `extra` keys rather than fixed grid
-names, and colino's `hermite` returns brodo's set with its `unhit` count beside it.
-
-## Amendment
-
-- **Date**: 2026-10-22
-
-Woop et al. compute in `f32` and, where an edge value is exactly 0, recompute its two
-products in `f64`, which holds a product of two `f32`s exactly; their §3.1 shows the rest
-of the test watertight because rounding keeps the order of two products. colino computes
-in `f64` (above), where no wider type holds a product exactly. The human decided:
-
-- An edge value whose two products round equal is decided by their rounding errors, each
-  found exactly by a fused multiply-add (`f64::mul_add`, rounded once by IEEE 754); where
-  the products are so small that their errors may not be exact, the value is 0 and the
-  edge counts as hit, as the paper counts a 0.
-- A test compares the sign with exact `i128` arithmetic on integer coordinates, where
-  products tie.
-- Computing in `f32`, as the paper does, was set aside: vertices rounded to `f32` could
-  not give crossings exact to `f32` rounding. Counting every 0 as a hit, with no
-  recomputation, was set aside as further from the paper.
-
-Since the lattice's edges are parallel to an axis, the paper's shear is zero. Across an
-edge, moving a corner by the edge's start keeps the sign of each coordinate, so a triangle
-whose box misses the edge's is never hit there. Along it, rounding can put a hit one ulp
-past the edge's end: of 200 000 triangles drawn in the plane one ulp beyond an edge of
-length 1, 737 were hit (2026-10-22). The search for a triangle widens an edge's box by the
-translation's rounding, which keeps them, as the paper widens its boxes
-(§3.3).
-
-## Amendment
-
-- **Date**: 2026-10-22
-
-The claim that every crossed edge's owner is a leaf held for the meshes tested, but not
-for a badly oriented one. With one face of a cube (half-side 6.3, h = 0.5) turned in, the
-exact winding number fell from 0.667 at the centre to 0.5 four units, eight voxels, inside
-the turned face, so a false surface lay inside the cube. With a band of 3 its signs
-differed across an edge no leaf point owned, 4.07 voxels from the mesh, and brodo's check
-refused the set; with bands of 6 and 12 the leaves covered it and the set was accepted,
-its false surface's edges counted as unhit (2026-10-22). The human decided:
-
-- Hermite data keeps to the winding number's sign. Where its inside changes beyond the
-  band, `hermite` refuses the mesh with `HermiteError::SignOutsideBand`, naming the
-  point; within the band, the false surface's edges are counted as unhit.
-- A sign that does not depend on orientation is B-016's to answer.
-- Adding leaves where the sign changes, which would change conversion (ADR-0027), and
-  answering B-016 first were set aside.
-
-## Amendment
-
-- **Date**: 2026-10-25
-
-The gate's property test found a crossing exactly at a segment's end that the test missed
-and exact arithmetic kept: the paper scales the third coordinate by 1/D, and with D = 5,
-7 × 0.2 rounded to just above 1.4, putting the hit past the end. The third coordinate is
-now kept unscaled and compared with det·D, one division made at the end, which on integer
-coordinates agrees with exact arithmetic. A test holds that case.
-
-## Amendment: an ASCII STL solid's name
-
-- **Date**: 2026-10-27
-
-P5's review found that the STL reader took a solid's name as its words up to the next
-`facet` or `endsolid`, so a valid file whose name held either word was refused. The
-Library of Congress's description (fdd000506) says the `solid` record can include a name,
-not where it ends. The human decided that a name is the rest of its line, after `solid` or
-`endsolid`; on `solid`'s line it ends before a `facet` the line goes on with `normal` or
-`outer`, and before an `endsolid` that ends the line, so that a solid written on one line
-reads. A name on the line after `solid` is no longer one, and a name after `endsolid` ends
-with its line.
-
-## Amendment: a Hermite set's metadata
-
-- **Date**: 2026-10-27
-
-P5's review found that a Hermite set had no metadata of its own: written with its
-conversion's, its ten grids were named `sdf` and stated the SDF convention, to be taken
-for SDFs, and metadata made anew lost the conversion's origin; nor did `CacheEntry::new`
-refuse the `hermite.` keys, so any grid could pass for a set's. The human decided:
-
-- `Produced::meta` is the set's metadata: the conversion's voxel size, transform and
-  unit, named `hermite`, without `sdf.version`.
-- `Hermite::entries` refuses metadata stating the SDF convention, `HermiteError::ClaimsSdf`.
-- `CacheEntry::new` refuses a key beginning `hermite.`, `CacheError::ReservedKey`;
-  `CacheEntry::with_reserved_keys` takes one, for a set's own entries and for files made
-  on purpose to break the format.
-
-## Amendment: a bare `g`
-
-- **Date**: 2026-10-27
-
-P5's review found that the triangles after an OBJ `g` naming no group took group 0, not
-the last `o`'s name. The specification says only that group information is optional and
-that the default group is named `default`. The human decided that a `g` naming no group
-is as none: the triangles after it take the last `o`'s name, failing that group 0.
-
-## Amendment: line ends and a name after `endsolid`
-
-- **Date**: 2026-10-27
-
-The re-review of P5's fixes found that the rule above lost every solid after the first,
-with no error, in a file of solids on one line, the name after `endsolid` running on
-over the next solid, and in a file whose lines end with a lone `\r`, read as one line.
-The human decided that a line ends at `\n`, `\r\n` or a lone `\r`, and that a name
-after `endsolid` ends before a `solid` on its line, as before the rule; such a name
-holding the word `solid` is cut there.
-
-## Amendment: a near tie of the nearest triangle
-
-- **Date**: 2026-10-28
-
-An edge crossed but hit by no triangle takes its crossing from the triangle nearest it,
-the lowest-numbered of equal distances, found through the BVH with a margin so that no
-triangle a scan would choose is passed. Three mutants that shrink the margin differ from
-the scan only where two distances are equal within their rounding, which no test can build
-(ADR-0043). The human decided that of triangles whose distances to the edge are equal
-within their rounding, any one may be taken (ARCHITECTURE.md §5.1).
-
-## Amendment: a triangle on a line, and a normal of any size
-
-- **Date**: 2026-11-02
-
-An outside review found that `crossing` crossed a triangle whose corners lie on a line, its
-edges' cross product exactly zero, when a segment passed through the line: moved to the
-segment's start, the corners rounded off it, and the edge functions and their sum off 0.
-Of 222 630 such triangles with a segment through a point of the line, 32 835 were crossed;
-a cube holding one just inside a face, through a point of a crossed edge, was refused
-Hermite data for a normal of no length in 216 meshes of 300, where ARCHITECTURE.md §5.1
-takes degenerate triangles. The parity count's test along an axis is of the same shape. It
-also found the unit normal taken from the squared length, which underflows to 0 for a
-triangle of edges below about 10⁻⁸¹ and overflows above about 10⁷⁷, so that such a triangle
-crossed was given a normal of no length too. The owner decided, on 2026-11-02, that it be
-fixed: `crossing` and the parity count refuse a triangle by its own corners' cross product
-first, as Hermite data's nearest triangle does, and a normal is divided by its largest
-component before its length. Shown to fire: a search of 200 000 triangles for the crossing
-and the parity count, the cube with such a triangle, and normals of edges 10⁻⁹⁰ and 10⁸⁰,
-each failed with its fix taken out.
-
-## Amendment: an end on the mesh, and the tree's margins derived
-
-- **Date**: 2026-11-02
-
-The survey of the whole repository found that an edge whose inside end lay on the mesh
-took its crossing at that end with the normal and group of the triangle `find` chose
-farther along, or nearest the edge: a box's top face at a lattice plane gave an edge in
-that plane the side face's normal. It found the tree's margins, 4ε for a segment's query
-and 64ε for the nearest triangle, chosen by a test failing with one less, and
-`Bvh::nearest` passing a node with no margin though it promises a scan's answer. The owner
-decided, on 2026-11-02, that both be fixed at their cause: the end takes the triangle
-holding it, the lowest-numbered with area at distance 0; and each margin is derived, once:
-a crossing's corner moves by at most four roundings of twice the largest coordinate, 8ε
-of it, and the margin is twice that; a distance found lies below the true one by at most
-√ε of the largest coordinate (ADR-0027), and the margin, `nearest`'s too, is twice that.
-Shown to fire: the box's edge took the side face's normal before and takes the top face's
-now; no input was found on which the old margins and the new differ.
+- colino's output has a second kind of data beside the SDF (ARCHITECTURE.md §5.1).
+- Acceptance tests: a cube turned about two axes, each face a group, every crossing exact
+  to `f32` rounding, every normal its face's and every group right; the same bytes at two
+  thread counts; signs and crossings agreeing on every band edge of a torus; by brute
+  force, every crossed edge owned by a leaf; an open mesh counting its unhit edges.
+- A table in the cache file, and every crossing along an edge, wait for a user's request.

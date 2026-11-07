@@ -3,6 +3,9 @@
 - **Status**: Amended
 - **Date**: 2026-10-20
 
+Condensed on 2026-11-08 (ADR-0001): each decision is kept with its reason and what it set
+aside; the text before is in git, this file as of `53f69d5`.
+
 ## Context
 
 P2's third item turns a mesh into a narrow-band signed distance field (ARCHITECTURE.md
@@ -17,189 +20,71 @@ root-mean-squared error near 10⁻³ and the exact voxelisation at the threshold
 
 ## Decision
 
-The human decided, on 2026-10-20:
+The human decided, on 2026-10-20 unless dated otherwise.
 
-- The caller gives the voxel size h; the grid's origin is the world's, unless the caller
-  gives another, so that conversions of different inputs share a lattice. A voxel's value
-  is taken at its centre, its index plus one half, in the mesh's world coordinates.
-- Values are signed distances in the mesh's unit, as `f32`, negative inside, clamped to
-  ±N·h, N being the band's half-width in voxels, 3 by default. Inside tiles hold −N·h; the
-  background is +N·h.
-- A leaf-sized cell becomes a leaf when one of its voxels' centres lies nearer the surface
-  than N·h. Candidate cells are those overlapping a triangle's box grown by N·h.
-- Distance is exact, to the nearest triangle, through a tree of axis-aligned boxes split
-  at the median, walked with an explicit stack. Sign is inside where the winding number is
-  1/2 or more, by Barill et al.'s approximation with β = 2 to second order, or by the
-  exact sum when the caller asks.
-- Regions holding no leaf are classified from the largest down, root region, upper node,
-  lower node, by one winding number at the region's centre; an inside region becomes one
-  tile at its level.
-- The grid's metadata takes the mesh's unit, or the caller's when the mesh has none, and
-  is an error when neither gives one.
-- `colino::bvh`, `colino::distance`, `colino::winding` and `colino::convert` hold it; leaves
-  are filled in parallel through brodo's leaf-parallel update, each voxel on its own, so
-  that the bytes do not depend on the thread count.
-- The orientation-independent option ADR-0017 names is left out of this item: what it is
-  is open, B-016 (ROADMAP.md §3).
+- **The grid.** The caller gives the voxel size h; the grid's origin is the world's unless
+  the caller gives another, so that conversions of different inputs share a lattice. A
+  voxel's value is taken at its centre, its index plus one half, in the mesh's world
+  coordinates. Its metadata takes the mesh's unit, or the caller's when the mesh has none,
+  and is an error when neither gives one.
+- **Values** are signed distances in the mesh's unit, as `f32`, negative inside, clamped
+  to ±N·h, N the band's half-width in voxels, 3 by default; inside tiles hold −N·h, the
+  background +N·h. An inside voxel whose distance rounds to zero holds
+  −`f32::MIN_POSITIVE` (2026-10-27: −0 is not found by `v < 0`, and two boxes sharing a
+  face labelled as two parts).
+- **Leaves.** A leaf-sized cell overlapping a triangle's box grown by N·h is a candidate
+  when its centre lies within (N + 4√3)·h of the triangle, 4√3·h the distance from a cell's
+  centre to its corners, and stays a leaf when one of its voxels' values lies within the
+  band (2026-10-27, as the code had it; ARCHITECTURE.md §5.1). Regions holding no leaf are
+  classified from the largest down, root region, upper node, lower node, by one winding
+  number at the region's centre; an inside region becomes one tile at its level.
+- **Distance** is exact, to the nearest triangle, through a tree of axis-aligned boxes
+  split at the median, walked with an explicit stack. Above a threshold of thinness, the
+  normal's length against ε of the edges' product measured at the first corner, the
+  face's nearest point is `p` projected on the triangle's plane; below it, the edges'
+  (2026-11-02: barycentric weights, ratios of |n|², lost ε over the square of the
+  triangle's sine, up to 0.13 of its size on thin triangles against points worked in
+  rationals). The edges and `p` are divided by their largest component first, so that no
+  product of four lengths under- or overflows. Turning the triangle so that its largest
+  angle came first was tried and taken back on 2026-11-03: its code and tests cost more
+  than it bought, which lay beyond what `on_triangle` promises for a triangle thinner than
+  √ε of its size, a point within its width (ARCHITECTURE.md §5.1).
+- **Sign.** Inside where the winding number is 1/2 or more, by Barill et al.'s
+  approximation with β = 2 to second order, or by the exact sum when the caller asks;
+  `Converted::accuracy` records which, and Hermite data and the report follow it, as they
+  follow `Converted::sign` (2026-10-27). A point at distance exactly 0 is inside, whichever
+  sign is asked for, as Hermite data takes it (2026-10-27: the winding number turned on
+  the sign of a rounded zero, and the parity count's sign there split overlapping parts
+  and put a box's lower faces inside and its upper ones outside).
+- **A sign without orientation** (2026-10-26, B-016). `spikes/sign/` signed broken meshes
+  by six methods against the intended mesh's exact winding number: none held on every
+  defect. The winding number fails on turned faces; a flood from outside leaks through a
+  hole and fills cavities; ray stabbing (Nooruddin and Turk, 2003, *Simplification and
+  Repair of Polygonal Models Using Volumetric Techniques*, IEEE TVCG 9(2), §3.2) fills
+  cavities; parity counting along lines in three axis directions with a majority vote, a
+  line with an odd count not voting and a tie outside (§3.1), held on turned faces, holes
+  and cavities, failing where parts pass into each other or walls are doubled. The parity
+  count is offered beside the winding number, which stays the default; the others are
+  not. Conversion and Hermite data take the same choice. A line exactly on an edge or a
+  corner counts once by an edge function of exactly 0 taking the sign it has with the line
+  moved by (ε, ε²), each product's sign exact, in an edge test of the parity count's own;
+  a fixed offset of the lines, the other candidate, signed the moved point and missed 20
+  voxels nearest each sphere.
+- **Placement.** `colino::bvh`, `colino::distance`, `colino::winding` and
+  `colino::convert` hold it; leaves are filled in parallel through brodo's leaf-parallel
+  update, each voxel on its own, so that the bytes do not depend on the thread count.
 
 ## Consequences
 
-Memory follows the band, plus one tile per inside region. Conversion comes in three
-units: distance and the tree, the winding number, then the band.
-
-## Amendment
-
-- **Date**: 2026-10-26
-
-B-016 asked which sign colino offers beside the winding number's that does not depend on
-orientation. `spikes/sign/` signed dense grids of broken meshes by six methods against
-the intended mesh's exact winding number (its REPORT.md): no method held on every defect.
-The winding number fails on turned faces; a flood from outside leaks through a hole of
-one triangle and fills cavities; ray stabbing (Nooruddin and Turk, 2003, *Simplification
-and Repair of Polygonal Models Using Volumetric Techniques*, IEEE TVCG 9(2), §3.2) fills
-cavities; parity counting along lines in three axis directions with a majority vote, a
-line with an odd count not voting and a tie outside (§3.1), held on turned faces, holes
-and cavities, and mixes of them, but fails where parts pass into each other or walls are
-doubled, where the winding number holds. colino's `crossing` hits both triangles of an
-edge a line passes exactly on, so parity needs a crossing counted once there. The human
-decided:
-
-- The orientation-independent option is the parity count in the three axis directions;
-  the winding number stays the default. Ray stabbing and the others are not offered.
-- Conversion and Hermite data take the same choice of sign, Hermite data's signs on the
-  voxels' corners counted as conversion's are on their centres (ADR-0030).
-- How a line exactly on a shared edge or corner counts once is measured before the option
-  is built, between moving the lines off the lattice by a fixed offset and a half-open
-  rule on the edge functions, and recorded here.
-
-The spike then measured both (REPORT.md, "A line on an edge"). An edge function exactly 0
-taking the sign it has with the line moved by (ε, ε²) across itself, each product's sign
-exact, counted every line on an edge or a corner once, on a cube's split faces and on an
-octahedron with its vertices on the lines, and changed no other sign. A fixed offset of
-the lines signed the moved point rather than the voxel's centre and missed 20 voxels
-nearest each sphere. The human chose the perturbation (2026-10-26): parity counts with an
-edge test of its own beside `crossing`, which keeps hitting both triangles of an edge for
-Hermite data's crossings.
-
-Building it found one limit the spike's holes were too shallow to show: within the sag of
-a missing cap, a point whose lines across pass through the hole finds no crossing on them
-and is outside. A sphere with a hole and a tenth of its faces turned keeps every sign below
-the hole's rim (`sign_reference`).
-
-## Amendment: a point on the mesh
-
-- **Date**: 2026-10-27
-
-P5's review found two faults at a voxel centre exactly on the mesh. Its winding number
-turned on the sign of a rounded zero, the solid angle of the triangle holding it being
-2·atan2(±0, d) with d < 0, so the winding number and parity converted a cube with its
-faces on planes of centres differently in 206 values (2026-10-26); and an inside one held
-−0, which `v < 0` does not find, so two boxes sharing a face labelled as two parts. The
-human decided that a point at distance exactly 0 takes the parity count's sign, decided by
-its lines moved by (ε, ε²), whichever sign is asked for, and that an inside voxel whose
-distance rounds to zero holds −`f32::MIN_POSITIVE`. Hermite data keeps its own rule: a
-point on the mesh is inside, so that the crossing lies there.
-
-## Amendment: the inside beyond an open mesh's band
-
-- **Date**: 2026-10-27
-
-P5's review found that across an open mesh's hole, beyond the band, the boundary between
-inside and outside followed the tiles, a region of up to 4096³ voxels taking its centre's
-sign. A closed mesh is not affected, its inside being the same at every point of such a
-region. The human decided that this is stated, not changed: an open mesh's inside is not
-defined, the report counts its open edges, and refining the regions whose corners
-disagree would add leaves and time to every conversion.
-
-## Amendment: a conversion records its accuracy
-
-- **Date**: 2026-10-27
-
-P5's review found that `Converted` recorded the sign a conversion used but not the
-accuracy its winding numbers were found at: Hermite data took the accuracy as an argument
-of its own, unchecked against the conversion's, and the report's third layer always used
-β = 2. The human decided that `Converted::accuracy` records it, and that Hermite data and
-the report follow it, as they follow `Converted::sign`; `hermite` takes no accuracy.
-
-## Amendment: the sizes the winding number holds for
-
-- **Date**: 2026-10-27
-
-P5's review found that at very small or very large coordinates the solid angles or the
-far field fell to 0, NaN or infinity. Measured on a sphere at the powers of ten in steps
-of five, the approximation holds for a mesh whose size lies between 10⁻⁴⁵ and 10⁶⁰, and
-the exact sum between 10⁻¹⁰⁰ and 10¹⁰⁰ (2026-10-27). The human decided that the range is
-stated, not enforced or widened by scaling the coordinates, which would change the bits
-of every result.
-
-## Amendment: the candidate cells
-
-- **Date**: 2026-10-27
-
-P5's review found that the rule this record decided for candidate cells, those
-overlapping a triangle's box grown by N·h, was not the code's: a cell overlapping the box
-is a candidate only when its centre also lies within (N + 4√3)·h of the triangle, 4√3·h
-being the distance from a cell's centre to its corners, so that no cell is kept whose
-voxels all lie beyond the band; a candidate stays a leaf when one of its voxels' values
-lies within the band. The leaves are the same either way. ARCHITECTURE.md §5.1 states the
-rule.
-
-## Amendment: a point on the mesh, again
-
-- **Date**: 2026-10-27
-
-The re-review of P5's fixes found that the parity count's sign at a point on the mesh,
-the amendment above, split overlapping parts: a voxel centre on one part's face, buried in
-another, came out outside, its lines' votes tied against it, and two overlapping boxes
-labelled as two solids; and that it put a box's centres on its lower faces inside and on
-its upper ones outside, by the side the lines are moved to; and that Hermite data took
-such a point as inside. The human decided that a point at distance exactly 0 is inside,
-whichever sign is asked for, as Hermite data takes it.
-
-## Amendment: a thin triangle's nearest point
-
-- **Date**: 2026-11-02
-
-An outside review of the uncommitted fix of a sliver's distance found that the face's point,
-by its barycentric weights, ratios of |n|², lost ε over the square of the triangle's sine:
-with the normal just above the threshold at which the edges are compared, a point on an edge
-of a triangle 1.07 times past it was found 9.7 × 10⁻⁵ of the triangle's size away. Measured
-against the nearest point worked in rationals, on 40 000 triangles 10⁻¹² to 10⁻² thin, the
-weights' point was off by up to 0.13 of the size; p projected on the triangle's plane, by up
-to ε of |ap| over the sine where the normal is above the threshold, and by up to 0.24 below
-it, where the normal is rounding. The owner decided, on 2026-11-02, that it be fixed: above
-the threshold, ε of the edges' product, the face's point is the projection; below it, the
-nearest point is the edges', the weights' point compared with them having changed no answer,
-since a mutation run left 22 of its mutants alive. The distance is then within the rounding
-of the coordinates over the sine of the triangle's sharpest angle, at most 5.4 × 10⁻⁹ of its
-size, near the threshold, below √ε.
-ARCHITECTURE.md §5.1 states it. Shown to fire: a point on an edge of a triangle of any
-thinness, found within √ε of the triangle's size, failed with the weights' point and passed
-with the projection.
-
-## Amendment: the nearest point whatever the triangle's size
-
-- **Date**: 2026-11-02
-
-A survey of the whole repository for what was fixed by patch found `on_triangle`'s
-thinness measured at whichever corner came first, so that one needle took the face or its
-edges by the corners' order, and its products of four lengths under- or overflowing for a
-triangle far from 1 in size: at 10⁻¹⁰⁰ a point above the face was found on an edge. The
-owner decided, on 2026-11-02, that it be fixed at its cause: the triangle is turned, its
-order kept, so that the corner opposite its longest edge, its largest angle, comes first,
-where the normal and the region tests round least; and the edges and `p` are divided by
-their largest component before the tests, which compare ratios the division leaves as
-they were. Against the nearest point worked in rationals, the largest error fell from
-5.4 × 10⁻⁹ to 2.8 × 10⁻⁹ of the triangle's size. Shown to fire: a point above a face of
-triangles 10⁻¹⁰⁰ to 10¹⁰⁰ in size, in each of three orders, and above a needle whose
-sharpest angle is 10⁻⁹, failed before and passed then.
-
-On 2026-11-03 the turning was taken back, its code and tests more than what it bought,
-which lies beyond what `on_triangle` promises: a triangle whose first corner's angle is
-below √ε is thinner than √ε of its size, for which only a point within its width is
-promised, and above it the projection is off by no more than √ε of `p`'s
-distance from that corner. The owner decided, on 2026-11-03, that thinness be measured at
-the first corner again and the division kept; the needle's check went with the turning.
-The slab benchmark's slowing, first laid to the turning, was the region tests no longer
-inlined once moved to a function of their own: inlined always, it measured within its
-baseline (`cargo bench -p colino`, 2026-11-03).
+- Memory follows the band, plus one tile per inside region.
+- An open mesh's inside is not defined beyond the band: across a hole a region of up to
+  4096³ voxels takes its centre's sign. The report counts its open edges; refining regions
+  whose corners disagree, which would add leaves and time to every conversion, was set
+  aside (2026-10-27). Within the sag of a missing cap, a point whose axis lines pass through
+  the hole is outside by parity.
+- The winding number holds for a mesh between 10⁻⁴⁵ and 10⁶⁰ in size by the approximation,
+  10⁻¹⁰⁰ and 10¹⁰⁰ by the exact sum (2026-10-27, a sphere at every fifth power of ten).
+  The range is stated, not enforced nor widened by scaling, which would change the bits of
+  every result.
+- A distance is within the rounding of the coordinates over the sine of the triangle's
+  sharpest angle, below √ε of its size near the threshold.
