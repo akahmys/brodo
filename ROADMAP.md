@@ -8,14 +8,12 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: the gaps T14's survey left for a later MINOR split by the owner (2026-11-08):
-  those that round off what is there kept in §4, those that add a capability opened as
-  GitHub issues 1 to 12.
-- **Next**: P10, rounding off 1.0 (§2), set by the owner on 2026-11-08: each change's API
-  put to the owner before it is written. brodo's core, an archive grid's encoding
-  (ADR-0062), colino's `Limits::default` (ADR-0026) and mestolo's command line (ADR-0050)
-  and the closing checks are done, and the version is 1.1.0. Its tag, GitHub release and
-  publication on crates.io follow, each with the owner's approval (TESTING.md V4).
+- **Done**: P10 released as 1.1.0, rounding off 1.0 without breaking a user (ADR-0026,
+  ADR-0050, ADR-0062): brodo, colino and mestolo published by the owner, docs.rs building
+  their reference, the additions used from a new crate depending on them by version, and
+  `cargo install mestolo` installing the command (2026-11-09).
+- **Next**: no milestone is scheduled; the owner chooses the next work. §2's "Later", §4
+  and GitHub issues 1 to 12 hold what is open.
 - **Unresolved**: `leaf_parallel_update_x32` drifts between processes by up to 20 %, its
   cause not measured (ADR-0019).
 
@@ -24,7 +22,7 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
 Named after the project group's phases (ADR-0011); the checks a milestone closes with are
 TESTING.md §2's and its checklist lists them (ADR-0033). A closed milestone leaves this
 file: what it brought is in its version's CHANGELOG.md section, and its checklist in git,
-in this file as of `53f69d5`.
+in this file as of `53f69d5` (P0 to P9) and `711cf5b` (P10).
 
 | Milestone | Version | Closed |
 | :--- | :--- | :--- |
@@ -39,30 +37,7 @@ in this file as of `53f69d5`.
 | The reviews after P7, no milestone | 0.8.1, 0.8.2 | 2026-11-02 |
 | P8, looking inside, and the formats settled | 0.9.0 | 2026-11-04 |
 | P9, 1.0 on crates.io | 1.0.0 | 2026-11-08 |
-
-### P10 — rounding off 1.0
-
-Set by the owner on 2026-11-08: the gaps T14's survey left for a later MINOR that round
-off what is there (2026-11-05), released as 1.1.0. Each change's API, or command line, is
-put to the owner before it is written, its ADR amended where the design changes.
-
-- [x] brodo's core: `Field::set_background`; `LeafNumber`, `TileNumber` and `Offset`
-      built from their numbers; `Field<T>` taken from an `AnyField` by `TryFrom`
-      (ADR-0062)
-- [x] brodo's formats: an archive grid's value encoding read (ADR-0062)
-- [x] colino: `Limits::default` (ADR-0026)
-- [x] mestolo: `--version`; help per command; `convert` to `.vdb` skipping, when asked,
-      the grids it cannot hold (ADR-0050). Hermite data and an archive's encodings shown
-      by `info` change its output, and wait for the next MAJOR (the owner, 2026-11-08; §4)
-- [x] The closing checks, chosen by the owner (2026-11-08): T11's mutation run, the
-      check against 1.0.0 (V9), and T6's fuzzing if a reader of untrusted bytes changed;
-      not T7, no unsafe code being touched
-  - [x] T6: `archive` and `cache_file` fuzzed 900 s each, 1,153,492 and 19,370,813 runs,
-        nothing found (2026-11-08)
-  - [x] V9: the gate's check against v1.0.0 passes on `d6422e2` (2026-11-08)
-  - [x] T11: the run on `d6422e2`, GitHub Actions run 42447561541, missed none of 4649
-        mutants, its four timeouts caught under 1800 s (2026-11-08)
-- [x] Version 1.1.0 (TESTING.md V2–V4, 2026-11-09)
+| P10, rounding off 1.0 | 1.1.0 | 2026-11-09 |
 
 ### Held — `piatto`
 
@@ -146,8 +121,8 @@ No spike is running.
   (2026-11-06). Letting such a line pass is a change to a rule, the owner's to decide
   (AGENTS.md, "Changing the rules"), with ADR-0044 amended and the check shown to fire.
 - Gaps T14's survey found before 1.0 that a later MINOR adds without breaking a user
-  (2026-11-05), split by the owner (2026-11-08): those that round off what is there are
-  P10's (§2); those that add a capability are GitHub issues 1 to 12, taken as any issue
+  (2026-11-05), split by the owner (2026-11-08): those that round off what is there were
+  P10's, released in 1.1.0; those that add a capability are GitHub issues 1 to 12, taken as any issue
   is (AGENTS.md S5).
 - For the next MAJOR, since it changes an output 1.0 promises (ARCHITECTURE.md §6.3,
   TESTING.md V9): Hermite data and an archive's encodings shown by mestolo's `info`
