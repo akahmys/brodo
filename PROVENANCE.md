@@ -47,17 +47,17 @@ copyright notice (`grep -rniE 'copyright|spdx|licen[cs]e' crates/*/src` finds no
 | `crates/brodo/src/error.rs` | ADR-0058 only | the crate's error types |
 | `crates/brodo/src/frozen.rs` | ARCHITECTURE.md §4.6, ADR-0016, ADR-0052, ADR-0060 only | the frozen layout, version 1, and `freeze` |
 | `crates/brodo/src/gather.rs` | ARCHITECTURE.md §4.4, ADR-0015 only | the gather of a leaf and one, two or three ghost layers |
-| `crates/brodo/src/field.rs` | ARCHITECTURE.md §4.2, §4.8, ADR-0014, ADR-0056 only | fields: the open `Value` trait and the sealed `Stored` one, the `ValueType` naming each stored type and the `AnyField` holding a field of one, values by leaf and tile number, the stamp check, the remap and merge rules |
+| `crates/brodo/src/field.rs` | ARCHITECTURE.md §4.2, §4.8, ADR-0014, ADR-0056, ADR-0062 only | fields: the open `Value` trait and the sealed `Stored` one, the `ValueType` naming each stored type and the `AnyField` holding a field of one, values by leaf and tile number, the stamp check, the remap and merge rules |
 | `crates/brodo/src/grid.rs` | ARCHITECTURE.md §4.2, ADR-0014, ADR-0059 only | a grid: one topology and one field, edited in one step |
 | `crates/brodo/src/kind.rs` | ARCHITECTURE.md §4.7, ADR-0056; docs/formats.md §2.1, §3.1, §8.1 and §9.1 for each file's first bytes | a file's kind told by its magic number, and each format's magic number |
 | `crates/brodo/src/hermite.rs` | ARCHITECTURE.md §4.9, ADR-0032, ADR-0051; Ju, Losasso, Schaefer and Warren (2002), *Dual Contouring of Hermite Data*, for Hermite data as signs on a lattice and a crossing and normal on each edge whose ends differ | the Hermite data format: a sign grid and its crossings held sparsely, its check, its cache entries and its reading in place |
 | `crates/brodo/src/lib.rs` | none | crate root |
-| `crates/brodo/src/manifest.rs` | ARCHITECTURE.md §4.3, ADR-0014 only | the leaf manifest: 26 directions and each leaf's neighbours |
+| `crates/brodo/src/manifest.rs` | ARCHITECTURE.md §4.3, ADR-0014, ADR-0062 only | the leaf manifest: 26 directions and each leaf's neighbours |
 | `crates/brodo/src/mapping.rs` | ARCHITECTURE.md §4.7, ADR-0008 only | mapping a file read-only: brodo's one unsafe operation |
 | `crates/brodo/src/meta.rs` | ARCHITECTURE.md §4.7, ADR-0016 only | a grid's metadata and bounding box |
 | `crates/brodo/src/morphology.rs` | ARCHITECTURE.md §4.5, ADR-0025 only; dilation and erosion by a structuring element as textbook material | dilation and erosion of a topology on whole leaves, and of values by a max or min filter |
 | `crates/brodo/src/parallel.rs` | ARCHITECTURE.md §4.4, ADR-0015 only | the leaf-parallel update and the fixed-order reduction |
-| `crates/brodo/src/topology.rs` | ARCHITECTURE.md §4.2, ADR-0014, ADR-0059 only; Morton order as bit interleaving | topologies: stamps, Morton numbering, the editor, `Remap` |
+| `crates/brodo/src/topology.rs` | ARCHITECTURE.md §4.2, ADR-0014, ADR-0059, ADR-0062 only; Morton order as bit interleaving | topologies: stamps, Morton numbering, the editor, `Remap` |
 | `crates/brodo/src/view.rs` | ARCHITECTURE.md §4.6, ADR-0016, ADR-0032, ADR-0052 only | `GridView`: checking a frozen grid whole, or its nodes without its leaf values, reading it in place, and walking its leaves and tiles |
 | `crates/brodo/src/slice.rs` | ARCHITECTURE.md §6.1, ADR-0018 only | a slice of a scalar field drawn and encoded as PNG |
 | `crates/brodo/src/vdb.rs` | ARCHITECTURE.md §4.7, ADR-0045, ADR-0046, ADR-0047; docs/formats.md §9, from OpenVDB `v14.0.0`'s files listed above, read and not copied; `spikes/vdb/` | grids of `f32` and `f64` written as OpenVDB's `.vdb` file at file version 225, and `vdb_read.rs`'s reader re-exported |

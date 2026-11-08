@@ -28,6 +28,24 @@ impl Offset {
         usize::from(self.0)
     }
 
+    /// The direction numbered `i`, as `index` gives it; none from 26 on.
+    pub fn from_index(i: usize) -> Option<Offset> {
+        u8::try_from(i).ok().filter(|&i| usize::from(i) < DIRECTIONS).map(Offset)
+    }
+
+    /// The direction of a step of `d` leaves along x, y and z, as `delta` gives it; none
+    /// unless each is -1, 0 or 1, nor for the step of none.
+    pub fn from_delta(d: [i32; 3]) -> Option<Offset> {
+        let [x, y, z] =
+            d.map(|k| k.checked_add(1).and_then(|k| u8::try_from(k).ok()).filter(|&k| k < 3));
+        let c = x? + 3 * y? + 9 * z?;
+        match c.cmp(&CENTRE) {
+            std::cmp::Ordering::Less => Some(Offset(c)),
+            std::cmp::Ordering::Equal => None,
+            std::cmp::Ordering::Greater => Some(Offset(c - 1)),
+        }
+    }
+
     /// The direction's place among the 27 cells of a 3³ block.
     fn cell(self) -> u8 {
         if self.0 < CENTRE { self.0 } else { self.0 + 1 }
@@ -99,6 +117,19 @@ impl LeafManifest {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// `from_index` and `from_delta` give back each direction from its number and its step,
+    /// and nothing for a number from 26 on, the step of none, or a step beyond one leaf.
+    #[test]
+    fn a_direction_is_made_from_its_number_and_its_step() {
+        for o in Offset::all() {
+            assert_eq!(Offset::from_index(o.index()), Some(o));
+            assert_eq!(Offset::from_delta(o.delta()), Some(o));
+        }
+        assert_eq!([26, 27, 255, 256, usize::MAX].map(Offset::from_index), [None; 5]);
+        let refused = [[0, 0, 0], [2, 0, 0], [0, -2, 0], [0, 0, i32::MAX], [i32::MIN, 1, 1]];
+        assert_eq!(refused.map(Offset::from_delta), [None; 5]);
+    }
 
     #[test]
     fn directions_cover_the_block_but_its_centre() {

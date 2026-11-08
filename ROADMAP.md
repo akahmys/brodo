@@ -11,8 +11,9 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
 - **Done**: the gaps T14's survey left for a later MINOR split by the owner (2026-11-08):
   those that round off what is there kept in §4, those that add a capability opened as
   GitHub issues 1 to 12.
-- **Next**: no milestone is scheduled; the owner chooses the next work. Proposed: a
-  milestone taking §4's gaps that round off what is there, released as 1.1.0.
+- **Next**: P10, rounding off 1.0 (§2), set by the owner on 2026-11-08: each change's API
+  put to the owner before it is written. brodo's core is done (ADR-0062); an archive
+  grid's encoding is next.
 - **Unresolved**: `leaf_parallel_update_x32` drifts between processes by up to 20 %, its
   cause not measured (ADR-0019).
 
@@ -37,7 +38,23 @@ in this file as of `53f69d5`.
 | P8, looking inside, and the formats settled | 0.9.0 | 2026-11-04 |
 | P9, 1.0 on crates.io | 1.0.0 | 2026-11-08 |
 
-No milestone is open.
+### P10 — rounding off 1.0
+
+Set by the owner on 2026-11-08: the gaps T14's survey left for a later MINOR that round
+off what is there (2026-11-05), released as 1.1.0. Each change's API, or command line, is
+put to the owner before it is written, its ADR amended where the design changes.
+
+- [x] brodo's core: `Field::set_background`; `LeafNumber`, `TileNumber` and `Offset`
+      built from their numbers; `Field<T>` taken from an `AnyField` by `TryFrom`
+      (ADR-0062)
+- [ ] brodo's formats: an archive grid's value encoding read
+- [ ] colino: `Limits::default`
+- [ ] mestolo: `--version`; help per command; Hermite data and an archive's encodings
+      shown by `info`; `convert` to `.vdb` skipping, when asked, the grids it cannot hold
+      (ADR-0050)
+- [ ] The closing checks, chosen by the owner (2026-11-08): T11's mutation run, the
+      check against 1.0.0 (V9), and T6's fuzzing if a reader of untrusted bytes changed;
+      not T7, no unsafe code being touched
 
 ### Held — `piatto`
 
@@ -121,13 +138,9 @@ No spike is running.
   (2026-11-06). Letting such a line pass is a change to a rule, the owner's to decide
   (AGENTS.md, "Changing the rules"), with ADR-0044 amended and the check shown to fire.
 - Gaps T14's survey found before 1.0 that a later MINOR adds without breaking a user
-  (2026-11-05), split by the owner (2026-11-08). Those that round off what is there,
-  held here to be taken first: `Field::set_background`; `LeafNumber`, `TileNumber` and
-  `Offset` built from their numbers; `Field<T>` taken from an `AnyField` by `TryFrom`; an
-  archive grid's value encoding read; colino's `Limits::default`; mestolo's `--version`,
-  help per command, Hermite data and an archive's encodings shown by `info`, and
-  `convert` to `.vdb` skipping, when asked, the grids it cannot hold. Those that add a
-  capability are GitHub issues 1 to 12, taken as any issue is (AGENTS.md S5).
+  (2026-11-05), split by the owner (2026-11-08): those that round off what is there are
+  P10's (§2); those that add a capability are GitHub issues 1 to 12, taken as any issue
+  is (AGENTS.md S5).
 - Requests from users. Held until one asks: merging into a root tile (ADR-0014); a public
   way to read a bare frozen buffer, a file of its own, into an aligned buffer, which only
   tests now do (P5's review, S1, 2026-10-27); a bound on a conversion's leaves, refused

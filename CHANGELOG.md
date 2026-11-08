@@ -4,6 +4,11 @@ Each version, newest first, with the milestones it closed and every change that 
 user (TESTING.md V2, V3). Format versions of the `GridView` layout and the file profiles
 are recorded here when they change (V6).
 
+## Unreleased
+
+- `Field::set_background`; `LeafNumber::new`, `TileNumber::new`, `Offset::from_index` and
+  `Offset::from_delta`; `Field<T>` taken from an `AnyField` by `TryFrom` (ADR-0062).
+
 ## 1.0.0 (2026-11-08)
 
 Closes P9, the first release on crates.io (ADR-0061): the formats settled, the public API

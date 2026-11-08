@@ -52,6 +52,12 @@ fn to_usize(i: u32) -> usize {
 pub struct LeafNumber(pub(crate) u32);
 
 impl LeafNumber {
+    /// The leaf numbered `n`. A number no leaf of a topology has is refused where it is used,
+    /// as `TreeError::UnknownLeaf` or `FieldError::UnknownLeaf`.
+    pub const fn new(n: u32) -> Self {
+        Self(n)
+    }
+
     /// The number.
     pub fn get(self) -> u32 {
         self.0
@@ -63,6 +69,12 @@ impl LeafNumber {
 pub struct TileNumber(pub(crate) u32);
 
 impl TileNumber {
+    /// The tile numbered `n`. A number no tile of a topology has is refused where it is used,
+    /// as `TreeError::UnknownTile` or `FieldError::UnknownTile`.
+    pub const fn new(n: u32) -> Self {
+        Self(n)
+    }
+
     /// The number.
     pub fn get(self) -> u32 {
         self.0

@@ -104,6 +104,9 @@ pub struct Field<T> {
   so the order of field values, follow it. A voxel is located through the tree, then
   numbered. `Topology::leaf_voxels` gives a leaf's voxel coordinates in the order of its
   values, x fastest, then y, then z; `TileLevel::edge` a tile's edge in voxels.
+- A leaf or tile number is also made from its `u32`; one its topology did not give is
+  refused where it is used. A field's background is set by `set_background`, its leaves'
+  and tiles' values unchanged (ADR-0062).
 - `Grid<T>` binds one `Topology` and one `Field<T>` for single-field use, with the merge
   rule chosen when it is made (the same-bits rule unless another is given). Its `edit`
   takes the edits as a closure, commits them and remaps the field in one step; if any part
@@ -159,7 +162,8 @@ pub struct Field<T> {
 the tree is the only source of truth. It holds, in leaf-number order (§4.2), what lies one
 leaf away from each leaf in each of the 26 directions: a leaf, a tile with its level, or
 the background, as a `Location` (CODING.md Rule 5). Directions are numbered with x
-fastest. A neighbour beyond the `i32` coordinate range is the background.
+fastest, and an `Offset` is made from its number or its step as from what gives them
+(ADR-0062). A neighbour beyond the `i32` coordinate range is the background.
 
 ### 4.4 Access and parallel work (ADR-0015)
 
@@ -346,7 +350,8 @@ trait over `Value` that brodo implements for `f32`, `f64`, `u8`, `u32`, `[f32; 3
 stored type is named at run time by `ValueType`, which gives its code and its name and is
 what a file's accessors and errors name a type by; a field of a type chosen at run time, a
 grid read from a file whose type its reader did not choose, is an `AnyField`, one variant a
-type (ADR-0056).
+type (ADR-0056), from which `Field<T>::try_from` takes a field of `T`, giving the
+`AnyField` back otherwise (ADR-0062).
 
 ### 4.9 Hermite data (ADR-0032, ADR-0051)
 

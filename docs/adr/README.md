@@ -96,3 +96,4 @@ A record is `Proposed` until the human accepts it.
 | [0059](0059-a-tile-is-removed-and-a-grid-made-from-its-parts.md) | A tile is removed in one call, and a grid is made from its parts |
 | [0060](0060-an-entry-read-is-written-again-as-it-was.md) | An entry read is written again as it was, and names need not be unique |
 | [0061](0061-brodo-colino-and-mestolo-are-released-as-1-0-0.md) | brodo, colino and mestolo are released as 1.0.0 |
+| [0062](0062-what-rounds-off-1-0-is-added.md) | What rounds off 1.0 is added |

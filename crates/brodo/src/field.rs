@@ -37,35 +37,54 @@ mod sealed {
     /// one in its variant of [`AnyField`].
     pub trait Sealed: Sized {
         fn any(f: Field<Self>) -> AnyField;
+        fn from_any(a: AnyField) -> Result<Field<Self>, AnyField>;
     }
     impl Sealed for f32 {
         fn any(f: Field<Self>) -> AnyField {
             AnyField::F32(f)
+        }
+        fn from_any(a: AnyField) -> Result<Field<Self>, AnyField> {
+            if let AnyField::F32(f) = a { Ok(f) } else { Err(a) }
         }
     }
     impl Sealed for f64 {
         fn any(f: Field<Self>) -> AnyField {
             AnyField::F64(f)
         }
+        fn from_any(a: AnyField) -> Result<Field<Self>, AnyField> {
+            if let AnyField::F64(f) = a { Ok(f) } else { Err(a) }
+        }
     }
     impl Sealed for u8 {
         fn any(f: Field<Self>) -> AnyField {
             AnyField::U8(f)
+        }
+        fn from_any(a: AnyField) -> Result<Field<Self>, AnyField> {
+            if let AnyField::U8(f) = a { Ok(f) } else { Err(a) }
         }
     }
     impl Sealed for u32 {
         fn any(f: Field<Self>) -> AnyField {
             AnyField::U32(f)
         }
+        fn from_any(a: AnyField) -> Result<Field<Self>, AnyField> {
+            if let AnyField::U32(f) = a { Ok(f) } else { Err(a) }
+        }
     }
     impl Sealed for [f32; 3] {
         fn any(f: Field<Self>) -> AnyField {
             AnyField::F32x3(f)
         }
+        fn from_any(a: AnyField) -> Result<Field<Self>, AnyField> {
+            if let AnyField::F32x3(f) = a { Ok(f) } else { Err(a) }
+        }
     }
     impl Sealed for [f64; 3] {
         fn any(f: Field<Self>) -> AnyField {
             AnyField::F64x3(f)
+        }
+        fn from_any(a: AnyField) -> Result<Field<Self>, AnyField> {
+            if let AnyField::F64x3(f) = a { Ok(f) } else { Err(a) }
         }
     }
 }
@@ -170,6 +189,15 @@ impl AnyField {
 impl<T: Stored> From<Field<T>> for AnyField {
     fn from(f: Field<T>) -> Self {
         T::any(f)
+    }
+}
+
+/// The field, if it holds values of `T`; otherwise the `AnyField` back, unchanged.
+impl<T: Stored> TryFrom<AnyField> for Field<T> {
+    type Error = AnyField;
+
+    fn try_from(a: AnyField) -> Result<Self, AnyField> {
+        T::from_any(a)
     }
 }
 
@@ -323,6 +351,12 @@ impl<T: Value> Field<T> {
     /// The value outside the tree.
     pub fn background(&self) -> T {
         self.background
+    }
+
+    /// Sets the value outside the tree. The leaves' and tiles' values are unchanged, those
+    /// equal to the old background among them.
+    pub fn set_background(&mut self, value: T) {
+        self.background = value;
     }
 
     pub(crate) fn check(&self, t: &Topology) -> Result<(), FieldError> {
@@ -491,6 +525,22 @@ mod tests {
         assert_eq!([0, 7, u32::MAX].map(ValueType::from_code), [None; 3]);
     }
 
+    /// A field is taken back from an `AnyField` holding its type, and an `AnyField` of
+    /// another type is given back unchanged.
+    #[test]
+    fn a_field_is_taken_from_an_any_field_of_its_type_only() {
+        let t = Topology::new();
+        let mut f = Field::new(&t, 2.5_f32);
+        f.set_background(-1.0);
+        let back = Field::<f32>::try_from(AnyField::from(f)).unwrap();
+        assert_eq!(back.background().to_bits(), (-1.0_f32).to_bits());
+        let refused = Field::<f64>::try_from(AnyField::from(back)).unwrap_err();
+        assert_eq!(refused.value_type(), ValueType::F32);
+        assert!(Field::<[f32; 3]>::try_from(AnyField::from(Field::new(&t, 0_u8))).is_err());
+        let wide = AnyField::from(Field::new(&t, [1.0_f64; 3]));
+        assert_eq!(Field::<[f64; 3]>::try_from(wide).ok().map(|f| f.background()), Some([1.0; 3]));
+    }
+
     /// Every value type compares by bits: equal values agree, a zero's sign and a NaN's
     /// payload are told apart, and so is any other difference, in each component.
     #[test]
@@ -504,6 +554,31 @@ mod tests {
         assert!(![1.0_f32, 2.0, 3.0].same_bits(&[1.0, 2.0, -3.0]));
         assert!([1.0_f64, 2.0, 3.0].same_bits(&[1.0, 2.0, 3.0]));
         assert!(![1.0_f64, 2.0, 3.0].same_bits(&[-1.0, 2.0, 3.0]));
+    }
+
+    /// A new background is read outside the tree, and the leaves' and tiles' values,
+    /// those equal to the old background among them, are unchanged.
+    #[test]
+    fn a_new_background_leaves_the_leaves_and_tiles_as_they_were() {
+        let t0 = Topology::new();
+        let mut e = t0.edit();
+        e.activate([0, 0, 0]).unwrap();
+        e.add_tile(TileLevel::Lower, [8, 0, 0]).unwrap();
+        let (t, _) = e.commit().unwrap();
+        let mut f = Field::new(&t, 0.0_f32);
+        f.leaf_mut(&t, LeafNumber(0)).unwrap()[1] = 3.0;
+        f.set_background(-7.0);
+        let at = |v| f.value_at(&t, v).map(f32::to_bits);
+        assert_eq!(f.background().to_bits(), (-7.0_f32).to_bits());
+        assert_eq!(at([-1, 0, 0]), Ok((-7.0_f32).to_bits()));
+        assert_eq!(at([0, 0, 0]), Ok(0.0_f32.to_bits()));
+        assert_eq!(at([1, 0, 0]), Ok(3.0_f32.to_bits()));
+        assert_eq!(at([9, 0, 0]), Ok(0.0_f32.to_bits()));
+        let leaf = LeafNumber::new(0);
+        assert_eq!(f.leaf(&t, leaf).map(|l| l[1].to_bits()), Ok(3.0_f32.to_bits()));
+        assert_eq!(f.tile(&t, TileNumber::new(0)).map(f32::to_bits), Ok(0.0_f32.to_bits()));
+        assert_eq!(f.leaf(&t, LeafNumber::new(1)).map(|_| ()), Err(FieldError::UnknownLeaf(1)));
+        assert_eq!(f.tile(&t, TileNumber::new(1)), Err(FieldError::UnknownTile(1)));
     }
 
     #[test]
