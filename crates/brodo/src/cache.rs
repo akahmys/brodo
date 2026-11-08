@@ -459,6 +459,9 @@ pub(crate) struct Entry {
     value_type: ValueType,
     /// The frozen buffer's byte range in the file.
     pub(crate) grid: std::ops::Range<usize>,
+    /// How the archive it was read from encoded its leaf values; `Exact` in a cache file.
+    #[cfg(feature = "archive")]
+    pub(crate) encoding: crate::archive::Encoding,
 }
 
 /// A cache file read into a 32-byte aligned buffer and checked whole.
@@ -637,7 +640,14 @@ fn grid_entry(
     if found != bounds {
         return Err(CacheError::Inconsistent("bounds"));
     }
-    Ok(Entry { meta, bounds, value_type, grid: payload })
+    Ok(Entry {
+        meta,
+        bounds,
+        value_type,
+        grid: payload,
+        #[cfg(feature = "archive")]
+        encoding: crate::archive::Encoding::Exact,
+    })
 }
 
 /// An entry of bytes at `payload`, checked as docs/formats.md §3.4, rule 7, states.
@@ -778,6 +788,8 @@ impl CacheFile {
                 bounds: e.bounds,
                 value_type: e.value_type,
                 bytes: all.get(e.grid.clone()).unwrap_or_default(),
+                #[cfg(feature = "archive")]
+                encoding: e.encoding,
             })
             .collect()
     }
@@ -805,6 +817,8 @@ pub struct GridEntry<'a> {
     bounds: Bounds,
     value_type: ValueType,
     bytes: &'a [u8],
+    #[cfg(feature = "archive")]
+    encoding: crate::archive::Encoding,
 }
 
 impl<'a> GridEntry<'a> {
@@ -827,6 +841,13 @@ impl<'a> GridEntry<'a> {
     /// The type of its values.
     pub fn value_type(&self) -> ValueType {
         self.value_type
+    }
+
+    /// How its leaf values were encoded in the archive the file was read from, the values
+    /// now held as that encoding read them back; `Exact` for a grid of a cache file.
+    #[cfg(feature = "archive")]
+    pub fn encoding(&self) -> crate::archive::Encoding {
+        self.encoding
     }
 
     /// A view of its values of type `T`; another type is refused as `CacheError::Grid` with

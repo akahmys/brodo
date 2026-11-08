@@ -307,7 +307,9 @@ fastest, and an `Offset` is made from its number or its step as from what gives 
   writer choosing per grid (`archive::Encoding`): as IEEE 754 binary16, byte-shuffled, or
   as 8 bits over each component's range across its leaf values, each read back within the
   bound docs/formats.md §8.5 states; the background and the tiles stay exact. A value the
-  encoding cannot hold is refused at write (ADR-0016).
+  encoding cannot hold is refused at write (ADR-0016). A grid read from an archive, whole
+  or as a region, gives the encoding it was written with, and a cache file's grid `Exact`
+  (ADR-0062).
 - One grid's region, a box of voxels, is read from an archive without its other leaf
   chunks (`archive::read_region`): the grid's first and tile chunks and the leaf chunks
   holding a leaf that meets the box are decompressed, each into a buffer of its own, and

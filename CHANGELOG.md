@@ -8,6 +8,8 @@ are recorded here when they change (V6).
 
 - `Field::set_background`; `LeafNumber::new`, `TileNumber::new`, `Offset::from_index` and
   `Offset::from_delta`; `Field<T>` taken from an `AnyField` by `TryFrom` (ADR-0062).
+- `GridEntry::encoding` and `Region::encoding`, an archive grid's value encoding, with the
+  `archive` feature (ADR-0062).
 
 ## 1.0.0 (2026-11-08)
 

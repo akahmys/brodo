@@ -408,6 +408,31 @@ proptest! {
     }
 }
 
+/// Each grid read from an archive, whole or as a region, gives the encoding it was written
+/// with, entries of bytes not counted among the grids, and a cache file's grids `Exact`.
+#[test]
+fn each_grid_read_gives_the_encoding_it_was_written_with() {
+    let mut e = row(3);
+    e.push(e[0].clone());
+    let note = CacheEntry::bytes("note", Default::default(), b"n".to_vec()).unwrap();
+    let written = [
+        (&e[0], Encoding::Binary16),
+        (&note, Encoding::Exact),
+        (&e[1], Encoding::EightBit),
+        (&e[2], Encoding::Exact),
+    ];
+    let bytes = to_bytes_with(&written).unwrap();
+    let expected = [Encoding::Binary16, Encoding::EightBit, Encoding::Exact];
+    let file = from_bytes(&bytes, u64::MAX).unwrap();
+    assert_eq!(file.grids().iter().map(|g| g.encoding()).collect::<Vec<_>>(), expected);
+    let all = Bounds::Box { min: [0; 3], max: [9; 3] };
+    for (i, encoding) in expected.into_iter().enumerate() {
+        assert_eq!(region_from_bytes(&bytes, i, all, u64::MAX).unwrap().encoding(), encoding);
+    }
+    let cache = cache::from_bytes(&cache::to_bytes(&e).unwrap()).unwrap();
+    assert!(cache.grids().iter().all(|g| g.encoding() == Encoding::Exact));
+}
+
 /// Quantised grids keep their bytes (TESTING.md V6), and read back within their bounds
 /// (docs/formats.md §8.5): binary16 within 2⁻¹¹ × |x| + 2⁻²⁵, 8 bits within a 510th of
 /// the range; the background and the tiles exact.

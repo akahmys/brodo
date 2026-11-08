@@ -10,7 +10,8 @@ breaking a user. The owner split them on 2026-11-08: those that round off what i
 are P10's (ROADMAP.md §2), released as 1.1.0; those that add a capability are GitHub
 issues. Of brodo's core, a field's background could be read but not set; a `LeafNumber`,
 a `TileNumber` and an `Offset` gave their number, and an `Offset` its step, but none was
-made from them; and a field went into an `AnyField` but came out only by a `match`.
+made from them; and a field went into an `AnyField` but came out only by a `match`. Of
+its formats, an archive's grid read back held no trace of how its values were encoded.
 
 ## Decision
 
@@ -26,6 +27,10 @@ The owner decided, on 2026-11-08, as proposed:
   one leaf.
 - `Field<T>` implements `TryFrom<AnyField>`, its error the `AnyField` given back unchanged,
   so that a caller trying one type after another loses nothing.
+- Of brodo's formats, an archive's grid read whole, as a `GridEntry`, or as a `Region`
+  gives the `Encoding` its values were written with, which reading it otherwise loses; a
+  cache file's grid gives `Exact`. The method exists with the `archive` feature, as
+  `Encoding` does.
 
 ## Consequences
 

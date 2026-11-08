@@ -313,6 +313,17 @@ struct Found<'a> {
     chunks: Vec<(&'a [u8], usize)>,
 }
 
+impl Found<'_> {
+    /// How the grid's leaf values are encoded.
+    fn encoding(&self) -> Encoding {
+        match self.values {
+            None => Encoding::Exact,
+            Some((_, Quantised::Binary16)) => Encoding::Binary16,
+            Some((_, Quantised::EightBit(_))) => Encoding::EightBit,
+        }
+    }
+}
+
 /// Reads the header block: the magic number, a format version this build reads, codec and
 /// chunk size, and unused words of zero. Returns the entry count.
 fn header(c: &mut Cursor<'_>) -> Result<usize, CacheError> {
@@ -481,7 +492,11 @@ pub fn from_bytes(bytes: &[u8], limit: u64) -> Result<CacheFile, CacheError> {
         return Err(CacheError::FileTooLarge { length, limit });
     }
     let out = unpack(&found, &top, blocks)?;
-    let index = index(out.as_bytes())?;
+    let mut index = index(out.as_bytes())?;
+    let grids = found.iter().filter(|g| g.kind == KIND_GRID);
+    for (e, g) in index.grids.iter_mut().zip(grids) {
+        e.encoding = g.encoding();
+    }
     Ok(CacheFile { storage: Storage::Copied(out), index })
 }
 
@@ -606,7 +621,8 @@ pub struct Region {
     index: usize,
     meta: GridMeta,
     bounds: Bounds,
-    value_type: ValueType,
+    /// The type of the grid's values, and how they are encoded.
+    values: (ValueType, Encoding),
     extent: Bounds,
     /// The frozen buffer's length in bytes.
     len: usize,
@@ -688,7 +704,8 @@ pub fn region_from_bytes(
         });
     }
     run(&found, work.iter_mut().collect())?;
-    Ok(Region { index, meta, bounds, value_type, extent, len, head, tail, chunks, leaves })
+    let values = (value_type, g.encoding());
+    Ok(Region { index, meta, bounds, values, extent, len, head, tail, chunks, leaves })
 }
 
 /// Grid `index`, numbered among the grids alone, and its place in the directory.
@@ -773,7 +790,12 @@ impl Region {
 
     /// The type of the grid's values.
     pub fn value_type(&self) -> ValueType {
-        self.value_type
+        self.values.0
+    }
+
+    /// How the grid's leaf values are encoded, as `GridEntry::encoding` gives it.
+    pub fn encoding(&self) -> Encoding {
+        self.values.1
     }
 
     /// The box read.
