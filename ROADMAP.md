@@ -14,7 +14,7 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
 - **Next**: P10, rounding off 1.0 (§2), set by the owner on 2026-11-08: each change's API
   put to the owner before it is written. brodo's core, an archive grid's encoding
   (ADR-0062), colino's `Limits::default` (ADR-0026) and mestolo's command line (ADR-0050)
-  are done; the closing checks are next.
+  and the closing checks are done; releasing it as 1.1.0 is next.
 - **Unresolved**: `leaf_parallel_update_x32` drifts between processes by up to 20 %, its
   cause not measured (ADR-0019).
 
@@ -53,9 +53,14 @@ put to the owner before it is written, its ADR amended where the design changes.
 - [x] mestolo: `--version`; help per command; `convert` to `.vdb` skipping, when asked,
       the grids it cannot hold (ADR-0050). Hermite data and an archive's encodings shown
       by `info` change its output, and wait for the next MAJOR (the owner, 2026-11-08; §4)
-- [ ] The closing checks, chosen by the owner (2026-11-08): T11's mutation run, the
+- [x] The closing checks, chosen by the owner (2026-11-08): T11's mutation run, the
       check against 1.0.0 (V9), and T6's fuzzing if a reader of untrusted bytes changed;
       not T7, no unsafe code being touched
+  - [x] T6: `archive` and `cache_file` fuzzed 900 s each, 1,153,492 and 19,370,813 runs,
+        nothing found (2026-11-08)
+  - [x] V9: the gate's check against v1.0.0 passes on `d6422e2` (2026-11-08)
+  - [x] T11: the run on `d6422e2`, GitHub Actions run 42447561541, missed none of 4649
+        mutants, its four timeouts caught under 1800 s (2026-11-08)
 
 ### Held — `piatto`
 
