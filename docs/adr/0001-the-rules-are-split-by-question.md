@@ -3,6 +3,9 @@
 - **Status**: Amended
 - **Date**: 2026-10-16
 
+Condensed on 2026-11-08 (this record's last decision): each decision is kept with its
+reason and what it set aside; the text before is in git, this file as of `53f69d5`.
+
 ## Context
 
 One document answering many questions is where facts get stated twice and drift apart,
@@ -11,198 +14,63 @@ every session, kept apart from the plan, drifted from it.
 
 ## Decision
 
-- Each document answers one question, and AGENTS.md lists them and what outranks what.
+The human decided, on 2026-10-16 unless dated otherwise.
+
+- **One question, one document.** AGENTS.md lists the documents and what outranks what.
   The rules are split by the phase of work they govern (planning, coding, testing,
   auditing); the design is in ARCHITECTURE.md, the plan and the status in ROADMAP.md, and
-  the reasons in these records.
-- The status is ROADMAP.md §1, overwritten at the end of each unit of work, so that
-  status and plan are read in one place.
-- Documents, code and commit messages are in English. Rules state what enforces them.
-- A rule changes only with the human's approval and a record here, in one commit with its
-  enforcement.
+  the reasons in these records. Documents, code and commit messages are in English. Rules
+  state what enforces them.
+- **The status** is ROADMAP.md §1, overwritten at the end of each unit of work, so that
+  status and plan are read in one place. `commit_msg_check.py`, in the hook and the audit,
+  refuses a commit that adds an ADR or ticks a box in ROADMAP.md without changing §1
+  (2026-11-05: five commits had ended units and left it as it was).
+- **A rule changes** only with the human's approval and a record here, in one commit with
+  its enforcement; the `commit-msg` hook asks a commit touching a rule file to name an ADR
+  it stages. The rule files are listed once, `project.RULE_FILES`, which the hook reads and
+  `documents.py` holds every path AGENTS.md names to (2026-11-02).
+- **References resolve** (2026-10-17). `documents.py` fails on a `NAME.md §N` naming a
+  document without a heading so numbered, a section found by a number followed by a dot or
+  a space, so that `4.2` is not `4.2.1`; it reads every committable file that is UTF-8 with
+  no NUL, listed once (2026-11-02: lists by suffix had left `.cpp`, `.tsv` and the hooks
+  unread).
+- **A crate's README** (2026-10-20, 2026-10-22) answers what the crate does and how it is
+  used, holds no rule or design, and is its documentation's front page, read in by
+  `include_str!` in a `#![doc]` attribute of its `lib.rs`, so that its code runs as a
+  doctest and cannot drift from the API. `documents.py` checks that every crate in
+  `LAYERS` has one, read in so: brodo had none until asked for one.
+- **What an ADR claims** (PLANNING.md §2). Its claims about the code as it is are
+  established by running something before the human decides, and one found wrong while
+  implementing goes back as an amendment before the work lands (2026-10-20: two ADRs'
+  claims, the complement's Betti numbers and the header's room, were wrong). A claim
+  holding for every input is measured on each kind of input the design accepts, badly
+  oriented, holed or degenerate meshes among them (2026-10-22). A number it sets is tried
+  on the case at its edge (2026-10-26). It states as the human's decision only a point the
+  human answered in the session (2026-10-29). An open question is answered by a
+  measurement, a spike's or another, or set aside for now by the human (2026-11-02).
+- **What a spike measures** (PLANNING.md §3): a method's cost at the size and on the shapes
+  it will meet, about 10⁵ triangles and slivers (2026-10-26: a report went from 1.69 s to
+  92 s once built); before timing a case, that it holds what is said to be measured
+  (2026-10-29: a box timed at a sphere's centre met no leaf); and for a format, the inputs
+  a reader will refuse or skip as well as those it reads (2026-11-01). Each held by review.
+- **Records** (docs/adr/README.md): the context and amendments in the past tense, the
+  decision possibly in the present, with no limit of length; a record reversed or narrowed
+  in part is amended to name the record that did it (2026-11-02).
+- **An ADR records decisions, and may be condensed** (2026-11-08). At 1.0 the records held
+  338 KB; ADR-0023 had 21 amendments and ADR-0019 15, eleven of them a milestone's run
+  reported, whose facts stood also in the commit, ROADMAP.md and `.cargo/mutants.toml`,
+  and a decision was found only by reading every amendment. An ADR records a decision that
+  changes the design or a rule, with its reason and what it set aside (PLANNING.md §2);
+  what applies a rule, a run's results, a test written for a mutant, a baseline kept or
+  recorded again, is stated in the commit and, while open, in ROADMAP.md, and an exclusion
+  approved for `.cargo/mutants.toml` adds one line to ADR-0023's list. A record may be
+  condensed once, as the owner decides: its decisions kept with their dates, reasons and
+  the options set aside, its reports left to git, the record naming the commit holding the
+  text before, its number, title and file kept so that every reference holds. Fourteen were
+  condensed on 2026-11-08, those of most amendments; ADR-0007, ADR-0010 and ADR-0044, on
+  licences and sources, were left whole, their history being their evidence.
 
 ## Consequences
 
-The design changes only by ADR. `scripts/audit/documents.py` checks the links, the
-language, the tense of the present-tense documents and this index; the `commit-msg` hook
-requires an ADR for a commit that changes a rule.
-
-## Amendment
-
-- **Date**: 2026-10-17
-
-P1's retrospective found crate docs pointing at ARCHITECTURE.md §3 and §4 for designs in
-§4 and §5, which no check had caught: `documents.py` resolved Markdown links but not
-section references. It was made to fail on a `NAME.md §N` or `§N.M`, in a document or a
-source comment, that names a root document without a heading so numbered; it checked 107
-such references when added. Changing a reference in `vtk.rs` from §6.1 to §6.9 failed it.
-
-
-## Amendment
-
-- **Date**: 2026-10-20
-
-colino was readied for publishing on its own (ROADMAP.md, P2), and a crate needs a README
-for its users, which no document answered. The human decided:
-
-- A crate's README answers what the crate does and how it is used, and holds no rule or
-  design; AGENTS.md lists it.
-- It is the crate's documentation front page, read in by `include_str!` in a `#![doc]`
-  attribute of its `lib.rs`, so that its code runs as a doctest in the gate's
-  `cargo test` and cannot drift from the API. That a README is read in so, nothing
-  checks.
-
-Shown to fire: an assertion in colino's README changed to a wrong value failed as a
-doctest of `cargo test --workspace --all-features`, and passed again once restored.
-
-## Amendment
-
-- **Date**: 2026-10-20
-
-P2's retrospective found two ADRs whose claims about the code were wrong, each found only
-while implementing. ADR-0028 had the complement's Betti numbers counted, not derived, but
-under the 26/6 pairing each lattice vertex adds as much to the complement's χ as to the
-solid's, so only its β₀ could be counted on its own. ADR-0029 had no section of the frozen
-layout change shape, but the header held the background in twelve bytes, too few for
-`[f64; 3]`. The human decided:
-
-- PLANNING.md §2: an ADR's claims about the code as it is are established by running
-  something before the human decides; one found wrong while implementing goes back to the
-  human as an amendment before the work lands. Held by review alone.
-
-## Amendment
-
-- **Date**: 2026-10-22
-
-brodo gained a README at the owner's request, as colino had: what it does and how it is
-used, read in by its `lib.rs`, its code a doctest. The human decided that AGENTS.md lists
-it beside colino's. Shown to fire: the README's Euler characteristic changed to a wrong
-value failed as a doctest of `cargo test -p brodo --doc`, and passed again once restored.
-
-## Amendment
-
-- **Date**: 2026-10-22
-
-P3's retrospective found ADR-0030's claim that every crossed edge's owner is a leaf
-measured on well-made meshes only; a cube with one face turned in broke it. The human
-decided that a claim holding for every input is measured on each kind of input the design
-accepts, a badly oriented, holed or degenerate mesh among them (PLANNING.md §2). Held by
-review alone.
-
-## Amendment
-
-- **Date**: 2026-10-22
-
-P3's retrospective found that brodo had no README until asked for one, and that nothing
-would have said so: AGENTS.md held that a README is read in, but nothing checked it. The
-human decided that `scripts/audit/documents.py` checks every crate in `LAYERS` for a
-README.md and for the `include_str!` in its `lib.rs` that reads it in. Shown to fire:
-with brodo's `lib.rs` line removed, and with colino's README moved away, the check failed
-naming each; restored, it passed.
-
-
-## Amendment
-
-- **Date**: 2026-10-26
-
-P5's retrospective found two costs that spikes missed and building found: the third
-layer's rays tested every triangle in a long ray's box, which took a report from 1.69 s to
-92 s on 32 768 triangles, and its k-fold sampling put k² points on a sliver, a test taking
-378 s; the spike's meshes had few triangles, none of them slivers. It also found a bound
-proposed untried at its edge: joining thin points within h split a wall between h and 2h
-thick into two places. The human decided that a spike weighing a method's cost measures
-it at the size and on the shapes the method will meet, for a mesh about 10⁵ triangles and
-slivers (PLANNING.md §3), and that a number an ADR sets is tried on the case at its edge
-before it is proposed (PLANNING.md §2). Held by review alone.
-
-## Amendment
-
-- **Date**: 2026-10-29
-
-P6's retrospective found a spike that timed a box at a sphere's centre, which met no leaf,
-so that its first timing measured a read of nothing; and an ADR amendment that stated as
-the human's decision a point, reading the archive whole for a region, not yet put to the
-human, who agreed to it only afterwards. The human decided that a spike asserts, before it
-times a case, that the case holds what its report says is measured (PLANNING.md §3), and
-that an ADR states as the human's decision only a point the human answered in the session,
-each put to the human before it is written (PLANNING.md §2). Held by review alone.
-
-## Amendment
-
-- **Date**: 2026-11-01
-
-P7's retrospective found that `spikes/vdbread/` measured the files OpenVDB writes by
-default but not the grids brodo's reader would skip: that OpenVDB writes a grid saved as
-half floats with `_HalfFloat` appended to its type name, and an instanced grid with its
-leaf buffers' offset 0, came to light only while the reader's test files were made, the
-second as a refusal of files the reader was to read. The owner decided that a spike that
-decides how a format is read measures, from what the producers to be read write, the inputs
-the reader will refuse or skip as well as those it reads (PLANNING.md §3). Held by review
-alone.
-
-## Amendment: the documents set against measurement
-
-- **Date**: 2026-11-02
-
-The review of the whole repository read each document against the code, one subagent a
-document, and found about ninety claims stale, restated or wrong. The owner decided, on
-2026-11-02:
-
-- PLANNING.md §2: an open question is answered by a measurement, a spike's or another the
-  ADR records, or set aside for now by the human, as ADR-0045 answered B-006 by measuring
-  `vdb-rs`'s dependencies and the human set B-018, B-019 and B-021 aside, where the rule had
-  said a spike's measurement alone.
-- docs/adr/README.md: a record's context and amendments are in the past tense and its
-  decision may be stated in the present, with no limit of a page, which 27 of 49 records
-  exceeded; a record reversed or narrowed in part is amended to name the record that did it.
-
-The other corrections, wording made true to the checks and the code with no rule changed,
-landed with them: in AUDITING.md, CODING.md, PLANNING.md and TESTING.md, eight records
-marked Amended, six amended to name what reversed or narrowed them, and two retitled as
-statements.
-
-## Amendment: one list of the files, the headings and the rule files
-
-- **Date**: 2026-11-02
-
-The survey of the whole repository found the text files listed by suffix twice, in
-`documents.py` and `paths.py`, with a third by file name, so that `.cpp`, `.tsv`,
-`.gitignore` and the hooks went unread for Japanese or a broken link; the committable files
-listed twice; a section found by its number in two ways, one taking `4.2` for `4.2.1`; and
-the rule files listed in `commit_msg_check.py` apart from AGENTS.md's list. The owner
-decided, on 2026-11-02, that each be one: `paths.text_files`, every committable file that
-is UTF-8 with no NUL; `documents.section`, a number followed by a dot or a space; and
-`project.RULE_FILES`, which the hook reads and `documents.py` holds every path AGENTS.md
-names to. Shown to fire: a rule file left out of the list failed `documents.py`.
-
-## Amendment
-
-- **Date**: 2026-11-05
-
-P9's retrospective found ROADMAP.md §1 not rewritten by commits that each ended a unit,
-nothing having checked it. The owner decided, on
-2026-11-05, as proposed: `commit_msg_check.py`, in the hook and the audit, refuses a
-commit that adds an ADR or ticks a box in ROADMAP.md without changing §1. Run on the
-commits since P8's close, it named five: ccc36bf, 637d9cd, 4105baf, 9eec928 and 36b26be; the audit holds it to
-the commits not yet pushed alone, so they stand. Whether §1 is true, nothing checks.
-
-## Amendment: an ADR records decisions, and may be condensed
-
-- **Date**: 2026-11-08
-
-At 1.0 the 61 records held 338 KB. ADR-0023 had 21 amendments and ADR-0019 15, eleven of
-them a milestone's run reported: its figures, the mutants killed, a baseline recorded
-again. Their decisions applied a rule already recorded, and the same facts stood in the
-commit, ROADMAP.md and `.cargo/mutants.toml`, against writing rule 1; a decision was found
-only by reading every amendment. The owner decided, on 2026-11-08:
-
-- **An ADR records a decision** that changes the design or a rule, with its reason and
-  what it set aside (PLANNING.md §2). What applies a rule, a run's results, a test written
-  for a mutant, a baseline kept or recorded again, is stated in the commit and, while
-  open, in ROADMAP.md. An exclusion approved for `.cargo/mutants.toml`, a rule file, adds
-  one line to ADR-0023's list of approvals.
-- **A record may be condensed**, once, as the owner decides: its decisions kept, each with
-  its date, reason and the options set aside, and its reports of runs left to git, the
-  record naming the commit that holds the text before. Its number, title and file stay, so
-  that every reference to it holds. ADR-0019 and ADR-0023 were condensed first, from 20
-  and 23 KB to 6 KB each.
+The design changes only by ADR. Most of these rules are held by review alone; what
+`documents.py` and `commit_msg_check.py` check is AUDITING.md's.
