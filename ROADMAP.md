@@ -8,11 +8,11 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: after P9's 1.0.0 on crates.io (ADR-0061), an ADR records a decision alone, a
-  run's results going to the commit and this file (owner, 2026-11-08; PLANNING.md §2),
-  and the records long with reports are condensed to their decisions (ADR-0001).
-- **Next**: no milestone is scheduled; the owner chooses the next work. §2's "Later" and
-  §4 hold what is open.
+- **Done**: the gaps T14's survey left for a later MINOR split by the owner (2026-11-08):
+  those that round off what is there kept in §4, those that add a capability opened as
+  GitHub issues 1 to 12.
+- **Next**: no milestone is scheduled; the owner chooses the next work. Proposed: a
+  milestone taking §4's gaps that round off what is there, released as 1.1.0.
 - **Unresolved**: `leaf_parallel_update_x32` drifts between processes by up to 20 %, its
   cause not measured (ADR-0019).
 
@@ -121,18 +121,13 @@ No spike is running.
   (2026-11-06). Letting such a line pass is a change to a rule, the owner's to decide
   (AGENTS.md, "Changing the rules"), with ADR-0044 amended and the check shown to fire.
 - Gaps T14's survey found before 1.0 that a later MINOR adds without breaking a user
-  (2026-11-05), held until one is asked for or a milestone takes it: a frozen grid's
-  leaves and tiles walked in place; an archive's grids listed without decompressing them,
-  and any file's grid found by name; an archive grid's value encoding read; `.vdb` grids
-  of `[f32; 3]` and the other stored types; a writer streaming many grids; components'
-  labels read in bulk, with the outside one named; labelling not refused for a few
-  scattered leaves (`TooSpread`); a field put on another topology, and two topologies'
-  union; `Field::set_background`; `LeafNumber`, `TileNumber` and `Offset` built from their
-  numbers; `Field<T>` taken from an `AnyField` by `TryFrom`; colino's `Limits::default`,
-  a `Converted` built from a read grid, and one reader for any mesh format; mestolo's
-  `--version`, help per command, Hermite data and an archive's encodings shown by `info`,
-  more `slice` options, a `.vdb` written skipping the grids it cannot hold, and
-  `convert --as archive` choosing a quantised encoding.
+  (2026-11-05), split by the owner (2026-11-08). Those that round off what is there,
+  held here to be taken first: `Field::set_background`; `LeafNumber`, `TileNumber` and
+  `Offset` built from their numbers; `Field<T>` taken from an `AnyField` by `TryFrom`; an
+  archive grid's value encoding read; colino's `Limits::default`; mestolo's `--version`,
+  help per command, Hermite data and an archive's encodings shown by `info`, and
+  `convert` to `.vdb` skipping, when asked, the grids it cannot hold. Those that add a
+  capability are GitHub issues 1 to 12, taken as any issue is (AGENTS.md S5).
 - Requests from users. Held until one asks: merging into a root tile (ADR-0014); a public
   way to read a bare frozen buffer, a file of its own, into an aligned buffer, which only
   tests now do (P5's review, S1, 2026-10-27); a bound on a conversion's leaves, refused
