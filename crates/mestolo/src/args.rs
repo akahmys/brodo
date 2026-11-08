@@ -37,12 +37,15 @@ pub struct Output {
     pub path: PathBuf,
     /// Whether a file already at `path` is replaced rather than refused.
     pub force: bool,
+    /// Whether `convert` leaves out the grids its format cannot hold, naming them, rather
+    /// than refusing them all; given by `--skip-unsupported`.
+    pub skip_unsupported: bool,
 }
 
 impl Output {
-    /// The file at `path`, one already there replaced if `force`.
+    /// The file at `path`, one already there replaced if `force`, no grid left out.
     pub fn new(path: PathBuf, force: bool) -> Self {
-        Self { path, force }
+        Self { path, force, skip_unsupported: false }
     }
 }
 
@@ -66,6 +69,11 @@ pub enum Format {
 pub enum Command {
     /// Write the usage.
     Help,
+    /// Write the usage of the command named, one `parse` knows: given by `help <command>`,
+    /// or by `-h` or `--help` among a command's arguments before `--`.
+    HelpOn(String),
+    /// Write mestolo's version, given by `--version` or `-V`.
+    Version,
     /// Write what a file holds.
     Info(Input),
     /// Draw a slice of a grid as PNG.
@@ -103,6 +111,7 @@ struct Given {
     at: Option<i32>,
     output: Option<PathBuf>,
     force: bool,
+    skip_unsupported: bool,
     limit: Option<u64>,
     format: Option<Format>,
 }
@@ -115,19 +124,26 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Command, Mestol
         return Err(MestoloError::NoCommand);
     };
     let name = text(name, "the command")?;
+    let args: Vec<OsString> = args.collect();
     let takes: &[&str] = match name.as_str() {
-        "help" | "-h" | "--help" => return Ok(Command::Help),
+        "help" | "-h" | "--help" => return Ok(help(&args)),
+        "--version" | "-V" => return Ok(Command::Version),
         "info" => &["--limit"],
         "slice" => &["--limit", "--grid", "--axis", "--at", "-o", "--force"],
-        "convert" => &["--limit", "--grid", "--as", "-o", "--force"],
+        "convert" => &["--limit", "--grid", "--as", "-o", "--force", "--skip-unsupported"],
         _ => return Err(MestoloError::UnknownCommand(name)),
     };
-    let given = options(args, takes)?;
+    let mut before_end = args.iter().take_while(|a| *a != "--");
+    if before_end.any(|a| a == "-h" || a == "--help") {
+        return Ok(Command::HelpOn(name));
+    }
+    let given = options(args.into_iter(), takes)?;
     let input = Input {
         path: given.input.ok_or(MestoloError::Missing("the input file"))?,
         limit: given.limit.unwrap_or(DEFAULT_LIMIT),
     };
-    let output = given.output.map(|path| Output { path, force: given.force });
+    let skip_unsupported = given.skip_unsupported;
+    let output = given.output.map(|path| Output { path, force: given.force, skip_unsupported });
     if name == "info" {
         return Ok(Command::Info(input));
     }
@@ -142,6 +158,15 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Command, Mestol
         at: given.at.ok_or(MestoloError::Missing("--at"))?,
         output,
     })
+}
+
+/// The command of `help`, `-h` or `--help`: the usage of the command its first argument names, or the whole usage
+/// for none or another.
+fn help(args: &[OsString]) -> Command {
+    match args.first().and_then(|a| a.to_str()) {
+        Some(name @ ("info" | "slice" | "convert")) => Command::HelpOn(name.to_owned()),
+        _ => Command::Help,
+    }
 }
 
 /// The options and input file, of the options `takes` lists; after `--`, every argument
@@ -183,6 +208,8 @@ fn set(
     match flag {
         "--force" if given.force => return Err(twice()),
         "--force" => given.force = true,
+        "--skip-unsupported" if given.skip_unsupported => return Err(twice()),
+        "--skip-unsupported" => given.skip_unsupported = true,
         "-o" => once(&mut given.output, PathBuf::from(value(args, "-o")?), twice)?,
         "--grid" => once(&mut given.grid, text(value(args, "--grid")?, "--grid")?, twice)?,
         "--axis" => once(&mut given.axis, axis(&text(value(args, "--axis")?, "--axis")?)?, twice)?,

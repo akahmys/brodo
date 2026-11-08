@@ -13,7 +13,8 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   GitHub issues 1 to 12.
 - **Next**: P10, rounding off 1.0 (§2), set by the owner on 2026-11-08: each change's API
   put to the owner before it is written. brodo's core, an archive grid's encoding
-  (ADR-0062) and colino's `Limits::default` (ADR-0026) are done; mestolo's are next.
+  (ADR-0062), colino's `Limits::default` (ADR-0026) and mestolo's command line (ADR-0050)
+  are done; the closing checks are next.
 - **Unresolved**: `leaf_parallel_update_x32` drifts between processes by up to 20 %, its
   cause not measured (ADR-0019).
 
@@ -49,9 +50,9 @@ put to the owner before it is written, its ADR amended where the design changes.
       (ADR-0062)
 - [x] brodo's formats: an archive grid's value encoding read (ADR-0062)
 - [x] colino: `Limits::default` (ADR-0026)
-- [ ] mestolo: `--version`; help per command; Hermite data and an archive's encodings
-      shown by `info`; `convert` to `.vdb` skipping, when asked, the grids it cannot hold
-      (ADR-0050)
+- [x] mestolo: `--version`; help per command; `convert` to `.vdb` skipping, when asked,
+      the grids it cannot hold (ADR-0050). Hermite data and an archive's encodings shown
+      by `info` change its output, and wait for the next MAJOR (the owner, 2026-11-08; §4)
 - [ ] The closing checks, chosen by the owner (2026-11-08): T11's mutation run, the
       check against 1.0.0 (V9), and T6's fuzzing if a reader of untrusted bytes changed;
       not T7, no unsafe code being touched
@@ -141,6 +142,9 @@ No spike is running.
   (2026-11-05), split by the owner (2026-11-08): those that round off what is there are
   P10's (§2); those that add a capability are GitHub issues 1 to 12, taken as any issue
   is (AGENTS.md S5).
+- For the next MAJOR, since it changes an output 1.0 promises (ARCHITECTURE.md §6.3,
+  TESTING.md V9): Hermite data and an archive's encodings shown by mestolo's `info`
+  (the owner, 2026-11-08; ADR-0050).
 - Requests from users. Held until one asks: merging into a root tile (ADR-0014); a public
   way to read a bare frozen buffer, a file of its own, into an aligned buffer, which only
   tests now do (P5's review, S1, 2026-10-27); a bound on a conversion's leaves, refused

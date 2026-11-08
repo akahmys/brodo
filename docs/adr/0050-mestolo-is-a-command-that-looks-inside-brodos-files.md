@@ -122,3 +122,23 @@ archive. The owner decided, on 2026-11-06, as proposed:
   convention among them (ADR-0047). `--grid` writes the one grid it names. An archive's
   grids are written exact; choosing a quantised encoding is a request a later MINOR may
   take (ROADMAP.md §4).
+
+## Amendment: rounding off the command line
+
+- **Date**: 2026-11-08
+
+The owner decided, on 2026-11-08, as proposed for P10:
+
+- `--version` or `-V` writes `mestolo` and its version; `help <command>`, and `-h` or
+  `--help` among a command's arguments before `--`, write that command's usage. `help`
+  with no command or another still writes the whole usage, so that no command line it
+  took is refused.
+- `convert --skip-unsupported` writes as `.vdb` the grids it holds and names each other
+  with its value type, a conversion leaving none refused as without it. The flag is held
+  by `Output`, which is `#[non_exhaustive]`, since a field added to `Command::Convert`
+  would break the 1.0.0 tests that build it (TESTING.md V9). The grids left out are
+  named on standard output, the one writer `run` has, not on standard error as first
+  proposed.
+- `info` showing Hermite data and an archive's encodings changes its output, which
+  §6.3 promises and the 1.0.0 tests compare whole (V9), so it waits for the next MAJOR
+  (ROADMAP.md §4).

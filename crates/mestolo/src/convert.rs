@@ -10,26 +10,32 @@ use brodo::field::AnyField;
 use brodo::vdb::{VdbEntry, VdbFile};
 use brodo::vtk::write;
 
-use crate::args::{Format, Input};
+use std::io::Write;
+
+use crate::args::{Format, Input, Output};
 use crate::error::MestoloError;
 use crate::load::{Grid, Loaded, Opened, load, open};
 
 /// Writes `input`'s grids at `output` in `format`, or with none in the format the output's
 /// name ends in, `.vdb` or `.vtu`: every grid, or the one `grid` names, as `.vdb`, a cache
-/// file or an archive; one grid as `.vtu`, its values named as the grid is.
+/// file or an archive; one grid as `.vtu`, its values named as the grid is. Grids `.vdb`
+/// cannot hold are refused, or, if `output.skip_unsupported`, left out and each written to
+/// `out` as a line naming it and its value type; none left is refused.
 pub fn convert(
     input: &Input,
     grid: Option<&str>,
     format: Option<Format>,
-    output: &Path,
+    output: &Output,
+    out: &mut impl Write,
 ) -> Result<(), MestoloError> {
+    let (skip, output) = (output.skip_unsupported, output.path.as_path());
     let by_name = || match output.extension().and_then(OsStr::to_str) {
         Some("vdb") => Ok(Format::Vdb),
         Some("vtu") => Ok(Format::Vtu),
         _ => Err(MestoloError::OutputKind(output.to_path_buf())),
     };
     match format.map_or_else(by_name, Ok)? {
-        Format::Vdb => vdb(&load(input)?, grid, output),
+        Format::Vdb => vdb(&load(input)?, grid, output, skip.then_some(out)),
         Format::Vtu => vtu(load(input)?.grid(grid)?, output),
         Format::Cache => Ok(brodo::cache::write(output, &entries(&open(input)?, grid)?)?),
         Format::Archive => Ok(brodo::archive::write(output, &entries(&open(input)?, grid)?)?),
@@ -37,19 +43,29 @@ pub fn convert(
 }
 
 /// Every grid, or the one `grid` names, as `.vdb`, refused naming every grid of a type
-/// `.vdb` does not hold.
-fn vdb(loaded: &Loaded, grid: Option<&str>, output: &Path) -> Result<(), MestoloError> {
+/// `.vdb` does not hold, or, given `skipped`, each such grid left out and named there.
+fn vdb(
+    loaded: &Loaded,
+    grid: Option<&str>,
+    output: &Path,
+    skipped: Option<&mut impl Write>,
+) -> Result<(), MestoloError> {
     let grids = match grid {
         Some(_) => vec![loaded.grid(grid)?],
         None => loaded.grids.iter().collect(),
     };
-    let not_written: Vec<_> = grids
-        .iter()
-        .filter(|g| !matches!(g.field, AnyField::F32(_) | AnyField::F64(_)))
-        .map(|g| (g.meta.name.clone(), g.field.value_type()))
-        .collect();
-    if !not_written.is_empty() {
-        return Err(MestoloError::NotWritten(not_written));
+    let (grids, not_written): (Vec<_>, Vec<_>) =
+        grids.into_iter().partition(|g| matches!(g.field, AnyField::F32(_) | AnyField::F64(_)));
+    let not_written: Vec<_> =
+        not_written.iter().map(|g| (g.meta.name.clone(), g.field.value_type())).collect();
+    match skipped {
+        Some(out) if !grids.is_empty() => {
+            for (name, value_type) in &not_written {
+                writeln!(out, "skipped {name:?}: .vdb does not hold {value_type}")?;
+            }
+        }
+        _ if not_written.is_empty() => {}
+        _ => return Err(MestoloError::NotWritten(not_written)),
     }
     let entries = grids.into_iter().map(entry).collect::<Result<Vec<_>, _>>()?;
     Ok(brodo::vdb::write(output, &entries)?)

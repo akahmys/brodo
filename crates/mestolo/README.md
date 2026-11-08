@@ -22,7 +22,10 @@ mestolo convert grids.vdb --as archive -o grids.archive     # brodo's compressed
 - `--grid` names the grid where a file holds more than one.
 - A file already at the output's path is refused unless `--force` is given.
 - `convert` writes the format `--as` names, `vdb`, `vtu`, `cache` or `archive`, or else
-  the one the output's name ends in, `.vdb` or `.vtu`.
+  the one the output's name ends in, `.vdb` or `.vtu`. `--skip-unsupported` leaves out,
+  and names, the grids `.vdb` cannot hold, rather than refusing them.
+- `mestolo help <command>`, or `-h` among a command's arguments, writes that command's
+  usage; `mestolo --version` the version.
 - A command line refused, none given among them, exits with status 2, a command failing
   with 1.
 

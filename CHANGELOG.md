@@ -10,6 +10,9 @@ are recorded here when they change (V6).
   `Offset::from_delta`; `Field<T>` taken from an `AnyField` by `TryFrom` (ADR-0062).
 - `GridEntry::encoding` and `Region::encoding`, an archive grid's value encoding, with the
   `archive` feature (ADR-0062).
+- mestolo's `--version` and `-V`, `help <command>` and a command's `-h` or `--help`;
+  `convert --skip-unsupported`; `Command::HelpOn`, `Command::Version` and
+  `Output::skip_unsupported` (ADR-0050).
 - colino's `Limits` implements `Default`: 2²⁶ triangles and vertices, 4 GiB (ADR-0026).
 
 ## 1.0.0 (2026-11-08)

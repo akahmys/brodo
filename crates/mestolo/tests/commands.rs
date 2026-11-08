@@ -109,6 +109,34 @@ fn what_a_format_does_not_hold_is_refused_by_name() {
     ));
 }
 
+/// `--skip-unsupported` writes as `.vdb` the grids it holds, as `--grid` writes the one, and
+/// names each it leaves out; a conversion leaving none is refused as without it.
+#[test]
+fn convert_skips_and_names_the_grids_vdb_does_not_hold_when_asked() {
+    let cache = brodo_file("cache_v2.bin");
+    let p = cache.to_str().unwrap();
+    let run = |words: &[&str], out: &Path| {
+        let mut all = args(words);
+        all.extend([OsString::from("-o"), out.as_os_str().to_owned()]);
+        let mut said = Vec::new();
+        mestolo::run(&parse(all).unwrap(), &mut said).map(|()| String::from_utf8(said).unwrap())
+    };
+    let out = fresh("skipped.vdb");
+    let said = run(&["convert", p, "--skip-unsupported"], &out).map_err(|e| e.to_string());
+    assert_eq!(said.as_deref(), Ok("skipped \"velocity\": .vdb does not hold [f32; 3]\n"));
+    assert_eq!(std::fs::read(&out).unwrap(), VDB);
+    let only = run(&["convert", p, "--grid", "velocity", "--skip-unsupported"], &fresh("v.vdb"));
+    assert!(matches!(
+        only,
+        Err(MestoloError::NotWritten(grids)) if grids == [("velocity".to_owned(), ValueType::F32x3)]
+    ));
+    let twice =
+        parse(args(&["convert", p, "-o", "x.vdb", "--skip-unsupported", "--skip-unsupported"]));
+    assert!(matches!(twice, Err(MestoloError::Repeated(o)) if o == "--skip-unsupported"));
+    let info = parse(args(&["info", p, "--skip-unsupported"]));
+    assert!(matches!(info, Err(MestoloError::UnknownOption(o)) if o == "--skip-unsupported"));
+}
+
 #[test]
 fn a_file_of_no_kind_read_and_a_bare_grid_are_refused() {
     let run =
@@ -126,6 +154,40 @@ fn the_limit_bounds_each_kind_of_file() {
         let refused = mestolo::run(&parse(all).unwrap(), &mut Vec::new());
         assert!(matches!(refused, Err(MestoloError::Cache(_) | MestoloError::Vdb(_))), "{name}");
     }
+}
+
+/// `help <command>`, `-h` or `--help` and a command's `-h` or `--help` before `--` write its
+/// usage, which names its options; of no command or another, the whole usage; `--version` and
+/// `-V` the version.
+#[test]
+fn help_writes_a_commands_usage_and_version_the_version() {
+    let text = |words: &[&str]| {
+        let mut out = Vec::new();
+        mestolo::run(&parse(args(words)).unwrap(), &mut out).unwrap();
+        String::from_utf8(out).unwrap()
+    };
+    for (name, options) in [
+        ("info", &["--limit"][..]),
+        ("slice", &["--axis", "--at", "-o", "--grid", "--limit", "--force"]),
+        ("convert", &["-o", "--as", "--grid", "--limit", "--force", "--skip-unsupported"]),
+    ] {
+        let usage = text(&["help", name]);
+        assert!(usage.starts_with(&format!("usage: mestolo {name} <file>")), "{usage}");
+        assert!(options.iter().all(|o| usage.contains(&format!(" {o} "))), "{usage}");
+        for words in [&[name, "f", "-h"][..], &[name, "--help", "f", "--limit", "x"]] {
+            let on = Ok(Command::HelpOn(name.to_owned()));
+            assert_eq!(parse(args(words)).map_err(|e| e.to_string()), on);
+            assert_eq!(text(words), usage);
+        }
+    }
+    for words in [&["help"][..], &["help", "look"], &["-h"], &["--help", "--help"]] {
+        assert_eq!(text(words), mestolo::USAGE);
+    }
+    assert_eq!(text(&["--help", "info"]), text(&["help", "info"]));
+    let input = parse(args(&["info", "--", "--help"]));
+    assert!(matches!(input, Ok(Command::Info(i)) if i.path == Path::new("--help")));
+    let version = format!("mestolo {}\n", env!("CARGO_PKG_VERSION"));
+    assert_eq!((text(&["--version"]), text(&["-V"])), (version.clone(), version));
 }
 
 #[test]

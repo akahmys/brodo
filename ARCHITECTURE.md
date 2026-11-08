@@ -546,7 +546,9 @@ Rust. It uses no GPU and no window.
   value to its greatest.
 - **`convert`** writes, in the format `--as` names or else by the output's name, `.vdb`
   or `.vtu`: every grid or the one `--grid` names as `.vdb` (§4.7), refused naming every
-  grid of a type it does not hold, with its value type; one grid as `.vtu` (§6.1); or, by
+  grid of a type it does not hold, with its value type, or, by `--skip-unsupported`, every
+  grid it holds, each other named on standard output with its value type and none left
+  refused; one grid as `.vtu` (§6.1); or, by
   `--as cache` or `--as archive`, a cache file or an archive of exact values (§4.7), a
   cache file's or an archive's entries copied as they were, its grids and then its
   entries of bytes, and a `.vdb`'s grids as read, or the one grid `--grid` names.
@@ -554,7 +556,9 @@ Rust. It uses no GPU and no window.
   input is read, unless `--force` is given for the first; the file is written by brodo's
   writers, whole (§4.7). A
   command line refused, none given among them, exits with status 2, a command failing
-  with 1, its error on standard error; `help` writes the usage to standard output.
+  with 1, its error on standard error; `help` writes the usage to standard output, `help`
+  with a command's name, or `-h` or `--help` among its arguments before `--`, that
+  command's usage, and `--version` or `-V` `mestolo` and its version (ADR-0050).
 
 ## 7. Compatibility
 
