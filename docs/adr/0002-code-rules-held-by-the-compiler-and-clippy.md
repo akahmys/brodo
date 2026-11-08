@@ -3,6 +3,9 @@
 - **Status**: Amended
 - **Date**: 2026-10-16
 
+Condensed on 2026-11-08 (ADR-0001): each decision is kept with its reason and what it set
+aside; the text before is in git, this file as of `53f69d5`.
+
 ## Context
 
 Text-matching checks miss what the compiler and clippy catch, and a rule that nothing
@@ -11,138 +14,47 @@ its intent.
 
 ## Decision
 
-- Rules are enforced by rustc and clippy where they can be (`[workspace.lints]`,
-  `clippy.toml`), and by scripts only where they cannot (CODING.md).
-- Panicking calls are banned in all production code. Indexing and slicing are banned in
-  the crates that read untrusted input, listed in `scripts/audit/project.py`.
-- From Holzmann's "Power of 10": no recursion without a stated bound, a maximum count on
+The owner decided, on 2026-10-16 unless dated otherwise.
+
+- **Who checks.** Rules are enforced by rustc and clippy where they can be
+  (`[workspace.lints]`, `clippy.toml`), and by scripts only where they cannot (CODING.md).
+- **Panics.** Panicking calls are banned in all production code. Indexing and slicing are
+  banned in the modules that parse untrusted input (ADR-0009), listed in
+  `scripts/audit/project.py`.
+- **Power of 10**, from Holzmann: no recursion without a stated bound, a maximum count on
   every loop that iterates toward a condition, checked numeric casts, no float equality
   and no debug output. Assertion density was not adopted: a quota invites assertions that
   check nothing, and `assert!` panics, so it joined the ban on panics.
-- The ways round the rules were closed: an exception is `#[expect]` with a reason, for
-  named lints only; `rustflags` in a cargo configuration is refused and the audit runs
-  with `RUSTFLAGS` empty; a crate that does not inherit the workspace lints fails.
-- A clippy step limited to some lints or some crates warns rather than denies and fails
-  if clippy does not finish: denied, a finding in one crate stopped the build of the
-  crates above it, which were then never linted, and the step passed having checked
-  nothing.
+- **The ways round closed.** An exception is `#[expect]` with a reason, for named lints
+  only; `rustflags` in a cargo configuration is refused and the audit runs with
+  `RUSTFLAGS` empty; a crate that does not inherit the workspace lints fails.
+- **A partial clippy step** warns rather than denies, and fails if clippy does not finish:
+  denied, a finding in one crate stopped the build of those above it, never linted, and
+  the step passed having checked nothing.
+- **Rust read as rustc reads it** (2026-11-02). The checks clippy cannot make
+  (`scripts/audit/source.py`) read each file through a lexer of their own, with no
+  dependency added: line and nested block comments, raw, byte and C strings and
+  characters told from lifetimes are blanked whole, line ends kept; attributes are read
+  with their brackets matched, every part of every `allow` and `expect` held, one that is
+  neither a lint nor `reason = …` failing. Reading by regular expressions had been patched
+  one reported form at a time, a string's `//`, a raw string's quote, a `cfg_attr` holding
+  two `expect`s, each passing what it should refuse. The files read are those git would
+  commit. Production code ends at `#[cfg(test)]` followed by `mod tests`, a test-only item
+  before it read as production code (the first line reading `#[cfg(test)]` had hidden
+  about 940 lines).
+- **Rules 8 and 9** (2026-11-02) are checked on each file's code by `source.py --errors`, a
+  `Result`'s brackets matched across lines, `->` and `=>` closing none: Rule 8 refuses an
+  error that is a string, owned, borrowed, boxed or copied on write, or a boxed
+  `dyn Error`, at any depth of the value type; Rule 9 by `flatten`, which needs the
+  iterator's item type, is left to review. The greps it replaced passed a fully named
+  `String`, a nested or broken `Result` and `filter_map(…ok)`.
+- **Rule 15's call graph leans on `cargo fmt`** (2026-11-02): it reads a body from the line
+  after its signature, which `cargo fmt` (Rule 10) always gives. It misses closures, trait
+  objects and a method called on another receiver or by a path: counting every `.name(` as
+  a call joined each function to every method of its name and made 21 false cycles.
 
 ## Consequences
 
 The gate is one command, the tests included. The project's own lists (layers, application
-crates, crates that read untrusted input, targets) live in one file, so a new crate is
+crates, modules that read untrusted input, targets) live in one file, so a new crate is
 placed before it is built.
-
-## Amendment
-
-- **Date**: 2026-10-16
-
-The ban on indexing and slicing moved from crates to the modules that parse untrusted
-input (ADR-0009).
-
-## Amendment
-
-- **Date**: 2026-11-01
-
-P7's retrospective found Rule 8's grep failing `Result<BTreeMap<String, String>, VdbError>`,
-a typed error whose value type holds strings, so that the code took a type alias to pass.
-The owner had the grep match `String` only as `Result`'s own error, its value type nested at
-most two deep (`scripts/audit/verify_compliance.sh`). Shown to fire on sample lines: the new
-pattern matches `Result<(), String>`, `Result<Vec<u8>, String>` and
-`Result<BTreeMap<u32, Vec<u8>>, String>`, as the old one did, and no longer
-`Result<BTreeMap<String, String>, VdbError>` or `Result<Vec<String>, VdbError>`; a value type
-nested deeper is not matched.
-
-## Amendment: Rule 15 leans on `cargo fmt`
-
-- **Date**: 2026-11-02
-
-The review of the whole repository found `scripts/audit/source.py`'s call graph reading a
-function's body from the line after its signature, so that a recursive function written on
-one line passed. `cargo fmt`, held by Rule 10, never leaves a body on its signature's line,
-and the same function formatted failed. The owner decided, on 2026-11-02, to keep the check
-as it is and state that it leans on `cargo fmt`, in CODING.md Rule 15 and AUDITING.md.
-
-## Amendment: production code read up to the test module
-
-- **Date**: 2026-11-02
-
-The review of the whole repository found `scripts/audit/source.py` taking a file's
-production code to end at its first line reading `#[cfg(test)]`, indented or not, so that a
-test-only item before the test module ended it early: in `bvh.rs`, `accessor.rs`, `tree.rs`
-and `topology.rs`, about 940 lines of production code went unread by the checks on asserts,
-recursion and the lints an exception names; none held anything they would refuse. It also
-found the gate's step titles naming neither Rule 18, which `source.py` checks, nor L2, which
-`paths.py` checks. The owner decided, on 2026-11-02, that production code ends at an
-unindented `#[cfg(test)]` followed by `mod`, a test-only item before it read as production
-code, and that the titles name both. Shown to fire: an assert added to `tree.rs` after its
-first `#[cfg(test)]` passed the old check and failed the new one.
-
-## Amendment: Rules 8 and 9 read as code, and the test module by its name
-
-- **Date**: 2026-11-02
-
-The second review of the whole repository found the gate's greps for Rules 8 and 9 passing
-`Result<T, std::string::String>`, a `Result` whose types nest three deep or break over
-lines, `filter_map(|r2| r2.ok())` and `filter_map(std::result::Result::ok)`; that
-`source.py` took production code to end at an unindented `#[cfg(test)]` before any `mod`,
-where only `mod tests` is the test module; and that Rule 15's text named closures and trait
-objects as what the call graph misses, though it misses a method called on another receiver
-or by a path too. The owner decided, on 2026-11-02, that `source.py --errors` checks Rules 8
-and 9 on each file's code, its comments cut, matching a `Result`'s brackets and reading
-across lines; that production code ends at `#[cfg(test)]` followed by `mod tests`; and that
-Rule 15's text names what the graph misses, since counting every `.name(` as a call joined
-each function to the methods of its name on other types and made 21 cycles, 18 of them of
-one function alone, such as `len` calling a `Vec`'s `len`. Shown to fire: a file holding
-those four forms passed the greps and failed `source.py --errors` at each.
-
-## Amendment: a string before a comment, a lint named `reason`, and an arrow
-
-- **Date**: 2026-11-02
-
-An outside review of the uncommitted checks found `source.py` cutting each line at its
-first `//` before emptying its strings, so that code after `"http://…"` on its line, a
-`Result<u8, String>` or an `unsafe`, went unread; skipping every part of an exception
-holding the word `reason`, so that an `#[expect]` of `clippy::allow_attributes_without_reason`
-passed Rule 19; and taking the `>` of `->` for a bracket, so that `Result<fn() -> usize,
-String>` passed Rule 8. It also reported that a second unsafe operation in the block of
-`unsafe { CacheFile::map(` passed Rule 4, which clippy's `multiple_unsafe_ops_per_block`,
-denied in every target, refuses. The owner decided, on 2026-11-02, that all of it be fixed,
-and it was: each line's strings and characters are blanked before its comment is found, in
-every check; an exception's part is skipped as its reason when it holds `=`; and the `>`
-of `->` and `=>` closes no bracket. Shown to fire: a file holding each of the three passed
-the old checks and failed the new, which pass the repository.
-
-## Amendment: strings read across lines
-
-- **Date**: 2026-11-02
-
-A further outside review found `source.py` blanking strings line by line, so that a raw
-string holding a quote, `r#"x "Result<u8, String>" y"#`, and a string over lines were read
-as code where they held a rule's words, and a `//` in a string's last line cut the code
-after it. The owner decided, on 2026-11-02, that it be fixed: each file's raw strings,
-strings over lines, characters and comments, line and block, are blanked whole before any
-check reads it, line ends kept. Shown to fire: of three such files, the old check flagged
-the two holding the words in a string and passed the one hiding a `Result<u8, String>`
-after a string's `//`; the new one the reverse. It also reported that two lints in one
-`#[expect]`, a nested `cfg_attr` and `unsafe {` in a string passed, which the checks
-already held, as each case showed.
-
-## Amendment: Rust read by a lexer, and errors with no type
-
-- **Date**: 2026-11-02
-
-The survey of the whole repository found `source.py` still reading Rust by regular
-expressions, one reported form at a time: a nested block comment's text read as code, an
-attribute holding two `expect`s under `cfg_attr` passing both unchecked, a part of an
-exception that was neither a lint nor its reason dropped silently, a `src/target/`
-directory skipped by its name, and Rule 8 holding `String` alone, so that `Box<str>`,
-`&'static str` and `Box<dyn Error>` passed. The owner decided, on 2026-11-02, that it be
-fixed at its cause, with no dependency added: a lexer reads each file as rustc reads it,
-line and nested block comments, raw, byte and C strings, characters told from lifetimes,
-and blanks them; attributes are read with their brackets matched, every part of every
-`allow` and `expect` held, one that is neither a lint nor `reason = …` failing; the files
-are those git would commit; and Rule 8 refuses an error that is a string, owned, borrowed,
-boxed or copied on write, or a boxed `dyn Error`. Rule 9 by `flatten`, which needs the
-iterator's item type, is left to review. Shown to fire: each such file passed the old
-checks and fails the new, and the repository passes.

@@ -3,6 +3,9 @@
 - **Status**: Amended
 - **Date**: 2026-10-17
 
+Condensed on 2026-11-08 (ADR-0001): each decision is kept with its reason and what it set
+aside; the text before is in git, this file as of `53f69d5`.
+
 ## Context
 
 Before P1 closed, the human asked whether the audit checks what it claims to. Three gaps
@@ -13,95 +16,28 @@ code behind a cargo feature, which was built and linted only with the default fe
 
 ## Decision
 
-- TESTING.md T1: the search finds an ignore written directly or under `cfg_attr`, in
-  `src/`, `tests/`, `examples/` and `benches/`.
-- CODING.md Rule 19: `source.py` checks the lints an exception names in every target, not
-  only in production code; asserts and recursion stay a production-code check.
-- CODING.md Rule 10: the gate runs `cargo clippy --all-targets -D warnings` on each member
-  with no default features and with each feature alone, besides the defaults.
+The human decided, on 2026-10-17 unless dated otherwise.
 
-Each was shown to fire: a test under `#[cfg_attr(all(), ignore)]`, an excepted
-`print_stdout` in `benches/brodo.rs`, and a re-export of `slice` outside its feature each
-failed the gate, which passed again once each was removed.
+- **Every way to ignore a test** (TESTING.md T1). `source.py --ignores` finds an ignore
+  written directly or under `cfg_attr`, across its lines, in every target, in the code
+  alone with its strings blanked, a reason being the string an `ignore =` of the code
+  opens (2026-11-02: a string spelling `#[ignore]`, and a `]` in a string before an
+  `ignore`, had fooled the search).
+- **Every target** (CODING.md Rule 19). The lints an exception names are checked in every
+  file whole, written directly or under `cfg_attr`, test modules included; asserts and
+  recursion stay a production-code check.
+- **Every feature.** The features are additive, so all of them together is one more build,
+  not one per combination. The gate runs with `--all-features` the tests (2026-10-20: a
+  test behind colino's `serde` never ran), Rule 12's `cargo tree` (a dependency behind a
+  feature could pull `cc` unseen), T2's list, the steps of Rules 2 and 3 (2026-11-02: three
+  of the nine modules reading untrusted input sat behind features they did not build) and
+  `cargo doc` with warnings denied (2026-11-02). Clippy runs on each member with no default
+  features and with each feature alone, besides the defaults (Rule 10).
+- **Doctests are listed** (2026-11-02), each by its file, its item and its place among the
+  item's, not its line, which an edit above would change, and every crate with a list is
+  held to it, so that a README's example cannot be deleted with no record (T2).
 
 ## Consequences
 
-Combinations of two or more non-default features are not linted; with two features,
-every combination is covered. The tests themselves run with the default features only.
-
-## Amendment
-
-- **Date**: 2026-10-20
-
-colino's feature `serde`, off by default (ADR-0028), showed what the Consequences left
-open: the tests ran with the default features only, and so did Rule 12's `cargo tree` and
-T2's list of tests. A test behind a feature off by default never ran in the gate, nor was
-it listed, and a dependency behind one could pull `cc` unseen; `cargo deny` alone already
-read every feature (`deny.toml`'s `all-features`). The human decided:
-
-- The gate runs the tests with `--all-features`, `cargo tree` for Rule 12 and
-  `scripts/audit/tests.py` for T2 likewise. The features are additive, so all of them
-  together is one more build, not one per combination.
-
-Each was shown to fire: a failing test behind `serde` failed the gate, and was missing from
-the list until listed; a dependency named `cc` behind a feature failed Rule 12. Each passed
-with the default features only.
-
-## Amendment: Rules 2 and 3 with every feature
-
-- **Date**: 2026-11-02
-
-The review of the whole repository broke each checked rule once (TESTING.md T3) and found
-the steps for Rule 2 and Rule 3, which lint production code apart from the clippy steps
-above, built with the default features only: code behind a feature off by default was never
-read by them. That covered three of the nine modules in `UNTRUSTED_INPUT`, `archive.rs` and
-`quantise.rs` behind `archive` and `vdb_read.rs` behind `vdb`. `x.unwrap()` and `b[0]` added
-to `vdb_read.rs` passed both steps; the code as it was passed them with every feature. The
-owner decided, on 2026-11-02, that both steps run with `--all-features`, as the tests do.
-Shown to fire: the same two breaks each failed its step, by name.
-
-## Amendment: the documentation with every feature
-
-- **Date**: 2026-11-02
-
-The review of the whole repository found `cargo doc` in the gate run with the default
-features only, so that the documentation of `archive`, `vdb`, `vtk` and `slice-png`, and a
-doc link within it, was never built with warnings denied; built with every feature, it
-passed. The owner decided, on 2026-11-02, that the gate builds the documentation with
-`--all-features`. Shown to fire: a doc link to nothing on a public item of `vdb.rs` passed
-the old step and failed the new one.
-
-## Amendment: exceptions under `cfg_attr`, and ignores over several lines
-
-- **Date**: 2026-11-02
-
-The second review of the whole repository found `source.py` reading the lints an exception
-names only in `#[expect(…)]` written directly, and in a `src/` file only up to its test
-module, so that `#[cfg_attr(test, expect(…))]` and an `#[expect]` in a test module went
-unchecked; and the gate's grep for T1 missing a `cfg_attr` whose `ignore` is on a line of its
-own. The owner decided, on 2026-11-02, that Rule 19's check reads both forms in every file
-whole, and that `source.py --ignores` reads each attribute naming `ignore` across its
-lines. Shown to fire: a file holding each form passed the old checks and failed the new.
-
-## Amendment: an ignore read in the code alone
-
-- **Date**: 2026-11-02
-
-An outside review found `source.py --ignores` finding attributes and their brackets in
-text whose strings were kept, so that a string holding `#[ignore]` was taken for a test
-switched off, and an attribute ended at a `]` in a string before its `ignore`, which passed.
-The owner decided, on 2026-11-02, that it be fixed: attributes and their brackets are found
-in the code alone, its strings blanked, and the reason is the string an `ignore =` of the
-code opens, so that a string spelling one is not taken for it. Shown to fire: the old check
-flagged the string and passed the `]`; the new one flags the attribute after the `]` and a
-string spelling a reason, and passes the string and two attributes with their reasons.
-
-## Amendment: doctests listed
-
-- **Date**: 2026-11-02
-
-The survey of the whole repository found `tests.py` listing no doctest, so that a crate
-README's example or a `compile_fail` one could be deleted with no record, and a crate with a
-list and no test never compared. The owner decided, on 2026-11-02, that doctests be listed,
-each by its file, its item and its place among the item's, without the line rustdoc names,
-which an edit above it would change; and that every crate with a list be held to it.
+Combinations of two or more non-default features are not linted by clippy; built together
+with every feature, they are by the tests and the other steps.
