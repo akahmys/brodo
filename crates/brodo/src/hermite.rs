@@ -608,16 +608,17 @@ impl Hermite {
 /// A set read from a file.
 struct Viewed<'a, 'b> {
     set: &'b HermiteView<'a>,
-    regions: crate::view::Regions,
+    regions: crate::view::ViewRegions<u8>,
 }
 
 impl Source for Viewed<'_, '_> {
     fn leaves(&self) -> Result<Vec<Coord>, HermiteError> {
-        Ok(self.regions.leaves.clone())
+        Ok(self.regions.leaves().to_vec())
     }
 
     fn tiles(&self) -> Result<Vec<(TileLevel, Coord, u32)>, HermiteError> {
-        Ok(self.regions.tiles.clone())
+        let tiles = self.regions.tiles().iter().zip(0_u32..);
+        Ok(tiles.map(|((level, origin, _), t)| (*level, *origin, t)).collect())
     }
 
     fn is_leaf(&self, v: Coord) -> Result<bool, HermiteError> {

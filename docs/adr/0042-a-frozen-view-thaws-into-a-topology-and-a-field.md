@@ -54,3 +54,26 @@ found that the Hermite reader, walking the whole tree, asked much work of a smal
 whose nodes were shared, and ADR-0038's amendment of 2026-10-27 has it refuse them now,
 by the walk thawing uses (docs/formats.md §4.2, rule 11). `GridView::new` and the cache
 reader keep version 1's checks.
+
+## Amendment: a view's leaves and tiles are listed without thawing
+
+- **Date**: 2026-11-09
+
+Issue 13, approved by the owner, asked for where a view's leaves and tiles lie without
+thawing it: a reader converting a mapped grid to another layout copied every value to
+learn each leaf's origin and each tile's level, origin and value. The Consequences above
+had set option 2, iterating them in public, aside, thawing serving the use then.
+
+The owner decided, on 2026-11-09, as proposed:
+
+- `GridView::regions` is public and gives a `ViewRegions<T>`: each leaf's origin at its
+  leaf number, and each tile's level, origin and value at its place among the tile values,
+  the number `ViewLocation::Tile` gives. They are what `thaw` gives; the nodes are walked
+  once and no leaf value is copied.
+- `ViewRegions` keeps its fields private behind `leaves` and `tiles`, which give slices, so
+  that what it holds may grow without breaking a user; a tile is a tuple, as
+  `Topology::tile` gives one. Two iterators were set aside: they would walk the nodes twice,
+  and the order asked is not the walk's, so that each would gather the walk first.
+- The walk thawing and the Hermite reader use is this one, so that one mechanism serves
+  all three (PLANNING.md §2).
+- It lands in 1.2.0, a milestone of its own, P11, after P10's closing checks and release.

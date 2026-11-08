@@ -6,6 +6,10 @@ are recorded here when they change (V6).
 
 ## Unreleased
 
+- `GridView::regions` and `ViewRegions`: a view's leaves' origins, by leaf number, and its
+  tiles' levels, origins and values, by their place among the tile values, read without
+  thawing (ADR-0042).
+
 ## 1.1.0 (2026-11-09)
 
 Closes P10, rounding off 1.0: what brodo, colino and mestolo lacked against their

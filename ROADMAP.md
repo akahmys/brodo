@@ -8,12 +8,11 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: P10 released as 1.1.0, rounding off 1.0 without breaking a user (ADR-0026,
-  ADR-0050, ADR-0062): brodo, colino and mestolo published by the owner, docs.rs building
-  their reference, the additions used from a new crate depending on them by version, and
-  `cargo install mestolo` installing the command (2026-11-09).
-- **Next**: no milestone is scheduled; the owner chooses the next work. §2's "Later", §4
-  and GitHub issues 1 to 12 hold what is open.
+- **Done**: issue 13, P11's one change: `GridView::regions` public, a view's leaves'
+  origins and its tiles' levels, origins and values listed without thawing, by the walk
+  `thaw` and the Hermite reader use (ADR-0042). P10 was released as 1.1.0 (2026-11-09).
+- **Next**: P11's closing checks, chosen by the owner, and its release as 1.2.0 (§2).
+  §2's "Later", §4 and GitHub issues 1 to 12 hold the rest of what is open.
 - **Unresolved**: `leaf_parallel_update_x32` drifts between processes by up to 20 %, its
   cause not measured (ADR-0019).
 
@@ -38,6 +37,16 @@ in this file as of `53f69d5` (P0 to P9) and `711cf5b` (P10).
 | P8, looking inside, and the formats settled | 0.9.0 | 2026-11-04 |
 | P9, 1.0 on crates.io | 1.0.0 | 2026-11-08 |
 | P10, rounding off 1.0 | 1.1.0 | 2026-11-09 |
+
+### P11 — a view's leaves and tiles without thawing
+
+Set by the owner on 2026-11-09, released as 1.2.0. Each change's API is put to the owner
+before it is written, its ADR amended where the design changes.
+
+- [x] [Issue 13](https://github.com/akahmys/brodo/issues/13), its `owner-approved` label
+      applied by `akahmys` (checked 2026-11-09): `GridView::regions` public, giving a
+      `ViewRegions` (ADR-0042)
+- [ ] The closing checks, chosen by the owner
 
 ### Held — `piatto`
 

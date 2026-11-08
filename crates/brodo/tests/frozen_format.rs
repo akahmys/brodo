@@ -189,6 +189,37 @@ proptest! {
     }
 }
 
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(128))]
+
+    /// A view's regions are the tree and values frozen, which it thaws into (the test
+    /// above), read without thawing: each leaf's origin at its number, whose values `leaf`
+    /// gives, and each tile's level, origin and value at the place `locate` gives it
+    /// (ARCHITECTURE.md §4.6, `GridView::regions`).
+    #[test]
+    fn a_views_regions_are_what_it_thaws_into(ops in ops()) {
+        let t = build(&ops);
+        let f = field(&t);
+        let frozen = freeze(&t, &f).unwrap();
+        let view = frozen.view::<f32>().unwrap();
+        let r = view.regions().unwrap();
+        let (leaves, mut tiles) = tree(&t);
+        prop_assert_eq!(r.leaves(), &leaves[..]);
+        for n in t.leaf_numbers() {
+            let (mine, frozen) = (view.leaf(n.get()).unwrap(), f.leaf(&t, n).unwrap());
+            prop_assert!(mine.iter().zip(frozen).all(|(a, b)| a.same_bits(b)), "leaf {}", n.get());
+        }
+        let mut found: Vec<(TileLevel, Coord)> = r.tiles().iter().map(|(l, o, _)| (*l, *o)).collect();
+        found.sort_by_key(|(_, o)| *o);
+        tiles.sort_by_key(|(_, o)| *o);
+        prop_assert_eq!(found, tiles);
+        for ((level, o, value), i) in r.tiles().iter().zip(0_u32..) {
+            prop_assert_eq!(view.locate(*o).unwrap(), ViewLocation::Tile(i, *level));
+            prop_assert!(f.value_at(&t, *o).unwrap().same_bits(value), "tile at {:?}", o);
+        }
+    }
+}
+
 #[test]
 fn a_topology_holding_other_leaves_or_tiles_is_refused_to_thaw_on() {
     // As many leaves and tiles, one of them elsewhere or at another level; or the view's

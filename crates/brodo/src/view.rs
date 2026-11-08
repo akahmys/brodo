@@ -506,10 +506,10 @@ impl<'a, T: Stored> GridView<'a, T> {
         let r = self.regions()?;
         let empty = Topology::new();
         let mut e = empty.edit();
-        for o in &r.leaves {
+        for o in r.leaves() {
             e.activate(*o).map_err(|_| lost("leaf value"))?;
         }
-        for (level, o, _) in &r.tiles {
+        for (level, o, _) in r.tiles() {
             e.add_tile(*level, *o).map_err(|_| lost("tile value"))?;
         }
         let t = e.commit().map_err(|_| lost("root"))?.0;
@@ -522,7 +522,7 @@ impl<'a, T: Stored> GridView<'a, T> {
     /// `OtherTopology` (ADR-0042).
     pub fn thaw_on(&self, t: &Topology) -> Result<Field<T>, FormatError> {
         let r = self.regions()?;
-        if t.leaf_count() != r.leaves.len() || t.tile_count() != r.tiles.len() {
+        if t.leaf_count() != r.leaves().len() || t.tile_count() != r.tiles().len() {
             return Err(FormatError::OtherTopology);
         }
         self.fill(t, &r)
@@ -531,20 +531,20 @@ impl<'a, T: Stored> GridView<'a, T> {
     /// A field on `t` holding the view's values, each leaf and tile found in `t` at its
     /// origin; one not there is refused as `OtherTopology`. With as many leaves and tiles
     /// in `t` as in the view, each found at another origin, `t` holds them all.
-    fn fill(&self, t: &Topology, r: &Regions) -> Result<Field<T>, FormatError> {
+    fn fill(&self, t: &Topology, r: &ViewRegions<T>) -> Result<Field<T>, FormatError> {
         let mut f = Field::new(t, self.background);
-        for (n, o) in (0_u32..).zip(&r.leaves) {
+        for (n, o) in (0_u32..).zip(r.leaves()) {
             let Location::Leaf(m) = t.locate(*o) else { return Err(FormatError::OtherTopology) };
             *f.leaf_mut(t, m).map_err(|_| lost("leaf value"))? = *self.leaf(n)?;
         }
-        for (level, o, i) in &r.tiles {
+        for (level, o, value) in r.tiles() {
             let Location::Tile(m, _) = t.locate(*o) else {
                 return Err(FormatError::OtherTopology);
             };
             if t.tile(m).map_err(|_| lost("tile value"))? != (*level, *o) {
                 return Err(FormatError::OtherTopology);
             }
-            f.set_tile(t, m, self.tile_value(*i)?).map_err(|_| lost("tile value"))?;
+            f.set_tile(t, m, *value).map_err(|_| lost("tile value"))?;
         }
         Ok(f)
     }
@@ -561,17 +561,26 @@ impl<'a, T: Stored> GridView<'a, T> {
             && self.lowers.as_bytes() == other.lowers.as_bytes()
     }
 
-    /// Every leaf's origin, by leaf number, and every tile's level and origin with its
-    /// place among the tile values, found by walking the nodes once; the writer's rules,
-    /// checked when the view was made, reach each from one place (docs/formats.md §2.5,
-    /// rule 11), so that the walk costs what the buffer holds.
-    pub(crate) fn regions(&self) -> Result<Regions, FormatError> {
+    /// Where the view's leaves and tiles lie, without thawing it: each leaf's origin by
+    /// leaf number, and each tile's level, origin and value by its place among the tile
+    /// values, as `ViewLocation` numbers them. They are what `thaw` gives: the thawed
+    /// topology holds the same leaves and tiles, and its field the same values. The nodes
+    /// are walked once and no leaf value is copied (ADR-0042).
+    pub fn regions(&self) -> Result<ViewRegions<T>, FormatError> {
+        // The writer's rules, checked when the view was made, reach each leaf and tile from
+        // one place (docs/formats.md §2.5, rule 11), so that the walk costs what the buffer
+        // holds and fills each slot once.
         let mut leaves = vec![None; self.leaf_count];
-        let mut tiles = Vec::with_capacity(self.tiles.len());
+        let mut tiles = vec![None; self.tiles.len()];
+        let mut put = |level, at, i: u32| -> Result<(), FormatError> {
+            let value = self.tile_value(i)?;
+            *tiles.get_mut(i as usize).ok_or(lost("tile value"))? = Some((level, at, value));
+            Ok(())
+        };
         for e in self.roots {
             let key = e.key.map(|k| k.get());
             if e.kind.get() == ROOT_TILE {
-                tiles.push((TileLevel::Root, key, e.index.get()));
+                put(TileLevel::Root, key, e.index.get())?;
                 continue;
             }
             let u = self.uppers.get(e.index.get() as usize).ok_or(lost("root"))?;
@@ -581,8 +590,7 @@ impl<'a, T: Stored> GridView<'a, T> {
             for p in 0..UPPER_PLACES {
                 let at = offset(key, unplace(p, 5), TileLevel::Upper.edge_log2());
                 if is_set(&u.tiles, p) {
-                    let i = tile.take("upper node")?;
-                    tiles.push((TileLevel::Upper, at, i));
+                    put(TileLevel::Upper, at, tile.take("upper node")?)?;
                 }
                 if !is_set(&u.children, p) {
                     continue;
@@ -593,8 +601,7 @@ impl<'a, T: Stored> GridView<'a, T> {
                 for q in 0..LOWER_PLACES {
                     let leaf_at = offset(at, unplace(q, 4), TileLevel::Lower.edge_log2());
                     if is_set(&l.tiles, q) {
-                        let i = tile.take("lower node")?;
-                        tiles.push((TileLevel::Lower, leaf_at, i));
+                        put(TileLevel::Lower, leaf_at, tile.take("lower node")?)?;
                     }
                     if is_set(&l.children, q) {
                         let i = leaf.take("lower node")?;
@@ -605,7 +612,8 @@ impl<'a, T: Stored> GridView<'a, T> {
             }
         }
         let leaves = leaves.into_iter().collect::<Option<Vec<_>>>().ok_or(lost("leaf value"))?;
-        Ok(Regions { leaves, tiles })
+        let tiles = tiles.into_iter().collect::<Option<Vec<_>>>().ok_or(lost("tile value"))?;
+        Ok(ViewRegions { leaves, tiles })
     }
 }
 
@@ -682,13 +690,25 @@ impl Next {
     }
 }
 
-/// A view's leaves and tiles (`GridView::regions`).
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub(crate) struct Regions {
-    /// Each leaf's origin, by leaf number.
-    pub(crate) leaves: Vec<Coord>,
-    /// Each tile's level and origin, with its place among the tile values.
-    pub(crate) tiles: Vec<(TileLevel, Coord, u32)>,
+/// Where a view's leaves and tiles lie, and its tiles' values ([`GridView::regions`]).
+#[derive(Debug, Clone)]
+pub struct ViewRegions<T> {
+    leaves: Vec<Coord>,
+    tiles: Vec<(TileLevel, Coord, T)>,
+}
+
+impl<T> ViewRegions<T> {
+    /// Each leaf's origin, at its leaf number: the leaf whose values
+    /// [`GridView::leaf`] gives by that number.
+    pub fn leaves(&self) -> &[Coord] {
+        &self.leaves
+    }
+
+    /// Each tile's level, origin and value, at its place among the view's tile values, the
+    /// number [`ViewLocation::Tile`] gives.
+    pub fn tiles(&self) -> &[(TileLevel, Coord, T)] {
+        &self.tiles
+    }
 }
 
 /// The local coordinates of Morton place `p` in a node of `2^bits` places a side: the
@@ -742,15 +762,16 @@ mod tests {
         let view = frozen.view::<u8>().unwrap();
         let r = view.regions().unwrap();
         let leaves: Vec<Coord> = t.leaf_numbers().map(|n| t.leaf_origin(n).unwrap()).collect();
-        assert_eq!(r.leaves, leaves);
-        let mut tiles: Vec<(TileLevel, Coord)> = r.tiles.iter().map(|(l, o, _)| (*l, *o)).collect();
+        assert_eq!(r.leaves(), leaves);
+        let mut tiles: Vec<(TileLevel, Coord)> =
+            r.tiles().iter().map(|(l, o, _)| (*l, *o)).collect();
         let mut want: Vec<(TileLevel, Coord)> =
             t.tile_numbers().map(|n| t.tile(n).unwrap()).collect();
         tiles.sort_by_key(|(_, o)| *o);
         want.sort_by_key(|(_, o)| *o);
         assert_eq!(tiles, want);
-        for (level, o, i) in &r.tiles {
-            assert_eq!(view.locate(*o).unwrap(), ViewLocation::Tile(*i, *level), "at {o:?}");
+        for ((level, o, _), i) in r.tiles().iter().zip(0_u32..) {
+            assert_eq!(view.locate(*o).unwrap(), ViewLocation::Tile(i, *level), "at {o:?}");
         }
     }
 

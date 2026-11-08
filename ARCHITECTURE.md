@@ -239,6 +239,10 @@ fastest, and an `Offset` is made from its number or its step as from what gives 
   on a topology holding its leaves and tiles (`thaw_on`), by walking its nodes once; the
   topology numbers them in its own order, so that one buffer gives one topology. Views whose root tables, nodes and
   counts agree hold one tree (`same_topology`) (ADR-0042).
+- Where a view's leaves and tiles lie is read without thawing (`GridView::regions`), by
+  the same walk: each leaf's origin by leaf number, each tile's level, origin and value by
+  its place among the tile values, as `ViewLocation` numbers them; they are the leaves,
+  tiles and values `thaw` gives, and no leaf value is copied (ADR-0042).
 
 ### 4.7 Files (ADR-0016)
 
