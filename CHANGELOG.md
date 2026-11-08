@@ -6,6 +6,11 @@ are recorded here when they change (V6).
 
 ## Unreleased
 
+## 1.1.0 (2026-11-09)
+
+Closes P10, rounding off 1.0: what brodo, colino and mestolo lacked against their
+promises, added without breaking a user (TESTING.md T14, V2). No format version changes.
+
 - `Field::set_background`; `LeafNumber::new`, `TileNumber::new`, `Offset::from_index` and
   `Offset::from_delta`; `Field<T>` taken from an `AnyField` by `TryFrom` (ADR-0062).
 - `GridEntry::encoding` and `Region::encoding`, an archive grid's value encoding, with the

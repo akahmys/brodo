@@ -14,7 +14,8 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
 - **Next**: P10, rounding off 1.0 (§2), set by the owner on 2026-11-08: each change's API
   put to the owner before it is written. brodo's core, an archive grid's encoding
   (ADR-0062), colino's `Limits::default` (ADR-0026) and mestolo's command line (ADR-0050)
-  and the closing checks are done; releasing it as 1.1.0 is next.
+  and the closing checks are done, and the version is 1.1.0. Its tag, GitHub release and
+  publication on crates.io follow, each with the owner's approval (TESTING.md V4).
 - **Unresolved**: `leaf_parallel_update_x32` drifts between processes by up to 20 %, its
   cause not measured (ADR-0019).
 
@@ -61,6 +62,7 @@ put to the owner before it is written, its ADR amended where the design changes.
   - [x] V9: the gate's check against v1.0.0 passes on `d6422e2` (2026-11-08)
   - [x] T11: the run on `d6422e2`, GitHub Actions run 42447561541, missed none of 4649
         mutants, its four timeouts caught under 1800 s (2026-11-08)
+- [x] Version 1.1.0 (TESTING.md V2–V4, 2026-11-09)
 
 ### Held — `piatto`
 
