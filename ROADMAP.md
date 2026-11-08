@@ -8,14 +8,11 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: P9 released as 1.0.0, the first release on crates.io (ADR-0061): brodo,
-  colino and mestolo published by the owner, docs.rs building their reference, each
-  README's example run from a new crate depending on them by version, and `cargo install
-  mestolo` installing the command (2026-11-08).
+- **Done**: after P9's 1.0.0 on crates.io (ADR-0061), an ADR records a decision alone, a
+  run's results going to the commit and this file (owner, 2026-11-08; PLANNING.md §2),
+  and the records long with reports are condensed to their decisions (ADR-0001).
 - **Next**: no milestone is scheduled; the owner chooses the next work. §2's "Later" and
-  §4 hold what is open, and the owner's question, raised 2026-11-08, whether an ADR
-  records only a decision changing a rule or the design, a run's results going to the
-  commit and this file, is undecided.
+  §4 hold what is open.
 - **Unresolved**: `leaf_parallel_update_x32` drifts between processes by up to 20 %, its
   cause not measured (ADR-0019).
 
