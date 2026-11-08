@@ -12,8 +12,8 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   those that round off what is there kept in §4, those that add a capability opened as
   GitHub issues 1 to 12.
 - **Next**: P10, rounding off 1.0 (§2), set by the owner on 2026-11-08: each change's API
-  put to the owner before it is written. brodo's core and an archive grid's encoding
-  are done (ADR-0062); colino's `Limits::default` is next, its numbers measured first.
+  put to the owner before it is written. brodo's core, an archive grid's encoding
+  (ADR-0062) and colino's `Limits::default` (ADR-0026) are done; mestolo's are next.
 - **Unresolved**: `leaf_parallel_update_x32` drifts between processes by up to 20 %, its
   cause not measured (ADR-0019).
 
@@ -48,7 +48,7 @@ put to the owner before it is written, its ADR amended where the design changes.
       built from their numbers; `Field<T>` taken from an `AnyField` by `TryFrom`
       (ADR-0062)
 - [x] brodo's formats: an archive grid's value encoding read (ADR-0062)
-- [ ] colino: `Limits::default`
+- [x] colino: `Limits::default` (ADR-0026)
 - [ ] mestolo: `--version`; help per command; Hermite data and an archive's encodings
       shown by `info`; `convert` to `.vdb` skipping, when asked, the grids it cannot hold
       (ADR-0050)

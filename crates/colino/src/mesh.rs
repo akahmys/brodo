@@ -36,6 +36,14 @@ pub struct Limits {
     pub bytes: u64,
 }
 
+/// At most 2²⁶ triangles, 2²⁶ vertices and 2³² bytes (4 GiB): a mesh read at them is held
+/// in a few GiB, the limits a caller who knows its machine and files sets otherwise.
+impl Default for Limits {
+    fn default() -> Limits {
+        Limits::new(1 << 26, 1 << 26, 1 << 32)
+    }
+}
+
 impl Limits {
     /// At most `triangles` triangles, `vertices` vertices and `bytes` bytes.
     pub const fn new(triangles: u64, vertices: u64, bytes: u64) -> Limits {
@@ -243,6 +251,12 @@ impl Mesh {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The default limits are those `Default` states.
+    #[test]
+    fn the_default_limits_are_two_to_the_26_triangles_and_vertices_and_4_gib() {
+        assert_eq!(Limits::default(), Limits::new(1 << 26, 1 << 26, 1 << 32));
+    }
 
     /// Two triangles over four vertices, the first two of them at one position.
     fn pair(groups: Vec<u32>, names: &[&str]) -> Mesh {

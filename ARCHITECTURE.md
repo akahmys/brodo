@@ -396,7 +396,7 @@ are in ADR-0030.
 - Input: STL (binary and ASCII), OBJ, 3MF, in that order, each under a default feature a
   user may leave out (`stl`, `obj`, `threemf`; ADR-0036) and read into a `Mesh` of `f64`
   vertices, `u32` triangles, a group per triangle (ADR-0030) and the file's unit, if any,
-  under limits its caller sets (ADR-0026), from bytes (`from_bytes`) or a file (`read`), as
+  under limits its caller sets, or `Limits::default` (ADR-0026), from bytes (`from_bytes`) or a file (`read`), as
   §4.7's readers are shaped (ADR-0055). Badly oriented, holed and degenerate meshes are
   accepted as they are; `Mesh::welded` joins vertices at equal positions, never within a
   tolerance. A 3MF package is read through `rawzip`, `miniz_oxide` and `quick-xml`, its

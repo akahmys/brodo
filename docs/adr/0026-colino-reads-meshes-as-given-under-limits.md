@@ -87,3 +87,16 @@ Before 3MF was read, the human approved its dependencies and decided how it is r
 - A model requiring an extension is refused; elements of other namespaces are skipped
   whole, attributes with a prefix ignored; an element of the core namespace the format
   does not define, or out of its place, is an error. The unit defaults to millimetres.
+
+## Amendment
+
+- **Date**: 2026-11-08
+
+`Limits` gains `Default`, at 2²⁶ triangles, 2²⁶ vertices and 2³² bytes (the owner, as
+proposed, for P10), so that a caller need not choose numbers to read a file at all. The
+peak memory of reading was measured (2026-11-08, `colino::stl::read` and `obj::read` on a
+grid of triangles, by `/usr/bin/time -l`): about 81 B a triangle from STL, whose reader
+keeps three vertices for each, and about 52 B from OBJ with shared vertices. At the
+defaults an STL is stopped by its vertices at some 22 million triangles, about 1.8 GB,
+and an OBJ by its triangles, about 3.5 GB; neither reaches the byte limit first. A
+caller reading on a smaller machine sets lower limits.

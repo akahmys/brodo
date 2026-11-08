@@ -16,6 +16,7 @@ lib colino distance::tests::the_vector_helpers_give_what_is_worked_by_hand
 lib colino intersect::tests::ties_are_decided_by_rounding_errors_down_to_small
 lib colino mesh::tests::groups_that_do_not_fit_are_refused
 lib colino mesh::tests::groups_that_fit_the_triangles_are_taken
+lib colino mesh::tests::the_default_limits_are_two_to_the_26_triangles_and_vertices_and_4_gib
 lib colino mesh::tests::welding_keeps_each_triangles_group
 lib colino parity::tests::a_cube_is_inside_along_its_split_edges_whatever_its_faces
 lib colino parity::tests::a_line_on_an_edge_or_a_corner_counts_once_and_a_fold_none_or_twice
