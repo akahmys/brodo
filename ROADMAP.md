@@ -8,13 +8,13 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: issue 15: an earlier version's `hermite.set` names an earlier set only on an
-  entry without `brodo.hermite.set`, in brodo and in `formats.py`, and every reader of
-  set names reads entries of bytes too (ADR-0037). Before it, issue 14 (ADR-0057) and
-  issue 13 (ADR-0042). P10 was released as 1.1.0 (2026-11-09).
-- **Next**: P11's closing checks are done, and the version is 1.2.0. Its tag, GitHub
-  release and publication on crates.io follow, each with the owner's approval (TESTING.md
-  V4). §2's "Later", §4 and GitHub issues 1 to 12 hold the rest of what is open.
+- **Done**: P11 released as 1.2.0, a view's leaves and tiles read without thawing and two
+  fixes to reading an archive, without breaking a user (ADR-0037, ADR-0042, ADR-0057):
+  brodo, colino and mestolo published by the owner, docs.rs building their reference,
+  `GridView::regions` used from a new crate depending on them by version, and `cargo
+  install mestolo` installing the command (2026-11-10).
+- **Next**: no milestone is scheduled; the owner chooses the next work. §2's "Later", §4
+  and GitHub issues 1 to 12 hold what is open.
 - **Unresolved**: `leaf_parallel_update_x32` drifts between processes by up to 20 %, its
   cause not measured (ADR-0019).
 
@@ -23,7 +23,7 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
 Named after the project group's phases (ADR-0011); the checks a milestone closes with are
 TESTING.md §2's and its checklist lists them (ADR-0033). A closed milestone leaves this
 file: what it brought is in its version's CHANGELOG.md section, and its checklist in git,
-in this file as of `53f69d5` (P0 to P9) and `711cf5b` (P10).
+in this file as of `53f69d5` (P0 to P9), `711cf5b` (P10) and `e27fd49` (P11).
 
 | Milestone | Version | Closed |
 | :--- | :--- | :--- |
@@ -39,34 +39,7 @@ in this file as of `53f69d5` (P0 to P9) and `711cf5b` (P10).
 | P8, looking inside, and the formats settled | 0.9.0 | 2026-11-04 |
 | P9, 1.0 on crates.io | 1.0.0 | 2026-11-08 |
 | P10, rounding off 1.0 | 1.1.0 | 2026-11-09 |
-
-### P11 — a view's leaves and tiles without thawing
-
-Set by the owner on 2026-11-09, released as 1.2.0. Each change's API is put to the owner
-before it is written, its ADR amended where the design changes.
-
-- [x] [Issue 13](https://github.com/akahmys/brodo/issues/13), its `owner-approved` label
-      applied by `akahmys` (checked 2026-11-09): `GridView::regions` public, giving a
-      `ViewRegions` (ADR-0042)
-- [x] [Issue 14](https://github.com/akahmys/brodo/issues/14), its `owner-approved` label
-      applied by `akahmys` (checked 2026-11-09), added to P11 by the owner on 2026-11-09:
-      a grid named by its place among the grids from every read, and `BytesDecompress`
-      and `BytesChunks` for an entry of bytes (ADR-0057)
-- [x] [Issue 15](https://github.com/akahmys/brodo/issues/15), its `owner-approved` label
-      applied by `akahmys` (checked 2026-11-09), added to P11 by the owner on 2026-11-09:
-      an old version's key refused only on an entry without this version's, and set names
-      read from entries of bytes too (ADR-0037)
-- [x] The closing checks, chosen by the owner (2026-11-09): T11's mutation run, the
-      check against 1.1.0 (V9), and T6's fuzzing, a reader of untrusted bytes having
-      changed; not T7, no unsafe code being touched
-  - [x] T6: `grid_view`, `hermite`, `cache_file` and `archive` fuzzed 900 s each on
-        `3a97708`, 5,067,824, 21,853,803, 12,060,891 and 1,288,015 runs, nothing found
-        (2026-11-09)
-  - [x] V9: the gate's check against v1.1.0 passes on `5598baa` (2026-11-09)
-  - [x] T11: the run on `3a97708`, GitHub Actions run 42574201431, missed none of 4665
-        mutants, its three timeouts before any failed test caught under 1800 s
-        (2026-11-09)
-- [x] Version 1.2.0 (TESTING.md V2–V4, 2026-11-10)
+| P11, a view's leaves and tiles without thawing | 1.2.0 | 2026-11-10 |
 
 ### Held — `piatto`
 
