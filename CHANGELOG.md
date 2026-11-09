@@ -16,6 +16,10 @@ are recorded here when they change (V6).
   file's grids, as `GridEntry::index` numbers it, from a whole read as from a region's,
   where a whole read counted entries of bytes before it; 1.0.0's note that the index is
   the entry's place in the directory was superseded by ADR-0057 (issue 14).
+- Fixed: `HermiteView::find` refuses a set as of an earlier version, by its key
+  `hermite.set`, only on an entry holding no `brodo.hermite.set`; a set of this version
+  carrying `hermite.set` as a free key no longer makes another set of that name refused
+  (docs/formats.md §4.2, rule 1; issue 15).
 
 ## 1.1.0 (2026-11-09)
 

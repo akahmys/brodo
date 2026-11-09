@@ -1,7 +1,8 @@
 //! Fuzzes `HermiteView::find`, the reader of Hermite data in a cache file
 //! (`crates/brodo/src/hermite.rs`), for every set a file names and for one it does not, and
 //! the reads of each set it finds, its signs and the crossings of its first and last leaves'
-//! first and last points on every axis, of either version: no input may panic (TESTING.md T6).
+//! first and last points on every axis; the sets are named by its grids and its entries of
+//! bytes, by this version's keys or an earlier one's: no input may panic (TESTING.md T6).
 
 #![no_main]
 
@@ -23,10 +24,13 @@ fn exercise<T: Stored>(view: &GridView<'_, T>) {
 fuzz_target!(|data: &[u8]| {
     if let Ok(file) = brodo::cache::from_bytes(data) {
         let mut sets = vec![String::new()];
-        for g in file.grids() {
-            let set = g.meta().extra.get("brodo.hermite.set").cloned();
+        let grids = file.grids();
+        let bytes_entries = file.bytes_entries();
+        let extras = grids.iter().map(|g| &g.meta().extra);
+        for extra in extras.chain(bytes_entries.iter().map(|b| b.extra)) {
+            let set = extra.get("brodo.hermite.set").or_else(|| extra.get("hermite.set"));
             if let Some(set) = set {
-                sets.push(set);
+                sets.push(set.clone());
             }
         }
         for set in sets {

@@ -760,6 +760,24 @@ fn a_sets_writers_refuse_a_brodo_key() {
     assert!(HermiteView::find(&f, "s").is_ok());
 }
 
+/// An earlier version's keys mark an entry of an earlier set only where it holds none of
+/// this version's (docs/formats.md §4.2, rule 1): a set of this version whose entry carries
+/// `hermite.set` naming another, as a free key, leaves that other set to be found, or
+/// missing, as any (issue 15).
+#[test]
+fn an_earlier_versions_key_beside_this_versions_names_no_earlier_set() {
+    let set = parts(1, None, 2, 6).make().unwrap();
+    let mut free = meta("s");
+    free.extra.insert("hermite.set".into(), "b".into());
+    free.extra.insert("hermite.version".into(), "2".into());
+    let mut entries = set.entries("s", &free).unwrap();
+    assert!(matches!(HermiteView::find(&file(&entries), "b"), Err(HermiteError::Missing("sign"))));
+    entries.extend(set.entries("b", &meta("b")).unwrap());
+    let f = file(&entries);
+    assert!(HermiteView::find(&f, "b").is_ok());
+    assert!(HermiteView::find(&f, "s").is_ok());
+}
+
 #[test]
 fn a_file_with_a_broken_rule_or_another_topology_is_refused() {
     // A sign grid of 2s in the place of the signs, written with the same keys.

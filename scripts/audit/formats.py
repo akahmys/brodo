@@ -730,7 +730,7 @@ def hermite(grids, name, entries=()):
         pairs = dict(m["pairs"])
         if pairs.get(H + b"set") == name:
             need(pairs.get(H + b"version") == b"3", "hermite version")
-        elif pairs.get(b"hermite.set") == name:
+        elif H + b"set" not in pairs and pairs.get(b"hermite.set") == name:
             need(False, "hermite version of an earlier release")
     signs, crossings = [], []
     for m, g in grids:
@@ -862,7 +862,7 @@ def read(path, brief, b=None, box=None):
             grids, sets = [(None, Grid(b))], []
         else:
             grids = archive(b, entries) if b[0:4] == b"BRDA" else cache(b, entries)
-            sets = sets_of(grids)
+            sets = sets_of(grids, entries)
         verdicts = []
         for name in sets:
             try:

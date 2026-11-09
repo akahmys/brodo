@@ -3,12 +3,14 @@
 //! read it, value for value, and accepts or refuses each damaged copy of them as the
 //! crates do, an archive's region (§8.6) among them. A difference means the document leaves out or misstates what a reader needs.
 
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
 #[cfg(feature = "archive")]
 use brodo::archive::region_from_bytes;
-use brodo::cache::CacheFile;
+use brodo::cache::{CacheEntry, CacheFile};
+use brodo::field::Field;
 use brodo::field::Stored;
 use brodo::hermite::HermiteView;
 use brodo::meta::Bounds;
@@ -228,9 +230,12 @@ fn crates_read(bytes: &[u8]) -> Vec<String> {
     }
     let Ok(file) = cache_file(bytes) else { return vec!["refused".to_owned()] };
     let mut out = vec!["accepted".to_owned()];
-    let mut sets: Vec<String> = (0..file.grids().len())
-        .filter_map(|i| {
-            let extra = &file.grids()[i].meta().extra;
+    let grids = file.grids();
+    let extras = grids.iter().map(|g| &g.meta().extra);
+    let bytes_entries = file.bytes_entries();
+    let mut sets: Vec<String> = extras
+        .chain(bytes_entries.iter().map(|b| b.extra))
+        .filter_map(|extra| {
             extra.get("brodo.hermite.set").or_else(|| extra.get("hermite.set")).cloned()
         })
         .collect();
@@ -287,6 +292,62 @@ fn the_document_s_reader_reads_every_golden_file_as_the_crates_do() {
         let hermite: Vec<String> =
             lines.iter().filter(|l| l.starts_with("hermite ")).cloned().collect();
         assert_eq!(verdict(&hermite), crates_read(&bytes)[1..], "{name}: Hermite sets");
+    }
+}
+
+/// The golden Hermite set's entries, each as read, but with `edit` given its keys: its
+/// sign grid is entry 0 and its crossings entry 1.
+fn golden_set_as(edit: impl Fn(usize, &mut BTreeMap<String, String>)) -> Vec<CacheEntry> {
+    let file = brodo::cache::from_bytes(&std::fs::read(data("hermite_v3.bin")).unwrap()).unwrap();
+    let g = file.grids()[0];
+    let mut meta = g.meta().clone();
+    edit(0, &mut meta.extra);
+    let (t, signs) = g.thaw(u64::MAX).unwrap();
+    let signs = Field::<u8>::try_from(signs).unwrap();
+    let b = file.bytes_entries()[0];
+    let mut extra = b.extra.clone();
+    edit(1, &mut extra);
+    vec![
+        CacheEntry::with_reserved_keys(&meta, &t, &signs).unwrap(),
+        CacheEntry::bytes_with_reserved_keys(b.name, extra, b.bytes.to_vec()),
+    ]
+}
+
+/// The document's reader and the crates name the same Hermite sets of a file, those its
+/// entries of bytes name among them, and find each alike; an earlier version's key on an
+/// entry of this version's names no earlier set (docs/formats.md §4.2, rule 1; issue 15).
+#[test]
+fn the_document_s_reader_finds_the_sets_the_crates_find() {
+    let named = |set: &'static str| {
+        move |_: usize, m: &mut BTreeMap<String, String>| {
+            m.insert("brodo.hermite.set".into(), set.into());
+        }
+    };
+    // Set "golden" carries a free `hermite.set` naming set "b", which is of this version.
+    let mut beside = golden_set_as(|_, m| {
+        m.insert("hermite.set".into(), "b".into());
+        m.insert("hermite.version".into(), "2".into());
+    });
+    beside.extend(golden_set_as(named("b")));
+    // Set "c" is named by its crossings alone, its sign grid gone.
+    let alone = vec![golden_set_as(named("c")).remove(1)];
+    let expected = [
+        vec!["hermite 62 ok - 61 62", "hermite 676f6c64656e ok - 61 62"],
+        vec!["hermite 63 refused"],
+    ];
+    let dir = Path::new(env!("CARGO_TARGET_TMPDIR"));
+    for ((entries, name), expected) in
+        [(beside, "beside.bin"), (alone, "alone.bin")].into_iter().zip(expected)
+    {
+        let bytes = brodo::cache::to_bytes(&entries).unwrap();
+        let path = dir.join(name);
+        std::fs::write(&path, &bytes).unwrap();
+        let ours = crates_read(&bytes);
+        assert_eq!(ours[1..], expected, "{name}: the crates");
+        let out = reports(&reader(&[&path.display().to_string()], ""));
+        let theirs: Vec<String> =
+            out[0].1.iter().filter(|l| l.starts_with("hermite ")).cloned().collect();
+        assert_eq!(verdict(&theirs), ours[1..], "{name}: the document's reader");
     }
 }
 

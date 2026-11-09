@@ -48,3 +48,21 @@ point.
 
 What a reader does not check is stated in the document rather than left unsaid; writing
 it down first found the gaps of version 1 that version 2 closed (ADR-0052).
+
+## Amendment
+
+- **Date**: 2026-11-09
+
+Issue 15 reported that `formats.py`'s `hermite`, like brodo's own `check_version`, took an
+entry's `hermite.set` for an earlier version's set though the entry held
+`brodo.hermite.set`, against docs/formats.md §4.2, rule 1, and that `formats.py`'s `read`,
+`format_document.rs`'s own reader of the crates and the Hermite fuzz target named the sets
+of a file from its grids alone, so that a set named only by an entry of bytes was never
+checked. The two readers agreed, each wrong, so that comparing them found nothing. The
+owner decided, on 2026-11-09, as proposed, that `formats.py`, the crates' reader and the
+other two readers be fixed together, in one commit with this amendment. So that agreeing
+is not enough, `format_document.rs` holds both readers to a verdict the test states: on a
+file whose set carries a free `hermite.set` naming another set of this version, and on one
+whose set is named by its crossings alone. Undoing either of `formats.py`'s fixes fails
+that test (T3).
+

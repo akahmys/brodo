@@ -8,13 +8,13 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: issue 14: `CacheError::Grid`, `Decompress` and `Chunks` name a grid by its
-  place among the grids from every read, and an archive's entry of bytes is named by
-  `BytesDecompress` and `BytesChunks` (ADR-0057). Before it, issue 13, `GridView::regions`
-  (ADR-0042). P10 was released as 1.1.0 (2026-11-09).
-- **Next**: issue 15, then P11's closing checks, chosen by the owner, and its release as
-  1.2.0 (§2); T11's run covers `f58a490`, so it runs again after issues 14 and 15. §2's
-  "Later", §4 and GitHub issues 1 to 12 hold the rest of what is open.
+- **Done**: issue 15: an earlier version's `hermite.set` names an earlier set only on an
+  entry without `brodo.hermite.set`, in brodo and in `formats.py`, and every reader of
+  set names reads entries of bytes too (ADR-0037). Before it, issue 14 (ADR-0057) and
+  issue 13 (ADR-0042). P10 was released as 1.1.0 (2026-11-09).
+- **Next**: P11's closing checks, chosen by the owner, and its release as 1.2.0 (§2);
+  T11's run covers `f58a490`, so it runs again after issues 14 and 15. §2's "Later", §4
+  and GitHub issues 1 to 12 hold the rest of what is open.
 - **Unresolved**: `leaf_parallel_update_x32` drifts between processes by up to 20 %, its
   cause not measured (ADR-0019).
 
@@ -52,10 +52,10 @@ before it is written, its ADR amended where the design changes.
       applied by `akahmys` (checked 2026-11-09), added to P11 by the owner on 2026-11-09:
       a grid named by its place among the grids from every read, and `BytesDecompress`
       and `BytesChunks` for an entry of bytes (ADR-0057)
-- [ ] [Issue 15](https://github.com/akahmys/brodo/issues/15), its `owner-approved` label
+- [x] [Issue 15](https://github.com/akahmys/brodo/issues/15), its `owner-approved` label
       applied by `akahmys` (checked 2026-11-09), added to P11 by the owner on 2026-11-09:
       an old version's key refused only on an entry without this version's, and set names
-      read from entries of bytes too
+      read from entries of bytes too (ADR-0037)
 - [ ] The closing checks, chosen by the owner
 
 ### Held — `piatto`
