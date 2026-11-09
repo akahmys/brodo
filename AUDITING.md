@@ -11,8 +11,8 @@ no configuration outside the repository can switch a lint off.
 
 Not in it: the fuzzer and Miri, which build on nightly, and the mutation run, which takes
 hours, its verdict by `scripts/audit/mutants.py` holding a run's or a sharded run's reports
-to every mutant `cargo mutants --list` gives, to a baseline that passed and to the memory
-guard's log; TESTING.md T6, T7 and T11 say when they run.
+to every mutant `cargo mutants --list` gives, to a baseline that passed, its tests built
+at opt-level 1, and to the memory guard's log; TESTING.md T6, T7 and T11 say when they run.
 Nor the benchmark harness, which runs its children on as many threads as the machine has
 performance cores and refuses a pair of runs that disagree on an item by more than 10 %
 (TESTING.md T5); it runs with the benchmarks, under TESTING.md T10.

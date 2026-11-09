@@ -38,6 +38,21 @@ the kernel panicked. macOS enforces neither `ulimit -v`, `-d` nor `-m`.
   and excluded with that reason; one still timing out fails the run. Stopping a binary at
   its first failure needs a nightly harness flag, so a binary's remaining tests run on
   after one fails, which is what outruns the timeout.
+- **The build** (2026-11-10): `mutants.py` gives cargo-mutants
+  `--cargo-arg=--config=profile.test.opt-level=1`, so that every cargo command of the run,
+  each mutant's and the baseline's, builds the tests at opt-level 1, `Cargo.toml`'s
+  profiles untouched; debug assertions, and the overflow checks that follow them, stay on.
+  The verdict fails on a report whose baseline's tests were not so built, its timeouts
+  being set by an unoptimized suite. Unoptimized, about 80 % of the tests' time in the
+  run on `f58a490` went to binaries that passed before the one that caught the mutant,
+  and four of colino's and brodo's slowest binaries took half of it. A trial of 106
+  mutants on GitHub Actions took 485 job-minutes unoptimized, 143 at opt-level 1, 147 at
+  3, and 448 under cargo-nextest stopping at the first failure (ADR-0034), each mutant's
+  outcome the same. The whole run at opt-level 1 on `78def09`, against the run on
+  `3a97708` with no code between them: 4665 mutants, none missed in either, eight moved
+  between caught and timed out and none else; 164 min against 619, 2468 job-minutes
+  against 7849, the longest shard 45 min against 331. Building optimized doubles the
+  build's time, 561 to 1077 job-minutes. cargo-nextest stays a choice of `mutants.yml`.
 - **The verdict** is the last report's missed mutants and the patient run's, and fails on
   a missed mutant, a timeout before any test failed, a baseline that failed or is missing,
   a list of none, and an argument it does not know (2026-11-02). Reports given with `--`

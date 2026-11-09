@@ -39,7 +39,8 @@ every mutant as `--report` holds them; a `--shard k/n` among ARGS runs one of n 
 the timeouts, so that they run again in parallel (ADR-0034). The patient run, or each part
 of it, fails unless it reports every timeout it was given, or cargo-mutants deals the part.
 
-Every report must hold an unmutated baseline that passed. Any other argument is refused.
+Every run builds the tests at opt-level 1, `OPTIMIZED`, and every report must hold an
+unmutated baseline that passed, its tests built so. Any other argument is refused.
 """
 
 import json
@@ -89,6 +90,9 @@ PATIENT_OUT = ROOT / "out" / "mutants" / "patient"
 # Every feature, as the gate's `cargo test` builds: code behind an opt-in feature is
 # mutated whatever the features, and its tests run only with them (ADR-0023).
 FEATURES = "--all-features"
+# The tests built at opt-level 1, debug assertions and overflow checks kept: every mutant's
+# outcome the same as unoptimized, in a quarter of the time (2026-11-10, ADR-0023).
+OPTIMIZED = "--config=profile.test.opt-level=1"
 
 
 def patterns() -> tuple[list[str], list[str]]:
@@ -229,8 +233,8 @@ def mutants(args: list[str], out: Path) -> None:
     env["RSS_GUARD_MIB"] = str(GUARD_MIB)
     env["RSS_GUARD_LOG"] = str(log)
     env["TMPDIR"] = str(tmp)
-    subprocess.run(["cargo", "mutants", "--workspace", FEATURES, "-j", str(JOBS), "-o", str(out),
-                    *args], cwd=ROOT, env=env, check=False)
+    subprocess.run(["cargo", "mutants", "--workspace", FEATURES, f"--cargo-arg={OPTIMIZED}",
+                    "-j", str(JOBS), "-o", str(out), *args], cwd=ROOT, env=env, check=False)
 
 
 def guarded(out: Path) -> list[str]:
@@ -284,6 +288,8 @@ def patient(args: list[str]) -> int:
         return report(missed)
     rerun = json.loads(written.read_text()) if written.exists() else {"outcomes": []}
     failures += baseline(rerun["outcomes"])
+    if written.exists():
+        failures += optimized(written.parent, rerun["outcomes"])
     names = {o["scenario"]["Mutant"]["name"] for o in rerun["outcomes"] if o["scenario"] != "Baseline"}
     lost = [n for n in mine if n not in names]
     if lost:
@@ -325,6 +331,20 @@ def baseline(reported: list[dict]) -> list[str]:
         return ["  no unmutated baseline: no mutant was tested against a passing tree"]
     if any(o["summary"] != "Success" for o in base):
         return ["  the unmutated baseline failed: no mutant was tested"]
+    return []
+
+
+def optimized(out: Path, reported: list[dict]) -> list[str]:
+    """A baseline whose tests were not built with `OPTIMIZED`, which every mutant's were
+    not either: its times and timeouts are not the run's."""
+    for o in reported:
+        if o["scenario"] != "Baseline":
+            continue
+        text = (out / o["log_path"]).read_text(errors="replace")
+        commands = [l for l in text.splitlines()
+                    if l.startswith("*** ") and re.search(r"\bcargo (test|nextest run)\b", l)]
+        if not commands or any(OPTIMIZED not in c.split() for c in commands):
+            return [f"  the baseline's tests were not built with {OPTIMIZED}: {out}"]
     return []
 
 
@@ -380,7 +400,8 @@ def verdict(out: Path) -> list[str]:
     failures = []
     written = out / "outcomes.json"
     if written.exists():
-        failures += baseline(json.loads(written.read_text())["outcomes"])
+        every = json.loads(written.read_text())["outcomes"]
+        failures += baseline(every) + optimized(out, every)
     reported = outcomes(out)
     for o in reported:
         name = o["scenario"]["Mutant"]["name"]
