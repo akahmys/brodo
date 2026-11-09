@@ -12,8 +12,9 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   entry without `brodo.hermite.set`, in brodo and in `formats.py`, and every reader of
   set names reads entries of bytes too (ADR-0037). Before it, issue 14 (ADR-0057) and
   issue 13 (ADR-0042). P10 was released as 1.1.0 (2026-11-09).
-- **Next**: P11's closing checks are done; releasing it as 1.2.0 is next (§2). §2's
-  "Later", §4 and GitHub issues 1 to 12 hold the rest of what is open.
+- **Next**: P11's closing checks are done, and the version is 1.2.0. Its tag, GitHub
+  release and publication on crates.io follow, each with the owner's approval (TESTING.md
+  V4). §2's "Later", §4 and GitHub issues 1 to 12 hold the rest of what is open.
 - **Unresolved**: `leaf_parallel_update_x32` drifts between processes by up to 20 %, its
   cause not measured (ADR-0019).
 
@@ -65,6 +66,7 @@ before it is written, its ADR amended where the design changes.
   - [x] T11: the run on `3a97708`, GitHub Actions run 42574201431, missed none of 4665
         mutants, its three timeouts before any failed test caught under 1800 s
         (2026-11-09)
+- [x] Version 1.2.0 (TESTING.md V2–V4, 2026-11-10)
 
 ### Held — `piatto`
 

@@ -6,6 +6,11 @@ are recorded here when they change (V6).
 
 ## Unreleased
 
+## 1.2.0 (2026-11-10)
+
+Closes P11: a view's leaves and tiles read without thawing, and two fixes to reading an
+archive, without breaking a user (TESTING.md V2). No format version changes.
+
 - `GridView::regions` and `ViewRegions`: a view's leaves' origins, by leaf number, and its
   tiles' levels, origins and values, by their place among the tile values, read without
   thawing (ADR-0042).

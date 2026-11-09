@@ -65,7 +65,7 @@ dependencies = [
 
 [[package]]
 name = "brodo"
-version = "1.1.0"
+version = "1.2.0"
 dependencies = [
  "lz4_flex",
  "memmap2",
@@ -107,7 +107,7 @@ dependencies = [
 
 [[package]]
 name = "colino"
-version = "1.1.0"
+version = "1.2.0"
 dependencies = [
  "brodo",
  "miniz_oxide 0.9.1",
@@ -292,7 +292,7 @@ dependencies = [
 
 [[package]]
 name = "mestolo"
-version = "1.1.0"
+version = "1.2.0"
 dependencies = [
  "brodo",
  "thiserror",
