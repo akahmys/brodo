@@ -9,6 +9,13 @@ are recorded here when they change (V6).
 - `GridView::regions` and `ViewRegions`: a view's leaves' origins, by leaf number, and its
   tiles' levels, origins and values, by their place among the tile values, read without
   thawing (ADR-0042).
+- `CacheError::BytesDecompress` and `CacheError::BytesChunks`, with the `archive` feature:
+  an archive's entry of bytes whose chunk does not decompress, or that is not cut as the
+  format cuts it, named by its place among the entries of bytes (ADR-0057).
+- Fixed: `CacheError::Grid`, `Decompress` and `Chunks` name a grid by its place among the
+  file's grids, as `GridEntry::index` numbers it, from a whole read as from a region's,
+  where a whole read counted entries of bytes before it; 1.0.0's note that the index is
+  the entry's place in the directory was superseded by ADR-0057 (issue 14).
 
 ## 1.1.0 (2026-11-09)
 

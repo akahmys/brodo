@@ -245,7 +245,7 @@ pub enum CacheError {
     /// A grid's frozen buffer was refused.
     #[error("grid {index}: {error}")]
     Grid {
-        /// The grid's place in the file.
+        /// The grid's place among the file's grids, as `GridEntry::index` numbers it.
         index: usize,
         /// Why its buffer was refused.
         error: FormatError,
@@ -271,15 +271,32 @@ pub enum CacheError {
     #[cfg(feature = "archive")]
     #[error("grid {index}'s chunk {chunk} does not decompress to its length")]
     Decompress {
-        /// The grid's place in the file.
+        /// The grid's place among the file's grids, as `GridEntry::index` numbers it.
         index: usize,
         /// The chunk's place in the grid's table.
         chunk: usize,
     },
-    /// An archive's grid is not cut into chunks as its writer cuts it (docs/formats.md §8.3).
+    /// An archive's grid, by its place among the file's grids as `GridEntry::index` numbers
+    /// it, is not cut into chunks as its writer cuts it (docs/formats.md §8.3).
     #[cfg(feature = "archive")]
     #[error("grid {0} is not cut into chunks as the format cuts it")]
     Chunks(usize),
+    /// An archive's entry of bytes' chunk does not decompress to the length its table states.
+    #[cfg(feature = "archive")]
+    #[error("entry of bytes {index}'s chunk {chunk} does not decompress to its length")]
+    BytesDecompress {
+        /// The entry's place among the file's entries of bytes, as `CacheFile::bytes_entries`
+        /// lists them.
+        index: usize,
+        /// The chunk's place in the entry's table.
+        chunk: usize,
+    },
+    /// An archive's entry of bytes, by its place among the file's entries of bytes as
+    /// `CacheFile::bytes_entries` lists them, is not cut into chunks as its writer cuts it
+    /// (docs/formats.md §8.3).
+    #[cfg(feature = "archive")]
+    #[error("entry of bytes {0} is not cut into chunks as the format cuts it")]
+    BytesChunks(usize),
     /// An archive's value encoding this build does not know (docs/formats.md §8.5).
     #[cfg(feature = "archive")]
     #[error("value encoding {0} is not read by this build")]

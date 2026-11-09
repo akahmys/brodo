@@ -121,6 +121,10 @@ fn cache_error(e: &CacheError) -> &'static str {
         #[cfg(feature = "archive")]
         CacheError::Chunks(..) => "Chunks",
         #[cfg(feature = "archive")]
+        CacheError::BytesDecompress { .. } => "BytesDecompress",
+        #[cfg(feature = "archive")]
+        CacheError::BytesChunks(..) => "BytesChunks",
+        #[cfg(feature = "archive")]
         CacheError::UnknownEncoding(..) => "UnknownEncoding",
         #[cfg(feature = "archive")]
         CacheError::NotQuantised { .. } => "NotQuantised",

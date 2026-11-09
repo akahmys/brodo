@@ -6,6 +6,8 @@
 
 #![cfg(feature = "archive")]
 
+use std::collections::BTreeMap;
+
 use brodo::archive::{
     Encoding, from_bytes, read, read_region, region_from_bytes, to_bytes, to_bytes_with, write,
     write_with,
@@ -707,6 +709,71 @@ fn a_region_holds_and_checks_only_the_chunks_it_needs() {
         region_from_bytes(&broken, 0, far, u64::MAX),
         Err(CacheError::Decompress { index: 0, chunk: 3 })
     ));
+}
+
+/// A grid refused while an archive is read, whole or as a region, is named by its place
+/// among the file's grids, as `GridEntry::index` numbers it, past an entry of bytes before
+/// it (ADR-0057; issue 14).
+#[test]
+fn a_refused_grid_is_named_by_its_place_among_the_grids() {
+    let t = row_topology(3);
+    let f = numbered(&t, 0.0_f32, |k| k as f32);
+    let entries = [
+        CacheEntry::bytes("a", BTreeMap::new(), vec![1, 2, 3]).unwrap(),
+        CacheEntry::new(&meta("f", &[]), &t, &f).unwrap(),
+    ];
+    let g = to_bytes(&entries).unwrap();
+    let extent = Bounds::Box { min: [0; 3], max: [9; 3] };
+    let whole = |b: &[u8]| from_bytes(b, u64::MAX).map(|_| ());
+    let region = |b: &[u8]| region_from_bytes(b, 0, extent, u64::MAX).map(|_| ());
+    // The grid is directory entry 1, words 16..24: metadata at, length, table at, chunks,
+    // blocks, type, encoding, kind. Its chunks: the nodes, the leaves, the tile.
+    assert_eq!(word(&g, 19), 3);
+    type Read<'a> = &'a dyn Fn(&[u8]) -> Result<(), CacheError>;
+    let reads: [Read<'_>; 2] = [&whole, &region];
+    for read in reads {
+        assert!(matches!(
+            read(&with_word(&g, 21, 5)),
+            Err(CacheError::Grid { index: 0, error: FormatError::WrongValueType { .. } })
+        ));
+        let mut broken = g.clone();
+        broken[chunk_at(&g, 16, 0)].fill(0xff);
+        assert!(matches!(read(&broken), Err(CacheError::Decompress { index: 0, chunk: 0 })));
+        // A block moved from the leaf chunk to the tile chunk: they add up, the nodes'
+        // chunk decompresses, and the cut is not the format's.
+        let table = word(&g, 18) as usize * 8;
+        let (leaf, tile) = (word(&g, table + 2), word(&g, table + 4));
+        let moved = with_word(&with_word(&g, table + 2, leaf - 1), table + 4, tile + 1);
+        assert!(matches!(read(&moved), Err(CacheError::Chunks(0))));
+    }
+}
+
+/// An entry of bytes refused while an archive is read is named as one, by its place among
+/// the file's entries of bytes, as `CacheFile::bytes_entries` lists them, past a grid and
+/// an entry of bytes before it (issue 14).
+#[test]
+fn a_refused_entry_of_bytes_is_named_by_its_place_among_them() {
+    let t = row_topology(3);
+    let f = numbered(&t, 0.0_f32, |k| k as f32);
+    let long: Vec<u8> = (0..600_000_u32).map(|k| (k % 251) as u8).collect();
+    let entries = [
+        CacheEntry::bytes("a", BTreeMap::new(), vec![1, 2, 3]).unwrap(),
+        CacheEntry::new(&meta("f", &[]), &t, &f).unwrap(),
+        CacheEntry::bytes("b", BTreeMap::new(), long).unwrap(),
+    ];
+    let g = to_bytes(&entries).unwrap();
+    let read = |b: &[u8]| from_bytes(b, u64::MAX).map(|_| ());
+    assert!(read(&g).is_ok());
+    // "b" is directory entry 2, words 24..32: metadata at, length, table at, chunks, ...
+    // Its chunks: 512 × 512 bytes, as many again, the rest.
+    assert_eq!(word(&g, 27), 3);
+    let mut broken = g.clone();
+    broken[chunk_at(&g, 24, 0)].fill(0xff);
+    assert!(matches!(read(&broken), Err(CacheError::BytesDecompress { index: 1, chunk: 0 })));
+    let table = word(&g, 26) as usize * 8;
+    let (second, third) = (word(&g, table + 2), word(&g, table + 4));
+    let moved = with_word(&with_word(&g, table + 2, second - 1), table + 4, third + 1);
+    assert!(matches!(read(&moved), Err(CacheError::BytesChunks(1))));
 }
 
 /// A region's read checks the archive's structure and its grid's first chunk as a whole

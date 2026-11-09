@@ -589,7 +589,7 @@ pub(crate) fn index(all: &[u8]) -> Result<Index, CacheError> {
         .and_then(|n| n.checked_mul(BLOCK))
         .ok_or(CacheError::Truncated("directory"))?;
     let mut index = Index { version: VERSION, grids: Vec::new(), bytes: Vec::new() };
-    for place in 0..count {
+    for _ in 0..count {
         let [meta_at, meta_len, at, blocks, value_type, kind, r1, r2] = [(); 8].map(|()| c.u32());
         let kind = kind?;
         let kind_ok = kind == KIND_GRID || kind == KIND_BYTES;
@@ -613,8 +613,8 @@ pub(crate) fn index(all: &[u8]) -> Result<Index, CacheError> {
             index.bytes.push(bytes_entry(all, meta, payload, value_type?)?);
             continue;
         }
-        let place = usize::try_from(place).map_err(|_| CacheError::TooLarge)?;
-        index.grids.push(grid_entry(all, meta, payload, value_type?, place)?);
+        let number = index.grids.len();
+        index.grids.push(grid_entry(all, meta, payload, value_type?, number)?);
     }
     if after != all.len() {
         return Err(CacheError::Inconsistent("end"));
@@ -622,18 +622,18 @@ pub(crate) fn index(all: &[u8]) -> Result<Index, CacheError> {
     Ok(index)
 }
 
-/// The grid at `payload`, the entry at `place` in the directory, its metadata `meta`,
+/// The grid at `payload`, numbered `index` among the file's grids, its metadata `meta`,
 /// checked as docs/formats.md §3.4 states, its bounds those its leaves and tiles cover.
 fn grid_entry(
     all: &[u8],
     meta: &[u8],
     payload: std::ops::Range<usize>,
     value_type: u32,
-    place: usize,
+    index: usize,
 ) -> Result<Entry, CacheError> {
     let (meta, bounds) = decode_meta(meta)?;
     let grid = all.get(payload.clone()).ok_or(CacheError::Truncated("grid"))?;
-    let refused = |error| CacheError::Grid { index: place, error };
+    let refused = |error| CacheError::Grid { index, error };
     let value_type = ValueType::from_code(value_type)
         .ok_or(refused(FormatError::UnknownValueType(value_type)))?;
     let found = check_grid(grid, value_type).map_err(refused)?;

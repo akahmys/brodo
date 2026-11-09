@@ -520,7 +520,7 @@ fn unpack(found: &[Found<'_>], top: &[u8], blocks: usize) -> Result<Vec<Block>, 
     run(found, work.iter_mut().filter(|w| w.chunk == 0).collect())?;
     for (i, g) in found.iter().enumerate() {
         let head = work.iter().find(|w| w.grid == i).map_or(&[][..], |w| &*w.room);
-        let pieces = pieces(i, g, head)?;
+        let pieces = pieces(number(found, i), g, head)?;
         for (w, (_, leaf)) in work.iter_mut().filter(|w| w.grid == i).zip(pieces) {
             w.leaf = leaf;
         }
@@ -529,9 +529,9 @@ fn unpack(found: &[Found<'_>], top: &[u8], blocks: usize) -> Result<Vec<Block>, 
     Ok(out)
 }
 
-/// Entry `index`'s chunks as §8.3 cuts a grid's frozen buffer, read from the frozen header
-/// in `head`, its first chunk decompressed, or as §8.3 cuts an entry of bytes; a table that
-/// lists others is refused (§8.4, rule 6).
+/// The chunks of entry `index`, numbered among its kind's entries, as §8.3 cuts a grid's
+/// frozen buffer, read from the frozen header in `head`, its first chunk decompressed, or
+/// as §8.3 cuts an entry of bytes; a table that lists others is refused (§8.4, rule 6).
 fn pieces(index: usize, g: &Found<'_>, head: &[u8]) -> Result<Vec<Piece>, CacheError> {
     let pieces = if g.kind == KIND_BYTES {
         let blocks = g.grid_blocks;
@@ -541,7 +541,11 @@ fn pieces(index: usize, g: &Found<'_>, head: &[u8]) -> Result<Vec<Piece>, CacheE
     };
     let first_leaf = pieces.first().is_some_and(|(_, leaf)| *leaf);
     if first_leaf || pieces.iter().map(|(r, _)| *r).ne(g.chunks.iter().map(|(_, raw)| *raw)) {
-        return Err(CacheError::Chunks(index));
+        return Err(if g.kind == KIND_BYTES {
+            CacheError::BytesChunks(index)
+        } else {
+            CacheError::Chunks(index)
+        });
     }
     Ok(pieces)
 }
@@ -593,7 +597,14 @@ fn run(found: &[Found<'_>], mut work: Vec<&mut Work<'_, '_>>) -> Result<(), Cach
         })
         .collect();
     match failed.into_iter().flatten().next() {
-        Some((index, chunk)) => Err(CacheError::Decompress { index, chunk }),
+        Some((place, chunk)) => {
+            let index = number(found, place);
+            Err(if found.get(place).is_some_and(|g| g.kind == KIND_BYTES) {
+                CacheError::BytesDecompress { index, chunk }
+            } else {
+                CacheError::Decompress { index, chunk }
+            })
+        }
         None => Ok(()),
     }
 }
@@ -706,6 +717,13 @@ pub fn region_from_bytes(
     run(&found, work.iter_mut().collect())?;
     let values = (value_type, g.encoding());
     Ok(Region { index, meta, bounds, values, extent, len, head, tail, chunks, leaves })
+}
+
+/// The entry at `place` in the directory numbered among the entries of its kind, as
+/// `GridEntry::index` numbers a grid (ADR-0057).
+fn number(found: &[Found<'_>], place: usize) -> usize {
+    let kind = found.get(place).map(|g| g.kind);
+    found.iter().take(place).filter(|g| Some(g.kind) == kind).count()
 }
 
 /// Grid `index`, numbered among the grids alone, and its place in the directory.

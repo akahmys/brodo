@@ -132,6 +132,29 @@ fn grids_are_listed_in_order_past_the_entries_of_bytes() {
     assert_eq!(bytes, [("a", vec![1, 2, 3]), ("first", vec![4])]);
 }
 
+/// A grid refused while a file is read is named by its place among the file's grids, as
+/// `GridEntry::index` numbers it, past an entry of bytes before it (ADR-0057; issue 14).
+#[test]
+fn a_refused_grid_is_named_by_its_place_among_the_grids() {
+    let t = build(&[[0, 0, 0]], &[]);
+    let entries = [
+        CacheEntry::bytes("a", BTreeMap::new(), vec![1, 2, 3]).unwrap(),
+        CacheEntry::new(&meta("g", &[]), &t, &Field::new(&t, 1.0_f32)).unwrap(),
+    ];
+    let g = to_bytes(&entries).unwrap();
+    let read = |b: &[u8]| brodo::cache::from_bytes(b).map(|_| ());
+    // The grid is directory entry 1, words 16..24: metadata at, length, grid at, blocks, type.
+    assert!(matches!(
+        read(&with_word(&g, 20, 7)),
+        Err(CacheError::Grid { index: 0, error: FormatError::UnknownValueType(7) })
+    ));
+    let frozen = usize::try_from(word(&g, 18)).unwrap() * 8;
+    assert!(matches!(
+        read(&with_word(&g, frozen + 1, 1)),
+        Err(CacheError::Grid { index: 0, error: FormatError::UnsupportedVersion(1) })
+    ));
+}
+
 /// Keys beginning `brodo.` are brodo's formats' (U1 of P5's review, ADR-0053): refused by
 /// `new` and `bytes`, so that a grid is not taken for a Hermite set's by mistake, and taken
 /// by their `with_reserved_keys` forms, which a set's own entries and files made to break a
