@@ -16,6 +16,7 @@
 //! bytes holding the crossings. A set of an earlier version, its keys beginning `hermite.`,
 //! is refused, not read (ADR-0053).
 
+use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::cache::{CacheEntry, CacheFile};
@@ -259,11 +260,13 @@ fn check_names(names: &[String]) -> Result<(), HermiteError> {
     Ok(())
 }
 
+/// A tile's level, origin and sign.
+type SignTile = (TileLevel, Coord, u8);
+
 /// What the check reads, from a set made in memory or read from a file.
 trait Source {
-    fn leaves(&self) -> Result<Vec<Coord>, HermiteError>;
-    /// Each tile's level, origin and the number its values are read by.
-    fn tiles(&self) -> Result<Vec<(TileLevel, Coord, u32)>, HermiteError>;
+    fn leaves(&self) -> Result<Cow<'_, [Coord]>, HermiteError>;
+    fn tiles(&self) -> Result<Cow<'_, [SignTile]>, HermiteError>;
     fn is_leaf(&self, v: Coord) -> Result<bool, HermiteError>;
     /// Whether a node holds the voxel's region of `level`.
     fn holds_node(&self, level: TileLevel, v: Coord) -> Result<bool, HermiteError>;
@@ -272,7 +275,6 @@ trait Source {
     /// The crossing on the edge along `axis` of leaf `n`'s point at `place`, if it holds one.
     fn crossing(&self, axis: usize, n: u32, place: usize)
     -> Result<Option<Crossing>, HermiteError>;
-    fn sign_tile(&self, t: u32) -> Result<u8, HermiteError>;
     fn sign_background(&self) -> u8;
 }
 
@@ -311,13 +313,13 @@ fn check(s: &impl Source, names: &[String]) -> Result<(), HermiteError> {
         return Err(violation(None, None, Rule::Sign));
     }
     let tiles = s.tiles()?;
-    for (_, origin, t) in &tiles {
-        if s.sign_tile(*t)? > 1 {
+    for (_, origin, sign) in tiles.iter() {
+        if *sign > 1 {
             return Err(violation(Some(*origin), None, Rule::Sign));
         }
     }
     let leaves = s.leaves()?;
-    for (n, origin) in (0_u32..).zip(&leaves) {
+    for (n, origin) in (0_u32..).zip(leaves.iter()) {
         let bad = s.sign_leaf(n)?.iter().position(|sign| *sign > 1);
         if let Some(i) = bad {
             return Err(violation(Some(voxel(*origin, i)), None, Rule::Sign));
@@ -325,11 +327,11 @@ fn check(s: &impl Source, names: &[String]) -> Result<(), HermiteError> {
     }
     // Tiles' faces before leaves, so that a change only a tile's face meets is the one
     // reported.
-    for (level, origin, t) in &tiles {
-        check_tile_faces(s, *level, *origin, s.sign_tile(*t)?)?;
+    for (level, origin, sign) in tiles.iter() {
+        check_tile_faces(s, *level, *origin, *sign)?;
     }
-    for (n, origin) in (0_u32..).zip(leaves) {
-        check_leaf(s, n, origin, groups)?;
+    for (n, origin) in (0_u32..).zip(leaves.iter()) {
+        check_leaf(s, n, *origin, groups)?;
     }
     Ok(())
 }
@@ -465,19 +467,19 @@ impl Face {
 struct Owned<'a>(&'a Hermite);
 
 impl Source for Owned<'_> {
-    fn leaves(&self) -> Result<Vec<Coord>, HermiteError> {
+    fn leaves(&self) -> Result<Cow<'_, [Coord]>, HermiteError> {
         let t = &self.0.topology;
-        Ok(t.leaf_numbers().map(|n| t.leaf_origin(n)).collect::<Result<_, _>>()?)
+        Ok(Cow::Owned(t.leaf_numbers().map(|n| t.leaf_origin(n)).collect::<Result<_, _>>()?))
     }
 
-    fn tiles(&self) -> Result<Vec<(TileLevel, Coord, u32)>, HermiteError> {
+    fn tiles(&self) -> Result<Cow<'_, [SignTile]>, HermiteError> {
         let t = &self.0.topology;
         let mut out = Vec::with_capacity(t.tile_count());
         for n in t.tile_numbers() {
             let (level, origin) = t.tile(n)?;
-            out.push((level, origin, n.get()));
+            out.push((level, origin, self.0.signs.tile_value_at(n.get())?));
         }
-        Ok(out)
+        Ok(Cow::Owned(out))
     }
 
     fn is_leaf(&self, v: Coord) -> Result<bool, HermiteError> {
@@ -509,10 +511,6 @@ impl Source for Owned<'_> {
     ) -> Result<Option<Crossing>, HermiteError> {
         let axis = Axis::ALL.get(axis).copied().ok_or(HermiteError::Missing("an axis"))?;
         Ok(self.0.crossings.get(LeafNumber(n), axis, place))
-    }
-
-    fn sign_tile(&self, t: u32) -> Result<u8, HermiteError> {
-        Ok(self.0.signs.tile_value_at(t)?)
     }
 
     fn sign_background(&self) -> u8 {
@@ -612,13 +610,12 @@ struct Viewed<'a, 'b> {
 }
 
 impl Source for Viewed<'_, '_> {
-    fn leaves(&self) -> Result<Vec<Coord>, HermiteError> {
-        Ok(self.regions.leaves().to_vec())
+    fn leaves(&self) -> Result<Cow<'_, [Coord]>, HermiteError> {
+        Ok(Cow::Borrowed(self.regions.leaves()))
     }
 
-    fn tiles(&self) -> Result<Vec<(TileLevel, Coord, u32)>, HermiteError> {
-        let tiles = self.regions.tiles().iter().zip(0_u32..);
-        Ok(tiles.map(|((level, origin, _), t)| (*level, *origin, t)).collect())
+    fn tiles(&self) -> Result<Cow<'_, [SignTile]>, HermiteError> {
+        Ok(Cow::Borrowed(self.regions.tiles()))
     }
 
     fn is_leaf(&self, v: Coord) -> Result<bool, HermiteError> {
@@ -645,10 +642,6 @@ impl Source for Viewed<'_, '_> {
     ) -> Result<Option<Crossing>, HermiteError> {
         let c = &self.set.crossings;
         sparse_crossing(c.masks, c.items, &c.starts, n, axis, place)
-    }
-
-    fn sign_tile(&self, t: u32) -> Result<u8, HermiteError> {
-        Ok(self.set.signs.tile_value(t)?)
     }
 
     fn sign_background(&self) -> u8 {
@@ -769,7 +762,7 @@ impl<'a> HermiteView<'a> {
     /// The set named `set` in `file`, its sign grid and its entry of crossings found by
     /// their keys and checked whole, as docs/formats.md §4.2 states; of several broken
     /// rules, which is named is not promised. A set written by an earlier version, its keys
-    /// beginning `hermite.`, is refused with `Version`.
+    /// beginning `hermite.`, is refused with `UnsupportedVersion`.
     pub fn find(file: &'a CacheFile, set: &str) -> Result<HermiteView<'a>, HermiteError> {
         check_version(file, set)?;
         let mut sign = None;
