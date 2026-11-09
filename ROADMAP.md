@@ -8,13 +8,11 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: P11 released as 1.2.0, a view's leaves and tiles read without thawing and two
-  fixes to reading an archive, without breaking a user (ADR-0037, ADR-0042, ADR-0057):
-  brodo, colino and mestolo published by the owner, docs.rs building their reference,
-  `GridView::regions` used from a new crate depending on them by version, and `cargo
-  install mestolo` installing the command (2026-11-10).
-- **Next**: no milestone is scheduled; the owner chooses the next work. §2's "Later", §4
-  and GitHub issues 1 to 12 hold what is open.
+- **Done**: P12's issue 2, an archive listed without decompressing a chunk and grids found
+  by name in a cache file, an archive and a `.vdb` (ADR-0016, ADR-0055); before it, P11
+  released as 1.2.0 (2026-11-10).
+- **Next**: P12's issue 7 (§2): a `Remap` between any two topologies, its API put to the
+  owner first.
 - **Unresolved**: `leaf_parallel_update_x32` drifts between processes by up to 20 %, its
   cause not measured (ADR-0019).
 
@@ -41,6 +39,34 @@ in this file as of `53f69d5` (P0 to P9), `711cf5b` (P10) and `e27fd49` (P11).
 | P10, rounding off 1.0 | 1.1.0 | 2026-11-09 |
 | P11, a view's leaves and tiles without thawing | 1.2.0 | 2026-11-10 |
 
+### P12 — picking a grid, and fields between topologies
+
+Set by the owner on 2026-11-09, started on 2026-11-10, to be released as 1.3.0, adding to
+the API without breaking a user. In this order; each change's API is put to the owner
+before it is written, its ADR amended where the design changes. Each issue's
+`owner-approved` label was last applied by `akahmys` (checked 2026-11-10).
+
+- [x] [Issue 2](https://github.com/akahmys/brodo/issues/2): an archive listed without
+      decompressing a chunk, §8.6's rules 1 and 2 held for every entry, and grids found by
+      name in a cache file, an archive and a `.vdb`, every match in the file's order
+      (ADR-0016, ADR-0055)
+- [ ] [Issue 7](https://github.com/akahmys/brodo/issues/7): a `Remap` between any two
+      topologies, values moved by `Field::remap`, a tile over leaves and background merged
+      by the caller's rule (ADR-0014)
+- [ ] [Issue 8](https://github.com/akahmys/brodo/issues/8): the union of two topologies,
+      the finer kept, a tile split where the other holds a leaf or a smaller tile, its
+      remaps made by issue 7's
+- [ ] [Issue 4](https://github.com/akahmys/brodo/issues/4): a writer taking its entry count
+      first and one grid at a time, to a path only; `write` and `to_bytes` made by it, their
+      bytes unchanged
+- [ ] [Issue 3](https://github.com/akahmys/brodo/issues/3): `.vdb` grids of `[f32; 3]` and
+      `[f64; 3]`, after a spike against OpenVDB 14 (AGENTS.md S1); `u8` and `u32` decided
+      once the spike has looked for their OpenVDB types; mestolo's `convert` taking them
+- [ ] [Issue 6](https://github.com/akahmys/brodo/issues/6): B-025 answered by its spike and
+      ADR before it is implemented
+- [ ] The closing checks, chosen by the owner when the issues are done
+- [ ] Version 1.3.0 (TESTING.md V2–V4)
+
 ### Held — `piatto`
 
 Not built for now (owner, 2026-10-24; ADR-0018; §3, B-021). If it is, then:
@@ -64,6 +90,7 @@ implementation (PLANNING.md §2).
 
 | # | Question | Proposal so far |
 | :--- | :--- | :--- |
+| B-025 | How does labelled connectivity number the root's empty regions without the dense grid of 2²² cells that refuses scattered leaves as `TooSpread` (issue 6)? | None yet: a spike measures a sparse form of the root's regions against the dense one on the layouts it accepts, before an ADR |
 
 Questions decided "not now", each revisited only when what it names happens:
 

@@ -7,16 +7,19 @@
 //! The bytes are in `docs/formats.md` §8, which this code follows: version 2, which holds
 //! entries of bytes beside grids (ADR-0051); version 1 is neither read nor written
 //! (ADR-0054). A region's read (§8.6) checks the archive's structure and only the chunks
-//! it decompresses.
+//! it decompresses; a listing (§8.7) checks the structure and every entry's metadata, and
+//! decompresses nothing.
 
+use std::collections::BTreeMap;
 use std::path::Path;
 
 use rayon::prelude::*;
 use zerocopy::{FromBytes, FromZeros, IntoBytes};
 
 use crate::cache::{
-    CacheEntry, CacheFile, Cursor, KIND_BYTES, KIND_GRID, Part, Payload, Storage, decode_meta,
-    head, index, pad_to, put_u32, range, read_within, u32_of, zero,
+    CacheEntry, CacheFile, Cursor, KIND_BYTES, KIND_GRID, Part, Payload, Storage,
+    decode_bytes_meta, decode_meta, head, index, pad_to, put_u32, range, read_within, u32_of,
+    within_blocks, zero,
 };
 use crate::error::{CacheError, FormatError};
 use crate::field::local_index;
@@ -621,6 +624,118 @@ pub fn read(path: &Path, limit: u64) -> Result<CacheFile, CacheError> {
 /// or by the bytes read where its length says less than it holds.
 fn load(path: &Path, limit: u64) -> Result<Vec<u8>, CacheError> {
     read_within(path, limit, |length, limit| CacheError::FileTooLarge { length, limit })
+}
+
+/// What an archive holds, read from its directory and metadata without decompressing a
+/// chunk (`list`, docs/formats.md §8.7): its grids and its entries of bytes, each in the
+/// file's order.
+#[derive(Debug, Clone)]
+pub struct Listing {
+    grids: Vec<ListedGrid>,
+    bytes: Vec<ListedBytes>,
+}
+
+impl Listing {
+    /// The grids, in the file's order, numbered among themselves as `GridEntry::index`
+    /// numbers them: an entry of bytes is not one.
+    pub fn grids(&self) -> &[ListedGrid] {
+        &self.grids
+    }
+
+    /// The grids named `name`, every one in the file's order; none if no grid is.
+    pub fn grids_named(&self, name: &str) -> Vec<&ListedGrid> {
+        self.grids.iter().filter(|g| g.meta.name == name).collect()
+    }
+
+    /// The entries of bytes, in the file's order.
+    pub fn bytes_entries(&self) -> &[ListedBytes] {
+        &self.bytes
+    }
+}
+
+/// A grid an archive lists: what its directory entry and metadata state, its values not
+/// read. Its region, or the whole grid as the region of its bounds, is read by
+/// `read_region` with its `index`.
+#[derive(Debug, Clone)]
+pub struct ListedGrid {
+    index: usize,
+    meta: GridMeta,
+    bounds: Bounds,
+    value_type: ValueType,
+    encoding: Encoding,
+}
+
+impl ListedGrid {
+    /// Its place among the file's grids, as `GridEntry::index` numbers it.
+    pub fn index(&self) -> usize {
+        self.index
+    }
+
+    /// Its metadata.
+    pub fn meta(&self) -> &GridMeta {
+        &self.meta
+    }
+
+    /// The bounds the file states for it, not checked against its leaves and tiles, which
+    /// a listing does not read (docs/formats.md §8.7).
+    pub fn bounds(&self) -> Bounds {
+        self.bounds
+    }
+
+    /// The type of its values.
+    pub fn value_type(&self) -> ValueType {
+        self.value_type
+    }
+
+    /// How its leaf values are encoded.
+    pub fn encoding(&self) -> Encoding {
+        self.encoding
+    }
+}
+
+/// An entry of bytes an archive lists: its name, its free pairs and its length, its bytes
+/// not read.
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct ListedBytes {
+    /// Its name.
+    pub name: String,
+    /// Its free pairs.
+    pub extra: BTreeMap<String, String>,
+    /// Its length in bytes.
+    pub len: u64,
+}
+
+/// Lists an archive of at most `limit` bytes, as `list_from_bytes` does: a longer file is
+/// refused by its length before any of it is read, or by the bytes read where its length
+/// says less than it holds. The file is read whole; no chunk is decompressed.
+pub fn list(path: &Path, limit: u64) -> Result<Listing, CacheError> {
+    list_from_bytes(&load(path, limit)?)
+}
+
+/// Checks an archive's structure and every entry's metadata as docs/formats.md §8.7
+/// states and lists its grids and entries of bytes, decompressing no chunk: a file whose
+/// chunks a whole read refuses may be listed. Of several broken rules, which is named is
+/// not promised.
+pub fn list_from_bytes(bytes: &[u8]) -> Result<Listing, CacheError> {
+    let mut listing = Listing { grids: Vec::new(), bytes: Vec::new() };
+    for g in &find(bytes)? {
+        if g.kind == KIND_BYTES {
+            let (name, len, extra) = decode_bytes_meta(g.meta)?;
+            within_blocks(len, g.grid_blocks)?;
+            listing.bytes.push(ListedBytes { name, extra, len });
+            continue;
+        }
+        let index = listing.grids.len();
+        let (meta, bounds) = decode_meta(g.meta)?;
+        let value_type = ValueType::from_code(g.value_type).ok_or(CacheError::Grid {
+            index,
+            error: FormatError::UnknownValueType(g.value_type),
+        })?;
+        let encoding = g.encoding();
+        listing.grids.push(ListedGrid { index, meta, bounds, value_type, encoding });
+    }
+    Ok(listing)
 }
 
 /// One grid's region of an archive, a box of voxels, read without the leaf chunks it does

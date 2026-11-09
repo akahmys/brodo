@@ -321,6 +321,14 @@ fastest, and an `Offset` is made from its number or its step as from what gives 
   `RegionView` answers every voxel within the box and refuses one outside it, whatever
   the chunks held cover, so that what it answers does not follow from how the grid is cut
   (ADR-0016).
+- An archive is listed without decompressing a chunk (`archive::list`): each grid's
+  number, metadata, bounds, value type and encoding, and each entry of bytes' name, pairs
+  and length, from its directory and metadata, checked as docs/formats.md §8.7 states; a
+  grid found there is read alone as the region of its bounds (ADR-0016).
+- Grids are found by name in every file brodo reads, every grid of the name in the file's
+  order, since names may repeat: in a file read (`CacheFile::grids_named`), in an
+  archive's listing (`Listing::grids_named`), and in a `.vdb` read for one name
+  (`vdb::read_named`), which skips each grid of another name unread (ADR-0016).
 - OpenVDB files (`.vdb`), under the feature `vdb`, are written by brodo itself, float and
   double grids on its tree, as one file OpenVDB 14 reads with brodo's values where brodo
   samples them (docs/formats.md §9, ADR-0045, ADR-0046); every leaf voxel and tile is

@@ -504,6 +504,20 @@ A chunk it does not decompress is not checked to decompress, nor are its values:
 that a whole read (§8.4) refuses may answer a region. It answers a voxel within the box as
 the frozen buffer does, and refuses any other, though the chunks it holds may cover it.
 
+### 8.7 Listing
+
+A listing reads each entry's directory entry and metadata, and decompresses no chunk
+(ADR-0016). It refuses a file, before answering anything, unless:
+
+1. rules 1 to 3 and 7 of §8.4 hold, and, for every entry, its chunks' lengths add up to its
+   payload's length;
+2. every grid's metadata passes §3.4, rule 4, and its value type is one of §1.1;
+3. every entry of bytes' metadata passes §3.4, rule 7, its byte length within the last of
+   its payload's blocks.
+
+A chunk is not checked to decompress, nor a grid's bounds against its leaves and tiles,
+nor an entry of bytes' padding: a file that a whole read (§8.4) refuses may be listed.
+
 Version 1, which held grids alone, its directory's last word unused, is not read
 (ADR-0054).
 
@@ -602,7 +616,8 @@ breaks them; of several broken rules, which is named is not promised.
    `Tree_double_5_4_3`, among them one saved as half floats, whose type OpenVDB writes
    with `_HalfFloat` appended, or whose instance string is not empty, an instanced grid
    with a leaf buffers' offset of 0, is skipped whole, by its offsets, and its name
-   returned.
+   returned. A read of the grids of one name skips every grid of another name so, by its
+   offsets, its name not returned and its body not checked.
 3. **Compression flags**: 0, 2, 4 or 6. Zip (1) and any other bit are refused.
 4. **Metadata.** Every entry's bytes are skipped by its count. Of entries of type
    `string`, `name` and those whose name begins `file_` are dropped, and the others kept,

@@ -1,6 +1,6 @@
 # ADR-0055: Every format reads and writes in one shape
 
-- **Status**: Accepted
+- **Status**: Amended
 - **Date**: 2026-11-05
 
 ## Context
@@ -43,3 +43,14 @@ compares its `Debug` text; colino's `each_damage_is_its_own_error` for STL, long
 is split into `each_damage_to_binary_is_its_own_error` and
 `each_damage_to_ascii_is_its_own_error`. The mutant excluded in `CacheFile::read`'s
 arithmetic (ADR-0023) is the same one in `cache::read`, its exclusion renamed with it.
+
+## Amendment
+
+- **Date**: 2026-11-10
+
+Issue 2 asked for an archive listed without decompressing it and for grids found by name.
+The owner decided, on 2026-11-10, as proposed, that the new reads take this record's
+shape: `archive::list(path, limit)` and `archive::list_from_bytes(bytes)`, the latter
+without a limit, a listing making nothing beyond its input; and `vdb::read_named(path,
+unit, name, limit)` and `vdb::from_bytes_named(bytes, unit, name, limit)`, the name before
+the limit, which stays last.

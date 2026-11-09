@@ -553,7 +553,9 @@ fn header(c: &mut Cursor<'_>) -> Result<u32, CacheError> {
 
 /// An entry of bytes' metadata: its name, its byte length and its free pairs, in the bytes
 /// brodo writes for them.
-fn decode_bytes_meta(bytes: &[u8]) -> Result<(String, u64, BTreeMap<String, String>), CacheError> {
+pub(crate) fn decode_bytes_meta(
+    bytes: &[u8],
+) -> Result<(String, u64, BTreeMap<String, String>), CacheError> {
     let mut c = Cursor { rest: bytes, what: "metadata" };
     let name = c.string()?;
     let len = <[u8; 8]>::try_from(c.take(8)?).map_err(|_| CacheError::Truncated("metadata"))?;
@@ -658,17 +660,26 @@ fn bytes_entry(
     value_type: u32,
 ) -> Result<BytesIndex, CacheError> {
     let (name, len, extra) = decode_bytes_meta(meta)?;
-    let len = usize::try_from(len).map_err(|_| CacheError::TooLarge)?;
-    let blocks = payload.len();
-    let within = len <= blocks && blocks - len < BLOCK;
-    if value_type != 0 || !within {
+    if value_type != 0 {
         return Err(CacheError::Inconsistent("entry of bytes"));
     }
+    let len = within_blocks(len, payload.len() / BLOCK)?;
     let end = payload.start + len;
     if !zero(all.get(end..payload.end).ok_or(CacheError::Truncated("entry of bytes"))?) {
         return Err(CacheError::Inconsistent("padding"));
     }
     Ok(BytesIndex { name, extra, range: payload.start..end })
+}
+
+/// An entry of bytes' length `len`, refused unless it lies within the last of its payload's
+/// `blocks` blocks (docs/formats.md §3.4, rule 7).
+pub(crate) fn within_blocks(len: u64, blocks: usize) -> Result<usize, CacheError> {
+    let len = usize::try_from(len).map_err(|_| CacheError::TooLarge)?;
+    let room = blocks.checked_mul(BLOCK).ok_or(CacheError::TooLarge)?;
+    if len > room || room - len >= BLOCK {
+        return Err(CacheError::Inconsistent("entry of bytes"));
+    }
+    Ok(len)
 }
 
 pub(crate) fn zero(bytes: &[u8]) -> bool {
@@ -792,6 +803,12 @@ impl CacheFile {
                 encoding: e.encoding,
             })
             .collect()
+    }
+
+    /// The grids named `name`, every one in the file's order, numbered as `grids` numbers
+    /// them; none if no grid is.
+    pub fn grids_named(&self, name: &str) -> Vec<GridEntry<'_>> {
+        self.grids().into_iter().filter(|g| g.meta.name == name).collect()
     }
 
     /// The entries of bytes, in the file's order.

@@ -6,6 +6,15 @@ are recorded here when they change (V6).
 
 ## Unreleased
 
+- `archive::list` and `archive::list_from_bytes`, with the `archive` feature: an archive's
+  grids and entries of bytes listed from its directory and metadata, as `Listing`,
+  `ListedGrid` and `ListedBytes`, decompressing no chunk (docs/formats.md §8.7, ADR-0016;
+  issue 2).
+- `CacheFile::grids_named` and `Listing::grids_named`: every grid of a name, in the file's
+  order (issue 2).
+- `vdb::read_named` and `vdb::from_bytes_named`, with the `vdb` feature: the grids of one
+  name read from a `.vdb`, every other grid skipped unread (docs/formats.md §9.7; issue 2).
+
 ## 1.2.0 (2026-11-10)
 
 Closes P11: a view's leaves and tiles read without thawing, and two fixes to reading an

@@ -13,7 +13,9 @@ use brodo::field::Field;
 use brodo::meta::{GridMeta, SDF_KEY, SDF_VERSION};
 use brodo::topology::Topology;
 use brodo::tree::TileLevel;
-use brodo::vdb::{VdbEntry, VdbFile, VdbValue, from_bytes, read, to_bytes};
+use brodo::vdb::{
+    VdbEntry, VdbFile, VdbValue, from_bytes, from_bytes_named, read, read_named, to_bytes,
+};
 
 const BY12: &[u8] = include_bytes!("data/vdb_by12_v224.bin");
 const BY14: &[u8] = include_bytes!("data/vdb_by14_v225.bin");
@@ -775,4 +777,60 @@ fn a_blosc_block_off_its_place_or_with_bytes_after_it_is_refused() {
     assert_eq!(refused(&chunk_with(&lz4, lz4.len(), &[0; 3])), "Blosc chunk");
     let memcpy = chunk_with(&BY14[p + 8..p + 8 + n], n, &[0]);
     assert_eq!(refused(&memcpy), "Blosc chunk");
+}
+
+/// The byte at which grid `name`'s descriptor states where its body starts, in a file of
+/// grids brodo wrote: after the name, the type and the instance, each a `u32` length and its
+/// bytes (docs/formats.md §9).
+fn body_of(bytes: &[u8], name: &str) -> usize {
+    let mut key = u32::try_from(name.len()).unwrap().to_le_bytes().to_vec();
+    key.extend(name.as_bytes());
+    let mut at = bytes.windows(key.len()).position(|w| w == key.as_slice()).unwrap() + key.len();
+    for _ in 0..2 {
+        at += 4 + u32::from_le_bytes(bytes[at..at + 4].try_into().unwrap()) as usize;
+    }
+    usize::try_from(i64::from_le_bytes(bytes[at..at + 8].try_into().unwrap())).unwrap()
+}
+
+/// A grid is read by name, every grid of the name in the file's order, the others skipped
+/// unread: a file whose other grid is damaged is read by name, though a whole read refuses
+/// it, and a name no grid has reads no grid (issue 2).
+#[test]
+fn grids_are_read_by_name_the_others_unread() {
+    let (m, t, f) = written(3.0_f32, |k| k as f32 * 0.5 - 900.0);
+    let named = |name: &str| {
+        let mut m = m.clone();
+        m.name = name.to_owned();
+        VdbEntry::new(&m, &t, &f).unwrap()
+    };
+    let bytes = to_bytes(&[named("aa"), named("bb"), named("cc")]).unwrap();
+    let whole = from_bytes(&bytes, "mm", u64::MAX).unwrap();
+    let by_name = from_bytes_named(&bytes, "mm", "bb", u64::MAX).unwrap();
+    let (lines, skipped) = listing_of(&by_name);
+    assert_eq!(lines.keys().collect::<Vec<_>>(), ["bb"]);
+    assert_eq!(lines["bb"], listing_of(&whole).0["bb"]);
+    assert!(skipped.is_empty());
+    assert!(from_bytes_named(&bytes, "mm", "dd", u64::MAX).unwrap().grids.is_empty());
+    // Grid "cc" renamed "aa", which brodo would not write: both are read, in order.
+    let mut twice = bytes.clone();
+    let at = twice.windows(6).position(|w| w == [2, 0, 0, 0, b'c', b'c']).unwrap();
+    twice[at + 4..at + 6].copy_from_slice(b"aa");
+    let both = from_bytes_named(&twice, "mm", "aa", u64::MAX).unwrap();
+    let names: Vec<&str> = both.grids.iter().map(|g| g.meta.name.as_str()).collect();
+    assert_eq!(names, ["aa", "aa"]);
+    // Grid "aa"'s compression flags, the first word of its body, of no meaning.
+    let mut broken = bytes.clone();
+    let body = body_of(&bytes, "aa");
+    broken[body..body + 4].copy_from_slice(&0x100_u32.to_le_bytes());
+    assert!(from_bytes(&broken, "mm", u64::MAX).is_err());
+    assert!(from_bytes_named(&broken, "mm", "aa", u64::MAX).is_err());
+    let read_b = from_bytes_named(&broken, "mm", "bb", u64::MAX).unwrap();
+    assert_eq!(listing_of(&read_b).0["bb"], listing_of(&whole).0["bb"]);
+    let path = Path::new(env!("CARGO_TARGET_TMPDIR")).join("named.vdb");
+    std::fs::write(&path, &broken).unwrap();
+    assert_eq!(read_named(&path, "mm", "bb", u64::MAX).unwrap().grids.len(), 1);
+    assert!(matches!(
+        read_named(&path, "mm", "bb", broken.len() as u64 - 1),
+        Err(VdbError::FileTooLarge { .. })
+    ));
 }

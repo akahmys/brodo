@@ -76,6 +76,15 @@ version 2 of the layout and of both profiles replaced version 1's (ADR-0052, ADR
   decompresses, not the others. A view over a grid-sized buffer was set aside: zeroing
   that buffer alone made it only 1.2 to 4 times faster than a whole read. The file is
   still read whole; reading only the chunks' bytes is left to later (ROADMAP.md §2).
+- **A listing, and grids by name** (2026-11-09 and 2026-11-10, issue 2). An archive is
+  listed from its directory and metadata, decompressing no chunk, its structure and every
+  entry's metadata checked as a region's read checks its grid's, so that one grid of a
+  large file is picked cheaply and then read alone as the region of its bounds; the
+  listing gives its entries of bytes too, as a `CacheFile` does, their metadata being
+  checked anyway. Grids are found by name in a cache file, an archive and a `.vdb`, every
+  match in the file's order, since names may repeat and brodo does not choose among them;
+  a `.vdb` read for one name skips each other grid by its offsets, unread. The file is
+  still read whole, as for a region.
 - **A whole read's buffer** (2026-10-30) is written with zeros rather than taken zeroed
   from the allocator: the saving was about 1 % of a read, and `zerocopy`'s `alloc` feature
   and a failure of its own to handle would come with it.

@@ -1,11 +1,12 @@
-//! Fuzzes `archive::from_bytes` and `archive::region_from_bytes`, the readers of archives
-//! (`crates/brodo/src/archive.rs`), and the reads of any file or region they accept, every
-//! grid as every value type: no input may panic (TESTING.md T6). The limit keeps what an
-//! archive may decompress into within the fuzzer's memory.
+//! Fuzzes `archive::from_bytes`, `archive::region_from_bytes` and `archive::list_from_bytes`,
+//! the readers of archives (`crates/brodo/src/archive.rs`), and the reads of any file or
+//! region they accept, every grid as every value type: no input may panic (TESTING.md T6),
+//! and a file read whole is listed as it was read. The limit keeps what an archive may
+//! decompress into within the fuzzer's memory.
 
 #![no_main]
 
-use brodo::archive::{Region, from_bytes, region_from_bytes};
+use brodo::archive::{Region, from_bytes, list_from_bytes, region_from_bytes};
 use brodo::cache::{CacheFile, GridEntry};
 use brodo::field::Stored;
 use brodo::meta::Bounds;
@@ -58,8 +59,37 @@ fn region<T: Stored>(region: &Region) {
     let _beyond = view.leaf(u32::MAX);
 }
 
+/// Fails unless `file`, read whole, is listed as it was read, and its grids found by name
+/// as the listing finds them.
+fn listed_as_read(data: &[u8], file: &CacheFile) {
+    let listing = list_from_bytes(data).expect("a file read whole is listed");
+    let (listed, read) = (listing.grids(), file.grids());
+    assert_eq!(listed.len(), read.len());
+    for (l, g) in listed.iter().zip(&read) {
+        assert_eq!((l.index(), l.meta(), l.bounds()), (g.index(), g.meta(), g.bounds()));
+        assert_eq!((l.value_type(), l.encoding()), (g.value_type(), g.encoding()));
+        let named: Vec<usize> =
+            listing.grids_named(&l.meta().name).iter().map(|n| n.index()).collect();
+        let found: Vec<usize> =
+            file.grids_named(&g.meta().name).iter().map(|n| n.index()).collect();
+        assert_eq!(named, found);
+    }
+    let (listed, read) = (listing.bytes_entries(), file.bytes_entries());
+    assert_eq!(listed.len(), read.len());
+    for (l, b) in listed.iter().zip(&read) {
+        assert_eq!((l.name.as_str(), &l.extra), (b.name, b.extra));
+        assert_eq!(usize::try_from(l.len).ok(), Some(b.bytes.len()));
+    }
+}
+
 fuzz_target!(|data: &[u8]| {
+    if let Ok(listing) = list_from_bytes(data) {
+        for g in listing.grids() {
+            let _named = listing.grids_named(&g.meta().name);
+        }
+    }
     if let Ok(file) = from_bytes(data, LIMIT) {
+        listed_as_read(data, &file);
         for g in file.grids() {
             let _meta = g.meta();
             let _bounds = g.bounds();

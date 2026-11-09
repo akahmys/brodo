@@ -1,16 +1,17 @@
 //! Format tier (TESTING.md §1) for the archive profile: an archive reads back as the cache
 //! file of the same grids, the same grids give the same bytes whatever the threads, the
 //! format keeps the bytes of its committed files (TESTING.md V6), a region reads as the
-//! whole grid does within its box (§8.6), and damaged archives are refused, never read
-//! wrongly or with a panic.
+//! whole grid does within its box (§8.6), a listing gives what a whole read does without
+//! decompressing a chunk (§8.7), and damaged archives are refused, never read wrongly or
+//! with a panic.
 
 #![cfg(feature = "archive")]
 
 use std::collections::BTreeMap;
 
 use brodo::archive::{
-    Encoding, from_bytes, read, read_region, region_from_bytes, to_bytes, to_bytes_with, write,
-    write_with,
+    Encoding, Listing, from_bytes, list, list_from_bytes, read, read_region, region_from_bytes,
+    to_bytes, to_bytes_with, write, write_with,
 };
 use brodo::cache::{self, CacheEntry, CacheFile};
 use brodo::error::{CacheError, FormatError};
@@ -884,4 +885,143 @@ fn each_grid_is_restored_by_its_own_cut() {
             assert_eq!(bits(&file, 1, second.1), bits(&exact, 0, second.1), "{encoding:?}");
         }
     }
+}
+
+/// Fails unless `listing` gives each grid and entry of bytes as the whole read `file` does.
+fn lists(listing: &Listing, file: &CacheFile) {
+    let (listed, read) = (listing.grids(), file.grids());
+    assert_eq!(listed.len(), read.len());
+    for (l, g) in listed.iter().zip(&read) {
+        assert_eq!(l.index(), g.index());
+        assert_eq!(l.meta(), g.meta());
+        assert_eq!(l.bounds(), g.bounds());
+        assert_eq!(l.value_type(), g.value_type());
+        assert_eq!(l.encoding(), g.encoding());
+    }
+    let (listed, read) = (listing.bytes_entries(), file.bytes_entries());
+    assert_eq!(listed.len(), read.len());
+    for (l, b) in listed.iter().zip(&read) {
+        assert_eq!((l.name.as_str(), &l.extra), (b.name, b.extra));
+        assert_eq!(l.len, b.bytes.len() as u64);
+    }
+}
+
+/// An archive of two grids and an entry of bytes, the bytes between them, as the committed
+/// `archive_v2.bin` holds them.
+fn with_bytes() -> Vec<u8> {
+    let mut e = golden_entries();
+    let extra = BTreeMap::from([("kind".to_owned(), "notes".to_owned())]);
+    e.insert(1, CacheEntry::bytes("readme", extra, b"brodo, 2026".to_vec()).unwrap());
+    to_bytes(&e).unwrap()
+}
+
+/// A listing gives each grid's number, metadata, bounds, value type and encoding, and each
+/// entry of bytes' name, pairs and length, as a whole read does, without decompressing a
+/// chunk: a file whose chunks are damaged is listed, though a whole read refuses it
+/// (docs/formats.md §8.7; issue 2).
+#[test]
+fn a_listing_gives_what_a_whole_read_gives_without_decompressing() {
+    for bytes in [GOLDEN.to_vec(), QUANTISED.to_vec(), with_bytes(), to_bytes(&[]).unwrap()] {
+        lists(&list_from_bytes(&bytes).unwrap(), &from_bytes(&bytes, u64::MAX).unwrap());
+    }
+    let g = with_bytes();
+    let listed = list_from_bytes(&g).unwrap();
+    let mut broken = g.clone();
+    // Grid 0 is directory entry 0, the entry of bytes 1, grid 1 entry 2: each one's first
+    // chunk filled with what decompresses to nothing.
+    for dir in [8, 16, 24] {
+        broken[chunk_at(&g, dir, 0)].fill(0xff);
+    }
+    assert!(from_bytes(&broken, u64::MAX).is_err());
+    lists(&list_from_bytes(&broken).unwrap(), &from_bytes(&g, u64::MAX).unwrap());
+    assert_eq!(listed.grids().len(), 2);
+    let path = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("listed.brda");
+    std::fs::write(&path, &broken).unwrap();
+    lists(&list(&path, g.len() as u64).unwrap(), &from_bytes(&g, u64::MAX).unwrap());
+    assert!(matches!(
+        list(&path, g.len() as u64 - 1),
+        Err(CacheError::FileTooLarge { length, .. }) if length == g.len() as u64
+    ));
+}
+
+/// A listing refuses a file whose structure, or any entry's metadata, breaks the format,
+/// whichever entry it is (docs/formats.md §8.7).
+#[test]
+fn a_listing_checks_the_structure_and_every_entrys_metadata() {
+    let g = with_bytes();
+    let listed = |b: &[u8]| list_from_bytes(b).map(|_| ());
+    assert!(listed(&g).is_ok());
+    assert!(matches!(
+        listed(&cache::to_bytes(&golden_entries()).unwrap()),
+        Err(CacheError::BadMagic(_))
+    ));
+    assert!(matches!(listed(&with_word(&g, 1, 1)), Err(CacheError::UnsupportedVersion(1))));
+    assert!(matches!(listed(&with_word(&g, 4, 256)), Err(CacheError::Inconsistent("header"))));
+    assert!(matches!(listed(&with_word(&g, 15, 2)), Err(CacheError::Inconsistent("directory"))));
+    assert!(matches!(listed(&g[..g.len() - 32]), Err(CacheError::Truncated(_))));
+    assert!(matches!(listed(&g[..g.len() - 1]), Err(CacheError::Inconsistent("length"))));
+    let mut longer = g.clone();
+    longer.extend([0; 32]);
+    assert!(matches!(listed(&longer), Err(CacheError::Inconsistent("end"))));
+    // The chunks of the entry of bytes, directory words 16..24, add up to less than its
+    // payload.
+    assert!(matches!(
+        listed(&with_word(&g, 20, word(&g, 20) + 1)),
+        Err(CacheError::Inconsistent("chunk table"))
+    ));
+    let table = word(&g, 18) as usize * 32 + word(&g, 19) as usize * 8;
+    let mut padded = g.clone();
+    padded[table] = 1;
+    assert!(matches!(listed(&padded), Err(CacheError::Inconsistent("padding"))));
+    // The last grid's metadata, at directory words 24..32: its name "velocity" and unit
+    // "mm" take 20 bytes, its voxel size and transform 120, then its bounds' kind.
+    let meta = word(&g, 24) as usize * 8;
+    assert!(matches!(
+        listed(&with_word(&g, meta + 35, 2)),
+        Err(CacheError::Inconsistent("bounds"))
+    ));
+    // Its voxel size's first, from 0.5 to -0.5.
+    let mut negative = g.clone();
+    negative[meta * 4 + 27] ^= 0x80;
+    assert!(listed(&negative).is_err());
+    // The entry of bytes' length, after its name "readme", said to be past its block.
+    let bytes_meta = word(&g, 16) as usize * 8;
+    assert!(matches!(
+        listed(&with_word(&g, bytes_meta + 3, 40)),
+        Err(CacheError::Inconsistent("entry of bytes"))
+    ));
+}
+
+/// Grids are found by name in an archive's listing and in a file read whole, every grid of
+/// the name in the file's order, an entry of bytes of the name not among them (issue 2).
+#[test]
+fn grids_are_found_by_name_every_match_in_order() {
+    let t = row_topology(3);
+    let f = numbered(&t, 0.0_f32, |k| k as f32);
+    let grid = |name: &str| CacheEntry::new(&meta(name, &[]), &t, &f).unwrap();
+    let entries = [
+        grid("a"),
+        CacheEntry::bytes("a", BTreeMap::new(), vec![1, 2, 3]).unwrap(),
+        grid("b"),
+        grid("a"),
+    ];
+    let bytes = to_bytes(&entries).unwrap();
+    let listing = list_from_bytes(&bytes).unwrap();
+    let numbers = |name: &str| -> Vec<usize> {
+        listing.grids_named(name).iter().map(|g| g.index()).collect()
+    };
+    assert_eq!((numbers("a"), numbers("b"), numbers("c")), (vec![0, 2], vec![1], vec![]));
+    for file in [
+        from_bytes(&bytes, u64::MAX).unwrap(),
+        cache::from_bytes(&cache::to_bytes(&entries).unwrap()).unwrap(),
+    ] {
+        let numbers = |name: &str| -> Vec<usize> {
+            file.grids_named(name).iter().map(|g| g.index()).collect()
+        };
+        assert_eq!((numbers("a"), numbers("b"), numbers("c")), (vec![0, 2], vec![1], vec![]));
+    }
+    // The grid found is read alone as a region over its bounds.
+    let found = listing.grids_named("b")[0];
+    let region = region_from_bytes(&bytes, found.index(), found.bounds(), u64::MAX).unwrap();
+    assert_eq!(region.meta(), found.meta());
 }

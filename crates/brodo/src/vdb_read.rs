@@ -89,12 +89,42 @@ pub struct VdbFile {
 /// `SDF_KEY`, makes `CacheEntry::new` refuse the grid with `ReservedKey` (docs/formats.md
 /// §3.3): remove such a key before writing the grid to a cache file.
 pub fn from_bytes(bytes: &[u8], unit: &str, limit: u64) -> Result<VdbFile, VdbError> {
+    grids(bytes, unit, None, limit)
+}
+
+/// Reads an OpenVDB file's bytes as `from_bytes` does, but only the grids named `name`,
+/// every one in the file's order: another grid is skipped by the offsets its descriptor
+/// states, neither read nor listed in `skipped`, and so not checked, as docs/formats.md
+/// §9.7 states. A name no grid has reads no grid.
+pub fn from_bytes_named(
+    bytes: &[u8],
+    unit: &str,
+    name: &str,
+    limit: u64,
+) -> Result<VdbFile, VdbError> {
+    grids(bytes, unit, Some(name), limit)
+}
+
+/// Reads the grids named `name` from an OpenVDB file of at most `limit` bytes, making at
+/// most `limit` bytes more, as `from_bytes_named` does; the file is refused by its length
+/// as `read` refuses it.
+pub fn read_named(path: &Path, unit: &str, name: &str, limit: u64) -> Result<VdbFile, VdbError> {
+    let bytes = read_within(path, limit, |length, limit| VdbError::FileTooLarge { length, limit })?;
+    from_bytes_named(&bytes, unit, name, limit)
+}
+
+/// The file's grids, or those named `name` alone.
+fn grids(bytes: &[u8], unit: &str, name: Option<&str>, limit: u64) -> Result<VdbFile, VdbError> {
     let mut budget = Budget { left: limit, limit };
     let mut c = Cursor { bytes, at: 0 };
     let count = header(&mut c)?;
     let mut file = VdbFile { grids: Vec::new(), skipped: Vec::new() };
     for _ in 0..count {
         let d = descriptor(&mut c)?;
+        if name.is_some_and(|n| n != d.name) {
+            c.at = d.end;
+            continue;
+        }
         let read = match d.kind.as_slice() {
             b"Tree_float_5_4_3" if d.instance.is_empty() => {
                 let (meta, topology, f) = grid::<f32>(bytes, &d, unit, &mut budget)?;
