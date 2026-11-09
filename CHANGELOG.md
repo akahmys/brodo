@@ -12,6 +12,9 @@ are recorded here when they change (V6).
   issue 2).
 - `CacheFile::grids_named` and `Listing::grids_named`: every grid of a name, in the file's
   order (issue 2).
+- `Remap::between`: the remap between two unrelated topologies, so that `Field::remap`
+  moves a field onto another topology, voxels absent from the source taking the
+  background and tiles over mixed content merged by the caller's rule (ADR-0014; issue 7).
 - `vdb::read_named` and `vdb::from_bytes_named`, with the `vdb` feature: the grids of one
   name read from a `.vdb`, every other grid skipped unread (docs/formats.md §9.7; issue 2).
 

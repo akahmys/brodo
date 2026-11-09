@@ -69,3 +69,22 @@ The human decided, on 2026-10-16 unless dated otherwise.
 
 Every field on a topology is remapped by its holder after each commit; a field forgotten
 fails as stale at its next use, not silently.
+
+## Amendment
+
+- **Date**: 2026-11-10
+
+Issue 7 asked for a field moved onto an unrelated topology, voxels absent from the source
+taking the background. The owner decided, on 2026-11-09 and 2026-11-10, as proposed:
+
+- A `Remap` is made between any two topologies by `Remap::between(&from, &to)`, not by a
+  commit alone, and the values are moved by `Field::remap`, so that one mechanism carries a
+  field across an edit and onto another topology. Its sources are those a commit records,
+  found as a commit finds them with nothing removed: `LeafSource`, `TileSource` and `Part`
+  are not `#[non_exhaustive]`, and a variant added would break a user.
+- A new tile covered whole by an old tile of its size or larger takes that tile's value,
+  without the merge rule, as a tile split by a commit does. One over mixed content is
+  merged by the caller's rule, its empty regions among its parts as `Part::Background`.
+- A new root tile over anything but one old root tile or nothing is refused as
+  `TreeError::MergeUnsupported`, as a merge into a root tile is: listing its parts by
+  leaf-sized region would visit about 1.3 × 10⁸ regions.

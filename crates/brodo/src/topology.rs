@@ -413,25 +413,32 @@ impl TopologyEditor<'_> {
             tree: &self.old.tree,
             removed: &self.removed,
             cleared: &self.cleared,
+            edited: true,
         };
-        let leaves = new
-            .leaves
-            .iter()
-            .map(|o| match old.locate(*o) {
-                Location::Leaf(n) => LeafSource::Leaf(n),
-                Location::Tile(t, _) => LeafSource::Split(t),
-                Location::Background => LeafSource::Background,
-            })
-            .collect();
-        let mut parts = Vec::new();
-        let tiles = new
-            .tiles
-            .iter()
-            .map(|(l, o)| tile_source(&old, *l, *o, &mut parts))
-            .collect::<Result<_, _>>()?;
-        let remap = Remap { from: self.old.stamp, to: new.stamp, leaves, tiles, parts };
+        let remap = sources(&old, &new)?;
         Ok((new, remap))
     }
+}
+
+/// The remap from `old`, as an edit or no edit leaves it, to `new`: where each new leaf's
+/// and tile's values come from.
+fn sources(old: &Before<'_>, new: &Topology) -> Result<Remap, TreeError> {
+    let leaves = new
+        .leaves
+        .iter()
+        .map(|o| match old.locate(*o) {
+            Location::Leaf(n) => LeafSource::Leaf(n),
+            Location::Tile(t, _) => LeafSource::Split(t),
+            Location::Background => LeafSource::Background,
+        })
+        .collect();
+    let mut parts = Vec::new();
+    let tiles = new
+        .tiles
+        .iter()
+        .map(|(l, o)| tile_source(old, *l, *o, &mut parts))
+        .collect::<Result<_, _>>()?;
+    Ok(Remap { from: old.old.stamp, to: new.stamp, leaves, tiles, parts })
 }
 
 /// Leaf-sized regions in a lower node's region.
@@ -445,6 +452,9 @@ struct Before<'a> {
     tree: &'a Tree,
     removed: &'a BTreeSet<Coord>,
     cleared: &'a [BTreeSet<Coord>; 2],
+    /// Whether an edit made the new topology from the old, rather than the two being
+    /// unrelated (`Remap::between`).
+    edited: bool,
 }
 
 impl Before<'_> {
@@ -509,14 +519,21 @@ fn tile_source(
             Location::Background => return Ok(TileSource::Background),
         },
         // Nothing merges into a root tile: it is the same tile, or one added where nothing
-        // was, where the edit removed every leaf, or where it removed the tile.
+        // was, where the edit removed every leaf, or where it removed the tile. Between
+        // unrelated topologies, one over anything else is refused (ADR-0014).
         TileLevel::Root => {
-            return Ok(match old.locate(origin) {
-                Location::Tile(t, TileLevel::Root) => TileSource::Tile(t),
-                Location::Leaf(_) | Location::Tile(..) | Location::Background => {
-                    TileSource::Background
+            return match old.locate(origin) {
+                Location::Tile(t, TileLevel::Root) => Ok(TileSource::Tile(t)),
+                Location::Background if !old.tree.has_upper_node(origin) => {
+                    Ok(TileSource::Background)
                 }
-            });
+                Location::Leaf(_) | Location::Tile(..) | Location::Background if old.edited => {
+                    Ok(TileSource::Background)
+                }
+                Location::Leaf(_) | Location::Tile(..) | Location::Background => {
+                    Err(TreeError::MergeUnsupported(TileLevel::Root))
+                }
+            };
         }
     }
     // Only regions that were the background: an added tile, not a merge.
@@ -598,6 +615,27 @@ pub struct Remap {
 }
 
 impl Remap {
+    /// The remap from `from`'s leaves and tiles to `to`'s, the two unrelated, so that
+    /// `Field::remap` moves a field of `from` onto `to` (ADR-0014): each new leaf voxel
+    /// takes what `from` holds there, its leaf's value, its tile's or the background; each
+    /// new tile takes the tile of `from` covering it whole, the background where `from`
+    /// holds nothing in its region, or else the merge rule applied to what each leaf-sized
+    /// region of it holds, its empty regions counted together. A new root tile over
+    /// anything but one root tile of `from` or nothing is refused as
+    /// `TreeError::MergeUnsupported`, as a merge into a root tile is; more parts than a
+    /// `u32` numbers as `TooManyParts`.
+    pub fn between(from: &Topology, to: &Topology) -> Result<Remap, TreeError> {
+        let (removed, cleared) = (BTreeSet::new(), [BTreeSet::new(), BTreeSet::new()]);
+        let old = Before {
+            old: from,
+            tree: &from.tree,
+            removed: &removed,
+            cleared: &cleared,
+            edited: false,
+        };
+        sources(&old, to)
+    }
+
     /// The parts in range `r`, a merged tile's (`TileSource::Merged`). The range is not
     /// checked against this remap: one from another remap gives whatever parts lie there,
     /// and none beyond this remap's parts.

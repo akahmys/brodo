@@ -8,11 +8,11 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: P12's issue 2, an archive listed without decompressing a chunk and grids found
-  by name in a cache file, an archive and a `.vdb` (ADR-0016, ADR-0055); before it, P11
-  released as 1.2.0 (2026-11-10).
-- **Next**: P12's issue 7 (§2): a `Remap` between any two topologies, its API put to the
-  owner first.
+- **Done**: P12's issue 7, a `Remap` between any two topologies (ADR-0014); before it,
+  issue 2, an archive listed without decompressing a chunk and grids found by name
+  (ADR-0016, ADR-0055).
+- **Next**: P12's issue 8 (§2): the union of two topologies, its API put to the owner
+  first.
 - **Unresolved**: `leaf_parallel_update_x32` drifts between processes by up to 20 %, its
   cause not measured (ADR-0019).
 
@@ -50,7 +50,7 @@ before it is written, its ADR amended where the design changes. Each issue's
       decompressing a chunk, §8.6's rules 1 and 2 held for every entry, and grids found by
       name in a cache file, an archive and a `.vdb`, every match in the file's order
       (ADR-0016, ADR-0055)
-- [ ] [Issue 7](https://github.com/akahmys/brodo/issues/7): a `Remap` between any two
+- [x] [Issue 7](https://github.com/akahmys/brodo/issues/7): a `Remap` between any two
       topologies, values moved by `Field::remap`, a tile over leaves and background merged
       by the caller's rule (ADR-0014)
 - [ ] [Issue 8](https://github.com/akahmys/brodo/issues/8): the union of two topologies,

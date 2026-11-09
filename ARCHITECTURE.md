@@ -141,6 +141,13 @@ pub struct Field<T> {
   tiles, each tile holding its range in it. A split leaf takes each field's own tile value.
   A region whose leaf the edit removed is the background to the commit: a leaf or tile the
   same edit puts there takes nothing of the removed values (ADR-0014).
+- A `Remap` is also made between two unrelated topologies (`Remap::between`), so that a
+  field is moved onto another topology by the same `Field::remap`: each new leaf voxel takes
+  what the old topology holds there, or the background; each new tile the old tile
+  covering it whole, the background where the old holds nothing in its region, or else
+  the merge rule applied to what each leaf-sized region of it holds, empty regions counted
+  together among its parts. A new root tile over anything but one old root tile or nothing
+  is refused, as a merge into a root tile is (ADR-0014).
 - A merge takes leaves and tiles at once, into a tile in a lower node (from a leaf) or in
   an upper node (from a lower node); a region that holds nothing refuses it, so a merge
   changes values, not which voxels are active. Merging into a root tile is not built.
