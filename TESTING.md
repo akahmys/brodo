@@ -104,7 +104,8 @@ cargo +nightly miri test -p colino --test miri_paths -- miri_
 
 Mutation testing (T11) needs `cargo-mutants`, which the audit also needs, at the version
 `.github/workflows/audit.yml` installs, the one home of each tool's version, which the
-gate holds the running one to (27.1.0 on 2026-11-07; ADR-0034). The run's settings (jobs, timeout, guard, output) are in
+gate holds the running one to (27.1.0 on 2026-11-07; ADR-0034); so is `cargo-nextest`,
+which a run on GitHub Actions may be given to run each mutant's tests (ADR-0034). The run's settings (jobs, timeout, guard, output) are in
 `scripts/audit/mutants.py`, the equivalent mutants in `.cargo/mutants.toml`. The run
 takes hours: about 9 for the workspace's 4247 mutants (`cargo mutants --workspace
 --all-features --list | wc -l`, 2026-11-02) at the two jobs `mutants.py` runs, from 13 to

@@ -8,6 +8,8 @@
 # near half that, and the timeouts run in parallel (ADR-0034). The further arguments reach
 # cargo-mutants through MUTANTS_ARGS, which mutants.py splits as a shell would but expands
 # nothing, and each shard keeps the guard's log beside its report, which the verdict reads.
+# The tests run under cargo test, or, chosen, under cargo-nextest, at the version audit.yml
+# installs, so that a run can be timed under each (ADR-0034).
 name: mutants
 
 on:
@@ -23,6 +25,11 @@ on:
         description: "Run the timeouts before any failed test again, under 1800 s each"
         type: boolean
         default: true
+      test_tool:
+        description: "What runs each mutant's tests"
+        type: choice
+        options: [cargo, nextest]
+        default: cargo
 
 permissions:
   contents: read
@@ -54,11 +61,14 @@ jobs:
         run: |
           rustup toolchain install
           cargo install --locked cargo-mutants@27.1.0
+          if [ "$TEST_TOOL" = nextest ]; then cargo install --locked cargo-nextest@0.9.151; fi
+        env:
+          TEST_TOOL: ${{ inputs.test_tool }}
       - name: Shard ${{ matrix.k }} of ${{ inputs.shards }}
         # Its verdict is taken with the others' in the last job.
         env:
           SHARD: ${{ matrix.k }}/${{ inputs.shards }}
-          MUTANTS_ARGS: ${{ inputs.args }}
+          MUTANTS_ARGS: --test-tool=${{ inputs.test_tool }} ${{ inputs.args }}
         run: python3 scripts/audit/mutants.py --run --shard "$SHARD" || true
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -84,7 +94,7 @@ jobs:
           cargo install --locked cargo-mutants@27.1.0
       - name: Every shard's report, together, holding every mutant
         env:
-          MUTANTS_ARGS: ${{ inputs.args }}
+          MUTANTS_ARGS: --test-tool=${{ inputs.test_tool }} ${{ inputs.args }}
         run: python3 scripts/audit/mutants.py --report shards/*/mutants.out --
 
   patient:
@@ -106,8 +116,11 @@ jobs:
         run: |
           rustup toolchain install
           cargo install --locked cargo-mutants@27.1.0
+          if [ "$TEST_TOOL" = nextest ]; then cargo install --locked cargo-nextest@0.9.151; fi
+        env:
+          TEST_TOOL: ${{ inputs.test_tool }}
       - name: Part ${{ matrix.k }} of 20 of the timeouts before any failed test, again
         env:
           PART: ${{ matrix.k }}/20
-          MUTANTS_ARGS: ${{ inputs.args }}
+          MUTANTS_ARGS: --test-tool=${{ inputs.test_tool }} ${{ inputs.args }}
         run: python3 scripts/audit/mutants.py --run --patient --from shards/*/mutants.out -- --shard "$PART"

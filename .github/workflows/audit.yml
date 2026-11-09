@@ -27,7 +27,7 @@ jobs:
       - name: Tools, at the versions the owner's machine runs
         run: |
           rustup toolchain install
-          cargo install --locked cargo-deny@0.20.2 cargo-mutants@27.1.0 cargo-semver-checks@0.51.0
+          cargo install --locked cargo-deny@0.20.2 cargo-mutants@27.1.0 cargo-nextest@0.9.151 cargo-semver-checks@0.51.0
           # betterleaks 1.10.0, its release archive checked against the SHA-256 GitHub states
           # for it (2026-11-07), as the owner's machine runs it; the gate fails on a machine
           # running another version than this URL names (ADR-0034).

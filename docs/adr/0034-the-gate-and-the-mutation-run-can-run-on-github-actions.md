@@ -76,3 +76,27 @@ The owner decided, on 2026-10-24 unless dated otherwise.
   the owner's machine (2026-10-25); public, the runs cost nothing, and a whole run takes
   about its work over 20 jobs.
 - What the gate checks on Linux alone is assumed not to depend on the platform.
+
+## Amendment: a mutation run can be timed under cargo-nextest
+
+2026-11-09. The run on `d6422e2` took about 9 hours and 7673 job-minutes. The shards of
+the run on `f58a490`, cancelled once superseded, show where the time went: of 4656 mutants,
+the tests of the 4137 caught by a test spent about 10330 minutes in test binaries that
+passed before the one that failed, and 1740 in that one, since `cargo test` runs the
+binaries in a fixed order and stops only at a failed one. cargo-mutants can run the tests
+under cargo-nextest, which runs each test in its own process, across binaries at once, and
+with `--max-fail=1:immediate` (0.9.111 on) ends the run at the first failure.
+
+The owner decided, on 2026-11-09:
+
+- **`mutants.yml` takes `test_tool`**, `cargo` by default or `nextest`, given to
+  cargo-mutants as `--test-tool` in each job; with `nextest`, the shard and patient jobs
+  install it. The verdict is unchanged (TESTING.md T11): a run under each is timed and
+  their outcomes compared before either is made the default, which would amend ADR-0023.
+- **`cargo-nextest` is pinned as the other tools are**, in `audit.yml`'s `cargo install`
+  line, its one home, and held by the gate's `[Tools]` step to the version that runs
+  (0.9.151, 2026-11-03, Apache-2.0 OR MIT), so the owner's machine runs it too.
+- nextest reads the runner `rss_guard.py` is put in as, `CARGO_TARGET_<triple>_RUNNER`, and
+  calls it while listing tests as well, when it must write nothing to standard output;
+  the guard writes to standard error alone. nextest runs no doctest; in the run on
+  `f58a490` none caught a mutant.
