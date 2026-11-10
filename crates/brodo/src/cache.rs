@@ -222,20 +222,11 @@ pub(crate) fn encode_meta(m: &GridMeta, b: Bounds) -> Result<Vec<u8>, CacheError
 
 /// The bytes of a cache file holding `entries`, in order.
 pub fn to_bytes(entries: &[CacheEntry]) -> Result<Vec<u8>, CacheError> {
-    let mut out = Vec::new();
-    emit(entries, &mut out)?;
-    Ok(out)
-}
-
-/// Writes zeros to `out` from `*written` bytes to `to`.
-pub(crate) fn pad_to(
-    out: &mut impl std::io::Write,
-    to: usize,
-    written: &mut usize,
-) -> std::io::Result<()> {
-    let zeros = to.saturating_sub(*written);
-    *written = to.max(*written);
-    out.write_all(&vec![0; zeros])
+    let mut sink = Sink::begin(std::io::Cursor::new(Vec::new()), top(entries.len())?)?;
+    for e in entries {
+        push_to(&mut sink, e)?;
+    }
+    Ok(sink.end()?.into_inner())
 }
 
 /// An entry as the cache file places it: its metadata's length in bytes, its payload's in
@@ -249,6 +240,7 @@ pub(crate) struct Part {
 
 /// The header and directory of a cache file of `parts`, and the block each payload starts
 /// at; each metadata starts at the block after the part before it.
+#[cfg(feature = "archive")]
 pub(crate) fn head(parts: &[Part]) -> Result<(Vec<u8>, Vec<usize>), CacheError> {
     let mut head = Vec::new();
     for x in [MAGIC, VERSION, u32_of(parts.len())?, 0, 0, 0, 0, 0] {
@@ -277,21 +269,167 @@ pub(crate) fn head(parts: &[Part]) -> Result<(Vec<u8>, Vec<usize>), CacheError> 
     Ok((head, places))
 }
 
-/// Writes the file holding `entries` to `out`, part by part.
-fn emit(entries: &[CacheEntry], out: &mut impl std::io::Write) -> Result<(), CacheError> {
-    let (metas, parts): (Vec<_>, Vec<_>) =
-        entries.iter().map(CacheEntry::part).collect::<Result<Vec<_>, _>>()?.into_iter().unzip();
-    let (head, places) = head(&parts)?;
-    out.write_all(&head)?;
-    let mut written = head.len();
-    // Each metadata starts where the part before it ends, the head or a payload, at a block.
-    for ((e, m), at) in entries.iter().zip(&metas).zip(places) {
-        out.write_all(m)?;
-        written += m.len();
-        pad_to(out, at * BLOCK, &mut written)?;
-        written += e.write_payload(out)?;
+/// A cache file's header for `count` entries.
+fn top(count: usize) -> Result<[u32; 8], CacheError> {
+    Ok([MAGIC, VERSION, u32_of(count)?, 0, 0, 0, 0, 0])
+}
+
+/// A file being written entry by entry to `out`: its header and a directory of zeros for
+/// the entries stated, then each entry as it comes, the directory written last.
+#[derive(Debug)]
+pub(crate) struct Sink<W> {
+    out: W,
+    /// The entries the directory has room for.
+    stated: usize,
+    /// The directory's entries of the entries written.
+    directory: Vec<u8>,
+    /// The entries written.
+    written: usize,
+    /// The block the next entry starts at.
+    pub(crate) at: usize,
+    /// Whether writing to `out` has failed.
+    failed: bool,
+}
+
+impl<W: std::io::Write + std::io::Seek> Sink<W> {
+    /// Writes `header` and a directory of zeros for the entries it counts, its third word.
+    pub(crate) fn begin(mut out: W, header: [u32; 8]) -> Result<Self, CacheError> {
+        let [_, _, count, ..] = header;
+        let stated = usize::try_from(count).map_err(|_| CacheError::TooLarge)?;
+        let mut words = Vec::new();
+        for x in header {
+            put_u32(&mut words, x);
+        }
+        out.write_all(&words)?;
+        let zeros = u64::try_from(stated.checked_mul(BLOCK).ok_or(CacheError::TooLarge)?)
+            .map_err(|_| CacheError::TooLarge)?;
+        std::io::copy(&mut std::io::Read::take(std::io::repeat(0), zeros), &mut out)?;
+        let at = stated.checked_add(1).ok_or(CacheError::TooLarge)?;
+        Ok(Self { out, stated, directory: Vec::new(), written: 0, at, failed: false })
     }
-    Ok(())
+
+    /// The place the next entry takes, refused once writing has failed or every entry
+    /// stated is written.
+    pub(crate) fn next(&self) -> Result<usize, CacheError> {
+        if self.failed {
+            return Err(CacheError::WriterFailed);
+        }
+        if self.written == self.stated {
+            let written = self.stated.saturating_add(1);
+            return Err(CacheError::EntryCount { stated: self.stated, written });
+        }
+        Ok(self.written)
+    }
+
+    /// Writes an entry by `write`, its directory entry `row` and the block after it `end`:
+    /// an error from `out` fails the sink.
+    pub(crate) fn put(
+        &mut self,
+        row: [u32; 8],
+        end: usize,
+        write: impl FnOnce(&mut W) -> std::io::Result<()>,
+    ) -> Result<(), CacheError> {
+        if let Err(e) = write(&mut self.out) {
+            self.failed = true;
+            return Err(e.into());
+        }
+        for x in row {
+            put_u32(&mut self.directory, x);
+        }
+        self.written += 1;
+        self.at = end;
+        Ok(())
+    }
+
+    /// Writes the directory over its zeros and gives `out`, refused once writing has
+    /// failed or short of the entries stated.
+    pub(crate) fn end(mut self) -> Result<W, CacheError> {
+        if self.failed {
+            return Err(CacheError::WriterFailed);
+        }
+        if self.written != self.stated {
+            return Err(CacheError::EntryCount { stated: self.stated, written: self.written });
+        }
+        self.out.seek(std::io::SeekFrom::Start(32))?;
+        self.out.write_all(&self.directory)?;
+        Ok(self.out)
+    }
+}
+
+/// Writes zeros to `out`, `n` of them.
+pub(crate) fn zeros(out: &mut impl std::io::Write, n: usize) -> std::io::Result<()> {
+    let n = u64::try_from(n).map_err(std::io::Error::other)?;
+    std::io::copy(&mut std::io::Read::take(std::io::repeat(0), n), out).map(drop)
+}
+
+/// Writes `e` as the next entry of `sink`: its metadata, at the block the part before it
+/// ends at, then its payload at the next block.
+fn push_to<W: std::io::Write + std::io::Seek>(
+    sink: &mut Sink<W>,
+    e: &CacheEntry,
+) -> Result<(), CacheError> {
+    sink.next()?;
+    let (meta, p) = e.part()?;
+    let meta_at = sink.at;
+    let grid_at = meta_at + p.meta_len.div_ceil(BLOCK);
+    let end = grid_at.checked_add(p.grid_blocks).ok_or(CacheError::TooLarge)?;
+    u32_of(end)?;
+    let row = [
+        u32_of(meta_at)?,
+        u32_of(p.meta_len)?,
+        u32_of(grid_at)?,
+        u32_of(p.grid_blocks)?,
+        p.value_type,
+        p.kind,
+        0,
+        0,
+    ];
+    let pad = (grid_at - meta_at) * BLOCK - meta.len();
+    sink.put(row, end, |out| {
+        out.write_all(&meta)?;
+        zeros(out, pad)?;
+        e.write_payload(out).map(drop)
+    })
+}
+
+/// A cache file being written at a path entry by entry, each entry's memory needed only
+/// while it is written: made for a count of entries, given each in turn by
+/// `push`, and ended by `finish`, which replaces the file at the path whole as `write`
+/// does. Its bytes are those `to_bytes` gives for the same entries.
+///
+/// The entries go to a hidden file beside the path as they come. A writer dropped
+/// unfinished, or whose `finish` is refused, removes it and leaves the old file.
+#[derive(Debug)]
+pub struct Writer {
+    sink: Sink<std::io::BufWriter<std::fs::File>>,
+    file: Hidden,
+}
+
+impl Writer {
+    /// Begins a cache file at `path` for `count` entries: its hidden file made new, its
+    /// header and a directory of zeros written.
+    pub fn create(path: &Path, count: usize) -> Result<Self, CacheError> {
+        let (file, out) = Hidden::create(path)?;
+        Ok(Self { sink: Sink::begin(out, top(count)?)?, file })
+    }
+
+    /// Writes `entry` as the next entry. An entry refused for itself, too large for the
+    /// format's fields, is not written, and the writer goes on; one past the count stated
+    /// is refused, `EntryCount`; after an error writing, every call is refused,
+    /// `WriterFailed`.
+    pub fn push(&mut self, entry: &CacheEntry) -> Result<(), CacheError> {
+        push_to(&mut self.sink, entry)
+    }
+
+    /// Writes the directory, flushes the file to the disk and renames it over the path. A
+    /// writer given fewer entries than its count is refused, `EntryCount`, and one whose
+    /// writing failed, `WriterFailed`; either leaves the old file.
+    pub fn finish(self) -> Result<(), CacheError> {
+        let Self { sink, file } = self;
+        let out = sink.end()?;
+        file.commit(out)?;
+        Ok(())
+    }
 }
 
 /// The cache files this process has begun to write, numbering their hidden files.
@@ -304,39 +442,75 @@ static WRITES: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(
 /// write that fails leaves the old one. The directory must be writable; a process killed
 /// while writing may leave the hidden file behind.
 pub fn write(path: &Path, entries: &[CacheEntry]) -> Result<(), CacheError> {
-    replace(path, |out| emit(entries, out))
+    let mut w = Writer::create(path, entries.len())?;
+    for e in entries {
+        w.push(e)?;
+    }
+    w.finish()
+}
+
+/// A hidden file beside a path, being written to replace it as `write` states: removed
+/// when dropped unless renamed over the path.
+#[derive(Debug)]
+pub(crate) struct Hidden {
+    temp: std::path::PathBuf,
+    path: std::path::PathBuf,
+    renamed: bool,
+}
+
+impl Hidden {
+    /// Makes the hidden file for `path` new, and gives it with a buffer to write it by.
+    pub(crate) fn create(
+        path: &Path,
+    ) -> std::io::Result<(Self, std::io::BufWriter<std::fs::File>)> {
+        let name = path.file_name().ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::InvalidInput, "the path names no file")
+        })?;
+        let mut hidden = std::ffi::OsString::from(".");
+        hidden.push(name);
+        let n = WRITES.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        hidden.push(format!(".{}.{n}.tmp", std::process::id()));
+        let temp = path.with_file_name(hidden);
+        let made = std::fs::OpenOptions::new().write(true).create_new(true).open(&temp)?;
+        let file = Self { temp, path: path.to_path_buf(), renamed: false };
+        Ok((file, std::io::BufWriter::new(made)))
+    }
+
+    /// Flushes `out`, the hidden file, to the disk, closes it and renames it over the path.
+    pub(crate) fn commit(
+        mut self,
+        mut out: std::io::BufWriter<std::fs::File>,
+    ) -> std::io::Result<()> {
+        use std::io::Write;
+        out.flush()?;
+        out.get_ref().sync_all()?;
+        drop(out);
+        std::fs::rename(&self.temp, &self.path)?;
+        self.renamed = true;
+        Ok(())
+    }
+}
+
+impl Drop for Hidden {
+    fn drop(&mut self) {
+        if !self.renamed {
+            // The hidden file may hold part of the bytes; the old file is untouched.
+            let _ignored = std::fs::remove_file(&self.temp);
+        }
+    }
 }
 
 /// Writes the bytes `emit` gives to a hidden file beside `path` and renames it over
 /// `path`, as `write` states.
+#[cfg(any(feature = "slice-png", feature = "vdb", feature = "vtk"))]
 pub(crate) fn replace<E: From<std::io::Error>>(
     path: &Path,
     emit: impl FnOnce(&mut std::io::BufWriter<std::fs::File>) -> Result<(), E>,
 ) -> Result<(), E> {
-    use std::io::Write;
-    let name = path.file_name().ok_or_else(|| {
-        std::io::Error::new(std::io::ErrorKind::InvalidInput, "the path names no file")
-    })?;
-    let mut hidden = std::ffi::OsString::from(".");
-    hidden.push(name);
-    let n = WRITES.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-    hidden.push(format!(".{}.{n}.tmp", std::process::id()));
-    let temp = path.with_file_name(hidden);
-    let written = (|| -> Result<(), E> {
-        let made = std::fs::OpenOptions::new().write(true).create_new(true).open(&temp)?;
-        let mut file = std::io::BufWriter::new(made);
-        emit(&mut file)?;
-        file.flush()?;
-        file.get_ref().sync_all()?;
-        drop(file);
-        std::fs::rename(&temp, path)?;
-        Ok(())
-    })();
-    if written.is_err() {
-        // The hidden file may hold part of the bytes; the old file is untouched.
-        let _ignored = std::fs::remove_file(&temp);
-    }
-    written
+    let (file, mut out) = Hidden::create(path)?;
+    emit(&mut out)?;
+    file.commit(out)?;
+    Ok(())
 }
 
 /// Reads bytes in order, refusing to read past their end.
@@ -935,6 +1109,45 @@ mod tests {
                 Err(kind) => Err(kind.into()),
             }
         }
+    }
+
+    /// A sink that takes `room` bytes, then fails every write; it seeks nowhere.
+    struct Full {
+        room: usize,
+    }
+
+    impl std::io::Write for Full {
+        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+            if self.room < buf.len() {
+                return Err(std::io::ErrorKind::StorageFull.into());
+            }
+            self.room -= buf.len();
+            Ok(buf.len())
+        }
+
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    impl std::io::Seek for Full {
+        fn seek(&mut self, _: std::io::SeekFrom) -> std::io::Result<u64> {
+            Ok(0)
+        }
+    }
+
+    /// `Writer`'s promise, held by the sink it writes through: an entry whose writing
+    /// fails fails the writer, which refuses every later entry and its end.
+    #[test]
+    fn a_sink_whose_writing_failed_writes_no_more() {
+        let e = CacheEntry::bytes("b", BTreeMap::new(), vec![1; 64]).unwrap();
+        let mut sink = Sink::begin(Full { room: 3 * BLOCK }, top(2).unwrap()).unwrap();
+        assert!(matches!(push_to(&mut sink, &e), Err(CacheError::Io(_))));
+        assert!(matches!(push_to(&mut sink, &e), Err(CacheError::WriterFailed)));
+        assert!(matches!(sink.end(), Err(CacheError::WriterFailed)));
+        let mut sink = Sink::begin(Full { room: 6 * BLOCK }, top(1).unwrap()).unwrap();
+        push_to(&mut sink, &e).unwrap();
+        assert!(sink.end().is_ok());
     }
 
     /// `read`'s promise, held through the loop it reads with: a read

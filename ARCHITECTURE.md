@@ -307,6 +307,11 @@ fastest, and an `Offset` is made from its number or its step as from what gives 
   written whole: to a hidden file beside it, flushed and renamed over it, so that a
   reader, a mapping process among them, sees the old file or the new one; the directory
   must be writable, and a process killed while writing may leave the hidden file behind.
+- A cache file or an archive is also written one entry at a time (`cache::Writer`,
+  `archive::Writer`), holding one entry's memory: made for a count of entries, its
+  directory written last over zeros, and replacing the file whole when finished; one
+  short of its count, or dropped unfinished, leaves the old file. Its bytes are those
+  `to_bytes` gives for the same entries (ADR-0055).
 - A cache file is read by copying it into an aligned buffer (`cache::read`) or by
   mapping it into memory without a copy (`CacheFile::map`, under the default feature
   `mmap`); both go through one parser. Mapping is brodo's only unsafe code, in one module

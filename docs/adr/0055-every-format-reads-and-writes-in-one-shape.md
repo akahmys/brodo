@@ -54,3 +54,14 @@ shape: `archive::list(path, limit)` and `archive::list_from_bytes(bytes)`, the l
 without a limit, a listing making nothing beyond its input; and `vdb::read_named(path,
 unit, name, limit)` and `vdb::from_bytes_named(bytes, unit, name, limit)`, the name before
 the limit, which stays last.
+
+Issue 4 asked for a file written one grid at a time, so that a writer holds one grid's
+memory, not every grid's. The owner decided, on 2026-11-10, as proposed, that the cache and
+the archive each gain a `Writer` to a path: `Writer::create(path, count)`, then each entry
+by `push` (and, for the archive, `push_with(entry, encoding)`), then `finish`, which
+replaces the file whole as `write` does. The count comes first so that the directory's
+room is known; the directory is written last, over zeros. An entry refused for itself is
+not written and the writer goes on; after an error writing, every call is refused. Two
+variants are added to `CacheError`: `EntryCount`, for an entry past the count or a finish
+short of it, and `WriterFailed`. `write`, `write_with`, `to_bytes` and `to_bytes_with` are
+made by the same code, their bytes unchanged.

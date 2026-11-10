@@ -10,7 +10,7 @@
 
 use std::collections::BTreeMap;
 
-use brodo::cache::{CacheEntry, CacheFile, to_bytes, write};
+use brodo::cache::{CacheEntry, CacheFile, Writer, to_bytes, write};
 use brodo::error::{CacheError, FormatError, MetaError};
 use brodo::field::{AnyField, Field, Value, ValueType};
 use brodo::meta::{Bounds, GridMeta};
@@ -297,6 +297,75 @@ fn a_file_is_replaced_whole() {
         std::fs::read_dir(&dir).unwrap().map(|e| e.unwrap().file_name()).collect();
     names.sort();
     assert_eq!(names, ["blocked", "grids.brdc"]);
+}
+
+/// A directory of this name beside the target, made empty.
+fn fresh(name: &str) -> std::path::PathBuf {
+    let dir = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join(name);
+    let _fresh = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    dir
+}
+
+/// The names in `dir`, in order.
+fn names(dir: &std::path::Path) -> Vec<String> {
+    let mut names: Vec<String> = std::fs::read_dir(dir)
+        .unwrap()
+        .map(|e| e.unwrap().file_name().into_string().unwrap())
+        .collect();
+    names.sort();
+    names
+}
+
+/// A file written entry by entry holds the bytes `to_bytes` gives for them (issue 4), the
+/// committed file's among them, and replaces the old file only once finished.
+#[test]
+fn a_file_written_entry_by_entry_is_the_one_written_at_once() {
+    let dir = fresh("entry_by_entry");
+    let path = dir.join("grids.brdc");
+    let entries = golden_entries_v2();
+    write(&path, &entries[..1]).unwrap();
+    let old = std::fs::read(&path).unwrap();
+    let mut w = Writer::create(&path, entries.len()).unwrap();
+    for e in &entries {
+        w.push(e).unwrap();
+        assert_eq!(std::fs::read(&path).unwrap(), old);
+    }
+    assert_eq!(names(&dir).len(), 2, "the hidden file beside the old");
+    w.finish().unwrap();
+    assert!(std::fs::read(&path).unwrap() == GOLDEN_2);
+    Writer::create(&path, 0).unwrap().finish().unwrap();
+    assert_eq!(std::fs::read(&path).unwrap(), to_bytes(&[]).unwrap());
+    assert_eq!(names(&dir), ["grids.brdc"]);
+}
+
+/// A writer given an entry past its count refuses it and goes on; one finished short of
+/// its count is refused, and one dropped unfinished writes nothing: each of these leaves
+/// the old file and nothing beside it (issue 4).
+#[test]
+fn a_writer_short_of_its_count_or_dropped_leaves_the_old_file() {
+    let dir = fresh("writer_short");
+    let path = dir.join("grids.brdc");
+    let entries = golden_entries_v2();
+    write(&path, &entries[..1]).unwrap();
+    let old = std::fs::read(&path).unwrap();
+    let mut w = Writer::create(&path, 2).unwrap();
+    w.push(&entries[0]).unwrap();
+    assert!(matches!(w.finish(), Err(CacheError::EntryCount { stated: 2, written: 1 })));
+    assert_eq!(
+        (std::fs::read(&path).unwrap(), names(&dir)),
+        (old.clone(), vec!["grids.brdc".into()])
+    );
+    let mut w = Writer::create(&path, 2).unwrap();
+    w.push(&entries[0]).unwrap();
+    drop(w);
+    assert_eq!((std::fs::read(&path).unwrap(), names(&dir)), (old, vec!["grids.brdc".into()]));
+    let mut w = Writer::create(&path, 1).unwrap();
+    w.push(&entries[2]).unwrap();
+    assert!(matches!(w.push(&entries[0]), Err(CacheError::EntryCount { stated: 1, written: 2 })));
+    w.finish().unwrap();
+    assert_eq!(std::fs::read(&path).unwrap(), to_bytes(&entries[2..]).unwrap());
+    assert!(Writer::create(&dir.join("absent").join("grids.brdc"), 1).is_err());
 }
 
 /// Writes to one path from several threads at once each replace the file whole (the

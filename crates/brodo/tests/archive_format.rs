@@ -10,8 +10,8 @@
 use std::collections::BTreeMap;
 
 use brodo::archive::{
-    Encoding, Listing, from_bytes, list, list_from_bytes, read, read_region, region_from_bytes,
-    to_bytes, to_bytes_with, write, write_with,
+    Encoding, Listing, Writer, from_bytes, list, list_from_bytes, read, read_region,
+    region_from_bytes, to_bytes, to_bytes_with, write, write_with,
 };
 use brodo::cache::{self, CacheEntry, CacheFile};
 use brodo::error::{CacheError, FormatError};
@@ -1024,4 +1024,50 @@ fn grids_are_found_by_name_every_match_in_order() {
     let found = listing.grids_named("b")[0];
     let region = region_from_bytes(&bytes, found.index(), found.bounds(), u64::MAX).unwrap();
     assert_eq!(region.meta(), found.meta());
+}
+
+/// An archive written entry by entry holds the bytes `to_bytes_with` gives for them (issue
+/// 4), the committed files' among them; an entry refused for itself is not written, the
+/// writer going on, and one past the count is refused, the old file kept.
+#[test]
+fn an_archive_written_entry_by_entry_is_the_one_written_at_once() {
+    let dir = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("archive_by_entry");
+    let _fresh = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("grids.brda");
+    let mut e = golden_entries();
+    let extra = BTreeMap::from([("kind".to_owned(), "notes".to_owned())]);
+    e.insert(1, CacheEntry::bytes("readme", extra, b"brodo, 2026".to_vec()).unwrap());
+    let mut w = Writer::create(&path, e.len()).unwrap();
+    for x in &e {
+        w.push(x).unwrap();
+    }
+    w.finish().unwrap();
+    assert!(std::fs::read(&path).unwrap() == GOLDEN_2);
+    let g = golden_entries();
+    let mut w = Writer::create(&path, 2).unwrap();
+    for (x, encoding) in quantised(&g) {
+        w.push_with(x, encoding).unwrap();
+    }
+    w.finish().unwrap();
+    assert!(std::fs::read(&path).unwrap() == QUANTISED);
+    let t = build(&[[0, 0, 0]], &[]);
+    let bytes = CacheEntry::new(&meta("g", &[]), &t, &Field::new(&t, 3_u8)).unwrap();
+    let mut w = Writer::create(&path, 2).unwrap();
+    w.push(&g[0]).unwrap();
+    assert!(matches!(
+        w.push_with(&bytes, Encoding::Binary16),
+        Err(CacheError::NotQuantised { index: 1, value_type: Some(ValueType::U8) })
+    ));
+    w.push_with(&g[1], Encoding::EightBit).unwrap();
+    assert!(matches!(w.push(&g[0]), Err(CacheError::EntryCount { stated: 2, written: 3 })));
+    w.finish().unwrap();
+    let want = to_bytes_with(&[(&g[0], Encoding::Exact), (&g[1], Encoding::EightBit)]).unwrap();
+    assert_eq!(std::fs::read(&path).unwrap(), want);
+    let mut w = Writer::create(&path, 3).unwrap();
+    w.push(&g[0]).unwrap();
+    assert!(matches!(w.finish(), Err(CacheError::EntryCount { stated: 3, written: 1 })));
+    assert_eq!(std::fs::read(&path).unwrap(), want);
+    let names: Vec<_> = std::fs::read_dir(&dir).unwrap().map(|e| e.unwrap().file_name()).collect();
+    assert_eq!(names, ["grids.brda"]);
 }

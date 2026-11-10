@@ -331,6 +331,18 @@ pub enum CacheError {
     /// brodo's formats built on the cache profile.
     #[error("the metadata holds the key {0:?}, which brodo's formats reserve")]
     ReservedKey(String),
+    /// A writer was given more entries than it was made for, or finished with fewer
+    /// (`cache::Writer`, `archive::Writer`).
+    #[error("a writer made for {stated} entries was given {written}")]
+    EntryCount {
+        /// The entries the writer was made for.
+        stated: usize,
+        /// The entries it was given, the one refused counted.
+        written: usize,
+    },
+    /// A writer's writing failed earlier, and it writes no more.
+    #[error("the writer failed earlier, and writes no more")]
+    WriterFailed,
 }
 
 /// Which rule of the Hermite data format a set breaks (ADR-0032).

@@ -8,11 +8,10 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: P12's issue 8, the union of two topologies (ADR-0014); before it, issue 7, a
-  `Remap` between any two topologies, and issue 2, an archive listed without decompressing
-  a chunk (2026-11-10).
-- **Next**: P12's issue 4 (§2): a writer taking one grid at a time, its API put to the
-  owner first.
+- **Done**: P12's issue 4, a cache file or an archive written one entry at a time
+  (ADR-0055); before it, issues 8, 7 and 2 (2026-11-10).
+- **Next**: P12's issue 3 (§2): `.vdb` grids of vectors, after a spike against OpenVDB 14
+  (AGENTS.md S1).
 - **Unresolved**: `leaf_parallel_update_x32` drifts between processes by up to 20 %, its
   cause not measured (ADR-0019).
 
@@ -56,9 +55,9 @@ before it is written, its ADR amended where the design changes. Each issue's
 - [x] [Issue 8](https://github.com/akahmys/brodo/issues/8): the union of two topologies,
       the finer kept, a tile split where the other holds a leaf or a smaller tile, its
       remaps made by issue 7's
-- [ ] [Issue 4](https://github.com/akahmys/brodo/issues/4): a writer taking its entry count
+- [x] [Issue 4](https://github.com/akahmys/brodo/issues/4): a writer taking its entry count
       first and one grid at a time, to a path only; `write` and `to_bytes` made by it, their
-      bytes unchanged
+      bytes unchanged (ADR-0055)
 - [ ] [Issue 3](https://github.com/akahmys/brodo/issues/3): `.vdb` grids of `[f32; 3]` and
       `[f64; 3]`, after a spike against OpenVDB 14 (AGENTS.md S1); `u8` and `u32` decided
       once the spike has looked for their OpenVDB types; mestolo's `convert` taking them

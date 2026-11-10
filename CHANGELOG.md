@@ -18,6 +18,10 @@ are recorded here when they change (V6).
 - `Topology::union`: a topology covering every voxel two topologies cover, the finer
   kept, each input's field moved onto it by `Remap::between` without a merge (ADR-0014;
   issue 8).
+- `cache::Writer` and `archive::Writer`, the latter with the `archive` feature: a file
+  written to a path one entry at a time, made for a count of entries and replacing the
+  file whole when finished, its bytes those `to_bytes` gives; with them `CacheError`
+  gains `EntryCount` and `WriterFailed` (ADR-0055; issue 4).
 - `vdb::read_named` and `vdb::from_bytes_named`, with the `vdb` feature: the grids of one
   name read from a `.vdb`, every other grid skipped unread (docs/formats.md §9.7; issue 2).
 

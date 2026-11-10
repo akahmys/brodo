@@ -17,9 +17,9 @@ use rayon::prelude::*;
 use zerocopy::{FromBytes, FromZeros, IntoBytes};
 
 use crate::cache::{
-    CacheEntry, CacheFile, Cursor, KIND_BYTES, KIND_GRID, Part, Payload, Storage,
-    decode_bytes_meta, decode_meta, head, index, pad_to, put_u32, range, read_within, u32_of,
-    within_blocks, zero,
+    CacheEntry, CacheFile, Cursor, Hidden, KIND_BYTES, KIND_GRID, Part, Payload, Sink, Storage,
+    decode_bytes_meta, decode_meta, head, index, put_u32, range, read_within, u32_of,
+    within_blocks, zero, zeros,
 };
 use crate::error::{CacheError, FormatError};
 use crate::field::local_index;
@@ -218,57 +218,62 @@ fn compress(
 /// How a frozen buffer is cut into chunks: `cuts`, but for a test of the reader.
 type Cut = fn(&[u8]) -> Result<Vec<Piece>, CacheError>;
 
-/// Writes the archive holding `grids` to `out`, part by part, each frozen buffer cut by
-/// `cut`.
-fn emit(
-    grids: &[(&CacheEntry, Encoding)],
+/// An archive's header for `count` entries.
+fn top(count: usize) -> Result<[u32; 8], CacheError> {
+    Ok([MAGIC, VERSION, u32_of(count)?, CODEC, u32_of(CHUNK_LEAVES)?, 0, 0, 0])
+}
+
+/// Writes `e`, its leaf values stored by `encoding` and its frozen buffer cut by `cut`, as
+/// the next entry of `sink`: its metadata, its chunk table and its chunks, each at a block.
+fn push_to<W: std::io::Write + std::io::Seek>(
+    sink: &mut Sink<W>,
+    e: &CacheEntry,
+    encoding: Encoding,
     cut: Cut,
-    out: &mut impl std::io::Write,
 ) -> Result<(), CacheError> {
-    let packed = grids
+    let index = sink.next()?;
+    let p = pack(index, e, encoding, cut)?;
+    let mut table = Vec::new();
+    for (r, c) in p.raw.iter().zip(&p.chunks) {
+        put_u32(&mut table, u32_of(*r)?);
+        put_u32(&mut table, u32_of(c.len())?);
+    }
+    table.extend_from_slice(&p.ranges);
+    let meta_at = sink.at;
+    let table_at = meta_at + p.meta.len().div_ceil(BLOCK);
+    let first = table_at + table.len().div_ceil(BLOCK);
+    let end = p
+        .chunks
         .iter()
-        .enumerate()
-        .map(|(i, (e, encoding))| pack(i, e, *encoding, cut))
-        .collect::<Result<Vec<_>, _>>()?;
-    let mut top = Vec::new();
-    for x in [MAGIC, VERSION, u32_of(grids.len())?, CODEC, u32_of(CHUNK_LEAVES)?, 0, 0, 0] {
-        put_u32(&mut top, x);
-    }
-    let mut at = 1 + grids.len();
-    for p in &packed {
-        let table_at = at + p.meta.len().div_ceil(BLOCK);
-        let first = table_at + (p.chunks.len() * ENTRY + p.ranges.len()).div_ceil(BLOCK);
-        at = first + p.chunks.iter().map(|c| c.len().div_ceil(BLOCK)).sum::<usize>();
-        for x in [
-            u32_of(table_at - p.meta.len().div_ceil(BLOCK))?,
-            u32_of(p.meta.len())?,
-            u32_of(table_at)?,
-            u32_of(p.chunks.len())?,
-            u32_of(p.part.grid_blocks)?,
-            p.part.value_type,
-            p.encoding,
-            p.part.kind,
-        ] {
-            put_u32(&mut top, x);
-        }
-    }
-    u32_of(at)?;
-    out.write_all(&top)?;
-    let mut written = top.len();
-    for p in &packed {
-        let mut table = Vec::new();
-        for (r, c) in p.raw.iter().zip(&p.chunks) {
-            put_u32(&mut table, u32_of(*r)?);
-            put_u32(&mut table, u32_of(c.len())?);
-        }
-        table.extend_from_slice(&p.ranges);
+        .try_fold(first, |at, c| at.checked_add(c.len().div_ceil(BLOCK)))
+        .ok_or(CacheError::TooLarge)?;
+    u32_of(end)?;
+    let row = [
+        u32_of(meta_at)?,
+        u32_of(p.meta.len())?,
+        u32_of(table_at)?,
+        u32_of(p.chunks.len())?,
+        u32_of(p.part.grid_blocks)?,
+        p.part.value_type,
+        p.encoding,
+        p.part.kind,
+    ];
+    sink.put(row, end, |out| {
         for part in std::iter::once(&p.meta).chain([&table]).chain(&p.chunks) {
             out.write_all(part)?;
-            written += part.len();
-            pad_to(out, written.next_multiple_of(BLOCK), &mut written)?;
+            zeros(out, part.len().next_multiple_of(BLOCK) - part.len())?;
         }
+        Ok(())
+    })
+}
+
+/// The bytes of the archive holding `grids`, each frozen buffer cut by `cut`.
+fn bytes_with(grids: &[(&CacheEntry, Encoding)], cut: Cut) -> Result<Vec<u8>, CacheError> {
+    let mut sink = Sink::begin(std::io::Cursor::new(Vec::new()), top(grids.len())?)?;
+    for (e, encoding) in grids {
+        push_to(&mut sink, e, *encoding, cut)?;
     }
-    Ok(())
+    Ok(sink.end()?.into_inner())
 }
 
 /// Every grid of `entries`, exact.
@@ -287,9 +292,7 @@ pub fn to_bytes(entries: &[CacheEntry]) -> Result<Vec<u8>, CacheError> {
 /// place in `grids`. An entry of bytes is stored exact; another encoding for one is
 /// refused, `NotQuantised`.
 pub fn to_bytes_with(grids: &[(&CacheEntry, Encoding)]) -> Result<Vec<u8>, CacheError> {
-    let mut out = Vec::new();
-    emit(grids, cuts, &mut out)?;
-    Ok(out)
+    bytes_with(grids, cuts)
 }
 
 /// Writes an archive holding `entries`, their values exact, replacing `path` whole as
@@ -301,7 +304,57 @@ pub fn write(path: &Path, entries: &[CacheEntry]) -> Result<(), CacheError> {
 /// Writes an archive holding `grids`, each by its encoding, as `to_bytes_with` makes it,
 /// replacing `path` whole as `cache::write` does.
 pub fn write_with(path: &Path, grids: &[(&CacheEntry, Encoding)]) -> Result<(), CacheError> {
-    crate::cache::replace(path, |out| emit(grids, cuts, out))
+    let mut w = Writer::create(path, grids.len())?;
+    for (e, encoding) in grids {
+        w.push_with(e, *encoding)?;
+    }
+    w.finish()
+}
+
+/// An archive being written at a path entry by entry, each entry's memory, its chunks
+/// compressed among it, needed only while it is written: made for a count of
+/// entries, given each in turn by `push` or `push_with`, and ended by `finish`, which
+/// replaces the file at the path whole as `cache::write` does. Its bytes are those
+/// `to_bytes_with` gives for the same entries and encodings.
+///
+/// The entries go to a hidden file beside the path as they come. A writer dropped
+/// unfinished, or whose `finish` is refused, removes it and leaves the old file.
+#[derive(Debug)]
+pub struct Writer {
+    sink: Sink<std::io::BufWriter<std::fs::File>>,
+    file: Hidden,
+}
+
+impl Writer {
+    /// Begins an archive at `path` for `count` entries: its hidden file made new, its
+    /// header and a directory of zeros written.
+    pub fn create(path: &Path, count: usize) -> Result<Self, CacheError> {
+        let (file, out) = Hidden::create(path)?;
+        Ok(Self { sink: Sink::begin(out, top(count)?)?, file })
+    }
+
+    /// Writes `entry` as the next entry, its values exact, as `push_with` does.
+    pub fn push(&mut self, entry: &CacheEntry) -> Result<(), CacheError> {
+        self.push_with(entry, Encoding::Exact)
+    }
+
+    /// Writes `entry` as the next entry, a grid's leaf values stored by `encoding`. An
+    /// entry refused for itself, as `to_bytes_with` refuses one, naming the place it would
+    /// take, is not written, and the writer goes on; one past the count stated is refused,
+    /// `EntryCount`; after an error writing, every call is refused, `WriterFailed`.
+    pub fn push_with(&mut self, entry: &CacheEntry, encoding: Encoding) -> Result<(), CacheError> {
+        push_to(&mut self.sink, entry, encoding, cuts)
+    }
+
+    /// Writes the directory, flushes the file to the disk and renames it over the path. A
+    /// writer given fewer entries than its count is refused, `EntryCount`, and one whose
+    /// writing failed, `WriterFailed`; either leaves the old file.
+    pub fn finish(self) -> Result<(), CacheError> {
+        let Self { sink, file } = self;
+        let out = sink.end()?;
+        file.commit(out)?;
+        Ok(())
+    }
 }
 
 /// An entry as read: where its metadata is, its payload's length in blocks, its value
@@ -1081,8 +1134,7 @@ mod tests {
     #[test]
     fn a_grid_cut_otherwise_is_refused() {
         let e = entries();
-        let mut bytes = Vec::new();
-        emit(&exact(&e), |b| Ok(vec![(b.len() / BLOCK, false)]), &mut bytes).unwrap();
+        let bytes = bytes_with(&exact(&e), |b| Ok(vec![(b.len() / BLOCK, false)])).unwrap();
         assert!(matches!(from_bytes(&bytes, u64::MAX), Err(CacheError::Chunks(0))));
     }
 }
