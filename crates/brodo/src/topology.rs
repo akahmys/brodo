@@ -7,7 +7,10 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::error::TreeError;
 use crate::manifest::{DIRECTIONS, LeafManifest};
-use crate::tree::{Activation, Coord, Deactivation, LeafId, Probe, Step, TileLevel, Tree};
+use crate::tree::{
+    Activation, Coord, Deactivation, LOWER_DIM_LOG2, LeafId, Probe, Step, TileLevel, Tree,
+    UPPER_DIM_LOG2,
+};
 
 static NEXT_STAMP: AtomicU64 = AtomicU64::new(1);
 
@@ -294,6 +297,46 @@ impl Topology {
         }
     }
 
+    /// A topology covering every voxel this one's or `other`'s leaves and tiles cover, and
+    /// no other (ADR-0014): every leaf of either, and a tile wherever either covers a region
+    /// whole and neither holds finer content in it. The finer is kept: a tile of one holding
+    /// a leaf or a smaller tile of the other is split down to it, each level on the way a
+    /// node whose other places are tiles one level down, as `TopologyEditor::split_tile`
+    /// splits. Each tile is so covered whole by a tile of an input or by nothing, and a
+    /// field of either input moves onto the union by `Remap::between` without a merge. The
+    /// same leaves and tiles whichever input comes first; more tiles than a `u32` numbers is
+    /// refused as `TreeError::TooManyTiles`.
+    pub fn union(&self, other: &Topology) -> Result<Topology, TreeError> {
+        let inputs = [self, other];
+        let keys: BTreeSet<Coord> = inputs.iter().flat_map(|t| t.root_keys()).collect();
+        let mut tiles = Vec::new();
+        for key in keys {
+            union_tiles(inputs, TileLevel::Root, key, &mut tiles);
+        }
+        let empty = Topology::new();
+        let mut e = empty.edit();
+        for o in inputs.iter().flat_map(|t| &t.leaves) {
+            e.activate(*o)?;
+        }
+        for (level, o) in tiles {
+            e.add_tile(level, o)?;
+        }
+        Ok(e.commit()?.0)
+    }
+
+    /// What this topology holds in the region at `level` and `o`.
+    fn holds_in(&self, level: TileLevel, o: Coord) -> Holds {
+        match self.locate(o) {
+            Location::Tile(_, l) if l.edge() >= level.edge() => Holds::Whole,
+            Location::Leaf(_) | Location::Tile(..) => Holds::Finer,
+            Location::Background => match level {
+                TileLevel::Root if self.has_upper_node(o) => Holds::Finer,
+                TileLevel::Upper if self.has_lower_node(o) => Holds::Finer,
+                TileLevel::Root | TileLevel::Upper | TileLevel::Lower => Holds::Nothing,
+            },
+        }
+    }
+
     /// An editor of a copy of this topology, which stays usable with its fields.
     pub fn edit(&self) -> TopologyEditor<'_> {
         TopologyEditor {
@@ -439,6 +482,45 @@ fn sources(old: &Before<'_>, new: &Topology) -> Result<Remap, TreeError> {
         .map(|(l, o)| tile_source(old, *l, *o, &mut parts))
         .collect::<Result<_, _>>()?;
     Ok(Remap { from: old.old.stamp, to: new.stamp, leaves, tiles, parts })
+}
+
+/// What a topology holds in a region: nothing, a tile covering it whole, or finer content,
+/// a leaf or a node.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Holds {
+    Nothing,
+    Whole,
+    Finer,
+}
+
+/// The union's tiles in the region at `level` and `o`: one tile if an input covers it whole
+/// and neither holds finer content, else those of each child region where one does; a
+/// leaf's region holding a leaf is that leaf, not a tile.
+// Bounded recursion: each call goes one tile level finer, root to upper to lower, and the
+// lower level calls no further, so the depth is at most three.
+fn union_tiles(
+    inputs: [&Topology; 2],
+    level: TileLevel,
+    o: Coord,
+    tiles: &mut Vec<(TileLevel, Coord)>,
+) {
+    let held = inputs.map(|t| t.holds_in(level, o));
+    if !held.contains(&Holds::Finer) {
+        if held.contains(&Holds::Whole) {
+            tiles.push((level, o));
+        }
+        return;
+    }
+    let (child, side) = match level {
+        TileLevel::Root => (TileLevel::Upper, 1 << UPPER_DIM_LOG2),
+        TileLevel::Upper => (TileLevel::Lower, 1 << LOWER_DIM_LOG2),
+        TileLevel::Lower => return,
+    };
+    let edge = child.edge();
+    for i in 0..side * side * side {
+        let at = [i % side, i / side % side, i / (side * side)].map(|c| c * edge);
+        union_tiles(inputs, child, [o[0] + at[0], o[1] + at[1], o[2] + at[2]], tiles);
+    }
 }
 
 /// Leaf-sized regions in a lower node's region.

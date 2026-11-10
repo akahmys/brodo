@@ -15,6 +15,9 @@ are recorded here when they change (V6).
 - `Remap::between`: the remap between two unrelated topologies, so that `Field::remap`
   moves a field onto another topology, voxels absent from the source taking the
   background and tiles over mixed content merged by the caller's rule (ADR-0014; issue 7).
+- `Topology::union`: a topology covering every voxel two topologies cover, the finer
+  kept, each input's field moved onto it by `Remap::between` without a merge (ADR-0014;
+  issue 8).
 - `vdb::read_named` and `vdb::from_bytes_named`, with the `vdb` feature: the grids of one
   name read from a `.vdb`, every other grid skipped unread (docs/formats.md §9.7; issue 2).
 

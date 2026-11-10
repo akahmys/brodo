@@ -148,6 +148,13 @@ pub struct Field<T> {
   the merge rule applied to what each leaf-sized region of it holds, empty regions counted
   together among its parts. A new root tile over anything but one old root tile or nothing
   is refused, as a merge into a root tile is (ADR-0014).
+- Two topologies have a union (`Topology::union`) covering every voxel either covers and
+  no other: every leaf of either, and a tile wherever either covers a region whole and
+  neither holds finer content in it. The finer is kept: a tile holding the other's leaf or
+  smaller tile is split down to it, as `split_tile` splits, each level on the way a node
+  whose other places are tiles one level down. So each of its tiles is covered whole by a
+  tile of an input or by nothing, and a field of either moves onto it by `Remap::between`
+  without a merge. It is the same whichever input comes first (ADR-0014).
 - A merge takes leaves and tiles at once, into a tile in a lower node (from a leaf) or in
   an upper node (from a lower node); a region that holds nothing refuses it, so a merge
   changes values, not which voxels are active. Merging into a root tile is not built.

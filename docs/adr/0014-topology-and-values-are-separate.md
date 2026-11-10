@@ -88,3 +88,10 @@ taking the background. The owner decided, on 2026-11-09 and 2026-11-10, as propo
 - A new root tile over anything but one old root tile or nothing is refused as
   `TreeError::MergeUnsupported`, as a merge into a root tile is: listing its parts by
   leaf-sized region would visit about 1.3 × 10⁸ regions.
+- Issue 8: two topologies have a union, `a.union(&b)`, giving a topology alone, its
+  remaps made by `Remap::between`, so that one mechanism makes every remap. The finer is
+  kept: a tile of one holding a leaf or a smaller tile of the other is split down to it,
+  the rest of each level tiles one level down, as `split_tile` splits, rather than into
+  leaves. A root tile kept over finer content would have made `between` refuse it; so
+  split, each tile of the union is covered whole by an input's tile or by nothing, and a
+  field moves onto it without a merge.
