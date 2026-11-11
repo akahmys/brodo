@@ -1,5 +1,5 @@
-//! Reading OpenVDB files (ARCHITECTURE.md §4.7, ADR-0047): the float and double grids of a
-//! `.vdb` file at file version 224 or 225, as brodo and OpenVDB 12 to 14 write them. This
+//! Reading OpenVDB files (ARCHITECTURE.md §4.7, ADR-0047): the float, double and vector
+//! grids of a `.vdb` file at file version 224 or 225, as brodo and OpenVDB 12 to 14 write them. This
 //! module parses untrusted bytes: it is listed in `UNTRUSTED_INPUT`, indexes nothing
 //! (CODING.md Rule 3), and is fuzzed (TESTING.md T6).
 //!
@@ -63,7 +63,8 @@ pub struct VdbGrid {
     /// Its leaves, and its tiles active or not holding the background.
     pub topology: Topology,
     /// Its values on the topology, every leaf voxel's whether active or not: `F32` for a
-    /// grid of `Tree_float_5_4_3`, `F64` for one of `Tree_double_5_4_3`, the only types read.
+    /// grid of `Tree_float_5_4_3`, `F64` for one of `Tree_double_5_4_3`, `F32x3` for one of
+    /// `Tree_vec3s_5_4_3` and `F64x3` for one of `Tree_vec3d_5_4_3`, the only types read.
     pub field: AnyField,
 }
 
@@ -71,7 +72,7 @@ pub struct VdbGrid {
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct VdbFile {
-    /// The float and double grids read.
+    /// The float, double and vector grids read.
     pub grids: Vec<VdbGrid>,
     /// The names of the grids skipped: of another type, saved as half floats, or instanced.
     pub skipped: Vec<String>,
@@ -134,6 +135,14 @@ fn grids(bytes: &[u8], unit: &str, name: Option<&str>, limit: u64) -> Result<Vdb
                 let (meta, topology, f) = grid::<f64>(bytes, &d, unit, &mut budget)?;
                 Some(VdbGrid { meta, topology, field: AnyField::F64(f) })
             }
+            b"Tree_vec3s_5_4_3" if d.instance.is_empty() => {
+                let (meta, topology, f) = grid::<[f32; 3]>(bytes, &d, unit, &mut budget)?;
+                Some(VdbGrid { meta, topology, field: AnyField::F32x3(f) })
+            }
+            b"Tree_vec3d_5_4_3" if d.instance.is_empty() => {
+                let (meta, topology, f) = grid::<[f64; 3]>(bytes, &d, unit, &mut budget)?;
+                Some(VdbGrid { meta, topology, field: AnyField::F64x3(f) })
+            }
             _ => None,
         };
         match read {
@@ -157,56 +166,85 @@ pub fn read(path: &Path, unit: &str, limit: u64) -> Result<VdbFile, VdbError> {
 }
 
 /// A value type read: its bytes, its negation and its bits.
-trait Scalar: VdbValue + std::ops::Neg<Output = Self> {
+trait Value: VdbValue {
     const SIZE: usize;
-    /// Whether a grid of the type may state the SDF convention (docs/formats.md §5).
-    const SDF: bool;
     /// What a leaf is counted to make (ARCHITECTURE.md §4.7): its values twice, in the
     /// reader's map and the field, and 1024 bytes for its mask, origin and numbers.
-    const LEAF: u64;
+    const LEAF: u64 = 2 * 512 * Self::SIZE as u64 + 1024;
 
     fn get(bytes: &[u8]) -> Option<Self>;
+
+    /// The value negated, a vector's every component (docs/formats.md §9.8).
+    #[must_use]
+    fn neg(self) -> Self;
 
     /// Whether two values have the same bits.
     fn same(self, other: Self) -> bool;
 
-    /// The value as `f64`, exactly.
-    fn wide(self) -> f64;
+    /// The value as a signed distance, exactly as `f64`, for the type alone whose grid may
+    /// state the SDF convention, `f32` (docs/formats.md §5); `None` for any other.
+    fn distance(self) -> Option<f64> {
+        None
+    }
 }
 
-impl Scalar for f32 {
+impl Value for f32 {
     const SIZE: usize = 4;
-    const SDF: bool = true;
-    const LEAF: u64 = 2 * 512 * 4 + 1024;
 
     fn get(bytes: &[u8]) -> Option<Self> {
         Some(Self::from_le_bytes(bytes.try_into().ok()?))
+    }
+
+    fn neg(self) -> Self {
+        -self
     }
 
     fn same(self, other: Self) -> bool {
         self.to_bits() == other.to_bits()
     }
 
-    fn wide(self) -> f64 {
-        f64::from(self)
+    fn distance(self) -> Option<f64> {
+        Some(f64::from(self))
     }
 }
 
-impl Scalar for f64 {
+impl Value for f64 {
     const SIZE: usize = 8;
-    const SDF: bool = false;
-    const LEAF: u64 = 2 * 512 * 8 + 1024;
 
     fn get(bytes: &[u8]) -> Option<Self> {
         Some(Self::from_le_bytes(bytes.try_into().ok()?))
     }
 
+    fn neg(self) -> Self {
+        -self
+    }
+
     fn same(self, other: Self) -> bool {
         self.to_bits() == other.to_bits()
     }
+}
 
-    fn wide(self) -> f64 {
-        self
+/// A vector of three components of `T`, x, y, z (docs/formats.md §9.8).
+impl<T: Value + Copy> Value for [T; 3]
+where
+    [T; 3]: VdbValue,
+{
+    const SIZE: usize = 3 * T::SIZE;
+
+    fn get(bytes: &[u8]) -> Option<Self> {
+        if bytes.len() != Self::SIZE {
+            return None;
+        }
+        let part = |k: usize| bytes.get(k * T::SIZE..(k + 1) * T::SIZE).and_then(T::get);
+        Some([part(0)?, part(1)?, part(2)?])
+    }
+
+    fn neg(self) -> Self {
+        self.map(T::neg)
+    }
+
+    fn same(self, other: Self) -> bool {
+        self.into_iter().zip(other).all(|(a, b)| a.same(b))
     }
 }
 
@@ -264,7 +302,7 @@ impl<'a> Cursor<'a> {
         Ok(f64::from_le_bytes(self.array(what)?))
     }
 
-    fn value<T: Scalar>(&mut self, what: &'static str) -> Result<T, VdbError> {
+    fn value<T: Value>(&mut self, what: &'static str) -> Result<T, VdbError> {
         T::get(self.take(T::SIZE, what)?).ok_or(VdbError::Malformed(what))
     }
 
@@ -348,7 +386,7 @@ struct Tree<T> {
 }
 
 /// A grid's body.
-fn grid<T: Scalar>(
+fn grid<T: Value>(
     bytes: &[u8],
     d: &Descriptor,
     unit: &str,
@@ -385,8 +423,7 @@ fn grid<T: Scalar>(
     if c.at != d.end {
         return Err(VdbError::Malformed("leaf buffers' end"));
     }
-    if T::SDF
-        && meta.extra.get(CLASS).is_some_and(|c| c == LEVEL_SET)
+    if meta.extra.get(CLASS).is_some_and(|c| c == LEVEL_SET)
         && is_sdf(meta.voxel_size, &tree, background)
     {
         meta.extra.remove(CLASS);
@@ -399,19 +436,22 @@ fn grid<T: Scalar>(
 /// Whether a level set meets the conditions under which it is read as stating the SDF
 /// convention (ARCHITECTURE.md §4.7): voxel sizes within `SPREAD` of each other, a positive
 /// finite background, every leaf value within ±background, and every tile kept ±background.
-fn is_sdf<T: Scalar>(size: [f64; 3], tree: &Tree<T>, background: T) -> bool {
-    let b = background.wide();
+fn is_sdf<T: Value>(size: [f64; 3], tree: &Tree<T>, background: T) -> bool {
+    let Some(b) = background.distance() else { return false };
     let [x, y, z] = size;
     let (least, most) = (x.min(y).min(z), x.max(y).max(z));
     most - least <= SPREAD * least
         && b > 0.0
         && b.is_finite()
-        && tree.leaves.values().all(|l| l.iter().all(|v| v.wide().abs() <= b))
-        && tree.tiles.values().all(|v| v.same(background) || v.same(-background))
+        && tree
+            .leaves
+            .values()
+            .all(|l| l.iter().all(|v| v.distance().is_some_and(|d| d.abs() <= b)))
+        && tree.tiles.values().all(|v| v.same(background) || v.same(background.neg()))
 }
 
 /// A leaf's values from OpenVDB's place order, z fastest, to brodo's, x fastest.
-fn brodo_order<T: Scalar>(values: &[T]) -> Result<Box<[T; LEAF_VOXELS]>, VdbError> {
+fn brodo_order<T: Value>(values: &[T]) -> Result<Box<[T; LEAF_VOXELS]>, VdbError> {
     let mut out =
         Box::new([values.first().copied().ok_or(VdbError::Malformed("leaf"))?; LEAF_VOXELS]);
     for (p, v) in values.iter().enumerate() {
@@ -423,7 +463,7 @@ fn brodo_order<T: Scalar>(values: &[T]) -> Result<Box<[T; LEAF_VOXELS]>, VdbErro
 }
 
 /// The topology and field of the leaves and tiles read.
-fn build<T: Scalar>(tree: &Tree<T>, background: T) -> Result<(Topology, Field<T>), VdbError> {
+fn build<T: Value>(tree: &Tree<T>, background: T) -> Result<(Topology, Field<T>), VdbError> {
     let empty = Topology::new();
     let mut e = empty.edit();
     for origin in tree.leaves.keys() {
@@ -526,7 +566,7 @@ type LeafMask = (Coord, Vec<u64>);
 
 /// The topology (docs/formats.md §9.4, §9.7 rule 6): the background, the tiles kept, and
 /// each leaf's origin and value mask in the file's order.
-fn topology<T: Scalar>(
+fn topology<T: Value>(
     c: &mut Cursor<'_>,
     flags: u32,
     budget: &mut Budget,
@@ -584,7 +624,7 @@ struct Node<T> {
     background: T,
 }
 
-impl<T: Scalar> Node<T> {
+impl<T: Value> Node<T> {
     /// An upper node at `origin`, then its lower nodes.
     fn upper(
         &self,
@@ -648,7 +688,7 @@ fn place_origin(origin: Coord, p: usize, log: u32, child: u32) -> Result<Coord, 
 }
 
 /// A node's `places` values (docs/formats.md §9.8), `mask` its active places.
-fn values<T: Scalar>(
+fn values<T: Value>(
     c: &mut Cursor<'_>,
     places: usize,
     mask: &[u64],
@@ -687,10 +727,10 @@ fn values<T: Scalar>(
             let s = bit(&select, p);
             match indicator {
                 0 => background,
-                1 => -background,
+                1 => background.neg(),
                 2 => first,
                 3 if s => background,
-                3 => -background,
+                3 => background.neg(),
                 4 if s => background,
                 4 => first,
                 5 if s => second,

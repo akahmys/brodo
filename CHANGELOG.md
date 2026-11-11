@@ -24,6 +24,11 @@ are recorded here when they change (V6).
   gains `EntryCount` and `WriterFailed` (ADR-0055; issue 4).
 - `vdb::read_named` and `vdb::from_bytes_named`, with the `vdb` feature: the grids of one
   name read from a `.vdb`, every other grid skipped unread (docs/formats.md §9.7; issue 2).
+- `.vdb` grids of `[f32; 3]` and `[f64; 3]`, with the `vdb` feature: written by
+  `VdbEntry::new` as OpenVDB's `Tree_vec3s_5_4_3` and `Tree_vec3d_5_4_3`, and read as
+  `AnyField::F32x3` and `F64x3`, which a `.vdb` read gave among `VdbFile::skipped` before;
+  mestolo's `convert` writes them to `.vdb`, and refuses or, with `--skip-unsupported`,
+  leaves out `u8` and `u32` alone (docs/formats.md §9, ADR-0046, ADR-0047; issue 3).
 
 ## 1.2.0 (2026-11-10)
 

@@ -8,10 +8,10 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: P12's issue 4, a cache file or an archive written one entry at a time
-  (ADR-0055); before it, issues 8, 7 and 2 (2026-11-10).
-- **Next**: P12's issue 3 (§2): `.vdb` grids of vectors, after a spike against OpenVDB 14
-  (AGENTS.md S1).
+- **Done**: P12's issue 3, `.vdb` grids of `[f32; 3]` and `[f64; 3]` written and read,
+  `u8` and `u32` not written, OpenVDB having no grid of either (`spikes/vdbvec/`, ADR-0046,
+  ADR-0047); before it, issues 4, 8, 7 and 2 (2026-11-10).
+- **Next**: P12's issue 6 (§2): B-025 answered by its spike and ADR.
 - **Unresolved**: `leaf_parallel_update_x32` drifts between processes by up to 20 %, its
   cause not measured (ADR-0019).
 
@@ -58,7 +58,7 @@ before it is written, its ADR amended where the design changes. Each issue's
 - [x] [Issue 4](https://github.com/akahmys/brodo/issues/4): a writer taking its entry count
       first and one grid at a time, to a path only; `write` and `to_bytes` made by it, their
       bytes unchanged (ADR-0055)
-- [ ] [Issue 3](https://github.com/akahmys/brodo/issues/3): `.vdb` grids of `[f32; 3]` and
+- [x] [Issue 3](https://github.com/akahmys/brodo/issues/3): `.vdb` grids of `[f32; 3]` and
       `[f64; 3]`, after a spike against OpenVDB 14 (AGENTS.md S1); `u8` and `u32` decided
       once the spike has looked for their OpenVDB types; mestolo's `convert` taking them
 - [ ] [Issue 6](https://github.com/akahmys/brodo/issues/6): B-025 answered by its spike and

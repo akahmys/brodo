@@ -209,7 +209,8 @@ int expect(const std::string& path)
     file.close();
     for (const auto& base : *grids) {
         const bool half = base->saveFloatAsHalf();
-        const bool kind = base->isType<openvdb::FloatGrid>() || base->isType<openvdb::DoubleGrid>();
+        const bool kind = base->isType<openvdb::FloatGrid>() || base->isType<openvdb::DoubleGrid>()
+            || base->isType<openvdb::Vec3SGrid>() || base->isType<openvdb::Vec3DGrid>();
         const bool shared = std::count_if(grids->begin(), grids->end(), [&](const openvdb::GridBase::Ptr& g) {
             return g->baseTreePtr() == base->baseTreePtr(); }) > 1 && base->getName() != "sdf";
         if (half || !kind || shared) { std::printf("skipped %s\n", base->getName().c_str()); continue; }
@@ -230,6 +231,8 @@ int expect(const std::string& path)
         std::printf("voxel_size %s\ntransform %s\n", hex(size, sizeof size).c_str(), hex(a, sizeof a).c_str());
         if (auto g = openvdb::gridPtrCast<openvdb::FloatGrid>(base)) expectTree(*g);
         else if (auto g = openvdb::gridPtrCast<openvdb::DoubleGrid>(base)) expectTree(*g);
+        else if (auto g = openvdb::gridPtrCast<openvdb::Vec3SGrid>(base)) expectTree(*g);
+        else if (auto g = openvdb::gridPtrCast<openvdb::Vec3DGrid>(base)) expectTree(*g);
     }
     return 0;
 }

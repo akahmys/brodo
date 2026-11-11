@@ -42,3 +42,25 @@ is larger than OpenVDB's own by the codec it lacks and by the voxels outside the
 brodo holds active. Whether OpenVDB 12 and 13 read file version 225 was not tried; it is
 tried before the reading step settles which files brodo reads. OpenVDB's tools are the
 check, by hand and in the spike, not in the gate.
+
+## Amendment: vector grids written
+
+- **Date**: 2026-11-10
+
+Issue 3 asked for `.vdb` grids of `[f32; 3]` and `[f64; 3]`, and of `u8` and `u32`. The
+spike `spikes/vdbvec/` (2026-11-10, `spikes/vdbvec/REPORT.md`) had OpenVDB 12.0.0, 13.0.0
+and 14.0.0 write vector grids at every compression, full and saved as half floats, and
+read every file the others wrote. A vector grid was laid out as a scalar grid, each value
+three components x, y, z, of type `Tree_vec3s_5_4_3` or `Tree_vec3d_5_4_3`; a vector type
+other than invariant was stated by a `string` entry `vector_type`. None of the three
+registered a grid type of `uint8_t` or `uint32_t`, so none of them reads such a grid; the
+nearest that were registered, `int32` and `int64`, hold every `u8` and `u32`.
+
+The owner decided, on 2026-11-10, as proposed: brodo writes grids of `[f32; 3]` and
+`[f64; 3]` as `Tree_vec3s_5_4_3` and `Tree_vec3d_5_4_3`, by docs/formats.md §9 with a
+value of three components, stating no vector type and of `class` `unknown` whatever its
+pairs, the SDF convention being a scalar's (§5). `u8` and `u32` are not written to `.vdb`:
+no OpenVDB reads them, and widened to `int32` and `int64` they would read back as another
+type. OpenVDB 12.0.0, 13.0.0 and 14.0.0 read brodo's vector test vector,
+`vdb_vec_v225.bin`, to the values brodo wrote, checked by hand in the spike's oracle, not
+in the gate.

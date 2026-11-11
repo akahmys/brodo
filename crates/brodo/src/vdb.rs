@@ -1,5 +1,5 @@
-//! OpenVDB files (ARCHITECTURE.md §4.7, ADR-0045, ADR-0046, ADR-0047): grids of `f32` or
-//! `f64` written as one `.vdb` file at file version 225, as OpenVDB 14 reads it, and read
+//! OpenVDB files (ARCHITECTURE.md §4.7, ADR-0045, ADR-0046, ADR-0047): grids of `f32`,
+//! `f64`, `[f32; 3]` or `[f64; 3]` written as one `.vdb` file at file version 225, as OpenVDB 14 reads it, and read
 //! from the files brodo and OpenVDB 12 to 14 write by `from_bytes` and `read`, which this
 //! module re-exports from the private module `vdb_read`, where reading lives.
 //!
@@ -39,8 +39,8 @@ const LEAF_PLACES: usize = 1 << 9;
 /// writes them for an empty grid (docs/formats.md §9.3).
 const EMPTY_BOX: (Coord, Coord) = ([i32::MAX; 3], [i32::MIN; 3]);
 
-/// A value type OpenVDB holds a grid of: `f32` or `f64` (ADR-0046). It names the types and
-/// promises nothing more: what writing one needs is brodo's own.
+/// A value type OpenVDB holds a grid of: `f32`, `f64`, `[f32; 3]` or `[f64; 3]` (ADR-0046).
+/// It names the types and promises nothing more: what writing one needs is brodo's own.
 pub trait VdbValue: sealed::VdbWrite {}
 
 /// Keeps what writing a value needs out of brodo's API.
@@ -51,6 +51,9 @@ mod sealed {
     pub trait VdbWrite: Stored {
         /// OpenVDB's name for a tree of the type.
         const TREE_TYPE: &'static str;
+        /// Whether a grid of the type holding `SDF_KEY` is written as a level set: a
+        /// scalar's alone (ADR-0046).
+        const LEVEL_SET: bool = true;
 
         /// Appends the value's little-endian bytes.
         fn put(self, out: &mut Vec<u8>);
@@ -59,6 +62,8 @@ mod sealed {
 
 impl VdbValue for f32 {}
 impl VdbValue for f64 {}
+impl VdbValue for [f32; 3] {}
+impl VdbValue for [f64; 3] {}
 
 impl sealed::VdbWrite for f32 {
     const TREE_TYPE: &'static str = "Tree_float_5_4_3";
@@ -76,6 +81,24 @@ impl sealed::VdbWrite for f64 {
     }
 }
 
+impl sealed::VdbWrite for [f32; 3] {
+    const TREE_TYPE: &'static str = "Tree_vec3s_5_4_3";
+    const LEVEL_SET: bool = false;
+
+    fn put(self, out: &mut Vec<u8>) {
+        self.into_iter().for_each(|x| out.extend(x.to_le_bytes()));
+    }
+}
+
+impl sealed::VdbWrite for [f64; 3] {
+    const TREE_TYPE: &'static str = "Tree_vec3d_5_4_3";
+    const LEVEL_SET: bool = false;
+
+    fn put(self, out: &mut Vec<u8>) {
+        self.into_iter().for_each(|x| out.extend(x.to_le_bytes()));
+    }
+}
+
 /// A grid ready to be written: its name, its tree type, and its body's bytes, the topology
 /// and the leaf buffers apart (docs/formats.md §9.3).
 #[derive(Debug, Clone)]
@@ -90,7 +113,8 @@ impl VdbEntry {
     /// A topology and a field on it, with its metadata, for an OpenVDB file.
     ///
     /// Of the metadata, the name and the transform are written, and `SDF_KEY` among
-    /// the free pairs makes the grid a level set; the unit, the voxel size and the other
+    /// the free pairs makes a grid of `f32` or `f64` a level set, a vector grid being of
+    /// class `unknown` whatever its pairs; the unit, the voxel size and the other
     /// pairs are not written, OpenVDB having no place for a unit and the transform alone
     /// placing the voxels. Every leaf voxel and tile is written active (ADR-0046).
     pub fn new<T: VdbValue>(meta: &GridMeta, t: &Topology, f: &Field<T>) -> Result<Self, VdbError> {
@@ -99,7 +123,7 @@ impl VdbEntry {
         let nodes = Nodes::of(t)?;
         let mut body = Vec::new();
         put_u32(&mut body, ACTIVE_MASK);
-        put_metadata(&mut body, meta, t)?;
+        put_metadata(&mut body, meta, t, T::LEVEL_SET)?;
         put_transform(&mut body, &meta.transform)?;
         put_topology(&mut body, &nodes, t, f)?;
         let mut buffers = Vec::new();
@@ -291,8 +315,14 @@ fn put_topology<T: VdbValue>(
 }
 
 /// The grid's metadata entries, sorted by name (docs/formats.md §9.3).
-fn put_metadata(out: &mut Vec<u8>, meta: &GridMeta, t: &Topology) -> Result<(), VdbError> {
-    let class: &[u8] = if meta.extra.contains_key(SDF_KEY) { b"level set" } else { b"unknown" };
+fn put_metadata(
+    out: &mut Vec<u8>,
+    meta: &GridMeta,
+    t: &Topology,
+    level_set: bool,
+) -> Result<(), VdbError> {
+    let class: &[u8] =
+        if level_set && meta.extra.contains_key(SDF_KEY) { b"level set" } else { b"unknown" };
     let (min, max) = match Bounds::of(t)? {
         Bounds::Box { min, max } => (min, max),
         Bounds::Empty => EMPTY_BOX,

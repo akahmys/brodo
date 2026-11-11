@@ -131,3 +131,22 @@ the current tests changed to agree; `### Breaking` under `## Unreleased` skipped
 check; 1.1.0 whose section has `### Breaking` failed; 2.0.0 skipped it; the pin set to
 0.50.0 failed on the tool and on `audit.yml`; with tag `v1.0.0` removed, 1.0.0 over
 `v0.9.0` skipped it. Unchanged, it passed, in 2 min with nothing built and 20 s built.
+
+## Amendment: a baseline test set aside
+
+- **Date**: 2026-11-10
+
+Issue 3 had `.vdb` hold vector grids (ADR-0046, ADR-0047). Five of v1.2.0's mestolo tests
+asserted that `convert` refused or skipped a vector grid as `.vdb` and that `info` listed a
+`.vdb`'s vector grid as skipped, so V9 failed on 1.3.0's code, which adds what they held
+absent: a MINOR under V2, not a break of a promise, but V9 could not tell them apart.
+
+The owner decided, on 2026-11-10, as proposed: `scripts/audit/semver.py` holds a table,
+`SET_ASIDE`, of the baseline's mestolo tests not run, each by its tag and test name, with
+why. They are skipped by exact name for that tag alone; an entry of another tag, or naming
+no test of its tag, fails the check, so that an entry does not outlive its baseline and a
+misspelt one is found. A break, rather than an addition, still declares `### Breaking`.
+
+Shown to fire (TESTING.md T3, 2026-11-10): an entry's tag changed to `v1.1.0`, its name
+misspelt, an entry removed, and an extra entry of no test or of another tag each failed;
+unchanged, it passed against `v1.2.0` in 35 s.

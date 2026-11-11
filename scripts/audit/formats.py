@@ -578,7 +578,8 @@ def region(b, index, lo, hi):
 
 
 # §9: the value types of an OpenVDB file brodo writes, by tree type.
-VDB_TYPES = {b"Tree_float_5_4_3": "<f", b"Tree_double_5_4_3": "<d"}
+VDB_TYPES = {b"Tree_float_5_4_3": "<f", b"Tree_double_5_4_3": "<d",
+             b"Tree_vec3s_5_4_3": "<3f", b"Tree_vec3d_5_4_3": "<3d"}
 VDB_META = [b"class", b"file_bbox_max", b"file_bbox_min", b"file_compression",
             b"file_mem_bytes", b"file_voxel_count", b"name"]
 

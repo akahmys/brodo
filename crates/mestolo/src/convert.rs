@@ -1,5 +1,5 @@
-//! `convert`: a file's grids written as `.vdb`, by brodo's writer, which takes `f32` and
-//! `f64` grids; as a cache file or an archive, a cache file's or an archive's entries
+//! `convert`: a file's grids written as `.vdb`, by brodo's writer, which takes grids of
+//! `f32`, `f64`, `[f32; 3]` and `[f64; 3]`; as a cache file or an archive, a cache file's or an archive's entries
 //! copied as they were; or one grid as an ASCII `.vtu` (ARCHITECTURE.md §4.7, §6.1, §6.3).
 
 use std::ffi::OsStr;
@@ -54,8 +54,12 @@ fn vdb(
         Some(_) => vec![loaded.grid(grid)?],
         None => loaded.grids.iter().collect(),
     };
-    let (grids, not_written): (Vec<_>, Vec<_>) =
-        grids.into_iter().partition(|g| matches!(g.field, AnyField::F32(_) | AnyField::F64(_)));
+    let (grids, not_written): (Vec<_>, Vec<_>) = grids.into_iter().partition(|g| {
+        matches!(
+            g.field,
+            AnyField::F32(_) | AnyField::F64(_) | AnyField::F32x3(_) | AnyField::F64x3(_)
+        )
+    });
     let not_written: Vec<_> =
         not_written.iter().map(|g| (g.meta.name.clone(), g.field.value_type())).collect();
     match skipped {
@@ -76,7 +80,9 @@ fn entry(g: &Grid) -> Result<VdbEntry, MestoloError> {
     match &g.field {
         AnyField::F32(f) => Ok(VdbEntry::new(m, t, f)?),
         AnyField::F64(f) => Ok(VdbEntry::new(m, t, f)?),
-        AnyField::U8(_) | AnyField::U32(_) | AnyField::F32x3(_) | AnyField::F64x3(_) | _ => {
+        AnyField::F32x3(f) => Ok(VdbEntry::new(m, t, f)?),
+        AnyField::F64x3(f) => Ok(VdbEntry::new(m, t, f)?),
+        AnyField::U8(_) | AnyField::U32(_) | _ => {
             Err(MestoloError::ValueType(g.field.value_type()))
         }
     }
@@ -117,7 +123,9 @@ fn from_vdb(file: &VdbFile, grid: Option<&str>) -> Result<Vec<CacheEntry>, Mesto
         .map(|g| match &g.field {
             AnyField::F32(f) => Ok(CacheEntry::new(&g.meta, &g.topology, f)?),
             AnyField::F64(f) => Ok(CacheEntry::new(&g.meta, &g.topology, f)?),
-            AnyField::U8(_) | AnyField::U32(_) | AnyField::F32x3(_) | AnyField::F64x3(_) | _ => {
+            AnyField::F32x3(f) => Ok(CacheEntry::new(&g.meta, &g.topology, f)?),
+            AnyField::F64x3(f) => Ok(CacheEntry::new(&g.meta, &g.topology, f)?),
+            AnyField::U8(_) | AnyField::U32(_) | _ => {
                 Err(MestoloError::ValueType(g.field.value_type()))
             }
         })

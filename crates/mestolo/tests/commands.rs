@@ -90,9 +90,10 @@ fn what_a_format_does_not_hold_is_refused_by_name() {
         mestolo::run(&parse(all).unwrap(), &mut Vec::new())
     };
     let p = cache.to_str().unwrap();
+    let hermite = brodo_file("hermite_v3.bin");
     assert!(matches!(
-        run(&["convert", p], "all.vdb"),
-        Err(MestoloError::NotWritten(grids)) if grids == [("velocity".to_owned(), ValueType::F32x3)]
+        run(&["convert", hermite.to_str().unwrap()], "all.vdb"),
+        Err(MestoloError::NotWritten(grids)) if grids == [("cube".to_owned(), ValueType::U8)]
     ));
     assert!(matches!(run(&["convert", p], "all.vtu"), Err(MestoloError::WhichGrid(2))));
     assert!(matches!(
@@ -109,11 +110,43 @@ fn what_a_format_does_not_hold_is_refused_by_name() {
     ));
 }
 
+/// A vector grid converted to `.vdb` reads back as it was (ADR-0046).
+#[test]
+fn convert_writes_a_vector_grid_as_vdb() {
+    let cache = brodo_file("cache_v2.bin");
+    let out = fresh("velocity.vdb");
+    written(&["convert", cache.to_str().unwrap(), "--grid", "velocity"], &out);
+    let file = brodo::cache::read(&cache, DEFAULT_LIMIT).unwrap();
+    let (t, f) = file.grids_named("velocity").remove(0).thaw(DEFAULT_LIMIT).unwrap();
+    let brodo::field::AnyField::F32x3(f) = f else { panic!("not [f32; 3]") };
+    let vdb = brodo::vdb::read(&out, "m", DEFAULT_LIMIT).unwrap();
+    let brodo::field::AnyField::F32x3(g) = &vdb.grids[0].field else { panic!("not [f32; 3]") };
+    let u = &vdb.grids[0].topology;
+    assert_eq!(u.leaf_count(), t.leaf_count());
+    assert_eq!(g.background().map(f32::to_bits), f.background().map(f32::to_bits));
+    for n in t.leaf_numbers() {
+        let m = u.leaf_numbers().find(|m| u.leaf_origin(*m).unwrap() == t.leaf_origin(n).unwrap());
+        assert_eq!(g.leaf(u, m.unwrap()).unwrap(), f.leaf(&t, n).unwrap());
+    }
+}
+
+/// A cache file of `cache_v2.bin`'s grids and a grid of `u8`.
+fn with_labels() -> PathBuf {
+    let file = brodo::cache::read(&brodo_file("cache_v2.bin"), DEFAULT_LIMIT).unwrap();
+    let mut entries: Vec<CacheEntry> = file.grids().into_iter().map(CacheEntry::copy).collect();
+    let (t, _) = file.grids_named("density").remove(0).thaw(DEFAULT_LIMIT).unwrap();
+    let labels = GridMeta::new("labels", [1.0; 3], "m").unwrap();
+    entries.push(CacheEntry::new(&labels, &t, &Field::new(&t, 1_u8)).unwrap());
+    let path = fresh("labels.cache");
+    brodo::cache::write(&path, &entries).unwrap();
+    path
+}
+
 /// `--skip-unsupported` writes as `.vdb` the grids it holds, as `--grid` writes the one, and
 /// names each it leaves out; a conversion leaving none is refused as without it.
 #[test]
 fn convert_skips_and_names_the_grids_vdb_does_not_hold_when_asked() {
-    let cache = brodo_file("cache_v2.bin");
+    let cache = with_labels();
     let p = cache.to_str().unwrap();
     let run = |words: &[&str], out: &Path| {
         let mut all = args(words);
@@ -123,12 +156,14 @@ fn convert_skips_and_names_the_grids_vdb_does_not_hold_when_asked() {
     };
     let out = fresh("skipped.vdb");
     let said = run(&["convert", p, "--skip-unsupported"], &out).map_err(|e| e.to_string());
-    assert_eq!(said.as_deref(), Ok("skipped \"velocity\": .vdb does not hold [f32; 3]\n"));
-    assert_eq!(std::fs::read(&out).unwrap(), VDB);
-    let only = run(&["convert", p, "--grid", "velocity", "--skip-unsupported"], &fresh("v.vdb"));
+    assert_eq!(said.as_deref(), Ok("skipped \"labels\": .vdb does not hold u8\n"));
+    let whole = brodo_file("cache_v2.bin");
+    let all = written(&["convert", whole.to_str().unwrap()], &fresh("whole.vdb"));
+    assert_eq!(std::fs::read(&out).unwrap(), all);
+    let only = run(&["convert", p, "--grid", "labels", "--skip-unsupported"], &fresh("l.vdb"));
     assert!(matches!(
         only,
-        Err(MestoloError::NotWritten(grids)) if grids == [("velocity".to_owned(), ValueType::F32x3)]
+        Err(MestoloError::NotWritten(grids)) if grids == [("labels".to_owned(), ValueType::U8)]
     ));
     let twice =
         parse(args(&["convert", p, "-o", "x.vdb", "--skip-unsupported", "--skip-unsupported"]));
@@ -409,7 +444,7 @@ fn a_slice_beyond_the_grid_is_refused_and_one_at_its_edge_drawn() {
     }
 }
 
-/// A cache file of three grids, two of types `.vdb` does not hold.
+/// A cache file of three grids, two of types `.vdb` does not hold, `u8` and `u32`.
 #[test]
 fn every_grid_vdb_does_not_hold_is_named() {
     let empty = Topology::new();
@@ -421,13 +456,13 @@ fn every_grid_vdb_does_not_hold_is_named() {
     let entries = [
         CacheEntry::new(&meta("labels"), &t, &Field::new(&t, 1_u8)).unwrap(),
         CacheEntry::new(&meta("density"), &t, &Field::new(&t, 0.5_f32)).unwrap(),
-        CacheEntry::new(&meta("flow"), &t, &Field::new(&t, [0.0_f64; 3])).unwrap(),
+        CacheEntry::new(&meta("flow"), &t, &Field::new(&t, 0_u32)).unwrap(),
     ];
     brodo::cache::write(&path, &entries).unwrap();
     let mut all = args(&["convert", path.to_str().unwrap(), "-o"]);
     all.push(fresh("three.vdb").into_os_string());
     let refused = mestolo::run(&parse(all).unwrap(), &mut Vec::new());
-    let want = vec![("labels".to_owned(), ValueType::U8), ("flow".to_owned(), ValueType::F64x3)];
+    let want = vec![("labels".to_owned(), ValueType::U8), ("flow".to_owned(), ValueType::U32)];
     assert!(
         matches!(&refused, Err(MestoloError::NotWritten(grids)) if *grids == want),
         "{refused:?}"
@@ -502,6 +537,13 @@ fn convert_writes_a_vdbs_grids_to_a_cache_file() {
         .collect();
     assert_eq!(String::from_utf8(out).unwrap(), want);
     assert!(want.contains(&format!("{SDF_KEY:?} = {SDF_VERSION:?}")));
+    let vectors = brodo_file("vdb_vec_by14_v225.bin");
+    let path = converted(&vectors, &["--as", "cache"], "vectors.cache");
+    let mut out = Vec::new();
+    mestolo::run(&Command::Info(Input::new(path)), &mut out).unwrap();
+    let want = info("vdb_vec_by14_v225.bin").replacen("kind: OpenVDB file", "kind: cache file", 1);
+    assert_eq!(String::from_utf8(out).unwrap(), want);
+    assert!(want.contains("[f64; 3]") && want.contains("[f32; 3]"));
 }
 
 /// A topology of one leaf at the origin.

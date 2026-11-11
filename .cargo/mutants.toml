@@ -307,8 +307,4 @@ exclude_re = [
     'cache\.rs:.*: replace match guard x0 <= x1 && y0 <= y1 && z0 <= z1 with true in decode_meta$',
     # As above.
     'cache\.rs:.*: replace && with \|\| in decode_meta$',
-    # `is_sdf` is called only for a type whose `SDF` is true, which `f64` is not, so its
-    # `wide` is never called.
-    # [same]
-    'vdb_read\.rs:.*: replace <impl Scalar for f64>::wide -> f64 with ',
 ]

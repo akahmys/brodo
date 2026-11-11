@@ -22,6 +22,9 @@ const BY14: &[u8] = include_bytes!("data/vdb_by14_v225.bin");
 const NONE: &[u8] = include_bytes!("data/vdb_by14_none.bin");
 const EXPECT: &str = include_str!("data/vdb_read_expect.txt");
 const NONE_EXPECT: &str = include_str!("data/vdb_read_none_expect.txt");
+const VEC12: &[u8] = include_bytes!("data/vdb_vec_by12_v224.bin");
+const VEC14: &[u8] = include_bytes!("data/vdb_vec_by14_v225.bin");
+const VEC_EXPECT: &str = include_str!("data/vdb_vec_read_expect.txt");
 
 fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()
@@ -79,7 +82,9 @@ fn listing_of(file: &VdbFile) -> Listing {
         let lines = match &g.field {
             AnyField::F32(f) => lines_of(&g.meta, &g.topology, f),
             AnyField::F64(f) => lines_of(&g.meta, &g.topology, f),
-            AnyField::U8(_) | AnyField::U32(_) | AnyField::F32x3(_) | AnyField::F64x3(_) | _ => {
+            AnyField::F32x3(f) => lines_of(&g.meta, &g.topology, f),
+            AnyField::F64x3(f) => lines_of(&g.meta, &g.topology, f),
+            AnyField::U8(_) | AnyField::U32(_) | _ => {
                 panic!("a value type this test does not know")
             }
         };
@@ -125,6 +130,14 @@ fn same_listing(bytes: &[u8], expect: &str) {
 fn files_openvdb_12_and_14_wrote_read_as_openvdb_reads_them() {
     same_listing(BY12, EXPECT);
     same_listing(BY14, EXPECT);
+}
+
+/// Vector grids of `[f32; 3]` and `[f64; 3]`, their nodes' inactive values in each of the
+/// seven ways OpenVDB writes them, as `spikes/vdbvec/oracle/` wrote them with Blosc.
+#[test]
+fn vector_grids_openvdb_12_and_14_wrote_read_as_openvdb_reads_them() {
+    same_listing(VEC12, VEC_EXPECT);
+    same_listing(VEC14, VEC_EXPECT);
 }
 
 #[test]
@@ -188,6 +201,35 @@ fn a_grid_brodo_writes_reads_back_the_same() {
     let (m, t, g) = written(-1.0_f64, |k| f64::from(k) * 0.25 + 1e-12 * f64::from(k % 7));
     let file = round_trip(&m, &t, &g);
     let AnyField::F64(g2) = &file.grids[0].field else { panic!("not a double grid") };
+    assert_eq!(
+        lines_of(&file.grids[0].meta, &file.grids[0].topology, g2),
+        lines_of(&file.grids[0].meta, &t, &g)
+    );
+}
+
+/// A vector grid brodo writes reads back the same, of class `unknown` though it holds
+/// `SDF_KEY`, which is a scalar's (ADR-0046).
+#[test]
+fn a_vector_grid_brodo_writes_reads_back_the_same() {
+    let unknown = BTreeMap::from([("class".to_owned(), "unknown".to_owned())]);
+    let (m, t, f) = written([0.0_f32, 1.0, -2.5], |k| {
+        let x = k as f32;
+        [x * 0.5 - 900.0, -x, x * 0.125 + 3.0]
+    });
+    let file = round_trip(&m, &t, &f);
+    let AnyField::F32x3(f2) = &file.grids[0].field else { panic!("not a float vector grid") };
+    assert_eq!(file.grids[0].meta.extra, unknown);
+    assert_eq!(
+        lines_of(&file.grids[0].meta, &file.grids[0].topology, f2),
+        lines_of(&file.grids[0].meta, &t, &f)
+    );
+    let (m, t, g) = written([-1.0_f64, 0.5, 1e-12], |k| {
+        let x = f64::from(k);
+        [x * 0.25, 1e-12 * f64::from(k % 7) - x, x * x]
+    });
+    let file = round_trip(&m, &t, &g);
+    let AnyField::F64x3(g2) = &file.grids[0].field else { panic!("not a double vector grid") };
+    assert_eq!(file.grids[0].meta.extra, unknown);
     assert_eq!(
         lines_of(&file.grids[0].meta, &file.grids[0].topology, g2),
         lines_of(&file.grids[0].meta, &t, &g)
@@ -374,7 +416,12 @@ fn charged(file: &VdbFile) -> u64 {
     let mut total = 0;
     for g in &file.grids {
         let t = &g.topology;
-        let size = if let AnyField::F64(_) = &g.field { 8 } else { 4 };
+        let size = match &g.field {
+            AnyField::F64(_) => 8,
+            AnyField::F32x3(_) => 12,
+            AnyField::F64x3(_) => 24,
+            AnyField::F32(_) | AnyField::U8(_) | AnyField::U32(_) | _ => 4,
+        };
         let floor = |o: [i32; 3], span: i32| o.map(|c| c.div_euclid(span) * span);
         let (mut lowers, mut uppers) = (BTreeSet::new(), BTreeSet::new());
         for n in t.leaf_numbers() {
@@ -405,7 +452,7 @@ fn charged(file: &VdbFile) -> u64 {
 #[test]
 fn what_reading_makes_is_bounded_by_the_limit() {
     let (_, _, written) = written_file();
-    for bytes in [BY12, BY14, NONE, written.as_slice()] {
+    for bytes in [BY12, BY14, NONE, VEC12, written.as_slice()] {
         let need = charged(&from_bytes(bytes, "m", u64::MAX).unwrap());
         let refused = from_bytes(bytes, "m", need - 1);
         assert!(

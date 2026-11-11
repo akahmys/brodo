@@ -14,6 +14,7 @@ use brodo::tree::{Coord, TileLevel};
 use brodo::vdb::{VdbEntry, VdbValue, to_bytes, write};
 
 const GOLDEN: &[u8] = include_bytes!("data/vdb_v225.bin");
+const VEC_GOLDEN: &[u8] = include_bytes!("data/vdb_vec_v225.bin");
 
 fn build(leaves: &[Coord], tiles: &[(TileLevel, Coord)]) -> Topology {
     let empty = Topology::new();
@@ -86,14 +87,44 @@ fn golden() -> Vec<u8> {
     to_bytes(&entries).unwrap()
 }
 
-#[test]
-fn file_version_225_keeps_its_bytes() {
-    let bytes = golden();
-    if bytes != GOLDEN {
-        let path = Path::new(env!("CARGO_TARGET_TMPDIR")).join("vdb_v225.bin");
-        std::fs::write(&path, &bytes).unwrap();
+fn vector_fields(t: &Topology) -> (Field<[f32; 3]>, Field<[f64; 3]>) {
+    let f = numbered(t, [1.5_f32, -2.75, 0.0], |k| {
+        let x = k as f32;
+        [x * 0.5 - 900.0, -x, x * 0.125 + 3.0]
+    });
+    let g = numbered(t, [-1.0_f64, 0.5, 1e-12], |k| {
+        let x = f64::from(k);
+        [x * 0.25, 1e-12 * f64::from(k % 7) - x, x * x]
+    });
+    (f, g)
+}
+
+/// Vector grids on `golden`'s topology, the first holding `SDF_KEY`, which a vector grid
+/// does not write as a level set, and an empty one.
+fn vector_golden() -> Vec<u8> {
+    let t = topology();
+    let (f, g) = vector_fields(&t);
+    let empty = Topology::new();
+    let entries = [
+        VdbEntry::new(&meta("velocity", true), &t, &f).unwrap(),
+        VdbEntry::new(&meta("moment", false), &t, &g).unwrap(),
+        VdbEntry::new(&meta("empty", false), &empty, &Field::new(&empty, [0.0_f32; 3])).unwrap(),
+    ];
+    to_bytes(&entries).unwrap()
+}
+
+fn keeps(bytes: &[u8], golden: &[u8], name: &str) {
+    if bytes != golden {
+        let path = Path::new(env!("CARGO_TARGET_TMPDIR")).join(name);
+        std::fs::write(&path, bytes).unwrap();
         panic!("the bytes brodo writes as .vdb changed; they are at {}", path.display());
     }
+}
+
+#[test]
+fn file_version_225_keeps_its_bytes() {
+    keeps(&golden(), GOLDEN, "vdb_v225.bin");
+    keeps(&vector_golden(), VEC_GOLDEN, "vdb_vec_v225.bin");
 }
 
 #[test]
@@ -138,10 +169,10 @@ fn a_field_of_another_topology_and_bad_metadata_are_refused() {
     assert!(matches!(VdbEntry::new(&m, &t, &f), Err(VdbError::Meta(_))));
 }
 
-/// The document's reader on the golden file, its lines between `file` and `end`.
-fn read_golden() -> Vec<String> {
+/// The document's reader on the golden file `name`, its lines between `file` and `end`.
+fn read_golden(name: &str) -> Vec<String> {
     let script = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../scripts/audit/formats.py");
-    let golden = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/vdb_v225.bin");
+    let golden = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data").join(name);
     let out = Command::new("python3").arg("-I").arg(script).arg(golden).output().unwrap();
     assert!(out.status.success(), "the document's reader failed");
     let text = String::from_utf8(out.stdout).unwrap();
@@ -260,7 +291,7 @@ fn the_document_s_reader_reads_the_golden_file_as_brodo_wrote_it() {
     let (f, g) = fields(&t);
     let empty = Topology::new();
     let e = Field::new(&empty, 0.0_f32);
-    let got = grids(&read_golden());
+    let got = grids(&read_golden("vdb_v225.bin"));
     let heads: Vec<String> = got.iter().map(|(w, _)| w[1..].join(" ")).collect();
     assert_eq!(
         heads,
@@ -272,5 +303,26 @@ fn the_document_s_reader_reads_the_golden_file_as_brodo_wrote_it() {
     );
     same_grid(&got[0].1, &meta("sdf", true), &t, &f, "level set");
     same_grid(&got[1].1, &meta("density", false), &t, &g, "unknown");
+    same_grid(&got[2].1, &meta("empty", false), &empty, &e, "unknown");
+}
+
+#[test]
+fn the_document_s_reader_reads_the_vector_golden_file_as_brodo_wrote_it() {
+    let t = topology();
+    let (f, g) = vector_fields(&t);
+    let empty = Topology::new();
+    let e = Field::new(&empty, [0.0_f32; 3]);
+    let got = grids(&read_golden("vdb_vec_v225.bin"));
+    let heads: Vec<String> = got.iter().map(|(w, _)| w[1..].join(" ")).collect();
+    assert_eq!(
+        heads,
+        [
+            format!("{} Tree_vec3s_5_4_3", hex(b"velocity")),
+            format!("{} Tree_vec3d_5_4_3", hex(b"moment")),
+            format!("{} Tree_vec3s_5_4_3", hex(b"empty")),
+        ]
+    );
+    same_grid(&got[0].1, &meta("velocity", true), &t, &f, "unknown");
+    same_grid(&got[1].1, &meta("moment", false), &t, &g, "unknown");
     same_grid(&got[2].1, &meta("empty", false), &empty, &e, "unknown");
 }

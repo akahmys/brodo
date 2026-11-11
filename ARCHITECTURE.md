@@ -348,23 +348,25 @@ fastest, and an `Offset` is made from its number or its step as from what gives 
   order, since names may repeat: in a file read (`CacheFile::grids_named`), in an
   archive's listing (`Listing::grids_named`), and in a `.vdb` read for one name
   (`vdb::read_named`), which skips each grid of another name unread (ADR-0016).
-- OpenVDB files (`.vdb`), under the feature `vdb`, are written by brodo itself, float and
-  double grids on its tree, as one file OpenVDB 14 reads with brodo's values where brodo
-  samples them (docs/formats.md §9, ADR-0045, ADR-0046); every leaf voxel and tile is
-  written active, the unit, voxel size and free pairs but `brodo.sdf.version` are not, and two
-  grids of one name are refused. They are read back, with those OpenVDB 12 to 14 writes by
-  default, as docs/formats.md §9.7 states (ADR-0047): each float and double grid with its
-  name, transform, voxel size, string metadata and a unit the caller gives; every leaf
-  voxel's value, active or not, and each tile that is active or whose value's bits differ
-  from the background's. A float grid whose `class` is `level set` is read as stating the
+- OpenVDB files (`.vdb`), under the feature `vdb`, are written by brodo itself, grids of
+  `f32`, `f64`, `[f32; 3]` and `[f64; 3]` on its tree, as one file OpenVDB 14 reads with
+  brodo's values where brodo samples them (docs/formats.md §9, ADR-0045, ADR-0046); every
+  leaf voxel and tile is written active, the unit, voxel size and free pairs but
+  `brodo.sdf.version` are not, a vector grid states no vector type and is of `class`
+  `unknown` whatever its pairs, and two grids of one name are refused. Grids of `u8` and
+  `u32` are not written, OpenVDB having no grid of either. They are read back, with those
+  OpenVDB 12 to 14 writes by default, as docs/formats.md §9.7 states (ADR-0047): each
+  float, double and vector grid with its name, transform, voxel size, string metadata and
+  a unit the caller gives; every leaf voxel's value, active or not, and each tile that is
+  active or whose value's bits differ from the background's. A float grid whose `class` is `level set` is read as stating the
   SDF convention (docs/formats.md §5), `class` replaced by `brodo.sdf.version` = `2`, when
   its three voxel sizes lie within 16 ε (`f64::EPSILON`) of each other, relative to the
   least, its background is positive and finite, every leaf value lies within ±background,
   none NaN, and every tile kept is ±background; any other grid keeps `class`, a double
   level set among them, so that an SDF brodo writes reads back stating the convention.
   That the values are signed distances, negative inside, is not checked, and is taken
-  from OpenVDB's convention for level sets. Other grids, half-float and instanced ones among them, are
-  skipped and their names returned; a file §9.7 does not take is refused. The limit
+  from OpenVDB's convention for level sets. Other grids, half-float and instanced ones
+  among them, are skipped and their names returned; a file §9.7 does not take is refused. The limit
   `vdb::from_bytes` and `vdb::read` take bounds what reading makes, besides the file's bytes,
   counted before it is made: a leaf twice its values' bytes and 1024 more, a tile kept 256,
   a lower node 2560 and an upper node 18 432; a grid skipped nothing. `vdb::read`'s limit
@@ -577,7 +579,7 @@ Rust. It uses no GPU and no window.
   value to its greatest.
 - **`convert`** writes, in the format `--as` names or else by the output's name, `.vdb`
   or `.vtu`: every grid or the one `--grid` names as `.vdb` (§4.7), refused naming every
-  grid of a type it does not hold, with its value type, or, by `--skip-unsupported`, every
+  grid of a type it does not hold, `u8` and `u32`, with its value type, or, by `--skip-unsupported`, every
   grid it holds, each other named on standard output with its value type and none left
   refused; one grid as `.vtu` (§6.1); or, by
   `--as cache` or `--as archive`, a cache file or an archive of exact values (§4.7), a

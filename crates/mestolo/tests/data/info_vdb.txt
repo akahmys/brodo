@@ -1,6 +1,5 @@
 kind: OpenVDB file
-grids: 4
-skipped: "vec"
+grids: 5
 skipped: "half"
 skipped: "sdf_instance"
 
@@ -58,3 +57,16 @@ grid 3: "inactive"
   background: 2
   least: -4
   greatest: 237.5
+
+grid 4: "vec"
+  type: [f32; 3]
+  unit: "unstated"
+  voxel size: 1 1 1
+  transform: 1 0 0 -0.5 | 0 1 0 -0.5 | 0 0 1 -0.5
+  bounds: 0 0 0 to 7 7 7
+  leaves: 1
+  tiles: 0
+  voxels: 512, 512 in leaves and 0 in tiles
+  background: [0 0 0]
+  least: [0 0 0]
+  greatest: [1 2 3]

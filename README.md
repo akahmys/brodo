@@ -50,7 +50,7 @@ A cache file, an archive or a `.vdb` can be looked at without writing Rust:
 cargo install mestolo
 mestolo info grids.cache                           # its grids, bounds, values, metadata
 mestolo slice grids.cache --grid sdf --axis z --at 0 -o z0.png
-mestolo convert grids.cache -o grids.vdb           # every f32 and f64 grid
+mestolo convert grids.cache -o grids.vdb           # every grid but u8 and u32
 mestolo convert grids.cache --grid sdf -o sdf.vtu  # one grid, for ParaView
 ```
 

@@ -14,7 +14,9 @@ The tool's version is the one `.github/workflows/audit.yml` installs, which the 
    behind a feature is seen; a version equal to the baseline's is judged a MINOR.
 3. `mestolo`'s command line and output, which no rustdoc shows, are held by the baseline's
    `crates/mestolo/tests/`, run against the current code in a copy of the tree under
-   `target/semver/`.
+   `target/semver/`, but for those `SET_ASIDE` names for the baseline's tag: tests that
+   held as refused or left out what a MINOR now does. An entry of another tag, or naming
+   no test of its tag, fails the check, so none outlives its baseline.
 4. A version whose CHANGELOG.md section has `### Breaking` raises MAJOR over the baseline,
    from a baseline of 1.0 on.
 
@@ -39,6 +41,20 @@ FEATURE = re.compile(r"^([\w-]+)\s*=", re.MULTILINE)
 SECTION = re.compile(r"^## (.+?)$(.*?)(?=^## |\Z)", re.MULTILINE | re.DOTALL)
 BREAKING = re.compile(r"^### Breaking\s*$", re.MULTILINE)
 COPY = ROOT / "target" / "semver" / "release-tests"
+
+# The baseline's mestolo tests not run, by tag and test name, each with why (ADR-0011).
+SET_ASIDE = {
+    ("v1.2.0", "info_writes_what_a_cache_file_an_archive_and_a_vdb_hold"):
+        "lists a .vdb's vector grid as skipped, which 1.3.0 reads (issue 3)",
+    ("v1.2.0", "what_a_format_does_not_hold_is_refused_by_name"):
+        "a vector grid refused as .vdb, which 1.3.0 writes (issue 3)",
+    ("v1.2.0", "convert_skips_and_names_the_grids_vdb_does_not_hold_when_asked"):
+        "a vector grid skipped from .vdb, which 1.3.0 writes (issue 3)",
+    ("v1.2.0", "every_grid_vdb_does_not_hold_is_named"):
+        "vector grids named as not held by .vdb, which 1.3.0 writes (issue 3)",
+    ("v1.2.0", "convert_writes_a_vdbs_grids_to_a_cache_file"):
+        "a .vdb's grids without its vector grid, which 1.3.0 reads (issue 3)",
+}
 
 
 def run(args: list[str], cwd: Path = ROOT) -> subprocess.CompletedProcess:
@@ -100,10 +116,24 @@ def library(pkg: dict, tag: str) -> list[str]:
     return out
 
 
+def set_aside(tag: str) -> tuple:
+    """`SET_ASIDE`'s test names for `tag`, and a line for each entry of another tag or
+    naming no test the tag's `crates/mestolo/tests/` has."""
+    names, stale = [], []
+    for t, name in SET_ASIDE:
+        found = run(["git", "grep", "-q", "-E", rf"^fn {name}\(", f"refs/tags/{t}", "--", "crates/mestolo/tests"])
+        if t != tag or found.returncode != 0:
+            stale.append(f"  SET_ASIDE's ({t}, {name}) is not a test of the baseline {tag}")
+        else:
+            names.append(name)
+    return names, stale
+
+
 def commands(tag: str) -> list[str]:
-    """The baseline's `crates/mestolo/tests/` against the current code."""
+    """The baseline's `crates/mestolo/tests/` against the current code, but those set aside."""
+    skips, stale = set_aside(tag)
     if run(["git", "cat-file", "-e", f"refs/tags/{tag}:crates/mestolo/tests"]).returncode != 0:
-        return []
+        return stale
     shutil.rmtree(COPY, ignore_errors=True)
     for path in committable():
         rel = path.relative_to(ROOT)
@@ -115,15 +145,17 @@ def commands(tag: str) -> list[str]:
                              cwd=ROOT, capture_output=True)
     unpacked = subprocess.run(["tar", "-x", "-C", str(COPY)], input=archive.stdout, capture_output=True)
     if archive.returncode != 0 or unpacked.returncode != 0:
-        return [f"  {tag}'s crates/mestolo/tests could not be read"]
+        return stale + [f"  {tag}'s crates/mestolo/tests could not be read"]
+    skip = [w for name in skips for w in ("--skip", name)]
     tested = run(["cargo", "test", "--quiet", "-p", "mestolo", "--all-features", "--test", "*",
-                  "--target-dir", str(ROOT / "target" / "semver" / "target")], cwd=COPY)
+                  "--target-dir", str(ROOT / "target" / "semver" / "target"),
+                  "--", "--exact", *skip], cwd=COPY)
     if tested.returncode != 0:
         said = [line for line in (tested.stdout + tested.stderr).splitlines()
                 if re.match(r"^(test .* FAILED|error|---- )", line) or "panicked" in line]
-        return [f"  {tag}'s mestolo tests fail on the current code (ARCHITECTURE.md §6.3):"] + \
+        return stale + [f"  {tag}'s mestolo tests fail on the current code (ARCHITECTURE.md §6.3):"] + \
                [f"    {line}" for line in said[:20]]
-    return []
+    return stale
 
 
 def main() -> int:

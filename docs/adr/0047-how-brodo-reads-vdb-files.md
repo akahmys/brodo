@@ -131,3 +131,32 @@ the most measured; its background is positive and finite; every leaf value lies 
 as before, a level set of `f64` among them, since §5 holds `f32` alone. That the values
 are signed distances, negative inside, cannot be checked, and is taken from OpenVDB's
 convention for level sets. ARCHITECTURE.md §4.7 states the conditions.
+
+## Amendment: vector grids read
+
+- **Date**: 2026-11-10
+
+By the spike `spikes/vdbvec/` of ADR-0046's amendment of the same date: a vector grid's
+background, tiles, inactive values and stored values are three components of its scalar,
+the indicators of docs/formats.md §9.8 meaning the same with minus a vector minus each
+component, and its Blosc chunks are of type size 4, which the reader's decoding by the
+chunk's own type size already takes. OpenVDB 12 and 13 write a metadata entry
+`file_delayed_load`, of type `__delayedload`, which 14 does not and which rule 4 drops by
+its name. A grid saved as half floats keeps its background, root tiles and inactive values
+as `f32` and stores its other values as `f16`, and a buffer of no values written with zip
+or Blosc carries no size.
+
+The owner decided, on 2026-11-10, as proposed: the reader takes `Tree_vec3s_5_4_3` and
+`Tree_vec3d_5_4_3` as `[f32; 3]` and `[f64; 3]` by §9.7 and §9.8 unchanged but for a
+value's size, keeping `vector_type`, if any, among the free pairs as rule 4 keeps any
+string entry; a vector grid of `class` `level set` keeps it, the convention being an
+`f32`'s. A grid saved as half floats, scalar or vector, stays skipped by name; reading it
+waits until a user asks. Files OpenVDB 12.0.0 and 14.0.0 wrote of vector grids in each of
+the seven indicators are test vectors in the gate, read as OpenVDB reads them.
+
+The reader's scalar trait became one of values, a vector's being its scalar's three
+times; `f64`'s `wide`, which `.cargo/mutants.toml` excluded as never called, went with it,
+and so did its exclusion. `scripts/audit/formats.py` reads the two vector types by
+docs/formats.md §9 (TESTING.md T13), and the gate holds `vdb_vec_v225.bin` to it as it
+holds `vdb_v225.bin`. Shown to fire (TESTING.md T3, 2026-11-10): `Tree_vec3d_5_4_3`'s
+value read as three `f32` failed `vdb_format.rs`.

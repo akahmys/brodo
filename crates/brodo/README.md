@@ -24,7 +24,7 @@ belong to.
   - An archive file is a cache file compressed, a floating grid's values kept exact or
     quantised. It reads back whole, or as one grid's region, decompressing only the parts
     that region needs.
-  - OpenVDB's `.vdb`: float and double grids, written for OpenVDB's tools and read from
+  - OpenVDB's `.vdb`: float, double and vector grids, written for OpenVDB's tools and read from
     files brodo and OpenVDB 12 to 14 write.
 - **Hermite data**: where a surface crosses each voxel edge, with its normal and a group
   naming the face, beside the signs at the voxels' corners: what a reader needs to place

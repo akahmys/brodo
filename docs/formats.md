@@ -7,7 +7,7 @@ ARCHITECTURE.md §4.6, §4.7, §4.9 and §5.1.
 
 `scripts/audit/formats.py` is a reader written from this document alone. The gate runs it on
 the golden files of §7 and on damaged copies of them, through
-`crates/brodo/tests/format_document.rs`, and on `vdb_v225.bin` (§9) through
+`crates/brodo/tests/format_document.rs`, and on `vdb_v225.bin` and `vdb_vec_v225.bin` (§9) through
 `crates/brodo/tests/vdb_format.rs`, and fails where it reads a value other than the crates
 read, or accepts what they refuse, or refuses what they accept. What §9.7 and §9.8 state
 of OpenVDB's files is held by `crates/brodo/tests/vdb_read.rs`, against OpenVDB's own
@@ -523,14 +523,17 @@ Version 1, which held grids alone, its directory's last word unused, is not read
 
 ## 9. OpenVDB files
 
-A grid of `f32` or `f64` written as OpenVDB's `.vdb` file at file version 225, as OpenVDB
-14.0.0 reads and writes it (ADR-0046), §9.1 to §9.6, and the files of OpenVDB 12 to 14
-that brodo reads (ADR-0047), §9.7; where the layout was learnt is in
+A grid of `f32`, `f64`, `[f32; 3]` or `[f64; 3]` written as OpenVDB's `.vdb` file at file
+version 225, as OpenVDB 14.0.0 reads and writes it (ADR-0046), §9.1 to §9.6, and the files
+of OpenVDB 12 to 14 that brodo reads (ADR-0047), §9.7; where the layout was learnt is in
 [PROVENANCE.md](../PROVENANCE.md). Unlike §1, a string here is a `u32` byte length and its
 bytes, with no padding, and nothing is aligned to blocks. Every number is little-endian.
-The test vector of what brodo writes is `crates/brodo/tests/data/vdb_v225.bin`: a float
-level set and a double grid on one topology of five leaves and a tile at each level, and
-an empty float grid.
+A **value** is one `f32` or `f64`, or for a vector three, x, y and z in that order. The
+test vectors of what brodo writes are in `crates/brodo/tests/data/`: `vdb_v225.bin`, a
+float level set and a double grid on one topology of five leaves and a tile at each
+level, and an empty float grid; and `vdb_vec_v225.bin`, a grid of `[f32; 3]` holding
+`brodo.sdf.version` and one of `[f64; 3]` on that topology, and an empty grid of
+`[f32; 3]`.
 
 ### 9.1 Header
 
@@ -549,8 +552,9 @@ the body's end.
 
 ### 9.2 Grid descriptor
 
-The grid's name, a string; its type, `Tree_float_5_4_3` or `Tree_double_5_4_3`; an empty
-string, the grid not being an instance; then three `i64`, each a byte offset from the start
+The grid's name, a string; its type, `Tree_float_5_4_3`, `Tree_double_5_4_3`,
+`Tree_vec3s_5_4_3` or `Tree_vec3d_5_4_3`, of `f32`, `f64`, `[f32; 3]` and `[f64; 3]`; an
+empty string, the grid not being an instance; then three `i64`, each a byte offset from the start
 of the file: the body's start, the start of its leaf buffers (§9.6), and the body's end.
 
 ### 9.3 Grid body
@@ -561,7 +565,7 @@ of the file: the body's start, the start of its leaf buffers (§9.6), and the bo
 
    | Name | Type | Value |
    | :--- | :--- | :--- |
-   | `class` | `string` | `level set` for a grid holding `brodo.sdf.version` (§5), else `unknown` |
+   | `class` | `string` | `level set` for a grid of `f32` or `f64` holding `brodo.sdf.version` (§5), else `unknown` |
    | `file_bbox_max` | `vec3i` | the greatest voxel of a leaf or tile, three `i32`; with none, `i32::MIN` thrice |
    | `file_bbox_min` | `vec3i` | the least such voxel; with none, `i32::MAX` thrice |
    | `file_compression` | `string` | `active values` |
@@ -612,8 +616,8 @@ breaks them; of several broken rules, which is named is not promised.
    descriptor's end and ends within the file, where the next descriptor starts, and the
    last grid's where the file ends; a grid read has its leaf buffers' offset from its
    start to its end.
-2. **Grids read and skipped.** A grid whose type is neither `Tree_float_5_4_3` nor
-   `Tree_double_5_4_3`, among them one saved as half floats, whose type OpenVDB writes
+2. **Grids read and skipped.** A grid whose type is none of the four of §9.2, among them
+   one saved as half floats, whose type OpenVDB writes
    with `_HalfFloat` appended, or whose instance string is not empty, an instanced grid
    with a leaf buffers' offset of 0, is skipped whole, by its offsets, and its name
    returned. A read of the grids of one name skips every grid of another name so, by its
@@ -656,10 +660,13 @@ places' alone, in place order. An inactive place holds:
 | 5 | 2 | yes | the second value where its bit is set, else the first |
 | 6 | 0 | no | its own value, every place stored |
 
+Minus a vector is minus each of its components. Each inactive value is one value (§9).
+
 With Blosc (flag 4), the values stored are preceded by an `i64` n: n > 0, a Blosc chunk of
 n bytes; n ≤ 0, −n bytes of the values as they are. Without it, they follow as they are. A
 Blosc chunk (c-blosc's `README_CHUNK_FORMAT.rst`) has a 16-byte header: format version 2,
-a codec version not read, flags, a type size, then `u32`s the values' byte count, which is
+a codec version not read, flags, a type size, which need not be the value's size (OpenVDB
+writes 4 for a vector of either type), then `u32`s the values' byte count, which is
 the count stored times the value's size, a block size, and the chunk's own byte count, n.
 With flag bit 1, the values follow as they are, to the chunk's end. Otherwise its codec,
 bits 5 to 7, is LZ4 (1), bit 2 (bit shuffle) clear, and its values, of one byte or more, fit
@@ -674,4 +681,8 @@ Test vectors of reading, written by OpenVDB, are in `crates/brodo/tests/data/`:
 `vdb_by12_v224.bin` and `vdb_by14_v225.bin`, the same seven grids with Blosc, by OpenVDB
 12.0.0 and 14.0.0, and `vdb_by14_none.bin`, one of them uncompressed; what brodo makes of
 each, as OpenVDB's own reading gives it, is in `vdb_read_expect.txt` and
-`vdb_read_none_expect.txt` (`spikes/vdbread/oracle/`, `oracle expect`).
+`vdb_read_none_expect.txt` (`spikes/vdbread/oracle/`, `oracle expect`); and
+`vdb_vec_by12_v224.bin` and `vdb_vec_by14_v225.bin`, a grid of `[f32; 3]` and one of
+`[f64; 3]`, each of seven leaves whose inactive values take the seven indicators, and an
+empty one, with Blosc, by OpenVDB 12.0.0 and 14.0.0 (`spikes/vdbvec/oracle/`), what brodo
+makes of each in `vdb_vec_read_expect.txt`.
