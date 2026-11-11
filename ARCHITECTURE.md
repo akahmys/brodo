@@ -210,8 +210,10 @@ fastest, and an `Offset` is made from its number or its step as from what gives 
   reaches the unbounded background outside the tree.
 - The units joined are leaf voxels, tiles, the empty places of lower and upper nodes and
   of the root (each a region of its own size), and the outside. Empty regions at the root
-  are found on a grid compressed along each axis around the root's keys, so enclosed
-  background stays apart from the outside. Adjacency between regions of different sizes
+  are runs within the root's keys' bounding box, grown by one region: of keyless z, of
+  keyless y within a keyed z, and of x between a keyed row's keys, each one unit, so
+  enclosed background stays apart from the outside and no spread of keys is refused
+  (ADR-0013). Adjacency between regions of different sizes
   is found by descending the levels with an explicit stack, never voxel by voxel over a
   large region. Components are numbered in the order of their first unit, the outside
   first, so labels do not depend on anything but the input, and a component holding the

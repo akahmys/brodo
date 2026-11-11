@@ -54,12 +54,6 @@ exclude_re = [
     # bit and `|` and `^` agree.
     # [same]
     'tree\.rs:.*: replace \| with \^ in child_place$',
-    # The last interval of a root axis holds no key: its cells, taken as empty regions rather than
-    # the outside, still join the outside through cells unbounded along another axis.
-    # [same]
-    'analysis\.rs:.*: replace \+ with \* in Axis::unbounded$',
-    # As above.
-    'analysis\.rs:.*: replace \+ with \- in Axis::unbounded$',
     # A region is classified at the root level only where an upper node or a root tile is, so
     # the guard always holds there.
     # [same]
@@ -79,13 +73,9 @@ exclude_re = [
     # As above.
     'analysis\.rs:.*: replace > with >= in Walk<._>::inside$',
     # As above.
-    'analysis\.rs:.*: replace > with < in Walk<._>::root$',
+    'analysis\.rs:.*: replace > with < in forward$',
     # As above.
-    'analysis\.rs:.*: replace > with >= in Walk<._>::root$',
-    # A step can leave the root grid only past its last cell, which is the outside, as the cell
-    # it leaves is.
-    # [same]
-    'analysis\.rs:.*: replace \|\| with \&\& in Walk<._>::root$',
+    'analysis\.rs:.*: replace > with >= in forward$',
     # 3 − d and 3 + d have the same parity.
     # [same]
     'euler\.rs:.*: replace \- with \+ in table$',

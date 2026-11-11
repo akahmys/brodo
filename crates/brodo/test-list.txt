@@ -9,9 +9,11 @@ lib brodo accessor::tests::writes_go_to_leaves_only_and_a_stale_field_is_refused
 lib brodo analysis::tests::a_corner_joins_under_26_and_not_under_6
 lib brodo analysis::tests::an_upper_nodes_empty_places_are_the_outsides
 lib brodo analysis::tests::background_enclosed_by_leaves_is_apart_from_the_outside
+lib brodo analysis::tests::keys_scattered_along_every_axis_are_labelled
 lib brodo analysis::tests::labelling_a_few_leaves_ends_in_time
 lib brodo analysis::tests::labelling_a_small_grid_ends_in_time
 lib brodo analysis::tests::more_units_than_a_u32_numbers_are_refused_before_any_is_made
+lib brodo analysis::tests::root_regions_touching_at_an_edge_or_a_corner_join_under_26_only
 lib brodo analysis::tests::root_tiles_can_enclose_a_root_region
 lib brodo analysis::tests::six_and_twenty_six_neighbours_are_one_step_away
 lib brodo analysis::tests::tiles_join_what_touches_them
@@ -211,6 +213,7 @@ test hermite_format inside_tiles_side_by_side_are_refused_at_a_change
 test hermite_format the_builder_refuses_crossings_out_of_its_order
 test label_reference an_enclosed_region_of_the_background_is_its_own_component
 test label_reference labels_split_voxels_as_a_dense_search_does
+test label_reference root_regions_split_as_a_search_over_them_does
 test manifest_reference neighbours_match_coordinates_and_are_symmetric
 test miri_paths miri_a_cache_files_bytes_read_in_place
 test miri_paths miri_a_frozen_grid_reads_in_place

@@ -53,3 +53,35 @@ the labelling, one mechanism, as the component of its seed. And the background w
 taken as one region: each empty place of a node, and each empty region at the root, is a
 unit of its own size, with one more for the unbounded outside, so that background
 enclosed by the tree is a component apart from it.
+
+## Amendment: the root's empty regions without a grid
+
+- **Date**: 2026-11-11
+
+Labelling found the root's empty regions on a grid compressed along each axis around the
+root's keys, each lone key place adding four intervals an axis, and refused as
+`TooSpread` past 2²² cells: some 40 leaves far apart along every axis were refused though
+the topology was small (issue 6, B-025). The spike `spikes/rootsparse/` (2026-11-11,
+`spikes/rootsparse/REPORT.md`) held a sparse form against the grid: the empty space within
+the keys' bounding box, grown by one region, as runs of keyless z, of keyless y within a
+keyed z, and of x between a keyed row's keys, each one unit, joined where they touch, a
+run on the rim joined to the outside. On every layout the grid accepted, both gave each
+region the same kind and the same empty components, in the same order, so the same
+labels. At 40 scattered keys the grid took 94% of `label`'s time under 6-connectivity
+and 86% of its memory, 1.3 s and 220 MiB; the runs took 0.01 ms and 0.04 MiB, and
+100 000 keys 46 ms. For keys side by side both took under 2 ms.
+
+The owner decided, on 2026-11-11, as proposed: labelling finds the root's empty regions as
+those runs, made in z, y, x order. The walk joins a key's region to what touches it from
+the regions holding a key and those before one, in the grid's order, so that its work is
+queued as it was. Nothing is refused for its spread. `AnalysisError::TooSpread` is no
+longer returned and is kept, so that a match naming it compiles, until a MAJOR removes it.
+What a lone leaf costs past the root, about 1.3 ms and 0.4 MiB under 6-connectivity and
+3.8 ms under 26 for its upper node's empty places, is left until a user asks (ROADMAP.md
+§4).
+
+With it, `.cargo/mutants.toml` dropped the three mutants it excluded in the grid's code,
+`Axis::unbounded`'s two and `Walk::root`'s `||`, and the two of `Walk::root`'s `>`, kept
+for their reason, a touching pair joined once whichever way it is walked, name `forward`,
+where that comparison now is (the owner, 2026-11-11). Shown to fire (TESTING.md T3,
+2026-11-11): an exclusion naming `Walk::root` again failed T11.

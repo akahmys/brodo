@@ -29,16 +29,21 @@ fn voxel(i: usize) -> Coord {
     [i % SIDE, i / SIDE % SIDE, i / (SIDE * SIDE)].map(|c| i32::try_from(c).unwrap() + LO)
 }
 
-/// Components of the dense grid by breadth-first search, with whether each touches the
-/// border while the background meets the condition.
-fn dense(meets: &[bool], conn: Connectivity, background: bool) -> (Vec<Option<usize>>, Vec<bool>) {
-    let offsets: Vec<[i32; 3]> = (-1..=1_i32)
+/// The neighbours' offsets under a connectivity.
+fn offsets(conn: Connectivity) -> Vec<[i32; 3]> {
+    (-1..=1_i32)
         .flat_map(|z| (-1..=1).flat_map(move |y| (-1..=1).map(move |x| [x, y, z])))
         .filter(|d: &[i32; 3]| {
             let n: i32 = d.iter().map(|c| c.abs()).sum();
             n > 0 && (conn == Connectivity::TwentySix || n == 1)
         })
-        .collect();
+        .collect()
+}
+
+/// Components of the dense grid by breadth-first search, with whether each touches the
+/// border while the background meets the condition.
+fn dense(meets: &[bool], conn: Connectivity, background: bool) -> (Vec<Option<usize>>, Vec<bool>) {
+    let offsets = offsets(conn);
     let mut comp = vec![None; meets.len()];
     let mut outside = Vec::new();
     for start in 0..meets.len() {
@@ -159,4 +164,111 @@ fn an_enclosed_region_of_the_background_is_its_own_component() {
     let outside = labels.label_at(&t, [0, 0, 0]).unwrap();
     assert!(labels.reaches_outside(outside) && outside != inside);
     assert_eq!(labels.label_at(&t, [8, 8, 8]).unwrap(), Label::Excluded);
+}
+
+/// Root regions from RLO to RHI - 1 on each axis; root tiles lie one region within.
+const RLO: i32 = -1;
+const RHI: i32 = 7;
+const RSIDE: usize = 8;
+
+fn region(i: usize) -> Coord {
+    [i % RSIDE, i / RSIDE % RSIDE, i / (RSIDE * RSIDE)].map(|c| i32::try_from(c).unwrap() + RLO)
+}
+
+/// Components of the root regions by breadth-first search, as `dense` finds voxels'.
+fn regions(
+    meets: &[bool],
+    conn: Connectivity,
+    background: bool,
+) -> (Vec<Option<usize>>, Vec<bool>) {
+    let offsets = offsets(conn);
+    let mut comp = vec![None; meets.len()];
+    let mut outside = Vec::new();
+    for start in 0..meets.len() {
+        if !meets[start] || comp[start].is_some() {
+            continue;
+        }
+        let id = outside.len();
+        let mut touches = false;
+        let mut queue = VecDeque::from([start]);
+        comp[start] = Some(id);
+        while let Some(i) = queue.pop_front() {
+            let v = region(i);
+            for d in &offsets {
+                let w = [v[0] + d[0], v[1] + d[1], v[2] + d[2]];
+                if w.iter().any(|c| !(RLO..RHI).contains(c)) {
+                    touches = true;
+                    continue;
+                }
+                let [x, y, z] = w.map(|c| usize::try_from(c - RLO).unwrap());
+                let j = x + RSIDE * (y + RSIDE * z);
+                if meets[j] && comp[j].is_none() {
+                    comp[j] = Some(id);
+                    queue.push_back(j);
+                }
+            }
+        }
+        outside.push(touches && background);
+    }
+    (comp, outside)
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(256))]
+
+    /// Root tiles crowded among root regions, so that the background between them forms
+    /// pockets, some touching only along an edge or at a corner: the root's empty regions
+    /// split as a search over the regions does (ADR-0013's amendment of 2026-11-11).
+    #[test]
+    fn root_regions_split_as_a_search_over_them_does(
+        seed in any::<u64>(),
+        crowd in 30..95_u32,
+        background in any::<bool>(),
+        six in any::<bool>(),
+    ) {
+        let mut g = lcg::Lcg(seed);
+        let mut next = || g.next() % 100;
+        let mut tiles = vec![];
+        for i in 0..RSIDE * RSIDE * RSIDE {
+            let r = region(i);
+            if r.iter().all(|c| (0..RHI - 1).contains(c)) && next() < crowd {
+                tiles.push((r, next() < 20));
+            }
+        }
+        let empty = Topology::new();
+        let mut e = empty.edit();
+        for (r, _) in &tiles {
+            e.add_tile(TileLevel::Root, r.map(|c| c * 4096)).unwrap();
+        }
+        let (t, _) = e.commit().unwrap();
+        let mut f = Field::new(&t, if background { 1.0_f32 } else { -1.0 });
+        let positive = |v: f32| v > 0.0;
+        let mut meets = vec![background; RSIDE * RSIDE * RSIDE];
+        for (r, m) in &tiles {
+            let n = t.tile_numbers().find(|n| t.tile(*n).unwrap().1 == r.map(|c| c * 4096)).unwrap();
+            f.set_tile(&t, n, if *m { 1.0 } else { -1.0 }).unwrap();
+            let [x, y, z] = r.map(|c| usize::try_from(c - RLO).unwrap());
+            meets[x + RSIDE * (y + RSIDE * z)] = *m;
+        }
+        let conn = if six { Connectivity::Six } else { Connectivity::TwentySix };
+        let labels = label(&t, &f, positive, conn).unwrap();
+        let (comp, outside) = regions(&meets, conn, background);
+        let merged = |c: usize| if outside[c] { usize::MAX } else { c };
+        let mut to_sparse = std::collections::BTreeMap::new();
+        let mut to_dense = std::collections::BTreeMap::new();
+        for (i, dense_comp) in comp.iter().enumerate() {
+            let at = region(i).map(|c| c * 4096 + 1000);
+            let got = labels.label_at(&t, at).unwrap();
+            match (*dense_comp, got) {
+                (None, Label::Excluded) => {}
+                (Some(c), Label::Component(s)) => {
+                    let c = merged(c);
+                    prop_assert_eq!(*to_sparse.entry(c).or_insert(s), s, "at {:?}", region(i));
+                    prop_assert_eq!(*to_dense.entry(s).or_insert(c), c, "at {:?}", region(i));
+                    prop_assert_eq!(labels.reaches_outside(got), c == usize::MAX, "outside at {:?}", region(i));
+                }
+                (d, s) => prop_assert!(false, "{:?} against {:?} at {:?}", d, s, region(i)),
+            }
+        }
+    }
 }

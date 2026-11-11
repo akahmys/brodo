@@ -39,7 +39,7 @@ copyright notice (`grep -rniE 'copyright|spdx|licen[cs]e' crates/*/src` finds no
 | File | Draws on | For |
 | :--- | :--- | :--- |
 | `crates/brodo/src/accessor.rs` | ARCHITECTURE.md §4.4, ADR-0015 only | value accessors: reads and leaf-only writes from a cached path |
-| `crates/brodo/src/analysis.rs` | ARCHITECTURE.md §4.5, ADR-0013 only; union-find and breadth-first search as textbook material | connected-component labelling and flood fill on the sparse tree |
+| `crates/brodo/src/analysis.rs` | ARCHITECTURE.md §4.5, ADR-0013 and `spikes/rootsparse/` for the root's empty regions as runs; union-find and breadth-first search as textbook material | connected-component labelling and flood fill on the sparse tree |
 | `crates/brodo/src/analysis/euler.rs` | ARCHITECTURE.md §4.5, ADR-0024; the Euler–Poincaré formula over a voxel complex as stated by Sánchez-Cruz et al. (2013, J. Appl. Res. Technol. 11(1), 65–78); a sum over 2×2×2 neighbourhoods as ImageJ Ops' documentation of `EulerCharacteristic26N` describes it | the Euler characteristic of the voxels meeting a condition, under 6- or 26-connectivity |
 | `crates/brodo/src/archive.rs` | ARCHITECTURE.md §4.7, ADR-0016, ADR-0051, ADR-0052, ADR-0062; the LZ4 project's `lz4_Block_format.md`, for the block format docs/formats.md §8.3 names | the archive profile: writing grids in compressed chunks and reading them back as a cache file, or one grid's region of them |
 | `crates/brodo/src/quantise.rs` | docs/formats.md §8.5, ADR-0016; IEEE 754-2019 §3.6, for binary16's format and §4.3.3, for rounding to nearest, ties to even | an archive's quantised leaf values: binary16, byte-shuffled, and 8 bits over a range |

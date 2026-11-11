@@ -3,8 +3,8 @@
 //! Euler characteristic (`euler`, ADR-0024).
 //!
 //! The units joined are leaf voxels, tiles, the empty places of lower nodes (8³) and upper
-//! nodes (128³), the empty regions at the root, found on a grid compressed along each axis
-//! around the root's keys, and the unbounded outside. Two units are joined when both meet
+//! nodes (128³), the empty regions at the root, as runs between the root's keys within
+//! their bounding box, and the unbounded outside. Two units are joined when both meet
 //! the condition and they touch: across a face (6-connectivity), or across a face, an edge
 //! or a corner (26-connectivity). Touching regions are found by descending the levels with
 //! an explicit stack: a pair of regions of one size, or a region against a uniform unit.
@@ -40,6 +40,14 @@ impl Connectivity {
         })
         .collect()
     }
+
+    /// How many coordinates two touching regions may differ in.
+    fn reach(self) -> i64 {
+        match self {
+            Connectivity::Six => 1,
+            Connectivity::TwentySix => 3,
+        }
+    }
 }
 
 /// A voxel's label.
@@ -53,83 +61,180 @@ pub enum Label {
     Excluded,
 }
 
-/// The largest compressed root grid, in cells.
-const ROOT_CELLS: usize = 1 << 22;
 /// log2 of a region's edge at each level: a root region, a lower node's, a leaf's, a voxel.
 const LOG: [u32; 4] = [UPPER_SPAN_LOG2, LOWER_SPAN_LOG2, LEAF_LOG2, 0];
 
-/// One axis of the compressed root grid: intervals of root-region numbers, in order; the
-/// first and last are unbounded.
-#[derive(Debug, Clone)]
-struct Axis(Vec<(i64, i64)>);
+/// A root region's coordinates: a voxel's shifted by a root region's log2 edge.
+type Region = [i64; 3];
 
-impl Axis {
-    fn new(keys: &BTreeSet<i64>) -> Self {
-        let near: BTreeSet<i64> = keys.iter().flat_map(|k| [k - 1, *k, k + 1]).collect();
-        let mut out = vec![];
-        let mut next = i64::MIN;
-        for v in near {
-            if v > next {
-                out.push((next, v - 1));
+fn region_of(v: Coord) -> Region {
+    v.map(|c| i64::from(c >> LOG[0]))
+}
+
+/// The offsets whose first non-zero component is positive: each touching pair once.
+fn forward(offsets: &[[i32; 3]]) -> impl Iterator<Item = &[i32; 3]> {
+    offsets.iter().filter(|e| e.iter().find(|x| **x != 0).is_some_and(|x| *x > 0))
+}
+
+/// Root regions along x, none holding a key, and their unit.
+#[derive(Debug, Clone, Copy)]
+struct Run {
+    x: (i64, i64),
+    unit: u32,
+}
+
+/// Root regions along y at each z of a slab: one run across the box, or, at a key's y in a
+/// key's z, the runs between its keys.
+#[derive(Debug, Clone)]
+struct Row {
+    y: (i64, i64),
+    runs: Vec<Run>,
+}
+
+/// Root regions along z, and their rows.
+#[derive(Debug, Clone)]
+struct Slab {
+    z: (i64, i64),
+    rows: Vec<Row>,
+}
+
+/// A root region to the labelling walk: the outside or an empty region, by its unit, or a
+/// key's region, classified, and its key.
+#[derive(Debug, Clone, Copy)]
+enum AtRoot {
+    Free(u32),
+    Key(Kind, Coord),
+}
+
+/// What a root region is.
+#[derive(Debug, Clone, Copy)]
+enum RootRegion {
+    Outside,
+    Key(Coord),
+    Empty(u32),
+}
+
+/// The root's empty regions (ADR-0013): within the keys' bounding box, grown by one region
+/// along each axis, as runs of keyless z, of keyless y in a keyed z, and of x between the
+/// keys of a keyed row, each one unit; the regions beyond the box are the outside's.
+#[derive(Debug, Clone)]
+struct RootRegions {
+    lo: Region,
+    hi: Region,
+    keys: BTreeMap<Region, Coord>,
+    slabs: Vec<Slab>,
+}
+
+impl RootRegions {
+    /// Makes a unit for each run, in z, y, x order, and joins the runs that touch, and
+    /// those on the box's rim to `outside`.
+    fn new(t: &Topology, units: &mut Units, background: bool, outside: u32, reach: i64) -> Self {
+        let keys: BTreeMap<Region, Coord> = t.root_keys().map(|k| (region_of(k), k)).collect();
+        let mut by_z: BTreeMap<i64, BTreeMap<i64, Vec<i64>>> = BTreeMap::new();
+        for &[x, y, z] in keys.keys() {
+            by_z.entry(z).or_default().entry(y).or_default().push(x);
+        }
+        let bound = |k: usize, f: fn(i64, i64) -> i64| keys.keys().map(|c| c[k]).reduce(f);
+        let (Some(x0), Some(y0), Some(z0)) =
+            (bound(0, i64::min), bound(1, i64::min), bound(2, i64::min))
+        else {
+            return Self { lo: [0; 3], hi: [0; 3], keys, slabs: vec![] };
+        };
+        let (x1, y1, z1) = (bound(0, i64::max), bound(1, i64::max), bound(2, i64::max));
+        let lo = [x0 - 1, y0 - 1, z0 - 1];
+        let hi = [x1.unwrap_or(x0) + 1, y1.unwrap_or(y0) + 1, z1.unwrap_or(z0) + 1];
+        let whole = |units: &mut Units, y| Row {
+            y,
+            runs: vec![Run { x: (lo[0], hi[0]), unit: units.add(background) }],
+        };
+        let mut slabs = vec![];
+        let mut z = lo[2];
+        for (&kz, rows) in &by_z {
+            if z < kz {
+                slabs.push(Slab { z: (z, kz - 1), rows: vec![whole(units, (lo[1], hi[1]))] });
             }
-            out.push((v, v));
-            next = v + 1;
+            let mut out = vec![];
+            let mut y = lo[1];
+            for (&ky, xs) in rows {
+                if y < ky {
+                    out.push(whole(units, (y, ky - 1)));
+                }
+                let mut runs = vec![];
+                let mut x = lo[0];
+                for &kx in xs {
+                    if x < kx {
+                        runs.push(Run { x: (x, kx - 1), unit: units.add(background) });
+                    }
+                    x = kx + 1;
+                }
+                runs.push(Run { x: (x, hi[0]), unit: units.add(background) });
+                out.push(Row { y: (ky, ky), runs });
+                y = ky + 1;
+            }
+            out.push(whole(units, (y, hi[1])));
+            slabs.push(Slab { z: (kz, kz), rows: out });
+            z = kz + 1;
         }
-        out.push((next, i64::MAX));
-        Self(out)
+        slabs.push(Slab { z: (z, hi[2]), rows: vec![whole(units, (lo[1], hi[1]))] });
+        let root = Self { lo, hi, keys, slabs };
+        root.join(units, outside, reach);
+        root
     }
 
-    fn find(&self, r: i64) -> usize {
-        self.0.partition_point(|(_, hi)| *hi < r)
+    /// Joins every two touching runs, `reach` being how many coordinates two touching
+    /// regions may differ in: a run on the rim and the outside, beyond it; runs of the rows
+    /// of a slab, along y; and of the next slab's rows, along z.
+    fn join(&self, units: &mut Units, outside: u32, reach: i64) {
+        let (lo, hi) = (self.lo, self.hi);
+        for (i, s) in self.slabs.iter().enumerate() {
+            for row in &s.rows {
+                for r in &row.runs {
+                    let rim = [(s.z, 2), (row.y, 1), (r.x, 0)];
+                    if rim.iter().any(|((a, b), k)| *a == lo[*k] || *b == hi[*k]) {
+                        units.join(outside, r.unit);
+                    }
+                }
+            }
+            for w in s.rows.windows(2) {
+                touch(units, &w[0], &w[1], 1, reach);
+            }
+            let Some(next) = self.slabs.get(i + 1) else { continue };
+            for a in &s.rows {
+                let first = next.rows.partition_point(|b| b.y.1 < a.y.0 - 1);
+                for b in next.rows[first..].iter().take_while(|b| b.y.0 <= a.y.1 + 1) {
+                    let dy = i64::from(b.y.0 > a.y.1 || a.y.0 > b.y.1);
+                    touch(units, a, b, 1 + dy, reach);
+                }
+            }
+        }
     }
 
-    fn singleton(&self, i: usize) -> Option<i64> {
-        self.0.get(i).and_then(|(lo, hi)| (lo == hi).then_some(*lo))
-    }
-
-    fn unbounded(&self, i: usize) -> bool {
-        i == 0 || i + 1 >= self.0.len()
+    /// What a root region is.
+    fn locate(&self, r: Region) -> RootRegion {
+        if self.slabs.is_empty() || (0..3).any(|k| r[k] < self.lo[k] || r[k] > self.hi[k]) {
+            return RootRegion::Outside;
+        }
+        let s = &self.slabs[self.slabs.partition_point(|s| s.z.1 < r[2])];
+        let row = &s.rows[s.rows.partition_point(|w| w.y.1 < r[1])];
+        match row.runs.get(row.runs.partition_point(|q| q.x.1 < r[0])) {
+            Some(q) if q.x.0 <= r[0] => RootRegion::Empty(q.unit),
+            _ => self.keys.get(&r).map_or(RootRegion::Outside, |k| RootRegion::Key(*k)),
+        }
     }
 }
 
-/// The root grid: compressed axes and the root's keys.
-#[derive(Debug, Clone)]
-struct RootGrid {
-    axes: [Axis; 3],
-    keys: BTreeSet<Coord>,
-}
-
-impl RootGrid {
-    fn new(t: &Topology) -> Result<Self, AnalysisError> {
-        let keys: BTreeSet<Coord> = t.root_keys().collect();
-        let axis = |k: usize| Axis::new(&keys.iter().map(|c| i64::from(c[k] >> LOG[0])).collect());
-        let axes = [axis(0), axis(1), axis(2)];
-        let cells = axes.iter().try_fold(1_usize, |n, a| n.checked_mul(a.0.len()));
-        if cells.is_none_or(|n| n > ROOT_CELLS) {
-            return Err(AnalysisError::TooSpread);
+/// Joins the runs of two rows whose regions differ in `apart` coordinates besides x, where
+/// their x overlaps or, if `reach` allows one more, touches.
+fn touch(units: &mut Units, a: &Row, b: &Row, apart: i64, reach: i64) {
+    if apart > reach {
+        return;
+    }
+    let tol = (reach - apart).min(1);
+    for r in &a.runs {
+        let first = b.runs.partition_point(|q| q.x.1 < r.x.0 - tol);
+        for q in b.runs[first..].iter().take_while(|q| q.x.0 <= r.x.1 + tol) {
+            units.join(r.unit, q.unit);
         }
-        Ok(Self { axes, keys })
-    }
-
-    fn dims(&self) -> [usize; 3] {
-        self.axes.each_ref().map(|a| a.0.len())
-    }
-
-    fn cell_of(&self, v: Coord) -> [usize; 3] {
-        [0, 1, 2].map(|k| self.axes[k].find(i64::from(v[k] >> LOG[0])))
-    }
-
-    /// The key at a cell, if the cell is one root region holding one.
-    fn key(&self, c: [usize; 3]) -> Option<Coord> {
-        let r = [0, 1, 2].map(|k| self.axes[k].singleton(c[k]));
-        let [Some(x), Some(y), Some(z)] = r else { return None };
-        let key = [x, y, z].map(|r| i32::try_from(r << LOG[0]).ok());
-        let [Some(x), Some(y), Some(z)] = key else { return None };
-        self.keys.contains(&[x, y, z]).then_some([x, y, z])
-    }
-
-    fn unbounded(&self, c: [usize; 3]) -> bool {
-        (0..3).any(|k| self.axes[k].unbounded(c[k]))
     }
 }
 
@@ -428,62 +533,63 @@ pub struct Labels {
     voxel_base: u32,
     tile_base: u32,
     empty: BTreeMap<(usize, Coord), u32>,
-    root: RootGrid,
-    root_units: BTreeMap<[usize; 3], u32>,
+    root: RootRegions,
     outside: u32,
     count: u32,
 }
 
 impl Walk<'_> {
-    /// What a root cell is: the outside, an empty region, or a key's region.
-    fn root_kind(
-        &mut self,
-        root: &RootGrid,
-        c: [usize; 3],
-        units: &mut BTreeMap<[usize; 3], u32>,
-        outside: u32,
-    ) -> (Kind, Coord) {
-        if root.unbounded(c) {
-            return (Kind::Uniform(outside), [0; 3]);
+    /// What a root region is to the walk: the outside's unit or an empty region's, or a
+    /// key's region classified.
+    fn root_kind(&mut self, root: &RootRegions, r: Region, outside: u32) -> AtRoot {
+        match root.locate(r) {
+            RootRegion::Outside => AtRoot::Free(outside),
+            RootRegion::Empty(u) => AtRoot::Free(u),
+            RootRegion::Key(key) => AtRoot::Key(self.classify(key, 0), key),
         }
-        if let Some(key) = root.key(c) {
-            return (self.classify(key, 0), key);
-        }
-        let u = *units.entry(c).or_insert_with(|| self.units.add(self.background));
-        (Kind::Uniform(u), [0; 3])
     }
 
-    /// Joins across every pair of touching root cells, and queues every upper node.
-    fn root(&mut self, root: &RootGrid, outside: u32) -> BTreeMap<[usize; 3], u32> {
-        let mut units = BTreeMap::new();
-        let [nx, ny, nz] = root.dims();
-        let cells =
-            (0..nz).flat_map(|z| (0..ny).flat_map(move |y| (0..nx).map(move |x| [x, y, z])));
+    /// Joins across every pair of touching root regions one of which holds a key, and
+    /// queues every upper node: the regions in z, y, x order, each against its neighbours
+    /// in the order of `forward`, so that the work is queued in one order. Empty regions
+    /// and the outside were joined as `RootRegions` was made.
+    fn root(&mut self, root: &RootRegions, outside: u32) {
         let offsets = self.offsets.clone();
-        for c in cells {
-            let (kc, a) = self.root_kind(root, c, &mut units, outside);
-            if matches!(kc, Kind::Split) {
+        let mut regions = BTreeSet::new();
+        for k in root.keys.keys() {
+            regions.insert([k[2], k[1], k[0]]);
+            for e in forward(&offsets) {
+                regions.insert([0, 1, 2].map(|i| k[2 - i] - i64::from(e[2 - i])));
+            }
+        }
+        for [z, y, x] in regions {
+            let c = [x, y, z];
+            let at = self.root_kind(root, c, outside);
+            if let AtRoot::Key(Kind::Split, a) = at {
                 self.stack.push(Work::Inside(a, 0));
             }
-            for e in offsets.iter().filter(|e| e.iter().find(|x| **x != 0).is_some_and(|x| *x > 0))
-            {
-                let d = [0, 1, 2].map(|k| c[k].checked_add_signed(e[k] as isize));
-                let [Some(dx), Some(dy), Some(dz)] = d else { continue };
-                if dx >= nx || dy >= ny || dz >= nz {
-                    continue;
-                }
-                let (kd, b) = self.root_kind(root, [dx, dy, dz], &mut units, outside);
-                match (kc, kd) {
-                    (Kind::Uniform(x), Kind::Uniform(y)) => self.units.join(x, y),
-                    (Kind::Split, Kind::Uniform(y)) => self.stack.push(Work::Mixed(a, 0, y, *e)),
-                    (Kind::Uniform(x), Kind::Split) => {
-                        self.stack.push(Work::Mixed(b, 0, x, e.map(|v| -v)))
+            for e in forward(&offsets) {
+                let d = [0, 1, 2].map(|k| c[k] + i64::from(e[k]));
+                match (at, self.root_kind(root, d, outside)) {
+                    (AtRoot::Free(_), AtRoot::Free(_)) => {}
+                    (
+                        AtRoot::Free(x) | AtRoot::Key(Kind::Uniform(x), _),
+                        AtRoot::Free(y) | AtRoot::Key(Kind::Uniform(y), _),
+                    ) => self.units.join(x, y),
+                    (
+                        AtRoot::Key(Kind::Split, a),
+                        AtRoot::Free(y) | AtRoot::Key(Kind::Uniform(y), _),
+                    ) => self.stack.push(Work::Mixed(a, 0, y, *e)),
+                    (
+                        AtRoot::Free(x) | AtRoot::Key(Kind::Uniform(x), _),
+                        AtRoot::Key(Kind::Split, b),
+                    ) => self.stack.push(Work::Mixed(b, 0, x, e.map(|v| -v))),
+                    (AtRoot::Key(Kind::Split, a), AtRoot::Key(Kind::Split, b)) => {
+                        self.stack.push(Work::Pair(a, b, 0, *e))
                     }
-                    (Kind::Split, Kind::Split) => self.stack.push(Work::Pair(a, b, 0, *e)),
                 }
             }
         }
-        units
     }
 }
 
@@ -500,10 +606,8 @@ fn fits_units(leaves: usize, tiles: usize) -> Result<(), AnalysisError> {
 ///
 /// Refused as `TooLarge`, before any label is made, when the outside, 512 units for each
 /// leaf and one for each tile are more than a `u32` numbers, about 8.4 million leaves, or
-/// when the empty regions found as it walks bring them past it; and as `TooSpread` when
-/// the compressed root grid would exceed 2²² cells: along each axis it holds every root
-/// region holding a key, those beside it, and the gaps between, four intervals for each
-/// lone key place, so some 40 lone key places along every axis reach it. The labels hold four bytes per leaf voxel.
+/// when the empty regions found as it walks bring them past it. The labels hold four bytes
+/// per leaf voxel.
 pub fn label<T: Value>(
     t: &Topology,
     f: &Field<T>,
@@ -512,7 +616,6 @@ pub fn label<T: Value>(
 ) -> Result<Labels, AnalysisError> {
     f.belongs_to(t)?;
     fits_units(t.leaf_count(), t.tile_count())?;
-    let root = RootGrid::new(t)?;
     let background = meets(f.background());
     let mut units = Units::default();
     let outside = units.add(background);
@@ -536,7 +639,8 @@ pub fn label<T: Value>(
         offsets: conn.offsets(),
         stack: Vec::new(),
     };
-    let root_units = walk.root(&root, outside);
+    let root = RootRegions::new(t, &mut walk.units, background, outside, conn.reach());
+    walk.root(&root, outside);
     walk.run();
     if walk.units.overflow {
         return Err(AnalysisError::TooLarge);
@@ -549,7 +653,6 @@ pub fn label<T: Value>(
         tile_base,
         empty: walk.empty,
         root,
-        root_units,
         outside,
         count,
     })
@@ -605,14 +708,11 @@ impl Labels {
                 .empty
                 .get(&(1, TileLevel::Root.origin(v)))
                 .map(|b| b + place(TileLevel::Upper.origin(v), 1)),
-            Location::Background => {
-                let c = self.root.cell_of(v);
-                if self.root.unbounded(c) {
-                    Some(self.outside)
-                } else {
-                    self.root_units.get(&c).copied()
-                }
-            }
+            Location::Background => match self.root.locate(region_of(v)) {
+                RootRegion::Outside => Some(self.outside),
+                RootRegion::Empty(u) => Some(u),
+                RootRegion::Key(_) => None,
+            },
         }
     }
 
@@ -752,7 +852,7 @@ mod tests {
     }
 
     /// Voxels in an upper node's empty places, where no lower node is, are labelled through
-    /// the node's own empty units, not the root grid: here they are the outside's, and a
+    /// the node's own empty units, not the root's: here they are the outside's, and a
     /// flood from one reaches it. Eight leaves that do not meet the condition number the
     /// first 4096 units after the outside, so a unit miscounted from an empty place's lands
     /// among them, excluded.
@@ -813,6 +913,79 @@ mod tests {
         let far = l.label_at(&t, [1_000_000, 0, 0]).unwrap();
         assert_eq!(l.count(), 2);
         assert!(!l.reaches_outside(centre) && l.reaches_outside(far));
+    }
+
+    /// Keys far apart along every axis, a leaf and root tiles, are labelled, each its own
+    /// component, and the regions between and beyond them the outside's: a grid of the
+    /// root's regions compressed around them would hold some 180³ cells, past the 2²² once
+    /// refused (ADR-0013's amendment of 2026-11-11).
+    #[test]
+    fn keys_scattered_along_every_axis_are_labelled() {
+        let at = |i: i32| [i * 4 * 4096, (44 - i) * 5 * 4096, (i * 7 % 45) * 6 * 4096];
+        let t = topology(|e| {
+            e.activate(at(0)).unwrap();
+            for i in 1..45 {
+                e.add_tile(TileLevel::Root, at(i)).unwrap();
+            }
+        });
+        let mut f = Field::new(&t, -1.0_f32);
+        for n in t.tile_numbers().collect::<Vec<_>>() {
+            f.set_tile(&t, n, 1.0).unwrap();
+        }
+        let n = t.leaf_numbers().next().unwrap();
+        f.leaf_mut(&t, n).unwrap()[0] = 1.0;
+        for conn in [Connectivity::Six, Connectivity::TwentySix] {
+            let l = label(&t, &f, positive, conn).unwrap();
+            assert_eq!(l.count(), 45, "{conn:?}");
+            assert_ne!(l.label_at(&t, at(0)).unwrap(), l.label_at(&t, at(1)).unwrap());
+            let inv = label(&t, &f, |v| v < 0.0, conn).unwrap();
+            let far = inv.label_at(&t, [-2_000_000_000, 0, 0]).unwrap();
+            assert!(inv.reaches_outside(far));
+            for v in [[4096 * 3 + 4000, 4096 * 7, 4096 * 11], at(0).map(|c| c + 4095)] {
+                assert_eq!(inv.label_at(&t, v), Ok(far), "{v:?} {conn:?}");
+            }
+        }
+    }
+
+    /// Two root regions enclosed by root tiles that touch only along an edge, in each
+    /// plane, or at a corner, are one component under 26-connectivity and two under 6,
+    /// neither the outside's.
+    #[test]
+    fn root_regions_touching_at_an_edge_or_a_corner_join_under_26_only() {
+        // Along an edge in each plane, each way, and at a corner.
+        let pairs = [
+            [[1, 1, 1], [2, 2, 1]],
+            [[2, 1, 1], [1, 2, 1]],
+            [[1, 1, 1], [1, 2, 2]],
+            [[1, 2, 1], [1, 1, 2]],
+            [[1, 1, 1], [2, 1, 2]],
+            [[2, 1, 1], [1, 1, 2]],
+            [[1, 1, 1], [2, 2, 2]],
+            [[2, 2, 1], [1, 1, 2]],
+        ];
+        for holes in pairs {
+            let t = topology(|e| {
+                for i in 0..64 {
+                    let c = [i % 4, i / 4 % 4, i / 16];
+                    if !holes.contains(&c) {
+                        e.add_tile(TileLevel::Root, c.map(|v| v * 4096)).unwrap();
+                    }
+                }
+            });
+            let mut f = Field::new(&t, 1.0_f32);
+            for n in t.tile_numbers().collect::<Vec<_>>() {
+                f.set_tile(&t, n, -1.0).unwrap();
+            }
+            let in_hole = |h: [i32; 3]| h.map(|v| v * 4096 + 9);
+            for (conn, count) in [(Connectivity::Six, 3), (Connectivity::TwentySix, 2)] {
+                let l = label(&t, &f, positive, conn).unwrap();
+                assert_eq!(l.count(), count, "{conn:?} {holes:?}");
+                let a = l.label_at(&t, in_hole(holes[0])).unwrap();
+                let b = l.label_at(&t, in_hole(holes[1])).unwrap();
+                assert_eq!(a == b, conn == Connectivity::TwentySix, "{holes:?}");
+                assert!(!l.reaches_outside(a) && !l.reaches_outside(b));
+            }
+        }
     }
 
     /// Labelling a leaf in each of 16 root regions ends at once: the walk takes an upper node's empty places whole,

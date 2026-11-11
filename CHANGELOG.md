@@ -29,6 +29,10 @@ are recorded here when they change (V6).
   `AnyField::F32x3` and `F64x3`, which a `.vdb` read gave among `VdbFile::skipped` before;
   mestolo's `convert` writes them to `.vdb`, and refuses or, with `--skip-unsupported`,
   leaves out `u8` and `u32` alone (docs/formats.md §9, ADR-0046, ADR-0047; issue 3).
+- `analysis::label`, and so `flood_fill`, no longer refuse leaves spread far apart:
+  the root's empty regions are found as runs between its keys rather than on a grid that
+  was refused past 2²² cells, labels unchanged where it was not. `AnalysisError::TooSpread`
+  is no longer returned (ADR-0013; issue 6).
 
 ## 1.2.0 (2026-11-10)
 

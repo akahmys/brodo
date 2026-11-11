@@ -8,10 +8,10 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: P12's issue 3, `.vdb` grids of `[f32; 3]` and `[f64; 3]` written and read,
-  `u8` and `u32` not written, OpenVDB having no grid of either (`spikes/vdbvec/`, ADR-0046,
-  ADR-0047); before it, issues 4, 8, 7 and 2 (2026-11-10).
-- **Next**: P12's issue 6 (§2): B-025 answered by its spike and ADR.
+- **Done**: P12's issue 6, leaves spread far apart labelled, the root's empty regions
+  found as runs between its keys (`spikes/rootsparse/`, ADR-0013; 2026-11-11); before it,
+  issues 3, 4, 8, 7 and 2.
+- **Next**: P12's closing checks, chosen by the owner (§2).
 - **Unresolved**: `leaf_parallel_update_x32` drifts between processes by up to 20 %, its
   cause not measured (ADR-0019).
 
@@ -61,8 +61,9 @@ before it is written, its ADR amended where the design changes. Each issue's
 - [x] [Issue 3](https://github.com/akahmys/brodo/issues/3): `.vdb` grids of `[f32; 3]` and
       `[f64; 3]`, after a spike against OpenVDB 14 (AGENTS.md S1); `u8` and `u32` decided
       once the spike has looked for their OpenVDB types; mestolo's `convert` taking them
-- [ ] [Issue 6](https://github.com/akahmys/brodo/issues/6): B-025 answered by its spike and
-      ADR before it is implemented
+- [x] [Issue 6](https://github.com/akahmys/brodo/issues/6): B-025 answered by its spike and
+      ADR before it is implemented: the root's empty regions as runs between its keys,
+      nothing refused for its spread (ADR-0013)
 - [ ] The closing checks, chosen by the owner when the issues are done
 - [ ] Version 1.3.0 (TESTING.md V2–V4)
 
@@ -87,9 +88,7 @@ Not built for now (owner, 2026-10-24; ADR-0018; §3, B-021). If it is, then:
 Each question is answered by a spike's measurement and an ADR, never in passing by an
 implementation (PLANNING.md §2).
 
-| # | Question | Proposal so far |
-| :--- | :--- | :--- |
-| B-025 | How does labelled connectivity number the root's empty regions without the dense grid of 2²² cells that refuses scattered leaves as `TooSpread` (issue 6)? | None yet: a spike measures a sparse form of the root's regions against the dense one on the layouts it accepts, before an ADR |
+None is open.
 
 Questions decided "not now", each revisited only when what it names happens:
 
@@ -155,7 +154,10 @@ No spike is running.
 - For the next MAJOR, since it changes an output 1.0 promises (ARCHITECTURE.md §6.3,
   TESTING.md V9): Hermite data and an archive's encodings shown by mestolo's `info`
   (the owner, 2026-11-08; ADR-0050).
-- Requests from users. Held until one asks: merging into a root tile (ADR-0014); a public
+- Requests from users. Held until one asks: merging into a root tile (ADR-0014);
+  labelling many lone leaves faster, each one's upper node costing `label` about 1.3 ms
+  and 0.4 MiB of empty places under 6-connectivity (`spikes/rootsparse/REPORT.md`,
+  Finding 5; ADR-0013); a public
   way to read a bare frozen buffer, a file of its own, into an aligned buffer, which only
   tests now do (P5's review, S1, 2026-10-27); a bound on a conversion's leaves, refused
   with a typed error before memory runs out, where now the caller bounds the cost by

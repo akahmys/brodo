@@ -124,8 +124,8 @@ pub enum AnalysisError {
     /// The topology refused a lookup by number.
     #[error(transparent)]
     Tree(#[from] TreeError),
-    /// The root's keys are spread so widely that the compressed root grid would be too
-    /// large.
+    /// Not returned: labelling no longer refuses keys spread widely. Kept so that a match
+    /// naming it still compiles, until a MAJOR version removes it.
     #[error("the root's keys are too spread out to label")]
     TooSpread,
     /// More units than a `u32` numbers.
