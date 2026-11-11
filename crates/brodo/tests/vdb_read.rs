@@ -646,15 +646,36 @@ fn a_root_origin_off_its_edge_and_a_map_not_affine_are_refused() {
     assert_eq!(malformed(&map), "AffineMap");
 }
 
+/// `bytes`, a file of one grid, with that grid's instance string set to "x".
+fn instanced(bytes: &[u8]) -> Vec<u8> {
+    let (_, at) = descriptors(bytes)[0].clone();
+    let mut b = splice(bytes, at..at, b"x");
+    b[at - 4..at].copy_from_slice(&1_u32.to_le_bytes());
+    b
+}
+
+fn skipped_alone(bytes: &[u8]) {
+    let file = from_bytes(bytes, "mm", u64::MAX).unwrap();
+    assert!(file.grids.is_empty());
+    assert_eq!(file.skipped, ["g"]);
+}
+
 #[test]
 fn an_instance_of_a_double_grid_is_skipped() {
     let (_, _, bytes) = written_file();
-    let (_, at) = descriptors(&bytes)[0].clone();
-    let mut b = splice(&bytes, at..at, b"x");
-    b[at - 4..at].copy_from_slice(&1_u32.to_le_bytes());
-    let file = from_bytes(&b, "mm", u64::MAX).unwrap();
-    assert!(file.grids.is_empty());
-    assert_eq!(file.skipped, ["g"]);
+    skipped_alone(&instanced(&bytes));
+}
+
+#[test]
+fn an_instance_of_a_vector_grid_is_skipped() {
+    let (m, t, f) = written([0.0_f32, 1.0, -2.5], |k| [k as f32, 0.0, 0.0]);
+    let bytes = to_bytes(&[VdbEntry::new(&m, &t, &f).unwrap()]).unwrap();
+    assert_eq!(from_bytes(&bytes, "mm", u64::MAX).unwrap().grids.len(), 1);
+    skipped_alone(&instanced(&bytes));
+    let (m, t, g) = written([-1.0_f64, 0.5, 1e-12], |k| [f64::from(k), 0.0, 0.0]);
+    let bytes = to_bytes(&[VdbEntry::new(&m, &t, &g).unwrap()]).unwrap();
+    assert_eq!(from_bytes(&bytes, "mm", u64::MAX).unwrap().grids.len(), 1);
+    skipped_alone(&instanced(&bytes));
 }
 
 #[test]

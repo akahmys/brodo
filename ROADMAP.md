@@ -8,10 +8,10 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: P12's issue 6, leaves spread far apart labelled, the root's empty regions
-  found as runs between its keys (`spikes/rootsparse/`, ADR-0013; 2026-11-11); before it,
-  issues 3, 4, 8, 7 and 2.
-- **Next**: P12's closing checks, chosen by the owner (§2).
+- **Done**: P12's closing checks: T6's fuzzing, V9 and T11's mutation run, its missed
+  mutants killed or excluded (2026-11-12); before them, issues 6, 3, 4, 8, 7 and 2.
+- **Next**: version 1.3.0 (TESTING.md V2–V4), its tag, GitHub release and publication on
+  crates.io each with the owner's approval.
 - **Unresolved**: `leaf_parallel_update_x32` drifts between processes by up to 20 %, its
   cause not measured (ADR-0019).
 
@@ -64,7 +64,17 @@ before it is written, its ADR amended where the design changes. Each issue's
 - [x] [Issue 6](https://github.com/akahmys/brodo/issues/6): B-025 answered by its spike and
       ADR before it is implemented: the root's empty regions as runs between its keys,
       nothing refused for its spread (ADR-0013)
-- [ ] The closing checks, chosen by the owner when the issues are done
+- [x] The closing checks, chosen by the owner (2026-11-11): T11's mutation run, the
+      check against 1.2.0 (V9), and T6's fuzzing, readers of untrusted bytes having
+      changed; not T7, no unsafe code being touched
+  - [x] T6: `archive`, `cache_file` and `vdb` fuzzed 900 s each on `1df519a`, 1,119,858,
+        11,071,780 and 78,529 runs, nothing found (2026-11-11)
+  - [x] V9: the gate's check against v1.2.0 passes on `1df519a` (2026-11-11)
+  - [x] T11: the run on `1df519a`, GitHub Actions run 43000893308, reported all 4815
+        mutants and missed 7, its six timeouts before any failed test caught under 1800 s
+        but one only slower; two killed by a test, six excluded as `[same]` with the
+        owner's approval, and the 63 of the functions touched run again, none missed
+        (2026-11-12)
 - [ ] Version 1.3.0 (TESTING.md V2–V4)
 
 ### Held — `piatto`

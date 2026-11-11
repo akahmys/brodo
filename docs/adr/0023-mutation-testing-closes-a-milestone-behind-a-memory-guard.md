@@ -110,3 +110,5 @@ gone with their code were removed with it.
   bounds check as `[open]`, and three of a `.vdb` reader's widening of `f64` as `[same]`;
   `cache::read`'s documentation then saying which of several broken rules is named is not
   promised.
+- 2026-11-11: six of P12's, as `[same]`: four of the root's empty regions in labelling,
+  one of them only slower, and two of a `.vdb` reader's default for a value's distance.

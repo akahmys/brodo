@@ -76,6 +76,18 @@ exclude_re = [
     'analysis\.rs:.*: replace > with < in forward$',
     # As above.
     'analysis\.rs:.*: replace > with >= in forward$',
+    # The root's empty regions lie in the keys' box grown by one, whose rim is all empty runs
+    # joined to the outside: a region on the rim, or beyond a low face, located as the
+    # outside or as a rim run is in one component either way.
+    # [same]
+    'analysis\.rs:\d+:57: replace < with (==|<=) in RootRegions::locate$',
+    # As above.
+    'analysis\.rs:\d+:78: replace > with >= in RootRegions::locate$',
+    # The rim is all empty and connected, and the lowest slab spans the box along y and x,
+    # so it is joined to the outside when only runs spanning an axis are, and the rest of
+    # the rim through it: only slower.
+    # [same]
+    'analysis\.rs:\d+:66: replace \|\| with && in RootRegions::join$',
     # 3 − d and 3 + d have the same parity.
     # [same]
     'euler\.rs:.*: replace \- with \+ in table$',
@@ -275,6 +287,10 @@ exclude_re = [
     'vdb_read\.rs:.*: delete match arm 2 in values$',
     # As above.
     'vdb_read\.rs:.*: delete match arm 4 in values$',
+    # The default serves the types that never state the SDF convention; a background of 0
+    # or -1 fails the positive background `is_sdf` asks for, so it answers false as for None.
+    # [same]
+    'vdb_read\.rs:\d+:9: replace Value::distance -> Option<f64> with Some\((0\.0|-1\.0)\)$',
     # Room for a block fewer is grown by `fill` as room for a file longer than it reported
     # is, and the same bytes are read.
     # [same]
