@@ -8,11 +8,14 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: P12's closing checks: T6's fuzzing, V9 and T11's mutation run, its missed
-  mutants killed or excluded (2026-11-12); before them, issues 6, 3, 4, 8, 7 and 2.
-- **Next**: P12's closing checks are done, and the version is 1.3.0. Its tag, GitHub
-  release and publication on crates.io follow, each with the owner's approval (TESTING.md
-  V4). §2's "Later", §4 and the GitHub issues hold the rest of what is open.
+- **Done**: P12 released as 1.3.0, grids picked by name, fields between topologies,
+  writers one entry at a time, `.vdb` vector grids and spread leaves labelled, without
+  breaking a user (ADR-0013, ADR-0014, ADR-0016, ADR-0046, ADR-0047, ADR-0055): brodo,
+  colino and mestolo published by the owner, docs.rs building their reference, the new
+  API used from a new crate depending on them by version, and `cargo install mestolo`
+  installing the command (2026-11-12).
+- **Next**: no milestone is scheduled; the owner chooses the next work. §2's "Later", §4
+  and the GitHub issues hold what is open.
 - **Unresolved**: `leaf_parallel_update_x32` drifts between processes by up to 20 %, its
   cause not measured (ADR-0019).
 
@@ -21,7 +24,8 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
 Named after the project group's phases (ADR-0011); the checks a milestone closes with are
 TESTING.md §2's and its checklist lists them (ADR-0033). A closed milestone leaves this
 file: what it brought is in its version's CHANGELOG.md section, and its checklist in git,
-in this file as of `53f69d5` (P0 to P9), `711cf5b` (P10) and `e27fd49` (P11).
+in this file as of `53f69d5` (P0 to P9), `711cf5b` (P10), `e27fd49` (P11) and `6f1140a`
+(P12).
 
 | Milestone | Version | Closed |
 | :--- | :--- | :--- |
@@ -38,45 +42,7 @@ in this file as of `53f69d5` (P0 to P9), `711cf5b` (P10) and `e27fd49` (P11).
 | P9, 1.0 on crates.io | 1.0.0 | 2026-11-08 |
 | P10, rounding off 1.0 | 1.1.0 | 2026-11-09 |
 | P11, a view's leaves and tiles without thawing | 1.2.0 | 2026-11-10 |
-
-### P12 — picking a grid, and fields between topologies
-
-Set by the owner on 2026-11-09, started on 2026-11-10, to be released as 1.3.0, adding to
-the API without breaking a user. In this order; each change's API is put to the owner
-before it is written, its ADR amended where the design changes. Each issue's
-`owner-approved` label was last applied by `akahmys` (checked 2026-11-10).
-
-- [x] [Issue 2](https://github.com/akahmys/brodo/issues/2): an archive listed without
-      decompressing a chunk, §8.6's rules 1 and 2 held for every entry, and grids found by
-      name in a cache file, an archive and a `.vdb`, every match in the file's order
-      (ADR-0016, ADR-0055)
-- [x] [Issue 7](https://github.com/akahmys/brodo/issues/7): a `Remap` between any two
-      topologies, values moved by `Field::remap`, a tile over leaves and background merged
-      by the caller's rule (ADR-0014)
-- [x] [Issue 8](https://github.com/akahmys/brodo/issues/8): the union of two topologies,
-      the finer kept, a tile split where the other holds a leaf or a smaller tile, its
-      remaps made by issue 7's
-- [x] [Issue 4](https://github.com/akahmys/brodo/issues/4): a writer taking its entry count
-      first and one grid at a time, to a path only; `write` and `to_bytes` made by it, their
-      bytes unchanged (ADR-0055)
-- [x] [Issue 3](https://github.com/akahmys/brodo/issues/3): `.vdb` grids of `[f32; 3]` and
-      `[f64; 3]`, after a spike against OpenVDB 14 (AGENTS.md S1); `u8` and `u32` decided
-      once the spike has looked for their OpenVDB types; mestolo's `convert` taking them
-- [x] [Issue 6](https://github.com/akahmys/brodo/issues/6): B-025 answered by its spike and
-      ADR before it is implemented: the root's empty regions as runs between its keys,
-      nothing refused for its spread (ADR-0013)
-- [x] The closing checks, chosen by the owner (2026-11-11): T11's mutation run, the
-      check against 1.2.0 (V9), and T6's fuzzing, readers of untrusted bytes having
-      changed; not T7, no unsafe code being touched
-  - [x] T6: `archive`, `cache_file` and `vdb` fuzzed 900 s each on `1df519a`, 1,119,858,
-        11,071,780 and 78,529 runs, nothing found (2026-11-11)
-  - [x] V9: the gate's check against v1.2.0 passes on `1df519a` (2026-11-11)
-  - [x] T11: the run on `1df519a`, GitHub Actions run 43000893308, reported all 4815
-        mutants and missed 7, its six timeouts before any failed test caught under 1800 s
-        but one only slower; two killed by a test, six excluded as `[same]` with the
-        owner's approval, and the 63 of the functions touched run again, none missed
-        (2026-11-12)
-- [x] Version 1.3.0 (TESTING.md V2–V4, 2026-11-12)
+| P12, picking a grid, and fields between topologies | 1.3.0 | 2026-11-12 |
 
 ### Held — `piatto`
 
