@@ -71,8 +71,8 @@
     <polygon points="302.77,283.00 256.00,310.00 256.00,364.00 302.77,337.00" fill="#0369A1" stroke="#0F172A" stroke-width="3.6" stroke-linejoin="round" stroke-linecap="round"/>
   </g>
   <g>
-    <polygon points="256.00,69.16 302.77,96.16 256.00,123.16 209.23,96.16" fill="#FDE68A" stroke="#0F172A" stroke-width="3.6" stroke-linejoin="round" stroke-linecap="round"/>
-    <polygon points="209.23,96.16 256.00,123.16 256.00,177.16 209.23,150.16" fill="#FBBF24" stroke="#0F172A" stroke-width="3.6" stroke-linejoin="round" stroke-linecap="round"/>
-    <polygon points="302.77,96.16 256.00,123.16 256.00,177.16 302.77,150.16" fill="#D97706" stroke="#0F172A" stroke-width="3.6" stroke-linejoin="round" stroke-linecap="round"/>
+    <polygon points="256.00,40.00 302.77,67.00 256.00,94.00 209.23,67.00" fill="#FDE68A" stroke="#0F172A" stroke-width="3.6" stroke-linejoin="round" stroke-linecap="round"/>
+    <polygon points="209.23,67.00 256.00,94.00 256.00,148.00 209.23,121.00" fill="#FBBF24" stroke="#0F172A" stroke-width="3.6" stroke-linejoin="round" stroke-linecap="round"/>
+    <polygon points="302.77,67.00 256.00,94.00 256.00,148.00 302.77,121.00" fill="#D97706" stroke="#0F172A" stroke-width="3.6" stroke-linejoin="round" stroke-linecap="round"/>
   </g>
 </svg>

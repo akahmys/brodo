@@ -150,3 +150,8 @@ misspelt one is found. A break, rather than an addition, still declares `### Bre
 Shown to fire (TESTING.md T3, 2026-11-10): an entry's tag changed to `v1.1.0`, its name
 misspelt, an entry removed, and an extra entry of no test or of another tag each failed;
 unchanged, it passed against `v1.2.0` in 35 s.
+
+Once `v1.3.0` was tagged and became the baseline, the five entries failed the check as
+it meant them to, and were removed on 2026-11-12 with the owner's approval, the table left
+empty. Shown to fire again (T3, 2026-11-12): one of them put back failed against `v1.3.0`,
+and the empty table passed.

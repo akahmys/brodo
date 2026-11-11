@@ -466,14 +466,14 @@
     <polygon points="174.71,184.00 160.86,192.00 160.86,208.00 174.71,200.00" fill="#0369A1" stroke="#0F172A" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>
   </g>
   <g>
-    <polygon points="147.00,52.80 162.24,61.60 147.00,70.40 131.76,61.60" fill="#FDE68A" stroke="#0F172A" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>
-    <polygon points="131.76,61.60 147.00,70.40 147.00,88.00 131.76,79.20" fill="#FBBF24" stroke="#0F172A" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>
-    <polygon points="162.24,61.60 147.00,70.40 147.00,88.00 162.24,79.20" fill="#D97706" stroke="#0F172A" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>
+    <polygon points="147.00,56.00 160.86,64.00 147.00,72.00 133.14,64.00" fill="#FDE68A" stroke="#0F172A" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>
+    <polygon points="133.14,64.00 147.00,72.00 147.00,88.00 133.14,80.00" fill="#FBBF24" stroke="#0F172A" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>
+    <polygon points="160.86,64.00 147.00,72.00 147.00,88.00 160.86,80.00" fill="#D97706" stroke="#0F172A" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>
   </g>
   <g>
-    <polygon points="183.03,80.00 195.50,87.20 183.03,94.40 170.56,87.20" fill="#7DD3FC" stroke="#0F172A" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"/>
-    <polygon points="170.56,87.20 183.03,94.40 183.03,108.80 170.56,101.60" fill="#0EA5E9" stroke="#0F172A" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"/>
-    <polygon points="195.50,87.20 183.03,94.40 183.03,108.80 195.50,101.60" fill="#0369A1" stroke="#0F172A" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"/>
+    <polygon points="188.57,80.00 202.43,88.00 188.57,96.00 174.71,88.00" fill="#7DD3FC" stroke="#0F172A" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>
+    <polygon points="174.71,88.00 188.57,96.00 188.57,112.00 174.71,104.00" fill="#0EA5E9" stroke="#0F172A" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>
+    <polygon points="202.43,88.00 188.57,96.00 188.57,112.00 202.43,104.00" fill="#0369A1" stroke="#0F172A" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>
   </g>
   <rect x="298.0" y="64.0" width="25" height="92" fill="#F8FAFC"/>
   <path d="M 298.0,156.0 a 44,44 0 1,0 88,0 a 44,44 0 1,0 -88,0 Z M 323.0,137.0 L 361.0,137.0 L 361.0,175.0 L 323.0,175.0 Z" fill="#F8FAFC" fill-rule="evenodd"/>
