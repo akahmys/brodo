@@ -1,6 +1,6 @@
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/logo/brodo-logo-dark.svg">
-  <img alt="brodo: sparse volumes in pure Rust" src="docs/logo/brodo-logo-light.svg" width="410">
+  <img alt="brodo: Block-sparse Rust Occupancy Data Objects" src="docs/logo/brodo-logo-light.svg" width="410">
 </picture>
 
 # brodo
