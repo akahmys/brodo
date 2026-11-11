@@ -6,6 +6,13 @@ are recorded here when they change (V6).
 
 ## Unreleased
 
+## 1.3.0 (2026-11-12)
+
+Closes P12: grids picked by name and archives listed without decompressing, fields moved
+between topologies and their union, files written one entry at a time, `.vdb` vector
+grids, and leaves spread far apart labelled, without breaking a user (TESTING.md V2). No
+format version changes.
+
 - `archive::list` and `archive::list_from_bytes`, with the `archive` feature: an archive's
   grids and entries of bytes listed from its directory and metadata, as `Listing`,
   `ListedGrid` and `ListedBytes`, decompressing no chunk (docs/formats.md §8.7, ADR-0016;

@@ -10,8 +10,9 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
 
 - **Done**: P12's closing checks: T6's fuzzing, V9 and T11's mutation run, its missed
   mutants killed or excluded (2026-11-12); before them, issues 6, 3, 4, 8, 7 and 2.
-- **Next**: version 1.3.0 (TESTING.md V2–V4), its tag, GitHub release and publication on
-  crates.io each with the owner's approval.
+- **Next**: P12's closing checks are done, and the version is 1.3.0. Its tag, GitHub
+  release and publication on crates.io follow, each with the owner's approval (TESTING.md
+  V4). §2's "Later", §4 and the GitHub issues hold the rest of what is open.
 - **Unresolved**: `leaf_parallel_update_x32` drifts between processes by up to 20 %, its
   cause not measured (ADR-0019).
 
@@ -75,7 +76,7 @@ before it is written, its ADR amended where the design changes. Each issue's
         but one only slower; two killed by a test, six excluded as `[same]` with the
         owner's approval, and the 63 of the functions touched run again, none missed
         (2026-11-12)
-- [ ] Version 1.3.0 (TESTING.md V2–V4)
+- [x] Version 1.3.0 (TESTING.md V2–V4, 2026-11-12)
 
 ### Held — `piatto`
 

@@ -6,7 +6,7 @@ exclude = ["spikes", "fuzz"]
 resolver = "3"
 
 [workspace.package]
-version = "1.2.0"
+version = "1.3.0"
 edition = "2024"
 rust-version = "1.98"
 license = "MIT OR Apache-2.0"
@@ -18,7 +18,7 @@ publish = ["crates-io"]
 # `name.workspace = true` (CODING.md Rule 20).
 [workspace.dependencies]
 # By version as well as path, the version the workspace's own (TESTING.md V8, ADR-0040).
-brodo = { path = "crates/brodo", version = "1.2.0", default-features = false }
+brodo = { path = "crates/brodo", version = "1.3.0", default-features = false }
 colino = { path = "crates/colino" }
 lz4_flex = { version = "0.14.0", default-features = false, features = ["std", "safe-encode", "safe-decode", "checked-decode"] }
 memmap2 = "0.9.11"
