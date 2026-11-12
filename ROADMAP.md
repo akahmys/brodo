@@ -8,7 +8,10 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: P12 released as 1.3.0, grids picked by name, fields between topologies,
+- **Done**: B-026 answered by `spikes/updrift/` (2026-11-12): `leaf_parallel_update_x32`
+  follows the performance cluster's state, which other processes' work on its cores sets,
+  17 % faster beside one busy thread and slower beside three; the owner kept the item and
+  its baseline (ADR-0019's amendment). Before it, P12 released as 1.3.0, grids picked by name, fields between topologies,
   writers one entry at a time, `.vdb` vector grids and spread leaves labelled, without
   breaking a user (ADR-0013, ADR-0014, ADR-0016, ADR-0046, ADR-0047, ADR-0055): brodo,
   colino and mestolo published by the owner, docs.rs building their reference, the new
@@ -16,8 +19,9 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   installing the command (2026-11-12).
 - **Next**: no milestone is scheduled; the owner chooses the next work. §2's "Later", §4
   and the GitHub issues hold what is open.
-- **Unresolved**: `leaf_parallel_update_x32` drifts between processes by up to 20 %, its
-  cause not measured (ADR-0019).
+- **Unresolved**: none. `leaf_parallel_update_x32`'s drift between sessions is measured:
+  other processes' work on the performance cores moves it either way, and the item and its
+  baseline are kept (B-026, ADR-0019's amendment of 2026-11-12).
 
 ## 2. Milestones
 
@@ -89,6 +93,8 @@ Questions answered, each by its spike and ADR:
 - `spikes/vtk/`: B-012 (ADR-0018)
 - `spikes/bench/`: B-007 (ADR-0019)
 - `spikes/parvar/`: B-024, a benchmark on the performance cores (ADR-0019)
+- `spikes/updrift/`: B-026, the leaf-parallel update's drift between sessions (ADR-0019's
+  amendment of 2026-11-12)
 - `spikes/mutants/`: the audit review's proposal C (ADR-0023)
 - `spikes/dilate/`: B-011, no mask (ADR-0025)
 - `spikes/sign/`: B-016 (ADR-0027)

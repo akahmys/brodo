@@ -1,0 +1,14 @@
+# Throwaway spike for B-026 (ROADMAP.md §3): why `leaf_parallel_update_x32` is found
+# 10 to 21 % slow in some sessions. Never imported by `crates/` (PLANNING.md §3); its own workspace.
+[package]
+name = "updrift-spike"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+brodo = { path = "../../crates/brodo" }
+rayon = "=1.12.0"
+
+[workspace]
+members = ["."]

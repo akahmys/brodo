@@ -79,9 +79,32 @@ Absolute times drifted by up to 7.9 % within one session of about 40 minutes.
 - Code placement alone moves an item by about 15 %: at P5's close `gather` went from 3.09
   to 3.58 ms between two builds whose code on its path disassembled the same, only its
   addresses moved. The tolerance cannot tell this from a change in the code; disassembling can.
-- `leaf_parallel_update_x32` drifts between processes on four threads by up to 20 %, its
-  cause not measured: it was found 10 to 21 % slow at P7's and P9's closes with the code
-  on its path unchanged, recorded again at the first and left at the second (2026-11-08).
+- `leaf_parallel_update_x32` drifts between sessions on four threads by up to 21 %, both
+  children of a pair alike: it was found 10 to 21 % slow at P7's and P9's closes with the
+  code on its path unchanged, recorded again at the first and left at the second
+  (2026-11-08). Its cause was measured on 2026-11-12 (the amendment below).
 - The eviction size, the loads and the thread count were measured on one Apple M5 alone.
 - colino's benchmark, including a file outside its crate, cannot be packaged; the packages
   leave benchmarks out (TESTING.md V8).
+
+## Amendment: why the leaf-parallel update drifts between sessions
+
+- **Date**: 2026-11-12
+
+`spikes/updrift/` (B-026) ran children as the harness runs them, every one within its rest,
+with threads of other work spun beside them. On an Apple M5 the item took 3.28 to 3.59 ms
+with none, 2.84 to 2.97 ms beside one or two busy threads on the performance cores, about
+3 % more than with none beside three, and as with none beside threads on the efficiency
+cores. A third of each call is `Field::new` zeroing 5.3 MB on one thread, which alone ran
+at its fastest only part of the time, its mean 33 to 80 % slower, and beside busy threads
+on the same cluster always; the parallel update moved too. The cores' clock moved by at
+most 6 %, so what in the chip takes the rest was not seen. A child lasts under half a
+second, so the cluster's state holds through both children of a pair, and one thread of
+other work, under one of load, passes the rest the harness reads. No form of the item
+removed it: the update alone, into a field made once, still moved with the cluster's load.
+
+The owner decided, on 2026-11-12, to record the cause and change nothing: the item and its
+baseline stay, and a drift is judged by the human as before (**A baseline moved**). The
+harness writing other processes' time on the performance cores into its report, so that a
+session's state is seen, was set aside: it would put a macOS-only system call into the
+benchmarks for a figure the human can read when a drift is judged.
