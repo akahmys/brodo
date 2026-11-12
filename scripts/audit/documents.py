@@ -21,6 +21,9 @@
    file's doc comment under `crates/*/src/`, no crate README, ARCHITECTURE.md and
    docs/formats.md name it in backquotes, alone or at the end of a path. A hidden module is
    not held to this, its own files naming what is in it.
+10. Retrospectives (PLANNING.md §7): every milestone in ROADMAP.md §2, a `### P<n>` heading,
+   lists `The retrospective and refactoring (PLANNING.md §7)` in its checklist, and does not
+   tick its `Version` item while that one is open. Whether the unit was done well, nothing.
 """
 
 import re
@@ -224,6 +227,32 @@ def hidden() -> list[str]:
     return out
 
 
+RETROSPECTIVE = "The retrospective and refactoring (PLANNING.md §7)"
+MILESTONE = re.compile(r"^### (P\d+)\b", re.MULTILINE)
+ITEM = re.compile(r"^- \[([ x])\] (.*)$", re.MULTILINE)
+
+
+def retrospectives() -> list[str]:
+    text = (ROOT / "ROADMAP.md").read_text()
+    start, end = text.find("\n## 2."), text.find("\n## 3.")
+    if start < 0 or end < start:
+        return ["  ROADMAP.md has no §2 before its §3"]
+    milestones = text[start:end]
+    heads = list(MILESTONE.finditer(milestones))
+    out = []
+    for k, head in enumerate(heads):
+        body = milestones[head.end():heads[k + 1].start() if k + 1 < len(heads) else None]
+        body = body.split("\n### ")[0]
+        items = ITEM.findall(body)
+        retro = [ticked for ticked, line in items if line.startswith(RETROSPECTIVE)]
+        version = [ticked for ticked, line in items if line.startswith("Version ")]
+        if not retro:
+            out.append(f"  ROADMAP.md's {head[1]} does not list `{RETROSPECTIVE}`")
+        elif "x" in version and " " in retro:
+            out.append(f"  ROADMAP.md's {head[1]} ticks its version before its retrospective")
+    return out
+
+
 def main() -> int:
     paths = walk()
     failures = []
@@ -238,6 +267,7 @@ def main() -> int:
         ("provenance", provenance),
         ("crate READMEs", readmes),
         ("hidden items", hidden),
+        ("retrospectives", retrospectives),
     )
     for label, check in checks:
         found = check()

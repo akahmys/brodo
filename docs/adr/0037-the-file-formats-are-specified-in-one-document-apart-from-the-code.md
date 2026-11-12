@@ -66,3 +66,12 @@ file whose set carries a free `hermite.set` naming another set of this version, 
 whose set is named by its crossings alone. Undoing either of `formats.py`'s fixes fails
 that test (T3).
 
+## Amendment: every reader held to a stated verdict
+
+- **Date**: 2026-11-12
+
+P12's retrospective found the case of 2026-11-09 above general: a check that compares two
+readers finds nothing when both misread the format alike. The owner decided, on 2026-11-12,
+that TESTING.md T13 say that `formats.py` and the crates' readers are each held to a
+verdict a test states, not only to one another. Held by review: no script can tell a stated
+verdict from a compared one.

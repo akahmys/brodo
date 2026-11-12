@@ -8,7 +8,11 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: B-026 answered by `spikes/updrift/` (2026-11-12): `leaf_parallel_update_x32`
+- **Done**: P12's retrospective (2026-11-12): the retrospective made a rule every milestone
+  lists and the audit checks (PLANNING.md §7, ADR-0004, ADR-0033), V9's set-aside entries
+  emptied after each tag (TESTING.md V4, ADR-0040), and every reader held to a stated
+  verdict (TESTING.md T13, ADR-0037). Before it, B-026 answered by `spikes/updrift/`
+  (2026-11-12): `leaf_parallel_update_x32`
   follows the performance cluster's state, which other processes' work on its cores sets,
   17 % faster beside one busy thread and slower beside three; the owner kept the item and
   its baseline (ADR-0019's amendment). Before it, P12 released as 1.3.0, grids picked by name, fields between topologies,
@@ -17,8 +21,8 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   colino and mestolo published by the owner, docs.rs building their reference, the new
   API used from a new crate depending on them by version, and `cargo install mestolo`
   installing the command (2026-11-12).
-- **Next**: no milestone is scheduled; the owner chooses the next work. §2's "Later", §4
-  and the GitHub issues hold what is open.
+- **Next**: issues 16 and 17 apart from any milestone, 17 with the ADR its rule files
+  need; then P13 (§2), set by the owner on 2026-11-12, its first step B-027's spike.
 - **Unresolved**: none. `leaf_parallel_update_x32`'s drift between sessions is measured:
   other processes' work on the performance cores moves it either way, and the item and its
   baseline are kept (B-026, ADR-0019's amendment of 2026-11-12).
@@ -48,6 +52,31 @@ in this file as of `53f69d5` (P0 to P9), `711cf5b` (P10), `e27fd49` (P11) and `6
 | P11, a view's leaves and tiles without thawing | 1.2.0 | 2026-11-10 |
 | P12, picking a grid, and fields between topologies | 1.3.0 | 2026-11-12 |
 
+### P13 — reading only what is needed, and rounding off the issues
+
+Set by the owner on 2026-11-12, to be released as 1.4.0, adding to the API without
+breaking a user. In this order; each change's API is put to the owner before it is
+written, its ADR amended where the design changes. Each issue's `owner-approved` label was
+last applied by `akahmys` (checked 2026-11-12).
+
+- [ ] A region of an archive read from only the bytes of the chunks it needs, the file not
+      read whole, and a listing and a grid by name the same way: B-027 answered by its
+      spike and ADR-0016 amended before it is implemented (left to later by the human on
+      2026-10-29, taken into P13 on 2026-11-12)
+- [ ] [Issue 5](https://github.com/akahmys/brodo/issues/5): components' labels read a leaf
+      at a time, with the outside component named
+- [ ] [Issue 9](https://github.com/akahmys/brodo/issues/9): a `Converted` built from a grid
+      read back from a file
+- [ ] [Issue 10](https://github.com/akahmys/brodo/issues/10): one mesh reader telling STL,
+      OBJ and 3MF apart from the file
+- [ ] [Issue 12](https://github.com/akahmys/brodo/issues/12): mestolo's `convert --as
+      archive` choosing a quantised encoding
+- [ ] [Issue 11](https://github.com/akahmys/brodo/issues/11): more `slice` options, the
+      options chosen by the owner before any is written
+- [ ] The retrospective and refactoring (PLANNING.md §7)
+- [ ] The closing checks, chosen by the owner
+- [ ] Version 1.4.0 (TESTING.md V2–V4)
+
 ### Held — `piatto`
 
 Not built for now (owner, 2026-10-24; ADR-0018; §3, B-021). If it is, then:
@@ -59,17 +88,14 @@ Not built for now (owner, 2026-10-24; ADR-0018; §3, B-021). If it is, then:
 - [ ] A `GridView` buffer read on the GPU as it is (TESTING.md §1); what cannot be read is
       recorded as a question on the frozen layout
 
-### Later
-
-- [ ] Reading a region of an archive from only the bytes of the chunks it needs, the file
-      not read whole (left to later by the human, 2026-10-29; ADR-0016)
-
 ## 3. Open questions and spikes
 
 Each question is answered by a spike's measurement and an ADR, never in passing by an
 implementation (PLANNING.md §2).
 
-None is open.
+| # | Question | Proposal so far |
+| :--- | :--- | :--- |
+| B-027 | How does an archive's reader take only the bytes of the chunks a region, a listing or a grid by name needs, and what does it save against reading the file whole (ADR-0016)? | A spike, P13's first step (owner, 2026-11-12): the bytes read and the time taken on a large archive, from a path read by seeking against the whole file read |
 
 Questions decided "not now", each revisited only when what it names happens:
 
@@ -136,7 +162,8 @@ No spike is running.
   is (AGENTS.md S5).
 - For the next MAJOR, since it changes an output 1.0 promises (ARCHITECTURE.md §6.3,
   TESTING.md V9): Hermite data and an archive's encodings shown by mestolo's `info`
-  (the owner, 2026-11-08; ADR-0050).
+  (the owner, 2026-11-08; ADR-0050). Kept for a MAJOR on 2026-11-12, not shown by a flag
+  in a MINOR: the owner judged its value too small for either until a user asks.
 - Requests from users. Held until one asks: merging into a root tile (ADR-0014);
   labelling many lone leaves faster, each one's upper node costing `label` about 1.3 ms
   and 0.4 MiB of empty places under 6-connectivity (`spikes/rootsparse/REPORT.md`,

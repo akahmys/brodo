@@ -38,3 +38,12 @@ of a kind the review of the public API before 1.0 had not looked for. The owner 
 API stays, 1.0 and each MAJOR after it, that survey is one of the milestone's closing
 checks (TESTING.md T14), each gap taken before the version or recorded in ROADMAP.md as one
 a later MINOR adds. Held by nothing: the milestone's checklist lists it.
+
+## Amendment: the retrospective is not chosen
+
+- **Date**: 2026-11-12
+
+The owner decided, on 2026-11-12, that PLANNING.md §7's retrospective and refactoring is no
+longer among the checks chosen by a milestone's content: every milestone closes with it,
+and `scripts/audit/documents.py` checks its checklist lists it (ADR-0004's amendment of that
+date). T6's, T7's and T11's runs and T14's survey stay chosen as before.

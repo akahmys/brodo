@@ -98,3 +98,16 @@ manifests and `cargo package --list`. Shown to fire (TESTING.md T3, 2026-11-07):
 mestolo's `LICENSE-MIT` other bytes than the root's, each failed it. `cargo publish
 --workspace --dry-run` packaged and built the three, colino and mestolo against brodo's
 package (2026-11-07).
+
+## Amendment: the set-aside tests after a tag
+
+- **Date**: 2026-11-12
+
+P12's closing commit failed the gate on GitHub Actions after it was pushed: tagging v1.3.0
+made it V9's baseline, and the five tests of v1.2.0 that `scripts/audit/semver.py`'s
+`SET_ASIDE` named became entries for another tag, which the check refuses as meant. The
+gate had last run on the owner's machine before the tag. The owner decided, on 2026-11-12,
+on P12's retrospective, that TESTING.md V4 say so: once the tag is made, `SET_ASIDE` loses
+its entries for the tag before, with the human's approval, and the gate passes again before
+the next push. No check is added: the gate already fails on such an entry, and that it runs
+between the tag and the push is held by nothing.
