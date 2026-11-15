@@ -18,8 +18,8 @@ use zerocopy::{FromBytes, FromZeros, IntoBytes};
 
 use crate::cache::{
     CacheEntry, CacheFile, Cursor, Hidden, KIND_BYTES, KIND_GRID, Part, Payload, Sink, Storage,
-    decode_bytes_meta, decode_meta, head, index, put_u32, range, read_within, u32_of,
-    within_blocks, zero, zeros,
+    decode_bytes_meta, decode_meta, head, index, magic_and_version, put_u32, range, read_within,
+    u32_of, value_type_of, within_blocks, zero, zeros,
 };
 use crate::error::{CacheError, FormatError};
 use crate::field::local_index;
@@ -383,14 +383,7 @@ impl Found<'_> {
 /// Reads the header block: the magic number, a format version this build reads, codec and
 /// chunk size, and unused words of zero. Returns the entry count.
 fn header(c: &mut Cursor<'_>) -> Result<usize, CacheError> {
-    let magic = c.u32()?;
-    if magic != MAGIC {
-        return Err(CacheError::BadMagic(magic));
-    }
-    let version = c.u32()?;
-    if version != VERSION {
-        return Err(CacheError::UnsupportedVersion(version));
-    }
+    magic_and_version(c, MAGIC, VERSION)?;
     let count = c.u32()?;
     if [c.u32()?, c.u32()?] != [CODEC, u32_of(CHUNK_LEAVES)?] || !zero(c.take(BLOCK - 20)?) {
         return Err(CacheError::Inconsistent("header"));
@@ -540,13 +533,7 @@ pub fn from_bytes(bytes: &[u8], limit: u64) -> Result<CacheFile, CacheError> {
         .zip(found.last())
         .map_or(Some(top.len() / BLOCK), |(at, g)| at.checked_add(g.grid_blocks))
         .ok_or(CacheError::TooLarge)?;
-    let length = u64::try_from(blocks)
-        .ok()
-        .and_then(|b| b.checked_mul(BLOCK as u64))
-        .ok_or(CacheError::TooLarge)?;
-    if length > limit {
-        return Err(CacheError::FileTooLarge { length, limit });
-    }
+    within(blocks, limit)?;
     let out = unpack(&found, &top, blocks)?;
     let mut index = index(out.as_bytes())?;
     let grids = found.iter().filter(|g| g.kind == KIND_GRID);
@@ -781,10 +768,7 @@ pub fn list_from_bytes(bytes: &[u8]) -> Result<Listing, CacheError> {
         }
         let index = listing.grids.len();
         let (meta, bounds) = decode_meta(g.meta)?;
-        let value_type = ValueType::from_code(g.value_type).ok_or(CacheError::Grid {
-            index,
-            error: FormatError::UnknownValueType(g.value_type),
-        })?;
+        let value_type = value_type_of(g.value_type, index)?;
         let encoding = g.encoding();
         listing.grids.push(ListedGrid { index, meta, bounds, value_type, encoding });
     }
@@ -855,8 +839,7 @@ pub fn region_from_bytes(
     };
     let len = g.grid_blocks.checked_mul(BLOCK).ok_or(CacheError::TooLarge)?;
     let refused = |error| CacheError::Grid { index, error };
-    let value_type = ValueType::from_code(g.value_type)
-        .ok_or(refused(FormatError::UnknownValueType(g.value_type)))?;
+    let value_type = value_type_of(g.value_type, index)?;
     let leaves =
         meeting(value_type, head.as_bytes(), tail.as_bytes(), len, extent).map_err(refused)?;
     let mut wanted: Vec<usize> = leaves.iter().map(|(n, _)| *n as usize / CHUNK_LEAVES).collect();

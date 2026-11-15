@@ -707,17 +707,27 @@ pub(crate) fn range(
     Ok(start..end)
 }
 
+/// Reads a header's first two words, refusing any but `magic` and `version`.
+pub(crate) fn magic_and_version(
+    c: &mut Cursor<'_>,
+    magic: u32,
+    version: u32,
+) -> Result<(), CacheError> {
+    let found = c.u32()?;
+    if found != magic {
+        return Err(CacheError::BadMagic(found));
+    }
+    let found = c.u32()?;
+    if found != version {
+        return Err(CacheError::UnsupportedVersion(found));
+    }
+    Ok(())
+}
+
 /// Reads the header block: the magic number, a format version this build reads, and unused
 /// words of zero. Returns the entry count.
 fn header(c: &mut Cursor<'_>) -> Result<u32, CacheError> {
-    let magic = c.u32()?;
-    if magic != MAGIC {
-        return Err(CacheError::BadMagic(magic));
-    }
-    let version = c.u32()?;
-    if version != VERSION {
-        return Err(CacheError::UnsupportedVersion(version));
-    }
+    magic_and_version(c, MAGIC, VERSION)?;
     let count = c.u32()?;
     if !zero(c.take(BLOCK - 12)?) {
         return Err(CacheError::Inconsistent("header"));
@@ -798,6 +808,12 @@ pub(crate) fn index(all: &[u8]) -> Result<Index, CacheError> {
     Ok(index)
 }
 
+/// The value type `code` names, or the refusal naming grid `index` among the grids.
+pub(crate) fn value_type_of(code: u32, index: usize) -> Result<ValueType, CacheError> {
+    ValueType::from_code(code)
+        .ok_or(CacheError::Grid { index, error: FormatError::UnknownValueType(code) })
+}
+
 /// The grid at `payload`, numbered `index` among the file's grids, its metadata `meta`,
 /// checked as docs/formats.md §3.4 states, its bounds those its leaves and tiles cover.
 fn grid_entry(
@@ -810,8 +826,7 @@ fn grid_entry(
     let (meta, bounds) = decode_meta(meta)?;
     let grid = all.get(payload.clone()).ok_or(CacheError::Truncated("grid"))?;
     let refused = |error| CacheError::Grid { index, error };
-    let value_type = ValueType::from_code(value_type)
-        .ok_or(refused(FormatError::UnknownValueType(value_type)))?;
+    let value_type = value_type_of(value_type, index)?;
     let found = check_grid(grid, value_type).map_err(refused)?;
     if found != bounds {
         return Err(CacheError::Inconsistent("bounds"));

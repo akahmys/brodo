@@ -128,20 +128,16 @@ fn grids(bytes: &[u8], unit: &str, name: Option<&str>, limit: u64) -> Result<Vdb
         }
         let read = match d.kind.as_slice() {
             b"Tree_float_5_4_3" if d.instance.is_empty() => {
-                let (meta, topology, f) = grid::<f32>(bytes, &d, unit, &mut budget)?;
-                Some(VdbGrid { meta, topology, field: AnyField::F32(f) })
+                Some(vdb_grid::<f32>(bytes, &d, unit, &mut budget)?)
             }
             b"Tree_double_5_4_3" if d.instance.is_empty() => {
-                let (meta, topology, f) = grid::<f64>(bytes, &d, unit, &mut budget)?;
-                Some(VdbGrid { meta, topology, field: AnyField::F64(f) })
+                Some(vdb_grid::<f64>(bytes, &d, unit, &mut budget)?)
             }
             b"Tree_vec3s_5_4_3" if d.instance.is_empty() => {
-                let (meta, topology, f) = grid::<[f32; 3]>(bytes, &d, unit, &mut budget)?;
-                Some(VdbGrid { meta, topology, field: AnyField::F32x3(f) })
+                Some(vdb_grid::<[f32; 3]>(bytes, &d, unit, &mut budget)?)
             }
             b"Tree_vec3d_5_4_3" if d.instance.is_empty() => {
-                let (meta, topology, f) = grid::<[f64; 3]>(bytes, &d, unit, &mut budget)?;
-                Some(VdbGrid { meta, topology, field: AnyField::F64x3(f) })
+                Some(vdb_grid::<[f64; 3]>(bytes, &d, unit, &mut budget)?)
             }
             _ => None,
         };
@@ -383,6 +379,17 @@ fn descriptor(c: &mut Cursor<'_>) -> Result<Descriptor, VdbError> {
 struct Tree<T> {
     leaves: BTreeMap<Coord, Box<[T; LEAF_VOXELS]>>,
     tiles: BTreeMap<(TileLevel, Coord), T>,
+}
+
+/// The grid `d` describes, its field held as an `AnyField` of `T`.
+fn vdb_grid<T: Value>(
+    bytes: &[u8],
+    d: &Descriptor,
+    unit: &str,
+    budget: &mut Budget,
+) -> Result<VdbGrid, VdbError> {
+    let (meta, topology, f) = grid::<T>(bytes, d, unit, budget)?;
+    Ok(VdbGrid { meta, topology, field: f.into() })
 }
 
 /// A grid's body.
