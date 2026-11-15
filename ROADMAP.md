@@ -8,7 +8,10 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: P12's retrospective (2026-11-12): the retrospective made a rule every milestone
+- **Done**: issues 16 and 17 (2026-11-16): three provenance rows and a test's header
+  brought up to the code, and three texts up to the checks they describe (ADR-0003's
+  amendment); both left open for the owner to close. Before them, P12's retrospective
+  (2026-11-12): the retrospective made a rule every milestone
   lists and the audit checks (PLANNING.md §7, ADR-0004, ADR-0033), V9's set-aside entries
   emptied after each tag (TESTING.md V4, ADR-0040), and every reader held to a stated
   verdict (TESTING.md T13, ADR-0037). Before it, B-026 answered by `spikes/updrift/`
@@ -21,8 +24,7 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   colino and mestolo published by the owner, docs.rs building their reference, the new
   API used from a new crate depending on them by version, and `cargo install mestolo`
   installing the command (2026-11-12).
-- **Next**: issues 16 and 17 apart from any milestone, 17 with the ADR its rule files
-  need; then P13 (§2), set by the owner on 2026-11-12, its first step B-027's spike.
+- **Next**: P13 (§2), set by the owner on 2026-11-12, its first step B-027's spike.
 - **Unresolved**: none. `leaf_parallel_update_x32`'s drift between sessions is measured:
   other processes' work on the performance cores moves it either way, and the item and its
   baseline are kept (B-026, ADR-0019's amendment of 2026-11-12).
