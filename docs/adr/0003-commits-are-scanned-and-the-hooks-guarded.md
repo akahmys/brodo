@@ -60,3 +60,16 @@ The owner decided, on 2026-10-16 unless dated otherwise.
 Each guard's gaps found by review, 11 of 25 commands, then 10 more, then 13 of 63, were
 closed one by one before the guard was made a convenience behind the audit; the audit's
 checks of commits and history, not the guard, are what hold.
+
+## Amendment: three texts brought in line with what holds
+
+- **Date**: 2026-11-16
+
+Issue 17 reported three texts behind the checks; read against the files on 2026-11-16,
+each was. `.betterleaks.toml`'s comment said the audit failed when fewer than 100 rules
+loaded, while `verify_compliance.sh` fails unless more rules load from the file than
+betterleaks' default holds (467 against 466, `betterleaks config check`). The gate's
+workspace step named V1 and V3 but not V7 and V8, which `workspace.py` checks too. And
+AGENTS.md's table of documents left out mestolo's README. The owner approved, on
+2026-11-16, each text corrected; no check changed.
+

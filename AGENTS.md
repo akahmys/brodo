@@ -46,6 +46,7 @@ If a rule and the design seem to conflict, stop and ask the human.
 | [docs/adr/](docs/adr/README.md) | Why is a rule or the design the way it is? | The present design |
 | [crates/brodo/README.md](crates/brodo/README.md) | What does the crate do, and how is it used? | Rules, design |
 | [crates/colino/README.md](crates/colino/README.md) | What does the crate do, and how is it used? | Rules, design |
+| [crates/mestolo/README.md](crates/mestolo/README.md) | What does the crate do, and how is it used? | Rules, design |
 
 A promise to a user, what the code may be held to by a test or an excluded mutant
 (TESTING.md T11, T12), has three homes: ARCHITECTURE.md for behaviour, docs/formats.md for

@@ -1,8 +1,8 @@
 title = "betterleaks config"
 
 # Load betterleaks' default rules as well. Without this line the rules below are the only
-# ones and every secret the defaults know would pass. The audit fails when fewer than 100
-# rules load (AUDITING.md §2).
+# ones and every secret the defaults know would pass. The audit fails unless more rules
+# load from this file than betterleaks' default holds (AUDITING.md §2).
 [extend]
 useDefault = true
 

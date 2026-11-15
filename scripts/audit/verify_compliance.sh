@@ -58,7 +58,7 @@ done
 [ $ERROR -eq 0 ] && echo "  PASS ($installs)"
 [ $ERROR_BEFORE -eq 0 ] || ERROR=1
 
-echo "[Rules 4, 11, 19, 20, L1, L3, L4, V1, V3, T6] Workspace members, lint inheritance, layer order, version, fuzzer, layout..."
+echo "[Rules 4, 11, 19, 20, L1, L3, L4, V1, V3, V7, V8, T6] Workspace members, lint inheritance, layer order, version, fuzzer, layout..."
 python3 scripts/audit/workspace.py || ERROR=1
 
 echo "[Rules 1, 4, 6, 7, 9, 10, 16, 17, 18, 19] cargo clippy --workspace --all-targets -D warnings..."
