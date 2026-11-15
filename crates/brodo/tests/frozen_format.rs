@@ -1,7 +1,7 @@
 //! Format tier (TESTING.md §1): `freeze` then `GridView` gives the field's values bit for bit,
-//! the same input gives the same bytes at any thread count, layout version 1 keeps the bytes
-//! of a committed file (TESTING.md V6), and damaged bytes are refused, never read wrongly or
-//! with a panic.
+//! the same input gives the same bytes at any thread count, layout version 2 keeps the bytes
+//! of a committed file and version 1 is refused (TESTING.md V6), and damaged bytes are
+//! refused, never read wrongly or with a panic.
 
 use brodo::error::FormatError;
 use brodo::field::{Field, Stored, Value, ValueType};

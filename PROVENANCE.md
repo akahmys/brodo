@@ -45,7 +45,7 @@ copyright notice (`grep -rniE 'copyright|spdx|licen[cs]e' crates/*/src` finds no
 | `crates/brodo/src/quantise.rs` | docs/formats.md §8.5, ADR-0016; IEEE 754-2019 §3.6, for binary16's format and §4.3.3, for rounding to nearest, ties to even | an archive's quantised leaf values: binary16, byte-shuffled, and 8 bits over a range |
 | `crates/brodo/src/cache.rs` | ARCHITECTURE.md §4.7, ADR-0016, ADR-0051, ADR-0052, ADR-0057, ADR-0060, ADR-0062 only | the cache profile: writing and checking a file of grids with their metadata, and reaching each grid read |
 | `crates/brodo/src/error.rs` | ADR-0058 only | the crate's error types |
-| `crates/brodo/src/frozen.rs` | ARCHITECTURE.md §4.6, ADR-0016, ADR-0052, ADR-0060 only | the frozen layout, version 1, and `freeze` |
+| `crates/brodo/src/frozen.rs` | ARCHITECTURE.md §4.6, ADR-0016, ADR-0052, ADR-0054, ADR-0060 only | the frozen layout, version 2, version 1 refused, and `freeze` |
 | `crates/brodo/src/gather.rs` | ARCHITECTURE.md §4.4, ADR-0015 only | the gather of a leaf and one, two or three ghost layers |
 | `crates/brodo/src/field.rs` | ARCHITECTURE.md §4.2, §4.8, ADR-0014, ADR-0056, ADR-0062 only | fields: the open `Value` trait and the sealed `Stored` one, the `ValueType` naming each stored type and the `AnyField` holding a field of one, values by leaf and tile number, the stamp check, the remap and merge rules |
 | `crates/brodo/src/grid.rs` | ARCHITECTURE.md §4.2, ADR-0014, ADR-0059 only | a grid: one topology and one field, edited in one step |
@@ -70,7 +70,7 @@ copyright notice (`grep -rniE 'copyright|spdx|licen[cs]e' crates/*/src` finds no
 | `crates/colino/src/intersect.rs` | ARCHITECTURE.md §5.1, ADR-0030; Woop, Benthin and Wald (2013), *Watertight Ray/Triangle Intersection*, JCGT 2(1), for the sheared 2D edge test and its tie rule; the nearest points of two segments by their stationary point and clamped sides, as textbook material | where a segment crosses a triangle, watertight, and the point of a segment nearest a triangle |
 | `crates/colino/src/lib.rs` | none | crate root |
 | `crates/colino/src/error.rs` | none | the crate's error types |
-| `crates/colino/src/hermite.rs` | ARCHITECTURE.md §5.1, ADR-0030, ADR-0032 only | Hermite data from a mesh: signs by the winding number, crossings by the watertight test, in brodo's format |
+| `crates/colino/src/hermite.rs` | ARCHITECTURE.md §5.1, ADR-0027, ADR-0030, ADR-0032 only | Hermite data from a mesh: signs by the conversion's sign, the winding number or the parity count, crossings by the watertight test, in brodo's format |
 | `crates/colino/src/mesh.rs` | ARCHITECTURE.md §5.1, ADR-0026 only | the mesh type, reading limits, and welding by exact position |
 | `crates/colino/src/obj.rs` | ARCHITECTURE.md §5.1, ADR-0026; the Wavefront OBJ specification as published at paulbourke.net/dataformats/obj/ | reading Wavefront OBJ |
 | `crates/colino/src/parity.rs` | ARCHITECTURE.md §5.1, ADR-0027; Nooruddin and Turk (2003), *Simplification and Repair of Polygonal Models Using Volumetric Techniques*, IEEE TVCG 9(2), §3.1, for the parity count's vote along several directions, a line with an odd count not voting; Woop, Benthin and Wald (2013), JCGT 2(1), for the 2D edge functions after moving the triangle to the line; the sign of an edge function exactly 0 taken with the line moved by (ε, ε²), derived in `spikes/sign/` | the sign that does not depend on orientation: a parity count along the three axes |
@@ -87,5 +87,5 @@ copyright notice (`grep -rniE 'copyright|spdx|licen[cs]e' crates/*/src` finds no
 | `crates/mestolo/src/load.rs` | ARCHITECTURE.md §6.3, ADR-0050, ADR-0056 only | a file's kind told and its grids read and thawed through brodo, within the limit |
 | `crates/mestolo/src/info.rs` | ARCHITECTURE.md §6.3, ADR-0050 only | what a file holds, as text |
 | `crates/mestolo/src/draw.rs` | ARCHITECTURE.md §6.1, §6.3, ADR-0050; docs/formats.md §9 for OpenVDB's `class` of `level set` | a plane of a scalar grid drawn as PNG |
-| `crates/mestolo/src/convert.rs` | ARCHITECTURE.md §6.3, ADR-0050 only | grids written as `.vdb` or one as `.vtu` |
+| `crates/mestolo/src/convert.rs` | ARCHITECTURE.md §6.3, ADR-0050, ADR-0060 only | grids written as `.vdb`, one as `.vtu`, or a file's entries as a cache file or an archive, copied as they were |
 | `crates/mestolo/src/output.rs` | ARCHITECTURE.md §6.3, ADR-0050 only | an output refused if a file is there or its path names none |
