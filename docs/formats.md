@@ -487,10 +487,12 @@ writer refuses a NaN, an infinity, or hi − lo beyond `f64`'s range; x' is with
 
 A reader of one grid's region, a box of voxels, decompresses that grid's first chunk, its
 last if it holds the tile values, and each leaf chunk holding a leaf whose 8 × 8 × 8 voxels
-meet the box (ADR-0016). It refuses a file, before answering anything, unless:
+meet the box (ADR-0016). Reading a file at a path, it reads the header, the directory,
+every entry's metadata and chunk table, and the chunks it decompresses, each with its
+padding; given the file's bytes whole, it reads them all. It refuses a file, before answering anything, unless:
 
 1. rules 1 to 3 and 7 of §8.4 hold, and, for every entry, its chunks' lengths add up to its
-   payload's length;
+   payload's length, rule 3's padding of zeros checked only within the bytes it reads;
 2. the grid's metadata passes §3.4, rule 4;
 3. each chunk it decompresses does so to exactly its length before compression, its first
    before any other;
@@ -500,23 +502,25 @@ meet the box (ADR-0016). It refuses a file, before answering anything, unless:
    directory's value type, so that a walk of its nodes into the regions that meet the box
    reaches each once.
 
-A chunk it does not decompress is not checked to decompress, nor are its values: a file
-that a whole read (§8.4) refuses may answer a region. It answers a voxel within the box as
+A chunk it does not decompress is not checked to decompress, nor are its values, nor,
+read at a path, the padding of a part it does not read: a file that a whole read (§8.4)
+refuses may answer a region. It answers a voxel within the box as
 the frozen buffer does, and refuses any other, though the chunks it holds may cover it.
 
 ### 8.7 Listing
 
-A listing reads each entry's directory entry and metadata, and decompresses no chunk
-(ADR-0016). It refuses a file, before answering anything, unless:
+A listing reads each entry's directory entry, metadata and chunk table, and decompresses
+no chunk (ADR-0016); reading a file at a path, it reads nothing else, and given the file's
+bytes whole, it reads them all. It refuses a file, before answering anything, unless:
 
 1. rules 1 to 3 and 7 of §8.4 hold, and, for every entry, its chunks' lengths add up to its
-   payload's length;
+   payload's length, rule 3's padding of zeros checked only within the bytes it reads;
 2. every grid's metadata passes §3.4, rule 4, and its value type is one of §1.1;
 3. every entry of bytes' metadata passes §3.4, rule 7, its byte length within the last of
    its payload's blocks.
 
 A chunk is not checked to decompress, nor a grid's bounds against its leaves and tiles,
-nor an entry of bytes' padding: a file that a whole read (§8.4) refuses may be listed.
+nor an entry of bytes' padding, nor, read at a path, a chunk's padding: a file that a whole read (§8.4) refuses may be listed.
 
 Version 1, which held grids alone, its directory's last word unused, is not read
 (ADR-0054).

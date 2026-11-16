@@ -1,16 +1,19 @@
 //! The archive profile (ARCHITECTURE.md §4.7, ADR-0016): grids with their metadata in one
 //! file, each frozen buffer cut into chunks compressed apart by `lz4_flex`'s block format,
 //! read back as the cache file of the same grids. This module parses untrusted bytes: it is
-//! listed in `UNTRUSTED_INPUT`, indexes nothing (CODING.md Rule 3), checks the whole file
+//! listed in `UNTRUSTED_INPUT`, indexes nothing (CODING.md Rule 3), checks what it reads
 //! before it answers, and is fuzzed (TESTING.md T6).
 //!
 //! The bytes are in `docs/formats.md` §8, which this code follows: version 2, which holds
 //! entries of bytes beside grids (ADR-0051); version 1 is neither read nor written
 //! (ADR-0054). A region's read (§8.6) checks the archive's structure and only the chunks
 //! it decompresses; a listing (§8.7) checks the structure and every entry's metadata, and
-//! decompresses nothing.
+//! decompresses nothing. Both, at a path, read only what they check (`Pieces`), and the
+//! structure's checks run over the bytes held (`Source`), whole or read in part.
 
 use std::collections::BTreeMap;
+use std::fs::File;
+use std::ops::Range;
 use std::path::Path;
 
 use rayon::prelude::*;
@@ -367,6 +370,8 @@ struct Found<'a> {
     kind: u32,
     values: Option<(Kind, Quantised)>,
     chunks: Vec<(&'a [u8], usize)>,
+    /// Where each chunk lies in the file, its padding included.
+    at: Vec<Range<usize>>,
 }
 
 impl Found<'_> {
@@ -393,28 +398,33 @@ fn header(c: &mut Cursor<'_>) -> Result<usize, CacheError> {
 
 /// Checks an archive's parts, each where the writer puts it with padding of zeros between
 /// and nothing after the last: every entry's metadata, chunk table and chunks.
-fn find(all: &[u8]) -> Result<Vec<Found<'_>>, CacheError> {
-    if !all.len().is_multiple_of(BLOCK) {
+fn find<S: Source + ?Sized>(all: &S) -> Result<Vec<Found<'_>>, CacheError> {
+    if !all.total().is_multiple_of(BLOCK) {
         return Err(CacheError::Inconsistent("length"));
     }
-    let mut c = Cursor { rest: all, what: "header" };
-    let count = header(&mut c)?;
-    c.what = "directory";
-    let mut after =
-        count.checked_add(1).and_then(|n| n.checked_mul(BLOCK)).ok_or(CacheError::TooLarge)?;
-    if after > all.len() {
+    let top = all.get(0..all.total().min(BLOCK)).unwrap_or(&[]);
+    let count = header(&mut Cursor { rest: top, what: "header" })?;
+    let mut after = directory_end(count)?;
+    if after > all.total() {
         return Err(CacheError::Truncated("directory"));
     }
+    let listed = all.get(BLOCK..after).ok_or(CacheError::Truncated("directory"))?;
+    let mut c = Cursor { rest: listed, what: "directory" };
     let mut grids = Vec::new();
     for _ in 0..count {
         let (g, end) = grid(all, &mut c, after)?;
         grids.push(g);
         after = end;
     }
-    if after != all.len() {
+    if after != all.total() {
         return Err(CacheError::Inconsistent("end"));
     }
     Ok(grids)
+}
+
+/// The byte after the directory of `count` entries.
+fn directory_end(count: usize) -> Result<usize, CacheError> {
+    count.checked_add(1).and_then(|n| n.checked_mul(BLOCK)).ok_or(CacheError::TooLarge)
 }
 
 fn size(n: u32) -> Result<usize, CacheError> {
@@ -423,8 +433,8 @@ fn size(n: u32) -> Result<usize, CacheError> {
 
 /// Checks one grid's directory entry, read from `c`, and its parts, the first at byte
 /// `after`: the grid and the byte after its last part's padding.
-fn grid<'a>(
-    all: &'a [u8],
+fn grid<'a, S: Source + ?Sized>(
+    all: &'a S,
     c: &mut Cursor<'_>,
     after: usize,
 ) -> Result<(Found<'a>, usize), CacheError> {
@@ -437,12 +447,12 @@ fn grid<'a>(
     }
     let (kind, components) =
         if entry == KIND_BYTES { (None, 0) } else { encoding_of(value_type, encoding)? };
-    let meta = range(meta_at?, size(meta_len?)?, after, all.len(), "metadata")?;
+    let meta = range(meta_at?, size(meta_len?)?, after, all.total(), "metadata")?;
     let entries = size(chunk_count?)?.checked_mul(ENTRY).ok_or(CacheError::TooLarge)?;
     let table_len =
         entries.checked_add(components * quantise::RANGE).ok_or(CacheError::TooLarge)?;
     let table_start = meta.end.next_multiple_of(BLOCK);
-    let table = range(table_at?, table_len, table_start, all.len(), "chunk table")?;
+    let table = range(table_at?, table_len, table_start, all.total(), "chunk table")?;
     let what = "chunk table";
     let (listed, tail) = all
         .get(table.clone())
@@ -464,17 +474,30 @@ fn grid<'a>(
     if sum != Some(grid_blocks) {
         return Err(CacheError::Inconsistent(what));
     }
+    let at = parts.get(2..).unwrap_or(&[]).iter().map(|p| p.start..p.end.next_multiple_of(BLOCK));
+    let at = at.collect();
     let end = parts.last().map_or(after, |p| p.end).next_multiple_of(BLOCK);
     parts.push(end..end);
+    padding(all, &parts)?;
+    let meta = all.get(meta).ok_or(CacheError::Truncated("metadata"))?;
+    Ok((Found { meta, grid_blocks, value_type, kind: entry, values, chunks, at }, end))
+}
+
+/// Checks that the bytes between `parts`, each after the one before, are zeros. Padding not
+/// held, of a part a path's read did not take, is not checked (docs/formats.md §8.6 and
+/// §8.7, rule 1).
+fn padding<S: Source + ?Sized>(all: &S, parts: &[Range<usize>]) -> Result<(), CacheError> {
     for w in parts.windows(2) {
-        if let [a, b] = w
-            && !zero(all.get(a.end..b.start).ok_or(CacheError::Truncated("padding"))?)
-        {
-            return Err(CacheError::Inconsistent("padding"));
+        if let [a, b] = w {
+            if a.end > b.start || b.start > all.total() {
+                return Err(CacheError::Truncated("padding"));
+            }
+            if all.get(a.end..b.start).is_some_and(|pad| !zero(pad)) {
+                return Err(CacheError::Inconsistent("padding"));
+            }
         }
     }
-    let meta = all.get(meta).ok_or(CacheError::Truncated("metadata"))?;
-    Ok((Found { meta, grid_blocks, value_type, kind: entry, values, chunks }, end))
+    Ok(())
 }
 
 /// A grid's value encoding `code`, checked against its value type: the kind of a
@@ -491,8 +514,8 @@ fn encoding_of(value_type: u32, code: u32) -> Result<(Option<Kind>, usize), Cach
 
 /// The chunks a grid's table entries `listed` list, each with its length in blocks, none
 /// zero, each at the block after the part before it; their places are added to `parts`.
-fn chunks<'a>(
-    all: &'a [u8],
+fn chunks<'a, S: Source + ?Sized>(
+    all: &'a S,
     listed: &[u8],
     parts: &mut Vec<std::ops::Range<usize>>,
 ) -> Result<Vec<(&'a [u8], usize)>, CacheError> {
@@ -506,7 +529,11 @@ fn chunks<'a>(
         }
         let start = parts.last().map_or(0, |p| p.end.next_multiple_of(BLOCK));
         let end = start.checked_add(len).ok_or(CacheError::TooLarge)?;
-        chunks.push((all.get(start..end).ok_or(CacheError::Truncated("chunk"))?, raw));
+        if end > all.total() {
+            return Err(CacheError::Truncated("chunk"));
+        }
+        // A chunk a path's read did not take is held as no bytes, and never decompressed.
+        chunks.push((all.get(start..end).unwrap_or(&[]), raw));
         parts.push(start..end);
     }
     Ok(chunks)
@@ -517,7 +544,7 @@ fn chunks<'a>(
 /// by the lengths the archive states, before any of it is made. Of several broken rules,
 /// which is named is not promised.
 pub fn from_bytes(bytes: &[u8], limit: u64) -> Result<CacheFile, CacheError> {
-    let found = find(bytes)?;
+    let found = find(&bytes)?;
     let parts: Vec<_> = found
         .iter()
         .map(|g| Part {
@@ -746,11 +773,13 @@ pub struct ListedBytes {
     pub len: u64,
 }
 
-/// Lists an archive of at most `limit` bytes, as `list_from_bytes` does: a longer file is
-/// refused by its length before any of it is read, or by the bytes read where its length
-/// says less than it holds. The file is read whole; no chunk is decompressed.
+/// Lists the archive at `path` as `list_from_bytes` does, reading its header, its directory
+/// and every entry's metadata and chunk table, and no chunk, of at most `limit` bytes in
+/// all: more is refused by the lengths the archive states, before it is read (ADR-0016,
+/// ADR-0036). The padding of a chunk is not checked (docs/formats.md §8.7). A file that
+/// cannot be read at an offset, a pipe among them, is refused by the error reading it gives.
 pub fn list(path: &Path, limit: u64) -> Result<Listing, CacheError> {
-    list_from_bytes(&load(path, limit)?)
+    list_in(&Pieces::open(path, limit)?)
 }
 
 /// Checks an archive's structure and every entry's metadata as docs/formats.md §8.7
@@ -758,8 +787,13 @@ pub fn list(path: &Path, limit: u64) -> Result<Listing, CacheError> {
 /// chunks a whole read refuses may be listed. Of several broken rules, which is named is
 /// not promised.
 pub fn list_from_bytes(bytes: &[u8]) -> Result<Listing, CacheError> {
+    list_in(&bytes)
+}
+
+/// The listing of the archive `all` holds.
+fn list_in<S: Source + ?Sized>(all: &S) -> Result<Listing, CacheError> {
     let mut listing = Listing { grids: Vec::new(), bytes: Vec::new() };
-    for g in &find(bytes)? {
+    for g in &find(all)? {
         if g.kind == KIND_BYTES {
             let (name, len, extra) = decode_bytes_meta(g.meta)?;
             within_blocks(len, g.grid_blocks)?;
@@ -773,6 +807,139 @@ pub fn list_from_bytes(bytes: &[u8]) -> Result<Listing, CacheError> {
         listing.grids.push(ListedGrid { index, meta, bounds, value_type, encoding });
     }
     Ok(listing)
+}
+
+/// An archive's bytes as a reader holds them: the file whole, or the parts of it read.
+trait Source {
+    /// The file's length in bytes.
+    fn total(&self) -> usize;
+    /// The bytes of `r`, if they are held.
+    fn get(&self, r: Range<usize>) -> Option<&[u8]>;
+    /// Takes the bytes of `ranges` in, each within the file; held whole, a no-op.
+    fn fetch(&mut self, ranges: &[Range<usize>]) -> Result<(), CacheError>;
+}
+
+impl Source for &[u8] {
+    fn total(&self) -> usize {
+        self.len()
+    }
+    fn get(&self, r: Range<usize>) -> Option<&[u8]> {
+        <[u8]>::get(self, r)
+    }
+    fn fetch(&mut self, _: &[Range<usize>]) -> Result<(), CacheError> {
+        Ok(())
+    }
+}
+
+/// The parts of an archive file read so far, by where each starts, at most `limit` bytes
+/// in all (ADR-0016's amendment of 2026-11-16).
+struct Pieces {
+    file: File,
+    total: usize,
+    held: BTreeMap<usize, Vec<u8>>,
+    read: u64,
+    limit: u64,
+}
+
+impl Pieces {
+    /// The file at `path` with its header, its directory and every entry's metadata and
+    /// chunk table read: what checking its structure takes (docs/formats.md §8.6, rule 1).
+    fn open(path: &Path, limit: u64) -> Result<Self, CacheError> {
+        let file = File::open(path)?;
+        let total = usize::try_from(file.metadata()?.len()).map_err(|_| CacheError::TooLarge)?;
+        let mut p = Self { file, total, held: BTreeMap::new(), read: 0, limit };
+        p.fetch(std::slice::from_ref(&(0..total.min(BLOCK))))?;
+        let top = p.get(0..BLOCK).ok_or(CacheError::Truncated("header"))?;
+        let end = directory_end(header(&mut Cursor { rest: top, what: "header" })?)?;
+        if end > total {
+            return Err(CacheError::Truncated("directory"));
+        }
+        p.fetch(std::slice::from_ref(&(BLOCK..end)))?;
+        let listed = p.get(BLOCK..end).ok_or(CacheError::Truncated("directory"))?;
+        let spans = listed.chunks(BLOCK).filter_map(|e| span(e, total)).collect::<Vec<_>>();
+        p.fetch(&spans)?;
+        Ok(p)
+    }
+}
+
+/// From a directory entry `e`'s metadata to its chunk table's padded end, where that lies
+/// within a file of `total` bytes; an entry for which it does not is refused by `find`.
+fn span(e: &[u8], total: usize) -> Option<Range<usize>> {
+    let mut c = Cursor { rest: e, what: "directory" };
+    let [meta_at, _, table_at, count, _, value_type, encoding, kind] =
+        [(); 8].map(|()| c.u32().ok().and_then(|w| usize::try_from(w).ok()));
+    let components = match (kind?, u32::try_from(value_type?), u32::try_from(encoding?)) {
+        (k, Ok(v), Ok(code)) if k == KIND_GRID as usize => {
+            encoding_of(v, code).map_or(0, |(_, n)| n)
+        }
+        _ => 0,
+    };
+    let start = meta_at?.checked_mul(BLOCK)?;
+    let len = count?.checked_mul(ENTRY)?.checked_add(components.checked_mul(quantise::RANGE)?)?;
+    let end = table_at?.checked_mul(BLOCK)?.checked_add(len)?.checked_next_multiple_of(BLOCK)?;
+    (start <= end && end <= total).then_some(start..end)
+}
+
+impl Source for Pieces {
+    fn total(&self) -> usize {
+        self.total
+    }
+    fn get(&self, r: Range<usize>) -> Option<&[u8]> {
+        let (start, bytes) = self.held.range(..=r.start).next_back()?;
+        bytes.get(r.start.checked_sub(*start)?..r.end.checked_sub(*start)?)
+    }
+    /// Reads each range not yet held, one call each, in parallel; more than `limit` bytes
+    /// read in all is refused before any of them is read.
+    fn fetch(&mut self, ranges: &[Range<usize>]) -> Result<(), CacheError> {
+        let new: Vec<_> = ranges.iter().filter(|r| self.get((*r).clone()).is_none()).collect();
+        let more = new.iter().map(|r| u64::try_from(r.len()).unwrap_or(u64::MAX));
+        let length = more.fold(self.read, u64::saturating_add);
+        if length > self.limit {
+            return Err(CacheError::FileTooLarge { length, limit: self.limit });
+        }
+        let file = &self.file;
+        let got: Result<Vec<_>, std::io::Error> = new
+            .par_iter()
+            .map(|r| {
+                let mut bytes = vec![0; r.len()];
+                read_at(file, &mut bytes, u64::try_from(r.start).unwrap_or(u64::MAX))?;
+                Ok((r.start, bytes))
+            })
+            .collect();
+        self.held.extend(got?);
+        self.read = length;
+        Ok(())
+    }
+}
+
+/// Fills `buf` from `file` at byte `at`, without moving a cursor shared between threads.
+#[cfg(unix)]
+fn read_at(file: &File, buf: &mut [u8], at: u64) -> std::io::Result<()> {
+    std::os::unix::fs::FileExt::read_exact_at(file, buf, at)
+}
+
+/// Fills `buf` from `file` at byte `at`, without moving a cursor shared between threads.
+#[cfg(windows)]
+fn read_at(file: &File, buf: &mut [u8], at: u64) -> std::io::Result<()> {
+    let (mut done, mut at) = (0, at);
+    while let Some(rest) = buf.get_mut(done..).filter(|r| !r.is_empty()) {
+        let n = std::os::windows::fs::FileExt::seek_read(file, rest, at)?;
+        if n == 0 {
+            return Err(std::io::ErrorKind::UnexpectedEof.into());
+        }
+        done += n;
+        at += n as u64;
+    }
+    Ok(())
+}
+
+/// Fills `buf` from `file` at byte `at`, through a cursor of its own.
+#[cfg(not(any(unix, windows)))]
+fn read_at(file: &File, buf: &mut [u8], at: u64) -> std::io::Result<()> {
+    use std::io::{Read, Seek};
+    let mut f = file.try_clone()?;
+    f.seek(std::io::SeekFrom::Start(at))?;
+    f.read_exact(buf)
 }
 
 /// One grid's region of an archive, a box of voxels, read without the leaf chunks it does
@@ -797,17 +964,21 @@ pub struct Region {
     leaves: Vec<(u32, Coord)>,
 }
 
-/// Reads grid `index`'s region `extent` from an archive of at most `limit` bytes, holding at
-/// most `limit` bytes decompressed, both refused before they are read or made, as `read`
-/// refuses them (ADR-0036). The file is read whole; a chunk not decompressed is not checked
-/// (docs/formats.md §8.6).
+/// Reads grid `index`'s region `extent` from the archive at `path` as `region_from_bytes`
+/// reads it from bytes, reading only the header, the directory, every entry's metadata and
+/// chunk table and the chunks it decompresses, of at most `limit` bytes in all, and holding
+/// at most `limit` bytes decompressed: more of either is refused by the lengths the archive
+/// states, before it is read or made (ADR-0016, ADR-0036). The padding of a part it does
+/// not read is not checked, nor a chunk it does not decompress (docs/formats.md §8.6). A
+/// file that cannot be read at an offset, a pipe among them, is refused by the error
+/// reading it gives.
 pub fn read_region(
     path: &Path,
     index: usize,
     extent: Bounds,
     limit: u64,
 ) -> Result<Region, CacheError> {
-    region_from_bytes(&load(path, limit)?, index, extent, limit)
+    region_in(&mut Pieces::open(path, limit)?, index, extent, limit)
 }
 
 /// Checks an archive's bytes as docs/formats.md §8.6 states and reads grid `index`'s region
@@ -820,16 +991,39 @@ pub fn region_from_bytes(
     extent: Bounds,
     limit: u64,
 ) -> Result<Region, CacheError> {
-    let found = find(bytes)?;
+    let mut all = bytes;
+    region_in(&mut all, index, extent, limit)
+}
+
+/// Grid `index`'s region `extent` of the archive `src` holds, each chunk taken in before it
+/// is decompressed: the first, for the nodes, then the tile chunk, then the leaf chunks
+/// meeting the box; the structure is checked again over what each step took in.
+fn region_in<S: Source + ?Sized>(
+    src: &mut S,
+    index: usize,
+    extent: Bounds,
+    limit: u64,
+) -> Result<Region, CacheError> {
+    let first = chunk_at(&find(src)?, index, 0)?;
+    src.fetch(std::slice::from_ref(&first))?;
+    let found = find(src)?;
     let (place, g) = grid_number(&found, index)?;
     let (meta, bounds) = decode_meta(g.meta)?;
-    let chunk = |k: usize| g.chunks.get(k).copied().ok_or(CacheError::Chunks(index));
-    let (first, raw) = chunk(0)?;
+    let value_type = value_type_of(g.value_type, index)?;
+    let encoding = g.encoding();
+    let len = g.grid_blocks.checked_mul(BLOCK).ok_or(CacheError::TooLarge)?;
+    let (first, raw) = g.chunks.first().copied().ok_or(CacheError::Chunks(index))?;
     within(raw, limit)?;
     let head = decompress(&found, place, 0, first, raw, false)?;
     let pieces = pieces(index, g, head.as_bytes())?;
     let last = pieces.len().checked_sub(1).filter(|k| *k > 0);
-    let tail = match last.filter(|k| pieces.get(*k).is_some_and(|(_, leaf)| !leaf)) {
+    let last = last.filter(|k| pieces.get(*k).is_some_and(|(_, leaf)| !leaf));
+    let tail_at = last.map(|k| chunk_at(&found, index, k)).transpose()?;
+    src.fetch(tail_at.as_slice())?;
+    let found = find(src)?;
+    let (_, g) = grid_number(&found, index)?;
+    let chunk = |k: usize| g.chunks.get(k).copied().ok_or(CacheError::Chunks(index));
+    let tail = match last {
         Some(k) => {
             let (bytes, raw) = chunk(k)?;
             within(head.len().saturating_add(raw), limit)?;
@@ -837,26 +1031,43 @@ pub fn region_from_bytes(
         }
         None => Vec::new(),
     };
-    let len = g.grid_blocks.checked_mul(BLOCK).ok_or(CacheError::TooLarge)?;
     let refused = |error| CacheError::Grid { index, error };
-    let value_type = value_type_of(g.value_type, index)?;
     let leaves =
         meeting(value_type, head.as_bytes(), tail.as_bytes(), len, extent).map_err(refused)?;
     let mut wanted: Vec<usize> = leaves.iter().map(|(n, _)| *n as usize / CHUNK_LEAVES).collect();
     wanted.dedup();
-    let mut sizes = Vec::new();
+    let (mut sizes, mut ranges) = (Vec::new(), Vec::new());
     let mut held = head.len().saturating_add(tail.len());
     for k in wanted {
-        let (_, raw) = chunk(k.checked_add(1).ok_or(CacheError::TooLarge)?)?;
+        let c = k.checked_add(1).ok_or(CacheError::TooLarge)?;
+        let (_, raw) = chunk(c)?;
         held = held.saturating_add(raw);
         sizes.push((k, raw));
+        ranges.push(chunk_at(&found, index, c)?);
     }
     within(held, limit)?;
+    let chunks = leaf_chunks(src, (index, place), sizes, &ranges)?;
+    let values = (value_type, encoding);
+    Ok(Region { index, meta, bounds, values, extent, len, head, tail, chunks, leaves })
+}
+
+/// Leaf chunks `sizes`, each by its place among the leaf chunks with its length in blocks,
+/// of the grid numbered `index` at directory place `place`, taken in from `ranges` and
+/// decompressed in parallel, each into a buffer of its own.
+fn leaf_chunks<S: Source + ?Sized>(
+    src: &mut S,
+    (index, place): (usize, usize),
+    sizes: Vec<(usize, usize)>,
+    ranges: &[Range<usize>],
+) -> Result<Vec<(usize, Vec<Block>)>, CacheError> {
+    src.fetch(ranges)?;
+    let found = find(src)?;
+    let (_, g) = grid_number(&found, index)?;
     let mut chunks: Vec<_> =
         sizes.into_iter().map(|(k, raw)| (k, vec![Block::new_zeroed(); raw])).collect();
     let mut work = Vec::new();
     for (k, room) in &mut chunks {
-        let (bytes, _) = chunk(*k + 1)?;
+        let (bytes, _) = g.chunks.get(*k + 1).copied().ok_or(CacheError::Chunks(index))?;
         work.push(Work {
             grid: place,
             chunk: *k + 1,
@@ -866,8 +1077,13 @@ pub fn region_from_bytes(
         });
     }
     run(&found, work.iter_mut().collect())?;
-    let values = (value_type, g.encoding());
-    Ok(Region { index, meta, bounds, values, extent, len, head, tail, chunks, leaves })
+    Ok(chunks)
+}
+
+/// Where chunk `k` of grid `index` lies in the file, its padding included.
+fn chunk_at(found: &[Found<'_>], index: usize, k: usize) -> Result<Range<usize>, CacheError> {
+    let (_, g) = grid_number(found, index)?;
+    g.at.get(k).cloned().ok_or(CacheError::Chunks(index))
 }
 
 /// The entry at `place` in the directory numbered among the entries of its kind, as

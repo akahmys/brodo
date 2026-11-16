@@ -8,7 +8,10 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: B-027 answered by `spikes/chunkread/` (2026-11-16): a region and a listing of a
+- **Done**: P13's first item (2026-11-16): `archive::read_region` and `archive::list` read
+  at a path only the structure and the chunks they decompress, one call a chunk in
+  parallel, their limit bounding what is read (ADR-0016's amendment of 2026-11-16). Before
+  it, B-027 answered by `spikes/chunkread/` (2026-11-16): a region and a listing of a
   2.16 GB archive read from only the bytes they need, a leaf's region in 0.6 ms against
   337 ms; the owner chose seeking reads at a path that keep every entry's structure checks,
   chunks read in parallel, and `limit` bounding what is read (ADR-0016's amendment of
@@ -28,8 +31,7 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   colino and mestolo published by the owner, docs.rs building their reference, the new
   API used from a new crate depending on them by version, and `cargo install mestolo`
   installing the command (2026-11-12).
-- **Next**: P13's first item (§2), implemented as ADR-0016's amendment of 2026-11-16 says,
-  its API's shape put to the owner first.
+- **Next**: P13's next item (§2), issue 5, its API's shape put to the owner first.
 - **Unresolved**: none. `leaf_parallel_update_x32`'s drift between sessions is measured:
   other processes' work on the performance cores moves it either way, and the item and its
   baseline are kept (B-026, ADR-0019's amendment of 2026-11-12).
@@ -66,7 +68,7 @@ breaking a user. In this order; each change's API is put to the owner before it 
 written, its ADR amended where the design changes. Each issue's `owner-approved` label was
 last applied by `akahmys` (checked 2026-11-12).
 
-- [ ] A region of an archive read from only the bytes of the chunks it needs, the file not
+- [x] A region of an archive read from only the bytes of the chunks it needs, the file not
       read whole, and a listing and a grid by name the same way: B-027 answered by its
       spike and ADR-0016 amended before it is implemented (left to later by the human on
       2026-10-29, taken into P13 on 2026-11-12)

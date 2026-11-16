@@ -341,11 +341,15 @@ fastest, and an `Offset` is made from its number or its step as from what gives 
   checked as docs/formats.md §8.6 states; a chunk not decompressed is not checked. Its
   `RegionView` answers every voxel within the box and refuses one outside it, whatever
   the chunks held cover, so that what it answers does not follow from how the grid is cut
-  (ADR-0016).
+  (ADR-0016). Read at a path, it reads only the header, the directory, every entry's
+  metadata and chunk table, and the chunks it decompresses, one call each in parallel,
+  within the length the file reports, its limit bounding the bytes read; the padding of a
+  part it does not read is not checked.
 - An archive is listed without decompressing a chunk (`archive::list`): each grid's
   number, metadata, bounds, value type and encoding, and each entry of bytes' name, pairs
   and length, from its directory and metadata, checked as docs/formats.md §8.7 states; a
-  grid found there is read alone as the region of its bounds (ADR-0016).
+  grid found there is read alone as the region of its bounds (ADR-0016). Listed at a path,
+  it reads only the header, the directory and every entry's metadata and chunk table.
 - Grids are found by name in every file brodo reads, every grid of the name in the file's
   order, since names may repeat: in a file read (`CacheFile::grids_named`), in an
   archive's listing (`Listing::grids_named`), and in a `.vdb` read for one name

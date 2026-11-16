@@ -289,9 +289,10 @@ fn read_of_a_fifo<T>(name: &str, read_from: impl FnOnce(&std::path::Path) -> T) 
     read
 }
 
-/// An archive longer than the limit is refused by the bytes read, whatever length it
-/// reports, by `read` and `read_region` alike: a named pipe reports none, as `/dev/zero`
-/// does, and a file can grow after its length is read (ADR-0036).
+/// An archive longer than the limit is refused by `read` by the bytes read, whatever
+/// length it reports: a named pipe reports none, as `/dev/zero` does, and a file can grow
+/// after its length is read (ADR-0036). A region's read and a listing at a path read
+/// within the length the file reports, which for both holds no header (ADR-0016).
 #[cfg(unix)]
 #[test]
 fn an_archive_longer_than_the_limit_is_refused_whatever_length_it_reports() {
@@ -301,7 +302,7 @@ fn an_archive_longer_than_the_limit_is_refused_whatever_length_it_reports() {
     let region = read_of_a_fifo("archive_region_longer.fifo", |p| {
         read_region(p, 0, extent, 1024).map(|_| ())
     });
-    assert!(matches!(region, Err(CacheError::FileTooLarge { limit: 1024, .. })), "{region:?}");
+    assert!(matches!(region, Err(CacheError::Truncated("header"))), "{region:?}");
     let zero = std::path::Path::new("/dev/zero");
     let zero_whole = read(zero, 1024).map(|_| ());
     assert!(
@@ -309,10 +310,9 @@ fn an_archive_longer_than_the_limit_is_refused_whatever_length_it_reports() {
         "{zero_whole:?}"
     );
     let zero_region = read_region(zero, 0, extent, 1024).map(|_| ());
-    assert!(
-        matches!(zero_region, Err(CacheError::FileTooLarge { length: 1025, limit: 1024 })),
-        "{zero_region:?}"
-    );
+    assert!(matches!(zero_region, Err(CacheError::Truncated("header"))), "{zero_region:?}");
+    let zero_list = list(zero, 1024).map(|_| ());
+    assert!(matches!(zero_list, Err(CacheError::Truncated("header"))), "{zero_list:?}");
 }
 
 #[test]
@@ -937,10 +937,122 @@ fn a_listing_gives_what_a_whole_read_gives_without_decompressing() {
     assert_eq!(listed.grids().len(), 2);
     let path = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("listed.brda");
     std::fs::write(&path, &broken).unwrap();
-    lists(&list(&path, g.len() as u64).unwrap(), &from_bytes(&g, u64::MAX).unwrap());
+    // At a path it reads the header, the directory and each entry's metadata and table.
+    let structure = structure_len(&g);
+    assert!(structure < g.len() as u64);
+    lists(&list(&path, structure).unwrap(), &from_bytes(&g, u64::MAX).unwrap());
     assert!(matches!(
-        list(&path, g.len() as u64 - 1),
-        Err(CacheError::FileTooLarge { length, .. }) if length == g.len() as u64
+        list(&path, structure - 1),
+        Err(CacheError::FileTooLarge { length, .. }) if length == structure
+    ));
+}
+
+/// The bytes a read at a path takes before any chunk: the header, the directory, and each
+/// entry's metadata and chunk table with their padding (docs/formats.md §8.6), for an
+/// archive of exact grids and entries of bytes.
+fn structure_len(bytes: &[u8]) -> u64 {
+    let count = word(bytes, 2) as usize;
+    let tables: usize = (1..=count)
+        .map(|e| {
+            let dir = 8 * e;
+            let table = word(bytes, dir + 2) as usize * 32 + 8 * word(bytes, dir + 3) as usize;
+            table.next_multiple_of(32) - word(bytes, dir) as usize * 32
+        })
+        .sum();
+    (32 + 32 * count + tables) as u64
+}
+
+/// `row(1300)`'s archive, written at a path of its own under `name`.
+fn seek_archive(name: &str) -> (Vec<u8>, std::path::PathBuf) {
+    let bytes = to_bytes(&row(1300)).unwrap();
+    let path = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join(name);
+    std::fs::write(&path, &bytes).unwrap();
+    (bytes, path)
+}
+
+/// Two regions alike: metadata, leaves, and each leaf's values bit for bit.
+fn same_region<T: brodo::field::Stored + Copy>(
+    a: &brodo::archive::Region,
+    b: &brodo::archive::Region,
+    bits: fn(T) -> Vec<u64>,
+) {
+    assert_eq!(a.meta(), b.meta());
+    let (a, b) = (a.view::<T>().unwrap(), b.view::<T>().unwrap());
+    assert_eq!(a.leaves().collect::<Vec<_>>(), b.leaves().collect::<Vec<_>>());
+    for (n, _) in b.leaves() {
+        let of = |l: &[T; 512]| l.iter().flat_map(|v| bits(*v)).collect::<Vec<_>>();
+        assert_eq!(of(a.leaf(n).unwrap()), of(b.leaf(n).unwrap()));
+    }
+}
+
+/// A region read at a path answers as a read of its bytes does, reading only the structure
+/// and the chunks it decompresses, each with its padding: the limit bounds those, not the
+/// file (docs/formats.md §8.6, ADR-0016).
+#[test]
+fn a_region_read_at_a_path_takes_only_what_it_needs() {
+    let (bytes, path) = seek_archive("archive_seek.brda");
+    let near = Bounds::Box { min: [0; 3], max: [7; 3] };
+    let far = Bounds::Box { min: [8 * 1299, 0, 32], max: [8 * 1299, 0, 32] };
+    for extent in [near, far, Bounds::Box { min: [0; 3], max: [8 * 1300, 8, 40] }] {
+        let read = |grid| read_region(&path, grid, extent, u64::MAX).unwrap();
+        let of_bytes = |grid| region_from_bytes(&bytes, grid, extent, u64::MAX).unwrap();
+        same_region::<f32>(&read(0), &of_bytes(0), |v| vec![u64::from(v.to_bits())]);
+        same_region::<[f64; 3]>(&read(1), &of_bytes(1), |v| v.map(f64::to_bits).to_vec());
+    }
+    // Grid 0, directory entry at word 8: the nodes, three chunks of leaves, the tiles; the
+    // near box needs the nodes, the first leaf chunk and the tiles.
+    assert_eq!(word(&bytes, 11), 5);
+    let padded = |k: usize| {
+        let r = chunk_at(&bytes, 8, k);
+        (r.end.next_multiple_of(32) - r.start) as u64
+    };
+    let read_len = structure_len(&bytes) + padded(0) + padded(1) + padded(4);
+    let table = word(&bytes, 10) as usize * 8;
+    let raw = |k: usize| u64::from(word(&bytes, table + 2 * k)) * 32;
+    let limit = read_len.max(raw(0) + raw(1) + raw(4));
+    assert!(limit < bytes.len() as u64);
+    assert!(read_region(&path, 0, near, limit).is_ok());
+    assert!(matches!(
+        read_region(&path, 0, near, limit - 1),
+        Err(CacheError::FileTooLarge { length, .. }) if length == limit
+    ));
+}
+
+/// A region read at a path checks the padding it reads, every entry's metadata and table
+/// and its own chunks', and not the padding of a chunk it does not read, which a read of
+/// the bytes refuses (docs/formats.md §8.6, ADR-0016).
+#[test]
+fn a_region_read_at_a_path_checks_the_padding_it_reads() {
+    let (bytes, path) = seek_archive("archive_seek_padding.brda");
+    let near = Bounds::Box { min: [0; 3], max: [7; 3] };
+    // After grid 0's leaf chunk 3, which the near box does not need, and its chunk 1,
+    // which it does; after grid 1's chunk table, which every read at a path takes.
+    let table1 = word(&bytes, 18) as usize * 32 + word(&bytes, 19) as usize * 8;
+    for (at, answered) in
+        [(chunk_at(&bytes, 8, 3).end, true), (chunk_at(&bytes, 8, 1).end, false), (table1, false)]
+    {
+        assert!(!at.is_multiple_of(32), "padding at {at}");
+        let mut damaged = bytes.clone();
+        damaged[at] = 1;
+        assert!(matches!(
+            region_from_bytes(&damaged, 0, near, u64::MAX),
+            Err(CacheError::Inconsistent("padding"))
+        ));
+        std::fs::write(&path, &damaged).unwrap();
+        let at_path = read_region(&path, 0, near, u64::MAX);
+        if answered {
+            assert!(at_path.is_ok(), "{at}: {at_path:?}");
+        } else {
+            assert!(
+                matches!(at_path, Err(CacheError::Inconsistent("padding"))),
+                "{at}: {at_path:?}"
+            );
+        }
+    }
+    std::fs::write(&path, &bytes[..bytes.len() - 32]).unwrap();
+    assert!(matches!(
+        read_region(&path, 0, near, u64::MAX),
+        Err(CacheError::Truncated(_) | CacheError::Inconsistent(_))
     ));
 }
 

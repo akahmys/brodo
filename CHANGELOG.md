@@ -6,6 +6,15 @@ are recorded here when they change (V6).
 
 ## Unreleased
 
+- `archive::read_region` and `archive::list`, with the `archive` feature, read from the
+  file only its header, directory, every entry's metadata and chunk table, and the chunks
+  they decompress, not the file whole: a leaf's region of a 2.16 GB archive in 0.6 ms
+  against 337 ms (`spikes/chunkread/`, 2026-11-16). Their `limit` bounds the bytes read
+  rather than the file's length, and the padding of a part they do not read is not
+  checked, so a file they refused before may be answered; a file that reports a length it
+  does not hold, as a pipe does, is refused as truncated rather than by its limit
+  (docs/formats.md §8.6 and §8.7, ADR-0016).
+
 ## 1.3.0 (2026-11-12)
 
 Closes P12: grids picked by name and archives listed without decompressing, fields moved
