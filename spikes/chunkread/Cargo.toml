@@ -1,0 +1,19 @@
+# Throwaway spike for B-027 (ROADMAP.md §3): what an archive's reader saves by reading only
+# the bytes of the chunks a region, a listing or a grid by name needs. Never imported by
+# `crates/` (PLANNING.md §3); its own workspace.
+[package]
+name = "chunkread-spike"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+brodo = { path = "../../crates/brodo", default-features = false, features = ["archive"] }
+rayon = "=1.12.0"
+lz4_flex = { version = "=0.14.0", default-features = false, features = ["std", "safe-encode", "safe-decode", "checked-decode"] }
+
+[profile.release]
+debug = false
+
+[workspace]
+members = ["."]
