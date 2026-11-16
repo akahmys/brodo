@@ -8,7 +8,11 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: issues 16 and 17 (2026-11-16): three provenance rows and a test's header
+- **Done**: B-027 answered by `spikes/chunkread/` (2026-11-16): a region and a listing of a
+  2.16 GB archive read from only the bytes they need, a leaf's region in 0.6 ms against
+  337 ms; the owner chose seeking reads at a path that keep every entry's structure checks,
+  chunks read in parallel, and `limit` bounding what is read (ADR-0016's amendment of
+  2026-11-16). Before it, issues 16 and 17 (2026-11-16): three provenance rows and a test's header
   brought up to the code, and three texts up to the checks they describe (ADR-0003's
   amendment); both left open for the owner to close. Before them, P12's retrospective
   (2026-11-12): the retrospective made a rule every milestone
@@ -24,7 +28,8 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   colino and mestolo published by the owner, docs.rs building their reference, the new
   API used from a new crate depending on them by version, and `cargo install mestolo`
   installing the command (2026-11-12).
-- **Next**: P13 (§2), set by the owner on 2026-11-12, its first step B-027's spike.
+- **Next**: P13's first item (§2), implemented as ADR-0016's amendment of 2026-11-16 says,
+  its API's shape put to the owner first.
 - **Unresolved**: none. `leaf_parallel_update_x32`'s drift between sessions is measured:
   other processes' work on the performance cores moves it either way, and the item and its
   baseline are kept (B-026, ADR-0019's amendment of 2026-11-12).
@@ -95,9 +100,7 @@ Not built for now (owner, 2026-10-24; ADR-0018; §3, B-021). If it is, then:
 Each question is answered by a spike's measurement and an ADR, never in passing by an
 implementation (PLANNING.md §2).
 
-| # | Question | Proposal so far |
-| :--- | :--- | :--- |
-| B-027 | How does an archive's reader take only the bytes of the chunks a region, a listing or a grid by name needs, and what does it save against reading the file whole (ADR-0016)? | A spike, P13's first step (owner, 2026-11-12): the bytes read and the time taken on a large archive, from a path read by seeking against the whole file read |
+None is open.
 
 Questions decided "not now", each revisited only when what it names happens:
 
@@ -118,6 +121,8 @@ Questions answered, each by its spike and ADR:
 - `spikes/quantise/`: value quantisation in the archive (ADR-0016's amendment on quantised
   values)
 - `spikes/region/`: reading a region of an archive (ADR-0016's amendment on a region)
+- `spikes/chunkread/`: B-027, a region and a listing read from only the bytes they need
+  (ADR-0016's amendment of 2026-11-16)
 - `spikes/vtk/`: B-012 (ADR-0018)
 - `spikes/bench/`: B-007 (ADR-0019)
 - `spikes/parvar/`: B-024, a benchmark on the performance cores (ADR-0019)

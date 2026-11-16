@@ -95,4 +95,40 @@ version 2 of the layout and of both profiles replaced version 1's (ADR-0052, ADR
 ## Consequences
 
 The layout and formats are versioned apart from the API (TESTING.md V6). A region's read
-costs a whole file's read until the chunks' bytes are read alone.
+and a listing cost the bytes they need, not the file's (the amendment below).
+
+## Amendment: a region and a listing read only the bytes they need
+
+- **Date**: 2026-11-16
+
+`spikes/chunkread/` (B-027, 2026-11-16, `spikes/chunkread/REPORT.md`) read a 2.16 GB
+archive's region, listing and grid by name from only the bytes each needs, written from
+docs/formats.md §8, its pages dropped from the page cache before each cold run. A leaf's
+region took 0.6 ms against 337 ms for the file read whole, a box of 64 leaf chunks 10 to
+13 ms, a listing under 0.5 ms against 338 ms, and one grid of four 81 to 96 ms against
+411 ms; the time followed the bytes read, plus about 0.2 ms a cold call. Reading every
+other entry's metadata and chunk table added 12 888 bytes and 0.03 ms. Many neighbouring
+chunks read one call each, in parallel, took 10.4 ms against 13.5 ms read as one call and
+23.4 ms one after another.
+
+The owner decided, on 2026-11-16, as proposed:
+
+- **What seeks**: `archive::read_region` and `archive::list`, which take a path, read the
+  header, the directory, every entry's metadata and chunk table, and the chunks they
+  decompress, not the file whole; a grid found by name is read through them. The
+  functions that take bytes, and `archive::read`, which checks the whole file, are
+  unchanged. No item is added to the API.
+- **What is checked**: every entry's structure, as before (docs/formats.md §8.6 and §8.7,
+  rule 1): each part's place, the chunk lengths summing to the payload, the file's length
+  a multiple of 32 and its last part ending where the file ends. The padding of zeros
+  between parts is checked only within what is read, since checking the rest needs the
+  file whole; a file refused for padding it does not read is now answered, which breaks
+  no user.
+- **How chunks are read**: one call a chunk, the calls in parallel, each chunk then
+  decompressed into a buffer of its own, the fastest measured; reading runs of neighbouring
+  chunks as one call was set aside, slower by a third on 64 chunks.
+- **What `limit` bounds**: the bytes read and held, not the file's length, so that a
+  small region of a large file needs a small limit.
+- **A file changed while read**: nothing is added. brodo replaces a file whole by renaming
+  (ARCHITECTURE.md §4.7), so an open file stays the one read; each part read is checked.
+
