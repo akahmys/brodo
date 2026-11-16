@@ -207,7 +207,8 @@ fastest, and an `Offset` is made from its number or its step as from what gives 
   26-connectivity, of the voxels whose value meets a condition (`Fn(T) -> bool`), applied
   alike to leaf voxels, tiles and the background; no per-voxel mask is needed. Flood fill
   is the component of a seed, built on the labelling. Each component says whether it
-  reaches the unbounded background outside the tree.
+  reaches the unbounded background outside the tree, and the outside's label is named.
+  Labels are read a voxel, a leaf's 512 or a tile at a time.
 - The units joined are leaf voxels, tiles, the empty places of lower and upper nodes and
   of the root (each a region of its own size), and the outside. Empty regions at the root
   are runs within the root's keys' bounding box, grown by one region: of keyless z, of

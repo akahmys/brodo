@@ -6,8 +6,9 @@
 use std::collections::VecDeque;
 
 use brodo::analysis::{Connectivity, Label, label};
+use brodo::error::{AnalysisError, FieldError};
 use brodo::field::Field;
-use brodo::topology::Topology;
+use brodo::topology::{LeafNumber, TileNumber, Topology};
 use brodo::tree::{Coord, TileLevel};
 use proptest::prelude::*;
 
@@ -131,7 +132,53 @@ proptest! {
                 (d, s) => prop_assert!(false, "{:?} against {:?} at {:?}", d, s, voxel(i)),
             }
         }
+        // Read a leaf, a tile and the outside at a time, the labels are those of label_at.
+        for n in t.leaf_numbers() {
+            let leaf = labels.leaf(&t, n).unwrap();
+            for (got, v) in leaf.iter().zip(t.leaf_voxels(n).unwrap()) {
+                prop_assert_eq!(*got, labels.label_at(&t, v).unwrap(), "leaf at {:?}", v);
+            }
+        }
+        for n in t.tile_numbers() {
+            let (_, o) = t.tile(n).unwrap();
+            prop_assert_eq!(labels.tile(&t, n).unwrap(), labels.label_at(&t, o).unwrap());
+        }
+        let far = labels.label_at(&t, [1 << 20, 0, 0]).unwrap();
+        prop_assert_eq!(labels.outside(), far);
+        prop_assert_eq!(far, if background { Label::Component(0) } else { Label::Excluded });
     }
+}
+
+/// A leaf's and a tile's labels are refused for another topology and for a number no leaf
+/// or tile of the topology has.
+#[test]
+fn a_leaf_or_tile_of_another_topology_or_none_is_refused() {
+    let empty = Topology::new();
+    let mut e = empty.edit();
+    // More tiles than a leaf has voxels, so that the units after the leaf's are a tile's.
+    e.activate([0, 0, 0]).unwrap();
+    for i in 1..=600 {
+        let _occupied = e.add_tile(TileLevel::Lower, [8 * i, 8, 0]);
+    }
+    let (t, _) = e.commit().unwrap();
+    assert_eq!(t.tile_count(), 600);
+    let f = Field::new(&t, 1.0_f32);
+    let labels = label(&t, &f, |v: f32| v > 0.0, Connectivity::Six).unwrap();
+    let leaf = t.leaf_numbers().next().unwrap();
+    let tile = t.tile_numbers().next().unwrap();
+    assert_eq!(labels.leaf(&t, leaf).unwrap(), [Label::Component(0); 512]);
+    assert_eq!(labels.tile(&t, tile).unwrap(), Label::Component(0));
+    assert!(matches!(
+        labels.leaf(&t, LeafNumber::new(1)),
+        Err(AnalysisError::Field(FieldError::UnknownLeaf(1)))
+    ));
+    assert!(matches!(
+        labels.tile(&t, TileNumber::new(600)),
+        Err(AnalysisError::Field(FieldError::UnknownTile(600)))
+    ));
+    let (other, _) = t.edit().commit().unwrap();
+    assert!(matches!(labels.leaf(&other, leaf), Err(AnalysisError::Field(FieldError::StaleField))));
+    assert!(matches!(labels.tile(&other, tile), Err(AnalysisError::Field(FieldError::StaleField))));
 }
 
 /// A leaf's region of the background enclosed by 26 leaves none of whose voxels meets the

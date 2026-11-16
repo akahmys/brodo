@@ -13,7 +13,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::error::{AnalysisError, FieldError};
 use crate::field::{Field, Value, leaf_place};
-use crate::topology::{Location, Topology};
+use crate::topology::{LeafNumber, Location, TileNumber, Topology};
 use crate::tree::{Coord, Place, TileLevel, align, child_place};
 use crate::tree::{LEAF_LOG2, LOWER_SPAN_LOG2, UPPER_SPAN_LOG2};
 
@@ -716,13 +716,52 @@ impl Labels {
         }
     }
 
+    /// Refuses a topology other than the one labelled.
+    fn check(&self, t: &Topology) -> Result<(), AnalysisError> {
+        if t.stamp() == self.stamp { Ok(()) } else { Err(FieldError::StaleField.into()) }
+    }
+
     /// The label of a voxel; `t` must be the topology labelled.
     pub fn label_at(&self, t: &Topology, v: Coord) -> Result<Label, AnalysisError> {
-        if t.stamp() != self.stamp {
-            return Err(AnalysisError::Field(FieldError::StaleField));
-        }
+        self.check(t)?;
         let u = self.unit_at(t, v).ok_or(AnalysisError::Unlabelled(v))?;
         self.labels.get(u as usize).map(|x| decode(*x)).ok_or(AnalysisError::Unlabelled(v))
+    }
+
+    /// A leaf's 512 labels, x fastest, in the order of [`Field::leaf`]'s values; `t` must
+    /// be the topology labelled.
+    ///
+    /// Refused as `Field(StaleField)` for another topology and as `Field(UnknownLeaf)` for
+    /// a number no leaf of it has.
+    pub fn leaf(&self, t: &Topology, n: LeafNumber) -> Result<[Label; 512], AnalysisError> {
+        self.check(t)?;
+        let unknown = || AnalysisError::from(FieldError::UnknownLeaf(n.get()));
+        if n.get() as usize >= t.leaf_count() {
+            return Err(unknown());
+        }
+        let s = self.voxel_base as usize + n.get() as usize * 512;
+        let stored = self.labels.get(s..s + 512).ok_or_else(unknown)?;
+        Ok(std::array::from_fn(|i| decode(stored[i])))
+    }
+
+    /// A tile's label, every voxel of the tile's; `t` must be the topology labelled.
+    ///
+    /// Refused as `Field(StaleField)` for another topology and as `Field(UnknownTile)` for
+    /// a number no tile of it has.
+    pub fn tile(&self, t: &Topology, n: TileNumber) -> Result<Label, AnalysisError> {
+        self.check(t)?;
+        let unknown = || AnalysisError::from(FieldError::UnknownTile(n.get()));
+        if n.get() as usize >= t.tile_count() {
+            return Err(unknown());
+        }
+        let u = self.tile_base as usize + n.get() as usize;
+        self.labels.get(u).map(|x| decode(*x)).ok_or_else(unknown)
+    }
+
+    /// The label of the unbounded background outside the tree: `Component(0)` when the
+    /// background meets the condition, else `Excluded`.
+    pub fn outside(&self) -> Label {
+        self.labels.get(self.outside as usize).map_or(Label::Excluded, |x| decode(*x))
     }
 
     /// Whether a component reaches the unbounded background outside the tree.

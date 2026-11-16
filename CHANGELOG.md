@@ -14,6 +14,9 @@ are recorded here when they change (V6).
   checked, so a file they refused before may be answered; a file that reports a length it
   does not hold, as a pipe does, is refused as truncated rather than by its limit
   (docs/formats.md §8.6 and §8.7, ADR-0016).
+- `Labels::leaf`, `Labels::tile` and `Labels::outside`: a leaf's 512 labels in the order
+  of `Field::leaf`'s values, a tile's label, and the label of the outside, so that a
+  sweep of every label need not look each voxel up (ARCHITECTURE.md §4.5; issue 5).
 
 ## 1.3.0 (2026-11-12)
 
