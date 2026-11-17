@@ -30,6 +30,11 @@ are recorded here when they change (V6).
   exact; `--encoding` without `--as archive` is refused as the new
   `MestoloError::EncodingNotArchive`, exiting with status 2, and `args::Output` gains
   `encoding` (ARCHITECTURE.md §6.3; issue 12).
+- mestolo's `slice --component x|y|z|magnitude`, `--range MIN,MAX` and `--region
+  U0,V0,U1,V1`: a component of a vector grid drawn, the sequential map's range fixed, and
+  a part of the plane drawn. A component of a scalar grid is refused as the new
+  `MestoloError::ComponentOfScalar`, and `args::Output` gains `drawing`, of the new
+  `args::Drawing` and `args::Component` (ARCHITECTURE.md §6.3, ADR-0050; issue 11).
 
 ## 1.3.0 (2026-11-12)
 

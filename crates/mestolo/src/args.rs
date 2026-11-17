@@ -45,13 +45,67 @@ pub struct Output {
     /// value type, given by `--encoding`; a grid of another type, and an entry of bytes, is
     /// stored exact whatever it is. `Exact` where `--encoding` is not given.
     pub encoding: Encoding,
+    /// What `slice` draws into the image beyond its plane, given by `--component`, `--range`
+    /// and `--region`. It is held here, not in `Command::Slice`, because a field added to
+    /// that variant would break a user who names its fields; the next MAJOR moves it
+    /// (ROADMAP.md §4).
+    pub drawing: Drawing,
+}
+
+/// What `slice` draws: a component of a vector grid, a range of the sequential colour map,
+/// and a region of the plane; each, where not given, as `slice` draws without it.
+#[derive(Debug, Clone, Copy, Default)]
+#[non_exhaustive]
+pub struct Drawing {
+    /// The component of a vector grid drawn, by `--component`; a scalar grid takes none.
+    pub component: Option<Component>,
+    /// The values drawn darkest and lightest by the sequential map, whatever the grid, a
+    /// level set's included, by `--range`: finite, the first below the second.
+    pub range: Option<[f64; 2]>,
+    /// The least and greatest of the plane's two other coordinates drawn, u and v as
+    /// `brodo::slice::Slice` names them, inclusive, by `--region`; with none, the grid's
+    /// bounds.
+    pub region: Option<[[i32; 2]; 2]>,
+}
+
+/// Equal where each part is, a range's values compared bit for bit, so that equality is
+/// an equivalence.
+impl PartialEq for Drawing {
+    fn eq(&self, other: &Self) -> bool {
+        let bits = |r: Option<[f64; 2]>| r.map(|r| r.map(f64::to_bits));
+        self.component == other.component
+            && bits(self.range) == bits(other.range)
+            && self.region == other.region
+    }
+}
+
+impl Eq for Drawing {}
+
+/// The component of a vector grid `slice` draws.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum Component {
+    /// The first.
+    X,
+    /// The second.
+    Y,
+    /// The third.
+    Z,
+    /// The vector's length.
+    Magnitude,
 }
 
 impl Output {
     /// The file at `path`, one already there replaced if `force`, no grid left out, an
-    /// archive's values stored exact.
+    /// archive's values stored exact, a slice drawn as with no option.
     pub fn new(path: PathBuf, force: bool) -> Self {
-        Self { path, force, skip_unsupported: false, encoding: Encoding::Exact }
+        Self {
+            path,
+            force,
+            skip_unsupported: false,
+            encoding: Encoding::Exact,
+            drawing: Drawing::default(),
+        }
     }
 }
 
@@ -122,7 +176,7 @@ pub(crate) struct Opt {
 }
 
 /// Every option, the one list `parse` takes them from and the usage is tested against.
-pub(crate) const OPTIONS: [Opt; 9] = [
+pub(crate) const OPTIONS: [Opt; 12] = [
     Opt { name: "--limit", example: Some("1"), commands: &["info", "slice", "convert"] },
     Opt { name: "--grid", example: Some("g"), commands: &["slice", "convert"] },
     Opt { name: "--axis", example: Some("x"), commands: &["slice"] },
@@ -132,6 +186,9 @@ pub(crate) const OPTIONS: [Opt; 9] = [
     Opt { name: "--as", example: Some("archive"), commands: &["convert"] },
     Opt { name: "--skip-unsupported", example: None, commands: &["convert"] },
     Opt { name: "--encoding", example: Some("8bit"), commands: &["convert"] },
+    Opt { name: "--component", example: Some("magnitude"), commands: &["slice"] },
+    Opt { name: "--range", example: Some("-1,2.5"), commands: &["slice"] },
+    Opt { name: "--region", example: Some("-8,0,7,7"), commands: &["slice"] },
 ];
 
 /// The options given, each at most once.
@@ -147,6 +204,9 @@ struct Given {
     limit: Option<u64>,
     format: Option<Format>,
     encoding: Option<Encoding>,
+    component: Option<Component>,
+    range: Option<[f64; 2]>,
+    region: Option<[[i32; 2]; 2]>,
 }
 
 /// The command the arguments after the program's name give; none is refused, as
@@ -184,7 +244,9 @@ fn command(name: &str, given: Given) -> Result<Command, MestoloError> {
     }
     let (skip_unsupported, force) = (given.skip_unsupported, given.force);
     let encoding = given.encoding.unwrap_or_default();
-    let output = given.output.map(|path| Output { path, force, skip_unsupported, encoding });
+    let drawing = Drawing { component: given.component, range: given.range, region: given.region };
+    let output =
+        given.output.map(|path| Output { path, force, skip_unsupported, encoding, drawing });
     if name == "info" {
         return Ok(Command::Info(input));
     }
@@ -256,6 +318,9 @@ fn set(given: &mut Given, name: &'static str, value: Option<OsString>) -> Result
         "--as" => once(&mut given.format, format(&text(v, name)?)?, twice),
         "--encoding" => once(&mut given.encoding, encoding(&text(v, name)?)?, twice),
         "--limit" => once(&mut given.limit, number(v, name)?, twice),
+        "--component" => once(&mut given.component, component(&text(v, name)?)?, twice),
+        "--range" => once(&mut given.range, range(&text(v, name)?)?, twice),
+        "--region" => once(&mut given.region, region(&text(v, name)?)?, twice),
         _ => Err(MestoloError::UnknownOption(name.to_owned())),
     }
 }
@@ -300,6 +365,38 @@ fn encoding(s: &str) -> Result<Encoding, MestoloError> {
     }
 }
 
+fn component(s: &str) -> Result<Component, MestoloError> {
+    match s {
+        "x" => Ok(Component::X),
+        "y" => Ok(Component::Y),
+        "z" => Ok(Component::Z),
+        "magnitude" => Ok(Component::Magnitude),
+        _ => Err(MestoloError::BadValue { option: "--component", value: s.to_owned() }),
+    }
+}
+
+/// `N` numbers separated by commas, none else.
+fn numbers<T: std::str::FromStr, const N: usize>(s: &str) -> Option<[T; N]> {
+    let parts: Vec<T> = s.split(',').map(str::parse).collect::<Result<_, _>>().ok()?;
+    parts.try_into().ok()
+}
+
+/// `MIN,MAX`: finite, the first below the second.
+fn range(s: &str) -> Result<[f64; 2], MestoloError> {
+    match numbers::<f64, 2>(s) {
+        Some([lo, hi]) if lo.is_finite() && hi.is_finite() && lo < hi => Ok([lo, hi]),
+        _ => Err(MestoloError::BadValue { option: "--range", value: s.to_owned() }),
+    }
+}
+
+/// `U0,V0,U1,V1`: the first corner no greater than the second in either coordinate.
+fn region(s: &str) -> Result<[[i32; 2]; 2], MestoloError> {
+    match numbers::<i32, 4>(s) {
+        Some([u0, v0, u1, v1]) if u0 <= u1 && v0 <= v1 => Ok([[u0, v0], [u1, v1]]),
+        _ => Err(MestoloError::BadValue { option: "--region", value: s.to_owned() }),
+    }
+}
+
 fn axis(s: &str) -> Result<Axis, MestoloError> {
     match s {
         "x" => Ok(Axis::X),
@@ -312,6 +409,25 @@ fn axis(s: &str) -> Result<Axis, MestoloError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Two drawings are equal where each part is, a range's values bit for bit.
+    #[test]
+    fn a_drawing_equals_one_of_the_same_parts() {
+        let d = Drawing {
+            component: Some(Component::Z),
+            range: Some([0.0, 1.0]),
+            region: Some([[0, 0], [1, 1]]),
+        };
+        assert_eq!(d, d);
+        for other in [
+            Drawing { component: Some(Component::X), ..d },
+            Drawing { range: Some([-0.0, 1.0]), ..d },
+            Drawing { range: None, ..d },
+            Drawing { region: Some([[0, 0], [1, 2]]), ..d },
+        ] {
+            assert_ne!(d, other);
+        }
+    }
 
     /// Each option of `OPTIONS` is taken by the commands it names, its value read, and
     /// refused given twice; by another command it is refused as not an option. An option a

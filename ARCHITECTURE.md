@@ -589,7 +589,13 @@ Rust. It uses no GPU and no window.
   beyond the bounds along its axis, one at either end drawn. A level set,
   by brodo's `brodo.sdf.version` or OpenVDB's `class` of `level set`, takes the diverging map
   saturated at its background's magnitude; another grid the sequential map from its least
-  value to its greatest.
+  value to its greatest. `--component x|y|z|magnitude` draws a component of a vector
+  grid, or its length found without overflow, as a grid of those values of `f64`, leaves,
+  tiles and background, takes the sequential map; a vector grid without it, and a scalar
+  grid with it, are refused. `--range MIN,MAX`, finite and the first below the second,
+  draws the sequential map over that range, a level set's included. `--region
+  U0,V0,U1,V1` draws those of the plane's two other coordinates, inclusive, in place of the
+  bounds, beyond them as background, the image's size refused as above.
 - **`convert`** writes, in the format `--as` names or else by the output's name, `.vdb`
   or `.vtu`: every grid or the one `--grid` names as `.vdb` (§4.7), refused naming every
   grid of a type it does not hold, `u8` and `u32`, with its value type, or, by `--skip-unsupported`, every

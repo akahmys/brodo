@@ -756,3 +756,144 @@ fn an_encoding_is_refused_where_it_cannot_be_kept() {
     assert_eq!(usage.status.code(), Some(2));
     assert!(String::from_utf8_lossy(&usage.stderr).contains("--encoding is taken only with"));
 }
+
+/// A topology of a leaf at the origin and a tile of a leaf's size beside it, in x.
+fn leaf_and_tile() -> Topology {
+    let empty = Topology::new();
+    let mut e = empty.edit();
+    e.activate([0, 0, 0]).unwrap();
+    e.add_tile(TileLevel::Lower, [8, 0, 0]).unwrap();
+    e.commit().unwrap().0
+}
+
+/// Each component of a vector grid, of `[f32; 3]` and of `[f64; 3]`, leaves, tile and
+/// background, is drawn as a scalar grid of its values is; the vectors are multiples of
+/// (3, 4, 12), whose magnitude, 13 times, is exact.
+#[test]
+fn a_component_of_a_vector_grid_is_drawn_as_a_grid_of_its_values() {
+    let t = leaf_and_tile();
+    let a = |i: usize| u8::try_from(i % 8 + i / 8 % 8).unwrap();
+    let (tile, background) = (20_u8, 30_u8);
+    let n = t.tile_numbers().next().unwrap();
+    let meta = |name: &str| GridMeta::new(name, [1.0; 3], "m").unwrap();
+    let k = [3_u8, 4, 12];
+    let mut v32 = filled(&t, k.map(|k| f32::from(k) * f32::from(background)), |i| {
+        k.map(|k| f32::from(k) * f32::from(a(i)))
+    });
+    v32.set_tile(&t, n, k.map(|k| f32::from(k) * f32::from(tile))).unwrap();
+    let mut v64 = filled(&t, k.map(|k| f64::from(k) * f64::from(background)), |i| {
+        k.map(|k| f64::from(k) * f64::from(a(i)))
+    });
+    v64.set_tile(&t, n, k.map(|k| f64::from(k) * f64::from(tile))).unwrap();
+    let mut entries = vec![
+        CacheEntry::new(&meta("v32"), &t, &v32).unwrap(),
+        CacheEntry::new(&meta("v64"), &t, &v64).unwrap(),
+    ];
+    for (name, k) in [("x", 3.0), ("y", 4.0), ("z", 12.0), ("magnitude", 13.0)] {
+        let mut f = filled(&t, k * f64::from(background), |i| k * f64::from(a(i)));
+        f.set_tile(&t, n, k * f64::from(tile)).unwrap();
+        entries.push(CacheEntry::new(&meta(name), &t, &f).unwrap());
+    }
+    let path = fresh("components.cache");
+    brodo::cache::write(&path, &entries).unwrap();
+    let draw = |grid: &str, extra: &[&str]| {
+        let mut words = vec!["slice", "--grid", grid, "--axis", "z", "--at", "3"];
+        words.extend(extra);
+        run_on(&path, &words, &format!("component_{grid}.png"))
+    };
+    // The components are proportional, so drawn over their own ranges they look alike:
+    // one range for all tells them apart.
+    let range = ["--range", "0,400"];
+    let mut drawn = Vec::new();
+    for component in ["x", "y", "z", "magnitude"] {
+        let want = draw(component, &range);
+        for grid in ["v32", "v64"] {
+            let got = draw(grid, &[&range[..], &["--component", component]].concat());
+            assert!(got == want, "{grid} {component}");
+        }
+        assert!(!drawn.contains(&want), "{component} drawn as another");
+        drawn.push(want);
+    }
+    assert!(draw("v64", &["--component", "z"]) == draw("z", &[]));
+}
+
+/// `--range` draws the sequential map over it and `--region` the part of the plane named,
+/// beyond the grid's bounds included, both as brodo's slice draws them, a level set's
+/// diverging map kept where no range is given; a region of more pixels than drawn is
+/// refused.
+#[test]
+fn a_range_and_a_region_are_drawn_as_brodos_slice_draws_them() {
+    use brodo::slice::{ColorMap, Slice, render, to_bytes};
+    let t = one_leaf();
+    let f = filled(&t, 4.0_f32, |i| f32::from(u8::try_from(i % 8 + i / 8 % 8).unwrap()) - 7.0);
+    let mut m = GridMeta::new("sdf", [1.0; 3], "m").unwrap();
+    m.extra.insert(SDF_KEY.to_owned(), SDF_VERSION.to_owned());
+    let path = cache_file("ranged.cache", &m, &t, &f);
+    let draw = |extra: &[&str]| {
+        let mut words = vec!["slice", "--axis", "z", "--at", "3"];
+        words.extend(extra);
+        run_on(&path, &words, "ranged.png")
+    };
+    let brodo = |min, max, map| {
+        to_bytes(&render(&t, &f, Slice::new(Axis::Z, 3, min, max), map).unwrap()).unwrap()
+    };
+    let sequential = ColorMap::Sequential { min: -1.0, max: 2.5 };
+    let diverging = ColorMap::Diverging { limit: 4.0 };
+    assert!(draw(&[]) == brodo([0, 0], [7, 7], diverging));
+    assert!(draw(&["--range", "-1,2.5"]) == brodo([0, 0], [7, 7], sequential));
+    assert!(draw(&["--region", "-4,-2,11,9"]) == brodo([-4, -2], [11, 9], diverging));
+    let both = draw(&["--region", "2,3,2,9", "--range", "-1,2.5"]);
+    assert!(both == brodo([2, 3], [2, 9], sequential));
+    let mut all = args(&["slice", path.to_str().unwrap(), "--axis", "z", "--at", "3"]);
+    all.extend(args(&["--region", "0,0,8191,8192", "-o"]));
+    all.push(fresh("huge.png").into_os_string());
+    let refused = mestolo::run(&parse(all).unwrap(), &mut Vec::new());
+    assert!(
+        matches!(refused, Err(MestoloError::ImageTooLarge { width: 8192, height: 8193, .. })),
+        "{refused:?}"
+    );
+}
+
+/// A component of a scalar grid is refused, and a vector grid with none names the option;
+/// a value the options do not take is refused naming the option.
+#[test]
+fn what_a_slice_does_not_draw_is_refused() {
+    let t = one_leaf();
+    let meta = GridMeta::new("s", [1.0; 3], "m").unwrap();
+    let path = cache_file("one_scalar.cache", &meta, &t, &Field::new(&t, 1.0_f32));
+    let mut all = args(&["slice", path.to_str().unwrap(), "--axis", "z", "--at", "0"]);
+    all.extend(args(&["--component", "x", "-o"]));
+    all.push(fresh("component.png").into_os_string());
+    let refused = mestolo::run(&parse(all).unwrap(), &mut Vec::new()).unwrap_err();
+    assert!(matches!(refused, MestoloError::ComponentOfScalar(ValueType::F32)), "{refused:?}");
+    assert!(!refused.is_usage());
+    let not_scalar = MestoloError::NotScalar(ValueType::F32x3).to_string();
+    assert!(not_scalar.contains("--component"), "{not_scalar}");
+    let slice = ["slice", "f", "--axis", "z", "--at", "0", "-o", "o.png"];
+    for (option, value) in [
+        ("--component", "w"),
+        ("--range", "2,1"),
+        ("--range", "1,1"),
+        ("--range", "NaN,1"),
+        ("--range", "1,inf"),
+        ("--range", "1"),
+        ("--range", "1,2,3"),
+        ("--range", ""),
+        ("--region", "1,0,0,0"),
+        ("--region", "0,1,0,0"),
+        ("--region", "0,0,1"),
+        ("--region", "a,0,0,0"),
+        ("--region", "0,0,0,0,0"),
+    ] {
+        let refused = parse(args(&[&slice[..], &[option, value]].concat()));
+        assert!(
+            matches!(&refused, Err(MestoloError::BadValue { option: o, value: v }) if *o == option && v == value),
+            "{option} {value}: {refused:?}"
+        );
+    }
+    let one = parse(args(&[&slice[..], &["--region", "0,0,0,0"]].concat()));
+    assert!(
+        matches!(&one, Ok(Command::Slice { output, .. }) if output.drawing.region == Some([[0, 0], [0, 0]])),
+        "{one:?}"
+    );
+}

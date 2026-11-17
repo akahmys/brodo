@@ -47,6 +47,18 @@ macro_rules! encoding {
                    (default exact); other grids are stored exact\n"
     };
 }
+macro_rules! drawing {
+    () => {
+        "  --component x|y|z|magnitude
+                   of a vector grid, the component drawn
+  --range <min>,<max>
+                   the values drawn darkest and lightest (default the grid's least and
+                   greatest; a level set's diverge at zero)
+  --region <u0>,<v0>,<u1>,<v1>
+                   the part of the plane drawn, in its two other voxel coordinates,
+                   inclusive (default the grid's bounds)\n"
+    };
+}
 macro_rules! force {
     () => {
         "  --force          replace a file already at the output's path\n"
@@ -75,6 +87,7 @@ options:
     force!(),
     skip!(),
     encoding!(),
+    drawing!(),
     "  -h, --help       the command's usage
 "
 );
@@ -89,10 +102,12 @@ fn usage_of(command: &str) -> Option<&'static str> {
         ),
         "slice" => concat!(
             "usage: mestolo slice <file> --axis x|y|z --at <n> -o <out.png> [options]\n\n",
-            "Draws the plane at voxel <n> along the axis of a scalar grid, as PNG.\n\noptions:\n",
+            "Draws the plane at voxel <n> along the axis of a scalar grid, or of a component\n",
+            "of a vector grid, as PNG.\n\noptions:\n",
             grid!(),
             limit!(),
-            force!()
+            force!(),
+            drawing!()
         ),
         "convert" => concat!(
             "usage: mestolo convert <file> -o <out> [--as vdb|vtu|cache|archive] [options]\n\n",
@@ -120,7 +135,7 @@ pub fn run(command: &Command, out: &mut impl Write) -> Result<(), MestoloError> 
         Command::Slice { input, grid, axis, at, output } => {
             output::check(output)?;
             let loaded = load::load(input)?;
-            draw::slice(loaded.grid(grid.as_deref())?, *axis, *at, &output.path)
+            draw::slice(loaded.grid(grid.as_deref())?, *axis, *at, &output.drawing, &output.path)
         }
         Command::Convert { input, grid, format, output } => {
             output::check(output)?;

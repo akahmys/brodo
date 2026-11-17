@@ -9,6 +9,7 @@ cargo install mestolo
 
 mestolo info grids.cache                                   # what the file holds
 mestolo slice grids.cache --grid sdf --axis z --at 0 -o z0.png
+mestolo slice grids.cache --grid v --component magnitude --range 0,2 --axis z --at 0 -o v.png
 mestolo convert grids.cache -o grids.vdb                   # for Blender, Houdini
 mestolo convert grids.cache --grid sdf -o sdf.vtu          # for ParaView
 mestolo convert grids.vdb --as archive -o grids.archive     # brodo's compressed archive
@@ -29,6 +30,10 @@ mestolo convert grids.vdb --as archive --encoding binary16 -o small.archive
   `f32`, `f64`, `[f32; 3]` or `[f64; 3]` so, `exact` unless given; other grids and entries
   of bytes are stored exact, and a grid holding a value the encoding cannot hold is
   refused.
+- `slice` draws a scalar grid, or by `--component x|y|z|magnitude` a component of a vector
+  grid; `--range <min>,<max>` fixes its colours' range, so that slices of several files
+  are drawn to one scale, and `--region <u0>,<v0>,<u1>,<v1>` draws a part of the plane,
+  in its two other voxel coordinates.
 - `mestolo help <command>`, or `-h` among a command's arguments, writes that command's
   usage; `mestolo --version` the version.
 - A command line refused, none given among them, exits with status 2, a command failing

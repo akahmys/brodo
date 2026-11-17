@@ -38,7 +38,7 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   colino and mestolo published by the owner, docs.rs building their reference, the new
   API used from a new crate depending on them by version, and `cargo install mestolo`
   installing the command (2026-11-12).
-- **Next**: P13's next item (§2), issue 11, its options chosen by the owner first.
+- **Next**: P13's next item (§2), the retrospective and refactoring.
 - **Unresolved**: none. `leaf_parallel_update_x32`'s drift between sessions is measured:
   other processes' work on the performance cores moves it either way, and the item and its
   baseline are kept (B-026, ADR-0019's amendment of 2026-11-12).
@@ -87,7 +87,7 @@ last applied by `akahmys` (checked 2026-11-12).
       OBJ and 3MF apart from the file
 - [x] [Issue 12](https://github.com/akahmys/brodo/issues/12): mestolo's `convert --as
       archive` choosing a quantised encoding
-- [ ] [Issue 11](https://github.com/akahmys/brodo/issues/11): more `slice` options, the
+- [x] [Issue 11](https://github.com/akahmys/brodo/issues/11): more `slice` options, the
       options chosen by the owner before any is written
 - [ ] The retrospective and refactoring (PLANNING.md §7)
 - [ ] The closing checks, chosen by the owner
@@ -180,6 +180,13 @@ No spike is running.
   TESTING.md V9): Hermite data and an archive's encodings shown by mestolo's `info`
   (the owner, 2026-11-08; ADR-0050). Kept for a MAJOR on 2026-11-12, not shown by a flag
   in a MINOR: the owner judged its value too small for either until a user asks.
+- For the next MAJOR, since it changes mestolo's library API (TESTING.md V9): `slice`'s
+  `--component`, `--range` and `--region` moved out of `Output`, where they are held since
+  a field added to `Command::Slice` would break a user, either by giving each command's
+  variant a `#[non_exhaustive]` struct of its options or by promising mestolo's command
+  line alone, its library hidden (the owner, 2026-11-17; ADR-0050). Taken when a MAJOR is
+  made for another reason, not made for this alone: brodo, colino and mestolo share one
+  version (V1).
 - Requests from users. Held until one asks: merging into a root tile (ADR-0014);
   labelling many lone leaves faster, each one's upper node costing `label` about 1.3 ms
   and 0.4 MiB of empty places under 6-connectivity (`spikes/rootsparse/REPORT.md`,

@@ -84,9 +84,12 @@ pub enum MestoloError {
         /// The greatest.
         max: i32,
     },
-    /// A slice of a grid whose values are not scalars.
-    #[error("a slice of {0} values is not drawn: they are not scalars")]
+    /// A slice of a grid whose values are not scalars, and no component named.
+    #[error("a slice of {0} values is not drawn: they are not scalars; name a --component")]
     NotScalar(ValueType),
+    /// A component named of a grid whose values are scalars.
+    #[error("{0} values are scalars, which have no --component")]
+    ComponentOfScalar(ValueType),
     /// A slice's image would be larger than mestolo draws.
     #[error("the slice would be {width} × {height} pixels, more than {most}")]
     ImageTooLarge {

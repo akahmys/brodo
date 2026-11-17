@@ -1,11 +1,16 @@
-//! `slice`: a plane of a scalar grid drawn as PNG by brodo's checking output
-//! (ARCHITECTURE.md §6.1), across the grid's bounds in the plane's two other axes.
+//! `slice`: a plane of a scalar grid, or of a component of a vector grid, drawn as PNG by
+//! brodo's checking output (ARCHITECTURE.md §6.1, §6.3), across the grid's bounds in the
+//! plane's two other axes or the region given, in the colours of the range given or else
+//! of its values.
 
 use std::path::Path;
 
-use brodo::field::{AnyField, Field};
+use brodo::field::{AnyField, Field, Value};
 use brodo::meta::{Bounds, SDF_KEY};
 use brodo::slice::{Axis, ColorMap, Image, Slice, render};
+use brodo::topology::Topology;
+
+use crate::args::{Component, Drawing};
 
 use crate::error::MestoloError;
 use crate::info::{Parts, extremes};
@@ -14,23 +19,73 @@ use crate::load::Grid;
 /// The most pixels a slice is drawn with: 2²⁶, a 256 MiB image of four bytes a pixel.
 pub const MOST_PIXELS: i64 = 1 << 26;
 
-/// Writes grid `g`'s plane perpendicular to `axis` at `at` as PNG at `path`, refusing a
-/// plane beyond the grid's leaves and tiles along `axis`.
-pub fn slice(g: &Grid, axis: Axis, at: i32, path: &Path) -> Result<(), MestoloError> {
-    let image = match &g.field {
-        AnyField::F32(f) => draw(g, f, axis, at)?,
-        AnyField::F64(f) => draw(g, f, axis, at)?,
-        AnyField::U8(f) => draw(g, f, axis, at)?,
-        AnyField::U32(f) => draw(g, f, axis, at)?,
-        AnyField::F32x3(_) | AnyField::F64x3(_) => {
+/// Writes grid `g`'s plane perpendicular to `axis` at `at` as PNG at `path`, as `drawing`
+/// says, refusing a plane beyond the grid's leaves and tiles along `axis`, a vector grid
+/// with no component named and a scalar grid with one.
+pub fn slice(
+    g: &Grid,
+    axis: Axis,
+    at: i32,
+    drawing: &Drawing,
+    path: &Path,
+) -> Result<(), MestoloError> {
+    let level_set = level_set(g);
+    let t = &g.topology;
+    let image = match (&g.field, drawing.component) {
+        (AnyField::F32(f), None) => draw(g, f, axis, at, drawing, level_set)?,
+        (AnyField::F64(f), None) => draw(g, f, axis, at, drawing, level_set)?,
+        (AnyField::U8(f), None) => draw(g, f, axis, at, drawing, level_set)?,
+        (AnyField::U32(f), None) => draw(g, f, axis, at, drawing, level_set)?,
+        (AnyField::F32x3(f), Some(c)) => draw(g, &component(t, f, c)?, axis, at, drawing, false)?,
+        (AnyField::F64x3(f), Some(c)) => draw(g, &component(t, f, c)?, axis, at, drawing, false)?,
+        (AnyField::F32x3(_) | AnyField::F64x3(_), None) => {
             return Err(MestoloError::NotScalar(g.field.value_type()));
+        }
+        (AnyField::F32(_) | AnyField::F64(_) | AnyField::U8(_) | AnyField::U32(_), Some(_)) => {
+            return Err(MestoloError::ComponentOfScalar(g.field.value_type()));
         }
         _ => return Err(MestoloError::ValueType(g.field.value_type())),
     };
     Ok(brodo::slice::write(path, &image)?)
 }
 
-fn draw<T>(g: &Grid, f: &Field<T>, axis: Axis, at: i32) -> Result<Image, MestoloError>
+/// The field of component `c` of `f`'s values, its leaves', its tiles' and its
+/// background's, as `f64`: a magnitude is found without overflowing on the way.
+fn component<T>(t: &Topology, f: &Field<[T; 3]>, c: Component) -> Result<Field<f64>, MestoloError>
+where
+    T: Copy + Into<f64>,
+    [T; 3]: Value,
+{
+    let pick = |v: [T; 3]| {
+        let [x, y, z] = v.map(Into::into);
+        match c {
+            Component::X => x,
+            Component::Y => y,
+            Component::Z => z,
+            Component::Magnitude => x.hypot(y).hypot(z),
+        }
+    };
+    let mut out = Field::new(t, pick(f.background()));
+    for n in t.leaf_numbers() {
+        let values = f.leaf(t, n)?;
+        for (o, v) in out.leaf_mut(t, n)?.iter_mut().zip(values) {
+            *o = pick(*v);
+        }
+    }
+    for n in t.tile_numbers() {
+        out.set_tile(t, n, pick(f.tile(t, n)?))?;
+    }
+    Ok(out)
+}
+
+fn draw<T>(
+    g: &Grid,
+    f: &Field<T>,
+    axis: Axis,
+    at: i32,
+    drawing: &Drawing,
+    level_set: bool,
+) -> Result<Image, MestoloError>
 where
     T: Parts + Into<f64>,
     T::Part: Into<f64>,
@@ -47,8 +102,20 @@ where
         let grid = g.meta.name.clone();
         return Err(MestoloError::OutsideGrid { grid, axis, at, min: span.0, max: span.1 });
     }
+    let [min, max] = drawing.region.unwrap_or([min, max]);
     size(min, max)?;
-    Ok(render(&g.topology, f, Slice::new(axis, at, min, max), colors(g, f)?)?)
+    let map = match drawing.range {
+        Some([min, max]) => ColorMap::Sequential { min, max },
+        None => colors(level_set, g, f)?,
+    };
+    Ok(render(&g.topology, f, Slice::new(axis, at, min, max), map)?)
+}
+
+/// Whether `g` is a level set: by brodo's `SDF_KEY` or OpenVDB's `class` of `level set`
+/// (docs/formats.md §9).
+fn level_set(g: &Grid) -> bool {
+    let extra = &g.meta.extra;
+    extra.contains_key(SDF_KEY) || extra.get("class").is_some_and(|c| c == "level set")
 }
 
 /// Refuses a slice from `min` to `max`, inclusive, of more than `MOST_PIXELS`.
@@ -63,17 +130,12 @@ fn size(min: [i32; 2], max: [i32; 2]) -> Result<(), MestoloError> {
 }
 
 /// A level set's colours diverge at zero, saturated at its background's magnitude, the
-/// band's half-width; another grid's run from its least value to its greatest. A grid is a
-/// level set by brodo's `SDF_KEY` or OpenVDB's `class` of `level set`
-/// (docs/formats.md §9).
-fn colors<T>(g: &Grid, f: &Field<T>) -> Result<ColorMap, MestoloError>
+/// band's half-width; another grid's run from its least value to its greatest.
+fn colors<T>(level_set: bool, g: &Grid, f: &Field<T>) -> Result<ColorMap, MestoloError>
 where
     T: Parts + Into<f64>,
     T::Part: Into<f64>,
 {
-    let extra = &g.meta.extra;
-    let level_set =
-        extra.contains_key(SDF_KEY) || extra.get("class").is_some_and(|c| c == "level set");
     let (least, most) = extremes(&g.topology, f)?;
     let first = |xs: Vec<Option<T::Part>>| xs.into_iter().flatten().next().map(Into::into);
     Ok(color_map(level_set, f.background().into(), first(least), first(most)))

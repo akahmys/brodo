@@ -142,3 +142,32 @@ The owner decided, on 2026-11-08, as proposed for P10:
 - `info` showing Hermite data and an archive's encodings changes its output, which
   §6.3 promises and the 1.0.0 tests compare whole (V9), so it waits for the next MAJOR
   (ROADMAP.md §4).
+
+## Amendment: the slice's options
+
+- **Date**: 2026-11-17
+
+Issue 11 asked which options `slice` lacks. The owner chose, on 2026-11-17, those that
+serve checking a file received, ADR-0018's purpose for the slice, over those that serve
+its look:
+
+- `--component x|y|z|magnitude` draws a component of a vector grid, or its length, as a
+  scalar grid of its values: a solver's velocity, refused before, is checked as its other
+  fields are. A scalar grid named a component is refused.
+- `--range MIN,MAX` draws the sequential map over a range given, whatever the grid, so
+  that slices of several files or steps are drawn to one scale; ADR-0018 gives the range
+  to the caller so that results do not drift, which the range read from each grid's values
+  does.
+- `--region U0,V0,U1,V1` draws a part of the plane, the grid's beyond its bounds as
+  background, so that a plane above the image's size of 2²⁶ pixels can be checked a part
+  at a time.
+- Set aside: a scale of pixels per voxel, which an image viewer gives and which §6.1's one
+  voxel to a pixel does not; `--at` in world coordinates, whose rounding would need
+  deciding for little gain, `info` giving the voxel bounds; and a choice of colour map,
+  which `--range` gives.
+
+The options are held by `Output`'s new `drawing`, as `--skip-unsupported` and
+`--encoding` are, since a field added to `Command::Slice` would break a user who names its
+fields (V9). The owner judged this untidy but kept 1.x rather than make a MAJOR for it
+alone, brodo and colino sharing the version (V1); moving them is recorded for the next
+MAJOR (ROADMAP.md §4).
