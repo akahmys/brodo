@@ -97,6 +97,10 @@ pub enum MestoloError {
         /// The most pixels drawn.
         most: i64,
     },
+    /// `--encoding` given where `--as archive` is not: it chooses how an archive stores its
+    /// values, and no other format is so encoded.
+    #[error("--encoding is taken only with --as archive")]
+    EncodingNotArchive,
     /// The output's name ends in no format mestolo writes, and `--as` names none.
     #[error("{0:?} ends in neither .vdb nor .vtu: name the format with --as")]
     OutputKind(PathBuf),
@@ -146,6 +150,7 @@ impl MestoloError {
                 | Self::Extra(_)
                 | Self::BadValue { .. }
                 | Self::NotText(_)
+                | Self::EncodingNotArchive
         )
     }
 }

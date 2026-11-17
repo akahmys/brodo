@@ -6,7 +6,9 @@ use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::process::Command as Process;
 
+use brodo::archive::Encoding;
 use brodo::cache::{CacheEntry, CacheFile};
+use brodo::error::CacheError;
 use brodo::field::{Field, ValueType};
 use brodo::kind::FileKind;
 use brodo::meta::{GridMeta, SDF_KEY, SDF_VERSION};
@@ -653,4 +655,108 @@ fn a_grid_is_drawn_as_a_level_set_by_its_class() {
     let plain = drawn("plain", None);
     assert!(drawn("fog", Some("fog volume")) == plain);
     assert!(drawn("level", Some("level set")) != plain);
+}
+
+/// A cache file of `cache_v2.bin`'s grids, grids of `u8`, `f64` and `[f64; 3]`, and
+/// `cache_v2.bin`'s entry of bytes.
+fn with_labels_and_bytes() -> PathBuf {
+    let file = brodo::cache::read(&brodo_file("cache_v2.bin"), DEFAULT_LIMIT).unwrap();
+    let mut entries: Vec<CacheEntry> = file.grids().into_iter().map(CacheEntry::copy).collect();
+    let (t, _) = file.grids_named("density").remove(0).thaw(DEFAULT_LIMIT).unwrap();
+    let labels = GridMeta::new("labels", [1.0; 3], "m").unwrap();
+    entries.push(CacheEntry::new(&labels, &t, &Field::new(&t, 1_u8)).unwrap());
+    let wide = GridMeta::new("wide", [1.0; 3], "m").unwrap();
+    entries.push(CacheEntry::new(&wide, &t, &Field::new(&t, 0.5_f64)).unwrap());
+    let flow = GridMeta::new("flow", [1.0; 3], "m/s").unwrap();
+    entries.push(CacheEntry::new(&flow, &t, &Field::new(&t, [0.5_f64; 3])).unwrap());
+    entries.extend(file.bytes_entries().into_iter().map(CacheEntry::copy_bytes));
+    let path = fresh("labels_bytes.cache");
+    brodo::cache::write(&path, &entries).unwrap();
+    path
+}
+
+/// `--encoding` stores an archive's grids of a floating value type in the encoding named,
+/// and its other grids and its entries of bytes exact; `exact` writes what no `--encoding`
+/// does.
+#[test]
+fn convert_stores_an_archives_floating_grids_in_the_encoding_named() {
+    let input = with_labels_and_bytes();
+    let held = entries_of(&brodo::cache::read(&input, u64::MAX).unwrap());
+    let plain = std::fs::read(converted(&input, &["--as", "archive"], "plain.archive")).unwrap();
+    for (word, encoding) in
+        [("exact", Encoding::Exact), ("binary16", Encoding::Binary16), ("8bit", Encoding::EightBit)]
+    {
+        let words = ["--as", "archive", "--encoding", word];
+        let path = converted(&input, &words, &format!("{word}.archive"));
+        let file = brodo::archive::read(&path, u64::MAX).unwrap();
+        let encodings: Vec<_> =
+            file.grids().iter().map(|g| (g.meta().name.clone(), g.encoding())).collect();
+        let want = [
+            ("density".to_owned(), encoding),
+            ("velocity".to_owned(), encoding),
+            ("labels".to_owned(), Encoding::Exact),
+            ("wide".to_owned(), encoding),
+            ("flow".to_owned(), encoding),
+        ];
+        assert_eq!(encodings, want, "{word}");
+        let read = entries_of(&file);
+        assert_eq!((&read[2], &read[5]), (&held[2], &held[5]), "{word}: labels and bytes exact");
+        if encoding == Encoding::Exact {
+            assert_eq!(std::fs::read(&path).unwrap(), plain);
+        }
+    }
+    let vdb = brodo_file("vdb_by14_v225.bin");
+    let path = converted(&vdb, &["--as", "archive", "--encoding", "8bit"], "vdb.archive");
+    let file = brodo::archive::read(&path, u64::MAX).unwrap();
+    assert!(!file.grids().is_empty());
+    for g in file.grids() {
+        assert_eq!(g.encoding(), Encoding::EightBit, "{}", g.meta().name);
+    }
+}
+
+/// A value an encoding cannot hold is refused naming the grid's place; `--encoding` is
+/// refused, as a command line refused, but with `--as archive`.
+#[test]
+fn an_encoding_is_refused_where_it_cannot_be_kept() {
+    let t = one_leaf();
+    let meta = GridMeta::new("hot", [1.0; 3], "K").unwrap();
+    let input = cache_file("hot.cache", &meta, &t, &filled(&t, 0.0_f32, |i| 1.0e6 * i as f32));
+    let run = |word: &str| {
+        let out = fresh("hot.archive");
+        let mut all = args(&["convert", input.to_str().unwrap(), "--as", "archive"]);
+        all.extend(args(&["--encoding", word, "-o", out.to_str().unwrap()]));
+        mestolo::run(&parse(all).unwrap(), &mut Vec::new())
+    };
+    let refused = run("binary16");
+    assert!(
+        matches!(refused, Err(MestoloError::Cache(CacheError::Unrepresentable(0)))),
+        "{refused:?}"
+    );
+    assert!(run("8bit").is_ok());
+    let refused = |words: &[&str]| parse(args(words)).unwrap_err();
+    for others in [&["--as", "cache"][..], &["--as", "vdb"], &["--as", "vtu"], &[]] {
+        let mut words = vec!["convert", "f", "-o", "o.vdb", "--encoding", "8bit"];
+        words.extend(others);
+        let e = refused(&words);
+        assert!(matches!(e, MestoloError::EncodingNotArchive) && e.is_usage(), "{others:?}");
+    }
+    let bad = refused(&["convert", "f", "-o", "o", "--as", "archive", "--encoding", "f16"]);
+    assert!(
+        matches!(bad, MestoloError::BadValue { option: "--encoding", value } if value == "f16")
+    );
+    let twice = ["convert", "f", "-o", "o", "--as", "archive", "--encoding", "exact"];
+    let twice = refused(&[&twice[..], &["--encoding", "exact"]].concat());
+    assert!(matches!(twice, MestoloError::Repeated(r) if r == "--encoding"));
+    let info = refused(&["info", "f", "--encoding", "exact"]);
+    assert!(matches!(info, MestoloError::UnknownOption(o) if o == "--encoding"));
+    let none = parse(args(&["convert", "f", "-o", "o", "--as", "archive"])).unwrap();
+    assert!(
+        matches!(&none, Command::Convert { output, .. } if output.encoding == Encoding::Exact),
+        "{none:?}"
+    );
+    let exe = env!("CARGO_BIN_EXE_mestolo");
+    let words = ["convert", "f", "-o", "o.vdb", "--encoding", "8bit"];
+    let usage = Process::new(exe).args(words).output().unwrap();
+    assert_eq!(usage.status.code(), Some(2));
+    assert!(String::from_utf8_lossy(&usage.stderr).contains("--encoding is taken only with"));
 }

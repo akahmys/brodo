@@ -595,9 +595,13 @@ Rust. It uses no GPU and no window.
   grid of a type it does not hold, `u8` and `u32`, with its value type, or, by `--skip-unsupported`, every
   grid it holds, each other named on standard output with its value type and none left
   refused; one grid as `.vtu` (§6.1); or, by
-  `--as cache` or `--as archive`, a cache file or an archive of exact values (§4.7), a
+  `--as cache` or `--as archive`, a cache file or an archive (§4.7), a
   cache file's or an archive's entries copied as they were, its grids and then its
-  entries of bytes, and a `.vdb`'s grids as read, or the one grid `--grid` names.
+  entries of bytes, and a `.vdb`'s grids as read, or the one grid `--grid` names. An
+  archive stores the leaf values of its grids of a floating value type in the encoding
+  `--encoding` names, `exact`, `binary16` or `8bit`, `exact` unless given, its other grids
+  and its entries of bytes exact, a value the encoding cannot hold refused with the grid's
+  place; `--encoding` without `--as archive` is a command line refused.
 - **Output**: a file at the output's path, or a path naming no file, is refused before the
   input is read, unless `--force` is given for the first; the file is written by brodo's
   writers, whole (§4.7). A

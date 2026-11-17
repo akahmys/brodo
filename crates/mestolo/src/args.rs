@@ -5,6 +5,7 @@
 use std::ffi::OsString;
 use std::path::PathBuf;
 
+use brodo::archive::Encoding;
 use brodo::slice::Axis;
 
 use crate::error::MestoloError;
@@ -40,12 +41,17 @@ pub struct Output {
     /// Whether `convert` leaves out the grids its format cannot hold, naming them, rather
     /// than refusing them all; given by `--skip-unsupported`.
     pub skip_unsupported: bool,
+    /// How an archive `convert` writes stores the leaf values of its grids of a floating
+    /// value type, given by `--encoding`; a grid of another type, and an entry of bytes, is
+    /// stored exact whatever it is. `Exact` where `--encoding` is not given.
+    pub encoding: Encoding,
 }
 
 impl Output {
-    /// The file at `path`, one already there replaced if `force`, no grid left out.
+    /// The file at `path`, one already there replaced if `force`, no grid left out, an
+    /// archive's values stored exact.
     pub fn new(path: PathBuf, force: bool) -> Self {
-        Self { path, force, skip_unsupported: false }
+        Self { path, force, skip_unsupported: false, encoding: Encoding::Exact }
     }
 }
 
@@ -114,6 +120,7 @@ struct Given {
     skip_unsupported: bool,
     limit: Option<u64>,
     format: Option<Format>,
+    encoding: Option<Encoding>,
 }
 
 /// The command the arguments after the program's name give; none is refused, as
@@ -130,7 +137,9 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Command, Mestol
         "--version" | "-V" => return Ok(Command::Version),
         "info" => &["--limit"],
         "slice" => &["--limit", "--grid", "--axis", "--at", "-o", "--force"],
-        "convert" => &["--limit", "--grid", "--as", "-o", "--force", "--skip-unsupported"],
+        "convert" => {
+            &["--limit", "--grid", "--as", "-o", "--force", "--skip-unsupported", "--encoding"]
+        }
         _ => return Err(MestoloError::UnknownCommand(name)),
     };
     let mut before_end = args.iter().take_while(|a| *a != "--");
@@ -142,8 +151,12 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Command, Mestol
         path: given.input.ok_or(MestoloError::Missing("the input file"))?,
         limit: given.limit.unwrap_or(DEFAULT_LIMIT),
     };
-    let skip_unsupported = given.skip_unsupported;
-    let output = given.output.map(|path| Output { path, force: given.force, skip_unsupported });
+    if given.encoding.is_some() && given.format != Some(Format::Archive) {
+        return Err(MestoloError::EncodingNotArchive);
+    }
+    let (skip_unsupported, force) = (given.skip_unsupported, given.force);
+    let encoding = given.encoding.unwrap_or_default();
+    let output = given.output.map(|path| Output { path, force, skip_unsupported, encoding });
     if name == "info" {
         return Ok(Command::Info(input));
     }
@@ -215,6 +228,10 @@ fn set(
         "--axis" => once(&mut given.axis, axis(&text(value(args, "--axis")?, "--axis")?)?, twice)?,
         "--at" => once(&mut given.at, number(value(args, "--at")?, "--at")?, twice)?,
         "--as" => once(&mut given.format, format(&text(value(args, "--as")?, "--as")?)?, twice)?,
+        "--encoding" => {
+            let e = encoding(&text(value(args, "--encoding")?, "--encoding")?)?;
+            once(&mut given.encoding, e, twice)?;
+        }
         _ => once(&mut given.limit, number(value(args, "--limit")?, "--limit")?, twice)?,
     }
     Ok(())
@@ -251,6 +268,15 @@ fn format(s: &str) -> Result<Format, MestoloError> {
         "cache" => Ok(Format::Cache),
         "archive" => Ok(Format::Archive),
         _ => Err(MestoloError::BadValue { option: "--as", value: s.to_owned() }),
+    }
+}
+
+fn encoding(s: &str) -> Result<Encoding, MestoloError> {
+    match s {
+        "exact" => Ok(Encoding::Exact),
+        "binary16" => Ok(Encoding::Binary16),
+        "8bit" => Ok(Encoding::EightBit),
+        _ => Err(MestoloError::BadValue { option: "--encoding", value: s.to_owned() }),
     }
 }
 

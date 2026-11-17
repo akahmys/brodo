@@ -38,7 +38,7 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   colino and mestolo published by the owner, docs.rs building their reference, the new
   API used from a new crate depending on them by version, and `cargo install mestolo`
   installing the command (2026-11-12).
-- **Next**: P13's next item (§2), issue 12, its API's shape put to the owner first.
+- **Next**: P13's next item (§2), issue 11, its options chosen by the owner first.
 - **Unresolved**: none. `leaf_parallel_update_x32`'s drift between sessions is measured:
   other processes' work on the performance cores moves it either way, and the item and its
   baseline are kept (B-026, ADR-0019's amendment of 2026-11-12).
@@ -85,7 +85,7 @@ last applied by `akahmys` (checked 2026-11-12).
       read back from a file
 - [x] [Issue 10](https://github.com/akahmys/brodo/issues/10): one mesh reader telling STL,
       OBJ and 3MF apart from the file
-- [ ] [Issue 12](https://github.com/akahmys/brodo/issues/12): mestolo's `convert --as
+- [x] [Issue 12](https://github.com/akahmys/brodo/issues/12): mestolo's `convert --as
       archive` choosing a quantised encoding
 - [ ] [Issue 11](https://github.com/akahmys/brodo/issues/11): more `slice` options, the
       options chosen by the owner before any is written

@@ -25,6 +25,11 @@ are recorded here when they change (V6).
   format told from its bytes (`any::format_of`, `any::Format`) and read by its own reader;
   a format whose reader the build leaves out is refused as the new `ReadError::NotBuilt`
   (ARCHITECTURE.md §5.1, ADR-0055; issue 10). `any.rs` is fuzzed by the new target `any`.
+- mestolo's `convert --as archive --encoding exact|binary16|8bit`: an archive's grids of a
+  floating value type stored in the encoding named, its other grids and entries of bytes
+  exact; `--encoding` without `--as archive` is refused as the new
+  `MestoloError::EncodingNotArchive`, exiting with status 2, and `args::Output` gains
+  `encoding` (ARCHITECTURE.md §6.3; issue 12).
 
 ## 1.3.0 (2026-11-12)
 

@@ -1,12 +1,14 @@
 //! `convert`: a file's grids written as `.vdb`, by brodo's writer, which takes grids of
 //! `f32`, `f64`, `[f32; 3]` and `[f64; 3]`; as a cache file or an archive, a cache file's or an archive's entries
-//! copied as they were; or one grid as an ASCII `.vtu` (ARCHITECTURE.md §4.7, §6.1, §6.3).
+//! copied as they were, an archive's grids of a floating value type stored in the encoding
+//! chosen; or one grid as an ASCII `.vtu` (ARCHITECTURE.md §4.7, §6.1, §6.3).
 
 use std::ffi::OsStr;
 use std::path::Path;
 
-use brodo::cache::{CacheEntry, CacheFile};
-use brodo::field::AnyField;
+use brodo::archive::Encoding;
+use brodo::cache::{CacheEntry, CacheFile, GridEntry};
+use brodo::field::{AnyField, ValueType};
 use brodo::vdb::{VdbEntry, VdbFile};
 use brodo::vtk::write;
 
@@ -18,7 +20,8 @@ use crate::load::{Grid, Loaded, Opened, load, open};
 
 /// Writes `input`'s grids at `output` in `format`, or with none in the format the output's
 /// name ends in, `.vdb` or `.vtu`: every grid, or the one `grid` names, as `.vdb`, a cache
-/// file or an archive; one grid as `.vtu`, its values named as the grid is. Grids `.vdb`
+/// file or an archive, an archive's grids of a floating value type in `output.encoding`;
+/// one grid as `.vtu`, its values named as the grid is. Grids `.vdb`
 /// cannot hold are refused, or, if `output.skip_unsupported`, left out and each written to
 /// `out` as a line naming it and its value type; none left is refused.
 pub fn convert(
@@ -28,7 +31,8 @@ pub fn convert(
     output: &Output,
     out: &mut impl Write,
 ) -> Result<(), MestoloError> {
-    let (skip, output) = (output.skip_unsupported, output.path.as_path());
+    let (skip, encoding) = (output.skip_unsupported, output.encoding);
+    let output = output.path.as_path();
     let by_name = || match output.extension().and_then(OsStr::to_str) {
         Some("vdb") => Ok(Format::Vdb),
         Some("vtu") => Ok(Format::Vtu),
@@ -37,8 +41,17 @@ pub fn convert(
     match format.map_or_else(by_name, Ok)? {
         Format::Vdb => vdb(&load(input)?, grid, output, skip.then_some(out)),
         Format::Vtu => vtu(load(input)?.grid(grid)?, output),
-        Format::Cache => Ok(brodo::cache::write(output, &entries(&open(input)?, grid)?)?),
-        Format::Archive => Ok(brodo::archive::write(output, &entries(&open(input)?, grid)?)?),
+        Format::Cache => {
+            let entries = entries(&open(input)?, grid)?;
+            let entries: Vec<_> = entries.into_iter().map(|(e, _)| e).collect();
+            Ok(brodo::cache::write(output, &entries)?)
+        }
+        Format::Archive => {
+            let entries = entries(&open(input)?, grid)?;
+            let chosen = |floating| if floating { encoding } else { Encoding::Exact };
+            let pairs: Vec<_> = entries.iter().map(|(e, f)| (e, chosen(*f))).collect();
+            Ok(brodo::archive::write_with(output, &pairs)?)
+        }
     }
 }
 
@@ -90,25 +103,35 @@ fn entry(g: &Grid) -> Result<VdbEntry, MestoloError> {
 
 /// A file's entries for a cache file or an archive: a cache file's or an archive's copied
 /// as they were, its grids and then its entries of bytes, or the one grid `grid` names; a
-/// `.vdb`'s grids as read, or the one named.
-fn entries(opened: &Opened, grid: Option<&str>) -> Result<Vec<CacheEntry>, MestoloError> {
+/// `.vdb`'s grids as read, or the one named. Each is paired with whether it is a grid of a
+/// floating value type, the entries an encoding other than `Exact` is for.
+fn entries(opened: &Opened, grid: Option<&str>) -> Result<Vec<(CacheEntry, bool)>, MestoloError> {
     match opened {
         Opened::Cache { file, .. } => copied(file, grid),
         Opened::Vdb(file) => from_vdb(file, grid),
     }
 }
 
-fn copied(file: &CacheFile, grid: Option<&str>) -> Result<Vec<CacheEntry>, MestoloError> {
+fn copied(file: &CacheFile, grid: Option<&str>) -> Result<Vec<(CacheEntry, bool)>, MestoloError> {
     let grids = file.grids();
+    let copy = |g: GridEntry<'_>| {
+        let f = floating(g.value_type());
+        (CacheEntry::copy(g), f)
+    };
     let Some(name) = grid else {
-        let bytes = file.bytes_entries().into_iter().map(CacheEntry::copy_bytes);
-        return Ok(grids.into_iter().map(CacheEntry::copy).chain(bytes).collect());
+        let bytes = file.bytes_entries().into_iter().map(|b| (CacheEntry::copy_bytes(b), false));
+        return Ok(grids.into_iter().map(copy).chain(bytes).collect());
     };
     let g = grids.into_iter().find(|g| g.meta().name == name);
-    Ok(vec![CacheEntry::copy(g.ok_or_else(|| MestoloError::NoGrid(name.to_owned()))?)])
+    Ok(vec![copy(g.ok_or_else(|| MestoloError::NoGrid(name.to_owned()))?)])
 }
 
-fn from_vdb(file: &VdbFile, grid: Option<&str>) -> Result<Vec<CacheEntry>, MestoloError> {
+/// Whether values of type `t` are floating, those an archive may store quantised.
+fn floating(t: ValueType) -> bool {
+    matches!(t, ValueType::F32 | ValueType::F64 | ValueType::F32x3 | ValueType::F64x3)
+}
+
+fn from_vdb(file: &VdbFile, grid: Option<&str>) -> Result<Vec<(CacheEntry, bool)>, MestoloError> {
     let chosen: Vec<_> = match grid {
         None => file.grids.iter().collect(),
         Some(name) => vec![
@@ -121,10 +144,10 @@ fn from_vdb(file: &VdbFile, grid: Option<&str>) -> Result<Vec<CacheEntry>, Mesto
     chosen
         .into_iter()
         .map(|g| match &g.field {
-            AnyField::F32(f) => Ok(CacheEntry::new(&g.meta, &g.topology, f)?),
-            AnyField::F64(f) => Ok(CacheEntry::new(&g.meta, &g.topology, f)?),
-            AnyField::F32x3(f) => Ok(CacheEntry::new(&g.meta, &g.topology, f)?),
-            AnyField::F64x3(f) => Ok(CacheEntry::new(&g.meta, &g.topology, f)?),
+            AnyField::F32(f) => Ok((CacheEntry::new(&g.meta, &g.topology, f)?, true)),
+            AnyField::F64(f) => Ok((CacheEntry::new(&g.meta, &g.topology, f)?, true)),
+            AnyField::F32x3(f) => Ok((CacheEntry::new(&g.meta, &g.topology, f)?, true)),
+            AnyField::F64x3(f) => Ok((CacheEntry::new(&g.meta, &g.topology, f)?, true)),
             AnyField::U8(_) | AnyField::U32(_) | _ => {
                 Err(MestoloError::ValueType(g.field.value_type()))
             }

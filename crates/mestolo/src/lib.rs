@@ -40,6 +40,13 @@ macro_rules! skip {
         "  --skip-unsupported  leave out, and name, the grids the format cannot hold\n"
     };
 }
+macro_rules! encoding {
+    () => {
+        "  --encoding exact|binary16|8bit
+                   with --as archive, how the values of floating grids are stored
+                   (default exact); other grids are stored exact\n"
+    };
+}
 macro_rules! force {
     () => {
         "  --force          replace a file already at the output's path\n"
@@ -67,6 +74,7 @@ options:
     limit!(),
     force!(),
     skip!(),
+    encoding!(),
     "  -h, --help       the command's usage
 "
 );
@@ -93,7 +101,8 @@ fn usage_of(command: &str) -> Option<&'static str> {
             grid!(),
             limit!(),
             force!(),
-            skip!()
+            skip!(),
+            encoding!()
         ),
         _ => return None,
     })

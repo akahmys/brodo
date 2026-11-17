@@ -12,6 +12,7 @@ mestolo slice grids.cache --grid sdf --axis z --at 0 -o z0.png
 mestolo convert grids.cache -o grids.vdb                   # for Blender, Houdini
 mestolo convert grids.cache --grid sdf -o sdf.vtu          # for ParaView
 mestolo convert grids.vdb --as archive -o grids.archive     # brodo's compressed archive
+mestolo convert grids.vdb --as archive --encoding binary16 -o small.archive
 ```
 
 - A file's kind is told by its first bytes, not its name, and it is read whole within
@@ -23,7 +24,11 @@ mestolo convert grids.vdb --as archive -o grids.archive     # brodo's compressed
 - A file already at the output's path is refused unless `--force` is given.
 - `convert` writes the format `--as` names, `vdb`, `vtu`, `cache` or `archive`, or else
   the one the output's name ends in, `.vdb` or `.vtu`. `--skip-unsupported` leaves out,
-  and names, the grids `.vdb` cannot hold, rather than refusing them.
+  and names, the grids `.vdb` cannot hold, rather than refusing them. `--encoding
+  exact|binary16|8bit`, with `--as archive` alone, stores the values of every grid of
+  `f32`, `f64`, `[f32; 3]` or `[f64; 3]` so, `exact` unless given; other grids and entries
+  of bytes are stored exact, and a grid holding a value the encoding cannot hold is
+  refused.
 - `mestolo help <command>`, or `-h` among a command's arguments, writes that command's
   usage; `mestolo --version` the version.
 - A command line refused, none given among them, exits with status 2, a command failing
