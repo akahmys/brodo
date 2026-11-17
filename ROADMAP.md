@@ -8,7 +8,15 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: issue 10 (2026-11-17): colino's `any::read` and `any::from_bytes` tell a mesh
+- **Done**: P13's retrospective and refactoring (2026-11-18): new public functions take
+  their settings as a struct (CODING.md Rule 22, ADR-0035's amendment), a slower verdict
+  against another session's baseline measured again against the commit before (TESTING.md
+  T10, ADR-0019's amendment), each test writing in a directory of its own (TESTING.md T15,
+  ADR-0048's amendment), and mestolo's test for a floating value type shared. Before it,
+  issue 11 (2026-11-17): mestolo's `slice` drawing a component, a range and a region, the
+  options chosen by the owner (ADR-0050's amendment); left open for the owner to close.
+  Before it, issue 12 (2026-11-17): mestolo's `convert --as archive --encoding`; left open
+  for the owner to close. Before it, issue 10 (2026-11-17): colino's `any::read` and `any::from_bytes` tell a mesh
   file's format from its bytes and read it by its own reader, the shape chosen by the owner
   (ADR-0055's amendment of 2026-11-17); left open for the owner to close. Before it,
   issue 9 (2026-11-17): colino's `Converted::from_parts` rebuilds a conversion
@@ -38,7 +46,7 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   colino and mestolo published by the owner, docs.rs building their reference, the new
   API used from a new crate depending on them by version, and `cargo install mestolo`
   installing the command (2026-11-12).
-- **Next**: P13's next item (§2), the retrospective and refactoring.
+- **Next**: P13's closing checks (§2), chosen by the owner, then version 1.4.0.
 - **Unresolved**: none. `leaf_parallel_update_x32`'s drift between sessions is measured:
   other processes' work on the performance cores moves it either way, and the item and its
   baseline are kept (B-026, ADR-0019's amendment of 2026-11-12).
@@ -89,8 +97,15 @@ last applied by `akahmys` (checked 2026-11-12).
       archive` choosing a quantised encoding
 - [x] [Issue 11](https://github.com/akahmys/brodo/issues/11): more `slice` options, the
       options chosen by the owner before any is written
-- [ ] The retrospective and refactoring (PLANNING.md §7)
-- [ ] The closing checks, chosen by the owner
+- [x] The retrospective and refactoring (PLANNING.md §7)
+- [ ] The closing checks, chosen by the owner (2026-11-18): T11's mutation run, the check
+      against 1.3.0 (V9), T6's fuzzing of `any`, `archive`, `cache_file` and `vdb`, readers
+      of untrusted bytes having changed, and both crates' benchmarks at rest, a slower
+      verdict measured again by T10; not T7, no unsafe code being touched
+  - [ ] T6: `any`, `archive`, `cache_file` and `vdb` fuzzed 900 s each
+  - [x] V9: the gate's check against v1.3.0 passes on `d190057` (2026-11-18)
+  - [ ] T11: the run on GitHub Actions
+  - [ ] T10: brodo's and colino's benchmarks at rest
 - [ ] Version 1.4.0 (TESTING.md V2–V4)
 
 ### Held — `piatto`
