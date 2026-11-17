@@ -8,6 +8,9 @@
     reason = "mapping a cache file is unsafe: the test keeps its files unchanged while mapped (ADR-0036)"
 )]
 
+#[path = "support/scratch.rs"]
+mod scratch;
+
 use std::collections::BTreeMap;
 
 use brodo::cache::{CacheEntry, CacheFile, Writer, to_bytes, write};
@@ -271,7 +274,7 @@ fn an_entry_of_bytes_padded_a_whole_block_is_refused() {
 #[test]
 fn a_file_is_replaced_whole() {
     use std::io::Read;
-    let dir = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("replaced_whole");
+    let dir = scratch::dir().join("replaced_whole");
     let _fresh = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("grids.brdc");
@@ -301,7 +304,7 @@ fn a_file_is_replaced_whole() {
 
 /// A directory of this name beside the target, made empty.
 fn fresh(name: &str) -> std::path::PathBuf {
-    let dir = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join(name);
+    let dir = scratch::dir().join(name);
     let _fresh = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     dir
@@ -373,7 +376,7 @@ fn a_writer_short_of_its_count_or_dropped_leaves_the_old_file() {
 /// the file once they end.
 #[test]
 fn writes_at_once_each_replace_the_file_whole() {
-    let dir = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("written_at_once");
+    let dir = scratch::dir().join("written_at_once");
     let _fresh = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("grids.brdc");
@@ -403,7 +406,7 @@ fn writes_at_once_each_replace_the_file_whole() {
 
 #[test]
 fn a_file_round_trips() {
-    let path = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("round_trip.brdc");
+    let path = scratch::dir().join("round_trip.brdc");
     let t = build(&[[3, 3, 3]], &[]);
     let f = numbered(&t, 0.0_f64, f64::from);
     write(&path, &[CacheEntry::new(&meta("on disk", &[]), &t, &f).unwrap()]).unwrap();
@@ -592,7 +595,7 @@ proptest! {
 }
 
 fn tmp(name: &str) -> std::path::PathBuf {
-    std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join(name)
+    scratch::dir().join(name)
 }
 
 #[test]

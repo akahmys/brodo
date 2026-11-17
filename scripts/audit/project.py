@@ -43,6 +43,10 @@ UNSAFE_MODULES = ["crates/brodo/src/mapping.rs"]
 # `#![expect(unsafe_code, …)]` (Rule 4).
 UNSAFE_CALLERS = ["crates/brodo/tests/cache_format.rs", "crates/brodo/benches/brodo.rs"]
 
+# The one file that names the directory tests write in (TESTING.md T15, ADR-0048): each test
+# writes under its own directory, which this file's `scratch::dir` gives.
+TEST_SCRATCH = "crates/brodo/tests/support/scratch.rs"
+
 # Directories for output and the environments tools build (CODING.md L2): git-ignored,
 # skipped by the document and path scans and by betterleaks; `paths.py` holds the three
 # to this list.

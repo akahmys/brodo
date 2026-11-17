@@ -3,6 +3,9 @@
 //! in the triangles is skipped and what would define shape otherwise, or reach outside the
 //! file, is refused; each damage is its own error; damaged text is refused or read safely.
 
+#[path = "../../brodo/tests/support/scratch.rs"]
+mod scratch;
+
 mod timed;
 
 use colino::error::ReadError;
@@ -144,7 +147,7 @@ fn each_damage_is_its_own_error() {
 #[test]
 fn a_file_at_a_path_reads_as_its_bytes() {
     let text = "v 0 0 0\nv 1 0 0\nv 0 1 0\nv 0 0 1\nf 1 2 3\nf 1 2 4\n";
-    let path = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("tetrahedron.obj");
+    let path = scratch::dir().join("tetrahedron.obj");
     std::fs::write(&path, text).unwrap();
     let read = colino::obj::read(&path, ROOMY).unwrap();
     assert_eq!(read.triangles.len(), 2);

@@ -3,6 +3,9 @@
 //! `spikes/vdbread/oracle/`'s `oracle expect` listed it into `vdb_read_expect.txt`; a grid
 //! brodo writes reads back the same; what §9.7 refuses is refused.
 
+#[path = "support/scratch.rs"]
+mod scratch;
+
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
@@ -474,7 +477,7 @@ fn what_reading_makes_is_bounded_by_the_limit() {
 #[test]
 fn a_file_longer_than_the_limit_is_refused_whatever_length_it_reports() {
     use std::io::Write;
-    let path = Path::new(env!("CARGO_TARGET_TMPDIR")).join("vdb_longer_than_its_length.fifo");
+    let path = scratch::dir().join("vdb_longer_than_its_length.fifo");
     std::fs::remove_file(&path).unwrap_or(());
     let made = std::process::Command::new("mkfifo").arg(&path).status().unwrap();
     assert!(made.success());
@@ -894,7 +897,7 @@ fn grids_are_read_by_name_the_others_unread() {
     assert!(from_bytes_named(&broken, "mm", "aa", u64::MAX).is_err());
     let read_b = from_bytes_named(&broken, "mm", "bb", u64::MAX).unwrap();
     assert_eq!(listing_of(&read_b).0["bb"], listing_of(&whole).0["bb"]);
-    let path = Path::new(env!("CARGO_TARGET_TMPDIR")).join("named.vdb");
+    let path = scratch::dir().join("named.vdb");
     std::fs::write(&path, &broken).unwrap();
     assert_eq!(read_named(&path, "mm", "bb", u64::MAX).unwrap().grids.len(), 1);
     assert!(matches!(

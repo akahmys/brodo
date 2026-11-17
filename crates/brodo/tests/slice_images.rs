@@ -8,6 +8,9 @@
 
 #![cfg(feature = "slice-png")]
 
+#[path = "support/scratch.rs"]
+mod scratch;
+
 use brodo::field::Field;
 use brodo::slice::{Axis, ColorMap, Image, Slice, render};
 use brodo::topology::Topology;
@@ -129,7 +132,7 @@ fn the_same_image_encodes_to_the_same_bytes_and_decodes_back() {
 /// `write` puts at its path the bytes `to_bytes` makes, replacing a file there whole.
 #[test]
 fn an_image_written_to_a_path_is_its_bytes() {
-    let path = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("written.png");
+    let path = scratch::dir().join("written.png");
     std::fs::write(&path, b"an older file").unwrap();
     for (name, image) in scenes() {
         brodo::slice::write(&path, &image).unwrap();

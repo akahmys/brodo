@@ -7,6 +7,9 @@
 
 #![cfg(feature = "archive")]
 
+#[path = "support/scratch.rs"]
+mod scratch;
+
 use std::collections::BTreeMap;
 
 use brodo::archive::{
@@ -79,7 +82,7 @@ const GOLDEN: &[u8] = include_bytes!("data/archive_v2_grids.bin");
 /// for a look when they are not.
 fn keeps(bytes: &[u8], golden: &[u8], name: &str) {
     if bytes != golden {
-        let path = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join(name);
+        let path = scratch::dir().join(name);
         std::fs::write(&path, bytes).unwrap();
         panic!(
             "the bytes of {name} changed; raise the version (TESTING.md V6): {}",
@@ -202,7 +205,7 @@ fn the_same_grids_give_the_same_bytes_whatever_the_threads() {
 #[test]
 fn an_archive_of_grids_keeps_its_bytes_and_a_file_round_trips() {
     keeps(&to_bytes(&golden_entries()).unwrap(), GOLDEN, "archive_v2_grids.bin");
-    let path = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("archive_grids.brda");
+    let path = scratch::dir().join("archive_grids.brda");
     // A file an earlier run left must not stand in for this one's.
     let _absent = std::fs::remove_file(&path);
     write(&path, &golden_entries()).unwrap();
@@ -253,7 +256,7 @@ fn the_limit_bounds_the_file_and_what_it_decompresses_into() {
     let first = (1 << 24) - (word(&g, 12) - word(&g, table));
     let huge = with_word(&with_word(&g, 12, 1 << 24), table, first);
     assert!(matches!(from_bytes(&huge, 1 << 20), Err(CacheError::FileTooLarge { .. })));
-    let path = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("archive_limit.brda");
+    let path = scratch::dir().join("archive_limit.brda");
     std::fs::write(&path, &g).unwrap();
     assert!(matches!(
         read(&path, g.len() as u64 - 1),
@@ -271,7 +274,7 @@ fn the_limit_bounds_the_file_and_what_it_decompresses_into() {
 #[cfg(unix)]
 fn read_of_a_fifo<T>(name: &str, read_from: impl FnOnce(&std::path::Path) -> T) -> T {
     use std::io::Write;
-    let path = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join(name);
+    let path = scratch::dir().join(name);
     std::fs::remove_file(&path).unwrap_or(());
     let made = std::process::Command::new("mkfifo").arg(&path).status().unwrap();
     assert!(made.success());
@@ -445,7 +448,7 @@ fn quantised_values_keep_their_bytes_and_read_back_within_their_bounds() {
     let bytes = to_bytes_with(&quantised(&e)).unwrap();
     keeps(&bytes, QUANTISED, "archive_v2_quantised.bin");
     assert!(bytes.len() < GOLDEN.len(), "quantised is smaller");
-    let path = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("archive_q.brda");
+    let path = scratch::dir().join("archive_q.brda");
     let _absent = std::fs::remove_file(&path);
     write_with(&path, &quantised(&e)).unwrap();
     assert!(std::fs::read(&path).unwrap() == to_bytes_with(&quantised(&e)).unwrap());
@@ -618,7 +621,7 @@ fn a_region_answers_within_its_box_as_the_whole_grid_does() {
             w.get([8, 0, 8]).unwrap().map(f64::to_bits)
         );
     }
-    let path = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("archive_region.brda");
+    let path = scratch::dir().join("archive_region.brda");
     let _absent = std::fs::remove_file(&path);
     write(&path, &e).unwrap();
     let extent = Bounds::Box { min: [0; 3], max: [7; 3] };
@@ -935,7 +938,7 @@ fn a_listing_gives_what_a_whole_read_gives_without_decompressing() {
     assert!(from_bytes(&broken, u64::MAX).is_err());
     lists(&list_from_bytes(&broken).unwrap(), &from_bytes(&g, u64::MAX).unwrap());
     assert_eq!(listed.grids().len(), 2);
-    let path = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("listed.brda");
+    let path = scratch::dir().join("listed.brda");
     std::fs::write(&path, &broken).unwrap();
     // At a path it reads the header, the directory and each entry's metadata and table.
     let structure = structure_len(&g);
@@ -965,7 +968,7 @@ fn structure_len(bytes: &[u8]) -> u64 {
 /// `row(1300)`'s archive, written at a path of its own under `name`.
 fn seek_archive(name: &str) -> (Vec<u8>, std::path::PathBuf) {
     let bytes = to_bytes(&row(1300)).unwrap();
-    let path = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join(name);
+    let path = scratch::dir().join(name);
     std::fs::write(&path, &bytes).unwrap();
     (bytes, path)
 }
@@ -1143,7 +1146,7 @@ fn grids_are_found_by_name_every_match_in_order() {
 /// writer going on, and one past the count is refused, the old file kept.
 #[test]
 fn an_archive_written_entry_by_entry_is_the_one_written_at_once() {
-    let dir = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("archive_by_entry");
+    let dir = scratch::dir().join("archive_by_entry");
     let _fresh = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("grids.brda");

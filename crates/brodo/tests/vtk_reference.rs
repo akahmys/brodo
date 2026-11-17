@@ -6,6 +6,9 @@
 
 #![cfg(feature = "vtk")]
 
+#[path = "support/scratch.rs"]
+mod scratch;
+
 use std::collections::{BTreeMap, BTreeSet};
 
 use brodo::field::Field;
@@ -321,7 +324,7 @@ fn write_vectors_for_vtk(tag: &str, t: &Topology) {
 #[test]
 fn a_field_written_to_a_path_is_its_bytes() {
     let (t, f) = grid(&[[0, 0, 0]], &[[8, 0, 0]], &[]);
-    let path = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("written.vtu");
+    let path = scratch::dir().join("written.vtu");
     std::fs::write(&path, b"an older file").unwrap();
     brodo::vtk::write(&path, &t, &f, "value").unwrap();
     assert_eq!(std::fs::read(&path).unwrap(), to_bytes(&t, &f, "value").unwrap());

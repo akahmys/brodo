@@ -152,11 +152,12 @@ done
 [ $ERROR -eq 0 ] && echo "  PASS"
 [ $ERROR_BEFORE -eq 0 ] || ERROR=1
 
-echo "[T1] Tests: no test file in src/, and #[ignore] only as needing what the repository lacks..."
+echo "[T1, T15] Tests: no test file in src/, #[ignore] only as needing what the repository lacks, and each test's files in its own directory..."
 stray=$(find $SRC_DIRS \( -name '*_test.rs' -o -name '*_tests.rs' -o -name 'test_*.rs' \
     -o -name 'tests.rs' -o -name 'test.rs' \) 2>/dev/null)
 [ -z "$stray" ] || { echo "$stray"; fail "test files in src/"; }
-# An ignore written directly or under `cfg_attr`, however its lines break, in any target.
+# An ignore written directly or under `cfg_attr`, however its lines break, in any target;
+# and the directory tests write in named by one file alone.
 python3 scripts/audit/source.py --ignores || ERROR=1
 
 echo "[Docs, S3] Language, tense, links, ADR index, provenance record, rustdoc..."

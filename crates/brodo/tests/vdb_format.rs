@@ -3,6 +3,9 @@
 //! alone, reads from it every grid's metadata, transform, leaves and tiles as brodo holds
 //! them. OpenVDB's own reading of the files is checked by hand (`spikes/vdb/`), not here.
 
+#[path = "support/scratch.rs"]
+mod scratch;
+
 use std::path::Path;
 use std::process::Command;
 
@@ -115,7 +118,7 @@ fn vector_golden() -> Vec<u8> {
 
 fn keeps(bytes: &[u8], golden: &[u8], name: &str) {
     if bytes != golden {
-        let path = Path::new(env!("CARGO_TARGET_TMPDIR")).join(name);
+        let path = scratch::dir().join(name);
         std::fs::write(&path, bytes).unwrap();
         panic!("the bytes brodo writes as .vdb changed; they are at {}", path.display());
     }
@@ -141,7 +144,7 @@ fn a_written_file_holds_the_bytes() {
     let t = topology();
     let (f, _) = fields(&t);
     let entries = [VdbEntry::new(&meta("sdf", true), &t, &f).unwrap()];
-    let path = Path::new(env!("CARGO_TARGET_TMPDIR")).join("written.vdb");
+    let path = scratch::dir().join("written.vdb");
     write(&path, &entries).unwrap();
     assert_eq!(std::fs::read(&path).unwrap(), to_bytes(&entries).unwrap());
 }

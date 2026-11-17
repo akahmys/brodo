@@ -3,6 +3,9 @@
 //! bytes; each rule of the format, broken alone, is refused for that rule, in memory and
 //! from a file; a file's set is found by its keys and refused when they do not fit.
 
+#[path = "support/scratch.rs"]
+mod scratch;
+
 mod timed;
 
 use std::collections::BTreeMap;
@@ -811,7 +814,7 @@ const EARLIER: [(&[u8], &str); 1] = [(include_bytes!("data/hermite_v2.bin"), "2"
 fn format_version_3_keeps_its_bytes() {
     let bytes = to_bytes(&golden_set().entries("golden", &meta("cube")).unwrap()).unwrap();
     if bytes != GOLDEN {
-        let path = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("hermite_v3.bin");
+        let path = scratch::dir().join("hermite_v3.bin");
         std::fs::write(&path, &bytes).unwrap();
         panic!("the bytes of Hermite format version 3 changed; they are at {}", path.display());
     }

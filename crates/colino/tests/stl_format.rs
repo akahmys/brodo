@@ -2,6 +2,9 @@
 //! the format descriptions leave open is read as `colino::stl` states; each damage is its
 //! own error; damaged bytes are refused or read safely, never with a panic.
 
+#[path = "../../brodo/tests/support/scratch.rs"]
+mod scratch;
+
 use colino::error::{MeshError, ReadError};
 use colino::mesh::{Limits, Mesh};
 use colino::stl::from_bytes;
@@ -313,7 +316,7 @@ fn an_ascii_file_holds_to_the_triangle_limit() {
 #[test]
 fn a_file_at_a_path_reads_as_its_bytes() {
     let bytes = binary(&[b' '; 80], &tetrahedron());
-    let path = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("tetrahedron.stl");
+    let path = scratch::dir().join("tetrahedron.stl");
     std::fs::write(&path, &bytes).unwrap();
     let read = colino::stl::read(&path, ROOMY).unwrap();
     assert_eq!(corners(&read), corners(&from_bytes(&bytes, ROOMY).unwrap()));

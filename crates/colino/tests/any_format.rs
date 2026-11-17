@@ -2,6 +2,9 @@
 //! `colino::any` (ADR-0055's amendment of 2026-11-17), and the reader of any format reads
 //! each as its own reader does, at a path as from bytes, under the same limits (issue 10).
 
+#[path = "../../brodo/tests/support/scratch.rs"]
+mod scratch;
+
 use std::path::PathBuf;
 
 use colino::any::{Format, format_of, from_bytes, read};
@@ -76,7 +79,7 @@ fn each_format_reads_as_its_own_reader_reads_it() {
         (OBJ.into(), colino::obj::from_bytes(OBJ.as_bytes(), LIMITS).unwrap()),
         (threemf(), colino::threemf::from_bytes(&threemf(), LIMITS).unwrap()),
     ];
-    let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR"));
+    let dir = scratch::dir();
     for (i, (bytes, expected)) in cases.iter().enumerate() {
         assert!(!expected.triangles.is_empty(), "case {i}");
         assert!(same(&from_bytes(bytes, LIMITS).unwrap(), expected), "case {i}");

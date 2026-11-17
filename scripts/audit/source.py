@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Checks on code that clippy has no lint for (CODING.md Rules 2, 4, 8, 9, 15, 18 and 19,
-TESTING.md T1).
+TESTING.md T1 and T15).
 
 Production code is each `src/` file up to its test module, an unindented `#[cfg(test)]`
 followed by `mod tests`, which clippy's `items_after_test_module` keeps at the end of the
@@ -30,6 +30,9 @@ production code.
    of a closure giving its argument's `.ok()`, however its lines break.
 7. T1, with `--ignores`: in every target, an attribute naming `ignore`, directly or under
    `cfg_attr`, however its lines break, is `ignore = "needs …"`.
+8. T15, with `--ignores`: no file of any target names `CARGO_TARGET_TMPDIR` or calls
+   `temp_dir(` but `TEST_SCRATCH` (`project.py`), whose `scratch::dir` gives each test a
+   directory of its own; a comment naming either counts too.
 
 The call graph is built from names, so it is approximate. A call counts when it is a bare
 `name(`, `self.name(` or `Self::name(`; `Vec::new()` inside `fn new` is not a call to
@@ -44,7 +47,7 @@ import sys
 from pathlib import Path
 
 from paths import committable
-from project import APPLICATIONS, UNSAFE_CALLERS, UNSAFE_MODULES
+from project import APPLICATIONS, TEST_SCRATCH, UNSAFE_CALLERS, UNSAFE_MODULES
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -402,6 +405,19 @@ def ignores(files: list[Path]) -> list[str]:
     return out
 
 
+def scratches(files: list[Path]) -> list[str]:
+    """T15: only `TEST_SCRATCH` names the directory tests write in."""
+    out = []
+    for path in files:
+        if path == ROOT / TEST_SCRATCH:
+            continue
+        for n, line in enumerate(path.read_text().splitlines(), 1):
+            if "CARGO_TARGET_TMPDIR" in line or "temp_dir(" in line:
+                out.append(f"  {path.relative_to(ROOT)}:{n}: a test writes outside its own "
+                           f"directory; use scratch::dir ({TEST_SCRATCH}, T15)")
+    return out
+
+
 def every_target(crate: Path) -> list[Path]:
     """Every `.rs` file of the crate git would commit, by `paths.committable`: a directory
     named as an output's but within `src/` is read, and no build output is."""
@@ -421,6 +437,7 @@ def main() -> int:
                 found += errors(crate, sources(crate))
             else:
                 found += ignores(every_target(crate))
+                found += scratches(every_target(crate))
         print("\n".join(found) if found else "  PASS")
         return 1 if found else 0
     failures = []

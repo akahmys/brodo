@@ -1,6 +1,6 @@
 # ADR-0048: Where files go at the root and where scripts lie is checked
 
-- **Status**: Accepted
+- **Status**: Amended
 - **Date**: 2026-11-02
 
 ## Context
@@ -33,3 +33,28 @@ root, a `.py` file and an executable file under `docs/` each failed the step by 
 
 A new root file or directory is a change to ARCHITECTURE.md §3, and so to the design
 (PLANNING.md §2). Where output goes (L2) stays unchecked.
+
+## Amendment: each test writes in a directory of its own
+
+- **Date**: 2026-11-17
+
+P13's retrospective found a test failing for a reason its code did not show: two of
+mestolo's tests, run in parallel, wrote the same file, `vectors.cache`, in
+`CARGO_TARGET_TMPDIR`, which every test of a crate shares, and one read the other's. Twelve
+test files wrote there, each naming its files its own way, by a literal, a helper or
+`format!`, and the names of the committed files they read recur, so no check of the names
+could tell a shared file from a read one.
+
+The owner decided, on 2026-11-17, as proposed, that the sharing is made impossible rather
+than looked for (TESTING.md T15): one file, `crates/brodo/tests/support/scratch.rs`,
+included by `#[path]` into each test file that writes one, gives the running test its own
+directory, `CARGO_TARGET_TMPDIR`, then its test target's name, then its own. The test
+harness names each test's thread after the test, its module path joined by `::`, with one
+thread or many, which a throwaway crate showed on 2026-11-17; `::` is written `-`, which
+every system's paths take. `scripts/audit/source.py --ignores` fails a file of any target
+but that one naming `CARGO_TARGET_TMPDIR` or calling `temp_dir(`, so that a test cannot
+reach the shared directory by the two ways a test has; one writing by a path built
+otherwise is held by review. The twelve files were changed to it, their tests unchanged
+in what they check. Shown to fire: a function joining `CARGO_TARGET_TMPDIR` added to
+colino's `obj_format.rs`, and one calling `std::env::temp_dir()` to mestolo's
+`commands.rs`, each failed the step by file and line.

@@ -2,6 +2,9 @@
 //! committed files held byte for byte to a committed golden file, and the program run for
 //! its command line, its exit status and its refusal to replace a file.
 
+#[path = "../../brodo/tests/support/scratch.rs"]
+mod scratch;
+
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::process::Command as Process;
@@ -33,7 +36,7 @@ fn brodo_file(name: &str) -> PathBuf {
 
 /// A path for an output, none there.
 fn fresh(name: &str) -> PathBuf {
-    let path = Path::new(env!("CARGO_TARGET_TMPDIR")).join(name);
+    let path = scratch::dir().join(name);
     std::fs::remove_file(&path).unwrap_or(());
     path
 }

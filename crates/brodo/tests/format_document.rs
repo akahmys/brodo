@@ -3,6 +3,9 @@
 //! read it, value for value, and accepts or refuses each damaged copy of them as the
 //! crates do, an archive's region (§8.6) among them. A difference means the document leaves out or misstates what a reader needs.
 
+#[path = "support/scratch.rs"]
+mod scratch;
+
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -335,7 +338,7 @@ fn the_document_s_reader_finds_the_sets_the_crates_find() {
         vec!["hermite 62 ok - 61 62", "hermite 676f6c64656e ok - 61 62"],
         vec!["hermite 63 refused"],
     ];
-    let dir = Path::new(env!("CARGO_TARGET_TMPDIR"));
+    let dir = scratch::dir();
     for ((entries, name), expected) in
         [(beside, "beside.bin"), (alone, "alone.bin")].into_iter().zip(expected)
     {
@@ -565,7 +568,7 @@ fn archive_with_a_shared_leaf() -> Vec<u8> {
 #[test]
 fn the_document_s_reader_refuses_a_region_of_nodes_sharing_a_leaf_as_the_crates_do() {
     let bytes = archive_with_a_shared_leaf();
-    let path = Path::new(env!("CARGO_TARGET_TMPDIR")).join("archive_with_a_shared_leaf.bin");
+    let path = scratch::dir().join("archive_with_a_shared_leaf.bin");
     std::fs::write(&path, &bytes).unwrap();
     // Refused whichever box: the nodes break the writer's rules, not only the walk to it.
     for (b, accepted) in [([0, 0, 0, 135, 7, 7], false), ([128, 0, 0, 135, 7, 7], false)] {
