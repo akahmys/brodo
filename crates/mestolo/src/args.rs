@@ -108,6 +108,32 @@ pub enum Command {
     },
 }
 
+/// The commands that take a file, each its usage in `help <command>`.
+pub(crate) const COMMANDS: [&str; 3] = ["info", "slice", "convert"];
+
+/// An option: its name, a value it takes, none for a flag, and the commands that take it.
+pub(crate) struct Opt {
+    /// Its name, as given.
+    pub(crate) name: &'static str,
+    /// A value it takes, for its tests; none for a flag, which takes no value.
+    pub(crate) example: Option<&'static str>,
+    /// The commands that take it.
+    pub(crate) commands: &'static [&'static str],
+}
+
+/// Every option, the one list `parse` takes them from and the usage is tested against.
+pub(crate) const OPTIONS: [Opt; 9] = [
+    Opt { name: "--limit", example: Some("1"), commands: &["info", "slice", "convert"] },
+    Opt { name: "--grid", example: Some("g"), commands: &["slice", "convert"] },
+    Opt { name: "--axis", example: Some("x"), commands: &["slice"] },
+    Opt { name: "--at", example: Some("-3"), commands: &["slice"] },
+    Opt { name: "-o", example: Some("o"), commands: &["slice", "convert"] },
+    Opt { name: "--force", example: None, commands: &["slice", "convert"] },
+    Opt { name: "--as", example: Some("archive"), commands: &["convert"] },
+    Opt { name: "--skip-unsupported", example: None, commands: &["convert"] },
+    Opt { name: "--encoding", example: Some("8bit"), commands: &["convert"] },
+];
+
 /// The options given, each at most once.
 #[derive(Default)]
 struct Given {
@@ -132,21 +158,23 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Command, Mestol
     };
     let name = text(name, "the command")?;
     let args: Vec<OsString> = args.collect();
-    let takes: &[&str] = match name.as_str() {
+    match name.as_str() {
         "help" | "-h" | "--help" => return Ok(help(&args)),
         "--version" | "-V" => return Ok(Command::Version),
-        "info" => &["--limit"],
-        "slice" => &["--limit", "--grid", "--axis", "--at", "-o", "--force"],
-        "convert" => {
-            &["--limit", "--grid", "--as", "-o", "--force", "--skip-unsupported", "--encoding"]
-        }
+        n if COMMANDS.contains(&n) => {}
         _ => return Err(MestoloError::UnknownCommand(name)),
-    };
+    }
     let mut before_end = args.iter().take_while(|a| *a != "--");
     if before_end.any(|a| a == "-h" || a == "--help") {
         return Ok(Command::HelpOn(name));
     }
-    let given = options(args.into_iter(), takes)?;
+    let given = options(args.into_iter(), &name)?;
+    command(&name, given)
+}
+
+/// The command `name` of the options `given`, refusing what it needs and was not given and
+/// options that do not go together.
+fn command(name: &str, given: Given) -> Result<Command, MestoloError> {
     let input = Input {
         path: given.input.ok_or(MestoloError::Missing("the input file"))?,
         limit: given.limit.unwrap_or(DEFAULT_LIMIT),
@@ -177,17 +205,14 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Command, Mestol
 /// for none or another.
 fn help(args: &[OsString]) -> Command {
     match args.first().and_then(|a| a.to_str()) {
-        Some(name @ ("info" | "slice" | "convert")) => Command::HelpOn(name.to_owned()),
+        Some(name) if COMMANDS.contains(&name) => Command::HelpOn(name.to_owned()),
         _ => Command::Help,
     }
 }
 
-/// The options and input file, of the options `takes` lists; after `--`, every argument
-/// is the input.
-fn options(
-    mut args: impl Iterator<Item = OsString>,
-    takes: &[&str],
-) -> Result<Given, MestoloError> {
+/// The options and input file of `command`, of the options `OPTIONS` gives it; after `--`,
+/// every argument is the input.
+fn options(mut args: impl Iterator<Item = OsString>, command: &str) -> Result<Given, MestoloError> {
     let mut given = Given::default();
     let mut ended = false;
     while let Some(arg) = args.next() {
@@ -203,38 +228,40 @@ fn options(
             ended = true;
             continue;
         }
-        if !takes.contains(&flag.as_str()) {
+        let opt = OPTIONS.iter().find(|o| o.name == flag && o.commands.contains(&command));
+        let Some(opt) = opt else {
             return Err(MestoloError::UnknownOption(flag));
-        }
-        set(&mut given, &flag, &mut args)?;
+        };
+        let value = match opt.example {
+            Some(_) => Some(args.next().ok_or(MestoloError::Missing(opt.name))?),
+            None => None,
+        };
+        set(&mut given, opt.name, value)?;
     }
     Ok(given)
 }
 
-/// Sets `flag`'s value, taken from `args` where it has one, refusing it twice.
-fn set(
-    given: &mut Given,
-    flag: &str,
-    args: &mut impl Iterator<Item = OsString>,
-) -> Result<(), MestoloError> {
-    let twice = || MestoloError::Repeated(flag.to_owned());
-    match flag {
-        "--force" if given.force => return Err(twice()),
-        "--force" => given.force = true,
-        "--skip-unsupported" if given.skip_unsupported => return Err(twice()),
-        "--skip-unsupported" => given.skip_unsupported = true,
-        "-o" => once(&mut given.output, PathBuf::from(value(args, "-o")?), twice)?,
-        "--grid" => once(&mut given.grid, text(value(args, "--grid")?, "--grid")?, twice)?,
-        "--axis" => once(&mut given.axis, axis(&text(value(args, "--axis")?, "--axis")?)?, twice)?,
-        "--at" => once(&mut given.at, number(value(args, "--at")?, "--at")?, twice)?,
-        "--as" => once(&mut given.format, format(&text(value(args, "--as")?, "--as")?)?, twice)?,
-        "--encoding" => {
-            let e = encoding(&text(value(args, "--encoding")?, "--encoding")?)?;
-            once(&mut given.encoding, e, twice)?;
-        }
-        _ => once(&mut given.limit, number(value(args, "--limit")?, "--limit")?, twice)?,
+/// Sets option `name` to `value`, none for a flag, refusing it twice; a name no arm takes
+/// is refused as not an option.
+fn set(given: &mut Given, name: &'static str, value: Option<OsString>) -> Result<(), MestoloError> {
+    let twice = || MestoloError::Repeated(name.to_owned());
+    let v = value.unwrap_or_default();
+    match name {
+        "--force" => flag(&mut given.force, twice),
+        "--skip-unsupported" => flag(&mut given.skip_unsupported, twice),
+        "-o" => once(&mut given.output, PathBuf::from(v), twice),
+        "--grid" => once(&mut given.grid, text(v, name)?, twice),
+        "--axis" => once(&mut given.axis, axis(&text(v, name)?)?, twice),
+        "--at" => once(&mut given.at, number(v, name)?, twice),
+        "--as" => once(&mut given.format, format(&text(v, name)?)?, twice),
+        "--encoding" => once(&mut given.encoding, encoding(&text(v, name)?)?, twice),
+        "--limit" => once(&mut given.limit, number(v, name)?, twice),
+        _ => Err(MestoloError::UnknownOption(name.to_owned())),
     }
-    Ok(())
+}
+
+fn flag(slot: &mut bool, twice: impl Fn() -> MestoloError) -> Result<(), MestoloError> {
+    if std::mem::replace(slot, true) { Err(twice()) } else { Ok(()) }
 }
 
 fn once<T>(
@@ -243,13 +270,6 @@ fn once<T>(
     twice: impl Fn() -> MestoloError,
 ) -> Result<(), MestoloError> {
     if slot.replace(v).is_some() { Err(twice()) } else { Ok(()) }
-}
-
-fn value(
-    args: &mut impl Iterator<Item = OsString>,
-    option: &'static str,
-) -> Result<OsString, MestoloError> {
-    args.next().ok_or(MestoloError::Missing(option))
 }
 
 fn text(arg: OsString, what: &'static str) -> Result<String, MestoloError> {
@@ -286,5 +306,46 @@ fn axis(s: &str) -> Result<Axis, MestoloError> {
         "y" => Ok(Axis::Y),
         "z" => Ok(Axis::Z),
         _ => Err(MestoloError::BadValue { option: "--axis", value: s.to_owned() }),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Each option of `OPTIONS` is taken by the commands it names, its value read, and
+    /// refused given twice; by another command it is refused as not an option. An option a
+    /// table names and `set` does not would be refused as not an option.
+    #[test]
+    fn every_option_is_taken_by_its_commands_and_no_other() {
+        for command in COMMANDS {
+            for opt in &OPTIONS {
+                let once: Vec<&str> = [opt.name].into_iter().chain(opt.example).collect();
+                let words = |times: usize| {
+                    let mut words = vec!["f"];
+                    (0..times).for_each(|_| words.extend(&once));
+                    words.into_iter().map(OsString::from).collect::<Vec<_>>()
+                };
+                let given = options(words(1).into_iter(), command);
+                let twice = options(words(2).into_iter(), command);
+                let name = opt.name.to_owned();
+                if opt.commands.contains(&command) {
+                    assert!(given.is_ok(), "{command} {}: {:?}", opt.name, given.err());
+                    assert!(
+                        matches!(&twice, Err(MestoloError::Repeated(n)) if *n == name),
+                        "{command} {}: {:?}",
+                        opt.name,
+                        twice.err()
+                    );
+                } else {
+                    assert!(
+                        matches!(&given, Err(MestoloError::UnknownOption(n)) if *n == name),
+                        "{command} {}: {:?}",
+                        opt.name,
+                        given.err()
+                    );
+                }
+            }
+        }
     }
 }

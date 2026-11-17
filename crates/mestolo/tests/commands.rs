@@ -194,7 +194,7 @@ fn the_limit_bounds_each_kind_of_file() {
 }
 
 /// `help <command>`, `-h` or `--help` and a command's `-h` or `--help` before `--` write its
-/// usage, which names its options; of no command or another, the whole usage; `--version` and
+/// usage; of no command or another, the whole usage; `--version` and
 /// `-V` the version.
 #[test]
 fn help_writes_a_commands_usage_and_version_the_version() {
@@ -203,14 +203,10 @@ fn help_writes_a_commands_usage_and_version_the_version() {
         mestolo::run(&parse(args(words)).unwrap(), &mut out).unwrap();
         String::from_utf8(out).unwrap()
     };
-    for (name, options) in [
-        ("info", &["--limit"][..]),
-        ("slice", &["--axis", "--at", "-o", "--grid", "--limit", "--force"]),
-        ("convert", &["-o", "--as", "--grid", "--limit", "--force", "--skip-unsupported"]),
-    ] {
+    // Which options each usage names is tested against the options' table, in `lib.rs`.
+    for name in ["info", "slice", "convert"] {
         let usage = text(&["help", name]);
         assert!(usage.starts_with(&format!("usage: mestolo {name} <file>")), "{usage}");
-        assert!(options.iter().all(|o| usage.contains(&format!(" {o} "))), "{usage}");
         for words in [&[name, "f", "-h"][..], &[name, "--help", "f", "--limit", "x"]] {
             let on = Ok(Command::HelpOn(name.to_owned()));
             assert_eq!(parse(args(words)).map_err(|e| e.to_string()), on);

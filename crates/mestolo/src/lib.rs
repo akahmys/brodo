@@ -128,3 +128,24 @@ pub fn run(command: &Command, out: &mut impl Write) -> Result<(), MestoloError> 
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use args::{COMMANDS, OPTIONS};
+
+    /// A command's usage names the options it takes and no other; the whole usage names
+    /// every option.
+    #[test]
+    fn each_usage_names_the_options_its_command_takes() {
+        for command in COMMANDS {
+            let usage = usage_of(command).unwrap_or_default();
+            assert!(usage.starts_with(&format!("usage: mestolo {command} ")), "{usage}");
+            for opt in &OPTIONS {
+                let named = usage.contains(&format!(" {} ", opt.name));
+                assert_eq!(named, opt.commands.contains(&command), "{command} {}", opt.name);
+                assert!(USAGE.contains(&format!(" {} ", opt.name)), "{}", opt.name);
+            }
+        }
+    }
+}

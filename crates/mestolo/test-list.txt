@@ -1,6 +1,8 @@
 doc mestolo crates/mestolo/src/lib.rs - #1
+lib mestolo args::tests::every_option_is_taken_by_its_commands_and_no_other
 lib mestolo draw::tests::a_level_set_diverges_at_its_band_and_another_grid_runs_over_its_values
 lib mestolo draw::tests::a_slice_of_the_most_pixels_is_drawn_and_one_more_row_refused
+lib mestolo tests::each_usage_names_the_options_its_command_takes
 test commands a_file_of_no_kind_read_and_a_bare_grid_are_refused
 test commands a_grid_is_drawn_as_a_level_set_by_its_class
 test commands a_grid_is_found_by_its_name
