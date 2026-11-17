@@ -108,3 +108,23 @@ baseline stay, and a drift is judged by the human as before (**A baseline moved*
 harness writing other processes' time on the performance cores into its report, so that a
 session's state is seen, was set aside: it would put a macOS-only system call into the
 benchmarks for a figure the human can read when a drift is judged.
+
+## Amendment: a slower verdict is measured again against the commit before
+
+- **Date**: 2026-11-17
+
+At issue 10 (c3579c0) colino's `convert_slab_320` was judged slower in four pairs, 13 to
+23 % behind its baseline of 2026-10-31, and the commit landed as off a timed path. The
+reports' headers read loads of 1.08 and 1.39, the machine at rest by the harness's
+measure. Measured again in another session against the commit before, the two in turn,
+its fastest times were 245.2 against 242.7 ms, about 1 % apart, both `ok`; the commit
+measured second in each turn of that session varied more. Like the leaf-parallel update
+(the amendment above), the item drifts between sessions at a load the harness reads as
+rest, and a retrospective proposal to lower `BUSY_LOAD` was withdrawn, since the runs it
+would have refused started below it.
+
+The owner decided, on 2026-11-17, as proposed: an item judged slower against a baseline of
+another session is measured again in one session against the commit before, the two run in
+the order A, B, B, A so that neither always follows the other's load, before the verdict
+is taken (TESTING.md T10). The harness is unchanged; nothing checks that the measuring is
+done.
