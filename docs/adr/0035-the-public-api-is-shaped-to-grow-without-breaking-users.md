@@ -106,3 +106,23 @@ home and no other file's doc comment names an item under `#[doc(hidden)]`, which
 doc comments under `crates/*/src/` but the item's own file's, the crate READMEs,
 ARCHITECTURE.md and docs/formats.md. A hidden module, `mestolo`'s, is not held to it. Run
 first, it found that documentation alone, which now says only to remove the key.
+
+## Amendment: settings are taken as a struct
+
+- **Date**: 2026-11-17
+
+P13's retrospective compared how the crates take settings. colino takes them one way,
+`Options` and `Limits`: `#[non_exhaustive]` structs made by `new` or `Default` and changed
+by `with_*`, so that P5 and later added settings without breaking a call. brodo takes them
+as arguments and adds a function for each variant: `.vdb`'s `read`, `read_named`,
+`from_bytes` and `from_bytes_named`, two axes of settings in four functions, and the
+archive's `write` and `write_with`, `to_bytes` and `to_bytes_with`, `push` and
+`push_with`, so that a third setting would double them again. mestolo's `Command::Slice`
+could not take issue 11's options without breaking a user (ADR-0050).
+
+The owner decided, on 2026-11-17, as proposed: a public function or method added from
+1.4.0 on that takes a setting takes its settings as such a struct (CODING.md Rule 22),
+unless a family of published functions already takes that setting as an argument, as
+brodo's readers take `limit`, so that a family stays one shape. The published functions
+are kept, since changing them breaks users (TESTING.md V9); the next MAJOR may reshape them.
+Nothing checks it: which argument is a setting is a judgement of review.
