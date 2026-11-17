@@ -19,9 +19,11 @@
 //! thread count (ARCHITECTURE.md §5.1).
 
 use std::collections::BTreeSet;
+use std::sync::Arc;
 
 use brodo::error::FieldError;
 use brodo::field::{Field, uniform};
+use brodo::grid::Grid;
 use brodo::meta::{GridMeta, SDF_KEY, SDF_VERSION};
 use brodo::parallel::par_update;
 use brodo::topology::Topology;
@@ -169,12 +171,7 @@ impl Options {
         if f64::from(self.band) * self.voxel_size > f64::from(f32::MAX) {
             return Err(ConvertError::BadOption("a band's half-width beyond f32"));
         }
-        if let Accuracy::Approximate { beta } = self.accuracy
-            && !(beta.is_finite() && beta > 0.0)
-        {
-            return Err(ConvertError::BadOption("a β that is not finite and positive"));
-        }
-        Ok(())
+        check_accuracy(self.accuracy)
     }
 
     /// A point in voxel index space, voxel corners at integers, as world coordinates.
@@ -186,6 +183,16 @@ impl Options {
     fn index(&self, p: Point) -> Point {
         [0, 1, 2].map(|k| (p[k] - self.origin[k]) / self.voxel_size)
     }
+}
+
+/// Refuses an approximate accuracy whose β is not finite and positive.
+fn check_accuracy(accuracy: Accuracy) -> Result<(), ConvertError> {
+    if let Accuracy::Approximate { beta } = accuracy
+        && !(beta.is_finite() && beta > 0.0)
+    {
+        return Err(ConvertError::BadOption("a β that is not finite and positive"));
+    }
+    Ok(())
 }
 
 /// A mesh converted: its tree, its signed distances and the grid's metadata.
@@ -226,6 +233,34 @@ impl Lattice {
 }
 
 impl Converted {
+    /// A conversion read back from a file, such as a grid `convert` gave, written and read
+    /// again: its topology, field and metadata, with the sign and accuracy it was converted
+    /// with, which the file does not record. [`hermite`](crate::hermite::hermite) and
+    /// [`report`](crate::report::report) take it as they take one `convert` gave.
+    ///
+    /// Refused as `Field(StaleField)` when the field belongs to another topology, as `Meta`
+    /// when [`GridMeta::check`] refuses the metadata, as `NotSdf` when its `extra` does not
+    /// hold [`SDF_KEY`] at [`SDF_VERSION`], and as `BadOption` for an approximate accuracy
+    /// whose β is not finite and positive. That the distances are those of the mesh it is
+    /// later given, and that the sign and accuracy are those it was converted with, is
+    /// taken on the caller's word: nothing checks them.
+    pub fn from_parts(
+        topology: Topology,
+        field: Field<f32>,
+        meta: GridMeta,
+        sign: Sign,
+        accuracy: Accuracy,
+    ) -> Result<Converted, ConvertError> {
+        let (topology, field, _) =
+            Grid::from_parts(topology, field, Arc::new(uniform))?.into_parts();
+        meta.check()?;
+        if meta.extra.get(SDF_KEY).map(String::as_str) != Some(SDF_VERSION) {
+            return Err(ConvertError::NotSdf);
+        }
+        check_accuracy(accuracy)?;
+        Ok(Converted { topology, field, meta, sign, accuracy })
+    }
+
     /// Its lattice, read from its transform; none unless the transform is aligned with the
     /// axes, an entry off the diagonal 0 and not NaN, each voxel size positive and finite,
     /// and the origin finite.

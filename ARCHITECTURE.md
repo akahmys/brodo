@@ -473,6 +473,10 @@ are in ADR-0030.
   dense grid: memory follows the band's volume. These are brodo's SDF convention, version
   2, which the grid's `extra` names under the key `brodo.sdf.version`
   (`brodo::meta::SDF_KEY`, ADR-0039, ADR-0053) so that any producer can claim it.
+- Resuming: a conversion is rebuilt from a grid read back from a file, its topology, field
+  and metadata, with the sign and accuracy it was made with, which the file does not
+  record; a grid not marked as this convention's version is refused, and that the
+  distances, sign and accuracy are the conversion's is taken on the caller's word.
 - Hermite data: a set in brodo's format (§4.9) on the conversion's topology, its signs
   found by the conversion's sign and its crossings found by a watertight edge test, with the count
   of crossed edges no triangle was hit on beside it, whose crossing is the nearest triangle's:

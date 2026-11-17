@@ -63,6 +63,7 @@ fn convert_error(e: &ConvertError) -> &'static str {
         ConvertError::BadOption(..) => "BadOption",
         ConvertError::NoUnit => "NoUnit",
         ConvertError::OutOfRange => "OutOfRange",
+        ConvertError::NotSdf => "NotSdf",
         _ => "later",
     }
 }

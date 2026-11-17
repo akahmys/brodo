@@ -8,7 +8,9 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: issue 5 (2026-11-17): `Labels::leaf`, `Labels::tile` and `Labels::outside`
+- **Done**: issue 9 (2026-11-17): colino's `Converted::from_parts` rebuilds a conversion
+  from a grid read back, with the sign and accuracy given by the caller, the shape chosen by
+  the owner; left open for the owner to close. Before it, issue 5 (2026-11-17): `Labels::leaf`, `Labels::tile` and `Labels::outside`
   read a leaf's 512 labels, a tile's and the outside's, the shape chosen by the owner;
   left open for the owner to close. Before it, P13's first item (2026-11-16): `archive::read_region` and `archive::list` read
   at a path only the structure and the chunks they decompress, one call a chunk in
@@ -33,7 +35,7 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   colino and mestolo published by the owner, docs.rs building their reference, the new
   API used from a new crate depending on them by version, and `cargo install mestolo`
   installing the command (2026-11-12).
-- **Next**: P13's next item (§2), issue 9, its API's shape put to the owner first.
+- **Next**: P13's next item (§2), issue 10, its API's shape put to the owner first.
 - **Unresolved**: none. `leaf_parallel_update_x32`'s drift between sessions is measured:
   other processes' work on the performance cores moves it either way, and the item and its
   baseline are kept (B-026, ADR-0019's amendment of 2026-11-12).
@@ -76,7 +78,7 @@ last applied by `akahmys` (checked 2026-11-12).
       2026-10-29, taken into P13 on 2026-11-12)
 - [x] [Issue 5](https://github.com/akahmys/brodo/issues/5): components' labels read a leaf
       at a time, with the outside component named
-- [ ] [Issue 9](https://github.com/akahmys/brodo/issues/9): a `Converted` built from a grid
+- [x] [Issue 9](https://github.com/akahmys/brodo/issues/9): a `Converted` built from a grid
       read back from a file
 - [ ] [Issue 10](https://github.com/akahmys/brodo/issues/10): one mesh reader telling STL,
       OBJ and 3MF apart from the file

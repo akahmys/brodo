@@ -213,6 +213,10 @@ pub enum ConvertError {
     /// the band, lies farther than `i32::MAX` − 8192 voxels from voxel 0 along an axis.
     #[error("the mesh reaches beyond the grid's i32 voxel coordinates")]
     OutOfRange,
+    /// A grid given as a conversion is not marked as an SDF of the convention this brodo
+    /// states: its metadata lacks `brodo::meta::SDF_KEY` at `SDF_VERSION`.
+    #[error("the grid is not marked as a signed distance field of this convention")]
+    NotSdf,
 }
 
 /// Why Hermite data could not be made by `hermite` (ADR-0030). Named after the function that
