@@ -6,6 +6,7 @@
 //! constructor and set by assignment, and each one a user reads is read by its fields,
 //! which a field added later leaves working.
 
+use colino::any::{Format, format_of};
 use colino::convert::{Options, Sign, convert};
 use colino::error::{ConvertError, HermiteError, MeshError, ReadError, ReportError};
 use colino::hermite::hermite;
@@ -37,6 +38,16 @@ fn read_error(e: &ReadError) -> &'static str {
         ReadError::NoObject { .. } => "NoObject",
         ReadError::TooLarge { .. } => "TooLarge",
         ReadError::Io(..) => "Io",
+        ReadError::NotBuilt(..) => "NotBuilt",
+        _ => "later",
+    }
+}
+
+fn format(f: &Format) -> &'static str {
+    match f {
+        Format::Stl => "Stl",
+        Format::Obj => "Obj",
+        Format::ThreeMf => "ThreeMf",
         _ => "later",
     }
 }
@@ -157,6 +168,7 @@ fn tetrahedron() -> Mesh {
 #[test]
 fn every_enum_that_may_grow_is_matched_with_a_wildcard() {
     assert_eq!(read_error(&ReadError::NotText), "NotText");
+    assert_eq!(format(&format_of(b"v 0 0 0\n")), "Obj");
     let bad = Mesh::new(vec![[0.0; 3]], vec![[0, 1, 2]]);
     assert_eq!(mesh_error(&Surface::of(&bad).unwrap_err()), "BadIndex");
     let no_unit = convert(&tetrahedron(), &Options::new(0.25)).unwrap_err();

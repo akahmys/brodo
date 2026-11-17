@@ -21,6 +21,10 @@ are recorded here when they change (V6).
   with the sign and accuracy it was made with, for `hermite` and `report` to take; a grid
   without the SDF convention's mark is refused as the new `ConvertError::NotSdf`
   (ARCHITECTURE.md §5.1; issue 9).
+- colino's `any::read` and `any::from_bytes`: a mesh file of any format colino reads, its
+  format told from its bytes (`any::format_of`, `any::Format`) and read by its own reader;
+  a format whose reader the build leaves out is refused as the new `ReadError::NotBuilt`
+  (ARCHITECTURE.md §5.1, ADR-0055; issue 10). `any.rs` is fuzzed by the new target `any`.
 
 ## 1.3.0 (2026-11-12)
 

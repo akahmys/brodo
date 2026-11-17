@@ -65,3 +65,20 @@ not written and the writer goes on; after an error writing, every call is refuse
 variants are added to `CacheError`: `EntryCount`, for an entry past the count or a finish
 short of it, and `WriterFailed`. `write`, `write_with`, `to_bytes` and `to_bytes_with` are
 made by the same code, their bytes unchanged.
+
+## Amendment: one reader for any mesh format
+
+- **Date**: 2026-11-17
+
+Issue 10 asked for one reader that tells a mesh file's format from its bytes, so that a
+caller need not match on the format itself. The owner decided, on 2026-11-17, as proposed,
+that colino gains a module `any` in this record's shape: `any::read(path, limits)` and
+`any::from_bytes(bytes, limits)`, with `any::Format` (`Stl`, `Obj`, `ThreeMf`,
+non-exhaustive) and `any::format_of(bytes)`, which tells it and refuses nothing. The
+format is told by the first that holds: a ZIP local file header at the start, 3MF; a
+binary STL's length, STL, as `stl::from_bytes` tells it; a first word `solid`, STL;
+otherwise OBJ, which has no mark, its reader refusing what is none of the three. A format
+whose reader a build leaves out by its feature is refused as the new
+`ReadError::NotBuilt(Format)`; `Format` and `format_of` are built always, the two readers
+with any reader. Telling the format parses untrusted bytes, so `any.rs` is listed in
+`UNTRUSTED_INPUT` and fuzzed by a target of its own (ADR-0009).

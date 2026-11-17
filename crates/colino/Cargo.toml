@@ -71,6 +71,10 @@ name = "threemf_format"
 required-features = ["threemf"]
 
 [[test]]
+name = "any_format"
+required-features = ["stl", "obj", "threemf"]
+
+[[test]]
 name = "miri_paths"
 required-features = ["threemf"]
 

@@ -139,6 +139,10 @@ pub enum ReadError {
     /// Reading the file failed.
     #[error(transparent)]
     Io(#[from] std::io::Error),
+    /// The bytes are told to be of a format whose reader this build leaves out, by its
+    /// feature (`colino::any::from_bytes`).
+    #[error("a {0:?} file, whose reader this build leaves out")]
+    NotBuilt(crate::any::Format),
 }
 
 /// Why a mesh could not be worked on.

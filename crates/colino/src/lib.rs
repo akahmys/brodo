@@ -2,6 +2,7 @@
 //!
 //! The design is in the repository's `ARCHITECTURE.md` §5.
 
+pub mod any;
 pub mod bvh;
 pub mod convert;
 pub mod distance;

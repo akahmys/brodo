@@ -8,7 +8,10 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: issue 9 (2026-11-17): colino's `Converted::from_parts` rebuilds a conversion
+- **Done**: issue 10 (2026-11-17): colino's `any::read` and `any::from_bytes` tell a mesh
+  file's format from its bytes and read it by its own reader, the shape chosen by the owner
+  (ADR-0055's amendment of 2026-11-17); left open for the owner to close. Before it,
+  issue 9 (2026-11-17): colino's `Converted::from_parts` rebuilds a conversion
   from a grid read back, with the sign and accuracy given by the caller, the shape chosen by
   the owner; left open for the owner to close. Before it, issue 5 (2026-11-17): `Labels::leaf`, `Labels::tile` and `Labels::outside`
   read a leaf's 512 labels, a tile's and the outside's, the shape chosen by the owner;
@@ -35,7 +38,7 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   colino and mestolo published by the owner, docs.rs building their reference, the new
   API used from a new crate depending on them by version, and `cargo install mestolo`
   installing the command (2026-11-12).
-- **Next**: P13's next item (§2), issue 10, its API's shape put to the owner first.
+- **Next**: P13's next item (§2), issue 12, its API's shape put to the owner first.
 - **Unresolved**: none. `leaf_parallel_update_x32`'s drift between sessions is measured:
   other processes' work on the performance cores moves it either way, and the item and its
   baseline are kept (B-026, ADR-0019's amendment of 2026-11-12).
@@ -80,7 +83,7 @@ last applied by `akahmys` (checked 2026-11-12).
       at a time, with the outside component named
 - [x] [Issue 9](https://github.com/akahmys/brodo/issues/9): a `Converted` built from a grid
       read back from a file
-- [ ] [Issue 10](https://github.com/akahmys/brodo/issues/10): one mesh reader telling STL,
+- [x] [Issue 10](https://github.com/akahmys/brodo/issues/10): one mesh reader telling STL,
       OBJ and 3MF apart from the file
 - [ ] [Issue 12](https://github.com/akahmys/brodo/issues/12): mestolo's `convert --as
       archive` choosing a quantised encoding

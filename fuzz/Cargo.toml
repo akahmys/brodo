@@ -74,3 +74,10 @@ path = "fuzz_targets/vdb.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "any"
+path = "fuzz_targets/any.rs"
+test = false
+doc = false
+bench = false
