@@ -67,12 +67,8 @@ fn vdb(
         Some(_) => vec![loaded.grid(grid)?],
         None => loaded.grids.iter().collect(),
     };
-    let (grids, not_written): (Vec<_>, Vec<_>) = grids.into_iter().partition(|g| {
-        matches!(
-            g.field,
-            AnyField::F32(_) | AnyField::F64(_) | AnyField::F32x3(_) | AnyField::F64x3(_)
-        )
-    });
+    let (grids, not_written): (Vec<_>, Vec<_>) =
+        grids.into_iter().partition(|g| floating(g.field.value_type()));
     let not_written: Vec<_> =
         not_written.iter().map(|g| (g.meta.name.clone(), g.field.value_type())).collect();
     match skipped {
@@ -126,7 +122,8 @@ fn copied(file: &CacheFile, grid: Option<&str>) -> Result<Vec<(CacheEntry, bool)
     Ok(vec![copy(g.ok_or_else(|| MestoloError::NoGrid(name.to_owned()))?)])
 }
 
-/// Whether values of type `t` are floating, those an archive may store quantised.
+/// Whether values of type `t` are floating: those `.vdb` holds and an archive may store
+/// quantised.
 fn floating(t: ValueType) -> bool {
     matches!(t, ValueType::F32 | ValueType::F64 | ValueType::F32x3 | ValueType::F64x3)
 }
