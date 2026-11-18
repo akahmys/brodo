@@ -1187,15 +1187,20 @@ fn an_archive_written_entry_by_entry_is_the_one_written_at_once() {
     assert_eq!(names, ["grids.brda"]);
 }
 
-/// Reads an archive of `n` entries of one byte, returning the seconds the read took.
+/// Reads an archive of `n` entries of one byte three times, returning the seconds the
+/// fastest read took, so that a test run beside it slows one read and not the verdict.
 fn seconds_to_read(n: usize) -> f64 {
     let one = CacheEntry::bytes("b", BTreeMap::new(), vec![1]).unwrap();
     let bytes = to_bytes(&vec![one; n]).unwrap();
-    let start = std::time::Instant::now();
-    let read = from_bytes(&bytes, u64::MAX).unwrap();
-    let took = start.elapsed().as_secs_f64();
-    assert_eq!(read.bytes_entries().len(), n);
-    took
+    (0..3)
+        .map(|_| {
+            let start = std::time::Instant::now();
+            let read = from_bytes(&bytes, u64::MAX).unwrap();
+            let took = start.elapsed().as_secs_f64();
+            assert_eq!(read.bytes_entries().len(), n);
+            took
+        })
+        .fold(f64::INFINITY, f64::min)
 }
 
 #[test]
