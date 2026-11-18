@@ -112,3 +112,8 @@ gone with their code were removed with it.
   promised.
 - 2026-11-11: six of P12's, as `[same]`: four of the root's empty regions in labelling,
   one of them only slower, and two of a `.vdb` reader's default for a value's distance.
+- 2026-11-18: four of P13's: three of an archive's read at an offset on Windows and on
+  other platforms, as `[same]` on the Linux the run is made on, and one of a path's span of
+  an entry of bytes, as `[open]`. Three timeouts with no failed test before them were
+  labelling looping for ever, its tests that end in time started after four that wait on
+  GitHub Actions' four threads; they were renamed to sort, and so start, first.

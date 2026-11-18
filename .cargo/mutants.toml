@@ -313,4 +313,18 @@ exclude_re = [
     'cache\.rs:.*: replace match guard x0 <= x1 && y0 <= y1 && z0 <= z1 with true in decode_meta$',
     # As above.
     'cache\.rs:.*: replace && with \|\| in decode_meta$',
+    # Compiled on Windows alone: on Linux, where the run is made, the mutant is the code
+    # unchanged, and audit.yml's Windows job runs the tests through it.
+    # [same]
+    'archive\.rs:.*: replace seek_read -> .*$',
+    # As above.
+    'archive\.rs:.* in seek_read$',
+    # Compiled on a platform neither Unix nor Windows alone, which the run is not made on.
+    # [same]
+    'archive\.rs:.*: replace cursor_read -> .*$',
+    # An entry of bytes has value type 0 and encoding 0, which give no ranges, so its span is
+    # the same; one that breaks that is refused, and a path's read may then fetch more and
+    # name its limit instead: of several broken rules, which is named is not promised.
+    # [open: `brodo::archive::list_from_bytes`]
+    'archive\.rs:.*: replace match guard k == KIND_GRID as usize with true in span$',
 ]

@@ -51,7 +51,7 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   colino and mestolo published by the owner, docs.rs building their reference, the new
   API used from a new crate depending on them by version, and `cargo install mestolo`
   installing the command (2026-11-12).
-- **Next**: P13's closing checks (§2), chosen by the owner, then version 1.4.0.
+- **Next**: version 1.4.0 (§2, TESTING.md V2–V4).
 - **Unresolved**: none. `leaf_parallel_update_x32`'s drift between sessions is measured:
   other processes' work on the performance cores moves it either way, and the item and its
   baseline are kept (B-026, ADR-0019's amendment of 2026-11-12).
@@ -104,14 +104,20 @@ last applied by `akahmys` (checked 2026-11-12).
 - [x] [Issue 11](https://github.com/akahmys/brodo/issues/11): more `slice` options, the
       options chosen by the owner before any is written
 - [x] The retrospective and refactoring (PLANNING.md §7)
-- [ ] The closing checks, chosen by the owner (2026-11-18): T11's mutation run, the check
+- [x] The closing checks, chosen by the owner (2026-11-18): T11's mutation run, the check
       against 1.3.0 (V9), T6's fuzzing of `any`, `archive`, `cache_file` and `vdb`, readers
       of untrusted bytes having changed, and both crates' benchmarks at rest, a slower
       verdict measured again by T10; not T7, no unsafe code being touched
   - [x] T6: `any`, `archive`, `cache_file` and `vdb` fuzzed 900 s each on `a3c03aa`,
         24,832,237, 1,156,580, 10,416,938 and 80,682 runs, nothing found (2026-11-18)
   - [x] V9: the gate's check against v1.3.0 passes on `d190057` (2026-11-18)
-  - [ ] T11: the run on GitHub Actions
+  - [x] T11: the run on `a3c03aa`, GitHub Actions run 44169118604, reported all 4964
+        mutants and missed 18, and three timeouts with no failed test before them still ran
+        at 1800 s; eight killed by tests, one by removing a check no input reaches, nine
+        excluded with the owner's approval, eight of them of an archive's read at an offset
+        compiled on other platforms than Linux; the three, labelling looping for ever,
+        caught once its tests that end in time start first; and the 76 of the functions
+        touched run again on four test threads, none missed but those excluded (2026-11-18)
   - [x] T10: brodo's and colino's benchmarks on `a3c03aa`: `archive_read_8bit_x8`,
         `archive_region_x8` and `convert_slab_320`, judged slower against their baselines,
         measured again against v1.3.0 in the order A, B, B, A, within 4 % of it, every

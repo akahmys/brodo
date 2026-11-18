@@ -328,7 +328,7 @@ fn each_check_refuses_its_damage() {
     assert!(matches!(read(&with_word(&g, 3, 2)), Err(CacheError::Inconsistent("header"))));
     assert!(matches!(read(&with_word(&g, 4, 256)), Err(CacheError::Inconsistent("header"))));
     assert!(matches!(read(&with_word(&g, 5, 1)), Err(CacheError::Inconsistent("header"))));
-    assert!(matches!(read(&g[..g.len() - 32]), Err(CacheError::Truncated(_))));
+    assert!(matches!(read(&g[..g.len() - 32]), Err(CacheError::Truncated("chunk"))));
     assert!(matches!(read(&g[..g.len() - 1]), Err(CacheError::Inconsistent("length"))));
     // Directory of grid 0 is words 8..16: metadata at, length, table at, chunks, blocks,
     // type, encoding, then one unused.
@@ -1205,4 +1205,70 @@ fn an_archives_read_takes_time_in_proportion_to_its_entries() {
     let few = seconds_to_read(2_000).max(1e-3);
     let many = seconds_to_read(16_000);
     assert!(many < 24.0 * few, "{many} s for 16000 entries against {few} s for 2000");
+}
+
+/// A path's listing and region read the parts a quantised grid's chunk table holds, its
+/// ranges after its entries however the two fall into blocks, and refuse what they cannot
+/// read by name: a directory beyond the file, or a chunk table running past it; a file of no
+/// grid is listed as none (docs/formats.md §8.6 and §8.7).
+#[test]
+fn a_paths_listing_and_region_read_what_the_bytes_do() {
+    let path = scratch::dir().join("archive_paths.brda");
+    let extent = Bounds::Box { min: [0; 3], max: [40; 3] };
+    for leaves in [1, 600, 1100, 1600, 2100] {
+        let e = row(leaves);
+        let bytes =
+            to_bytes_with(&[(&e[0], Encoding::EightBit), (&e[1], Encoding::EightBit)]).unwrap();
+        std::fs::write(&path, &bytes).unwrap();
+        let at_path = format!("{:?}", list(&path, u64::MAX).unwrap());
+        assert_eq!(at_path, format!("{:?}", list_from_bytes(&bytes).unwrap()), "{leaves}");
+        for index in 0..2 {
+            let a = read_region(&path, index, extent, u64::MAX).unwrap();
+            let b = region_from_bytes(&bytes, index, extent, u64::MAX).unwrap();
+            assert_eq!(format!("{:?}", a.meta()), format!("{:?}", b.meta()), "{leaves}");
+            assert_eq!(a.extent(), b.extent(), "{leaves}");
+        }
+    }
+    let g = GOLDEN.to_vec();
+    let refused = |bytes: &[u8]| {
+        std::fs::write(&path, bytes).unwrap();
+        list(&path, u64::MAX).map(|_| ())
+    };
+    assert!(matches!(refused(&g[..64]), Err(CacheError::Truncated("directory"))));
+    let table_beyond = with_word(&g, 10, 1 << 20);
+    assert!(matches!(refused(&table_beyond), Err(CacheError::Inconsistent("chunk table"))));
+    std::fs::write(&path, to_bytes(&[]).unwrap()).unwrap();
+    assert_eq!(list(&path, u64::MAX).unwrap().grids().len(), 0);
+}
+
+/// A chunk may end at the end of the file, its length a whole number of blocks: an entry of
+/// bytes whose chunk is an LZ4 block of 32 bytes, 14 literals, a match of 4 and 14 more,
+/// which this writer does not make, is read whole or at a path (docs/formats.md §8.4).
+#[test]
+fn a_chunk_ending_at_the_end_of_the_file_is_read() {
+    let first: Vec<u8> = (1..=14).collect();
+    let last: Vec<u8> = (101..=114).collect();
+    let bytes = [&first[..], &first[10..], &last[..]].concat();
+    assert_eq!(bytes.len(), 32);
+    let mut block = vec![0xe0];
+    block.extend(&first);
+    block.extend([4, 0, 0xe0]);
+    block.extend(&last);
+    assert_eq!(
+        (block.len(), lz4_flex::block::decompress(&block, 32).unwrap()),
+        (32, bytes.clone())
+    );
+
+    let e = CacheEntry::bytes("b", BTreeMap::new(), bytes.clone()).unwrap();
+    let written = to_bytes(&[e]).unwrap();
+    let table = word(&written, 10) as usize * 8;
+    let start = (table * 4 + 8).next_multiple_of(32);
+    let mut file = with_word(&written, table + 1, 32);
+    file.truncate(start);
+    file.extend(&block);
+    let read = from_bytes(&file, u64::MAX).unwrap();
+    assert_eq!(read.bytes_entries()[0].bytes, &bytes[..]);
+    let path = scratch::dir().join("archive_chunk_at_end.brda");
+    std::fs::write(&path, &file).unwrap();
+    assert_eq!(list(&path, u64::MAX).unwrap().bytes_entries().len(), 1);
 }

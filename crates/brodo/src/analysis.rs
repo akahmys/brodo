@@ -836,6 +836,49 @@ mod tests {
         v > 0.0
     }
 
+    /// Labelling a small grid ends: a mutant that makes it loop for ever fails here within a
+    /// minute, in the first test binary. This test's name and the next's sort before those of
+    /// the tests that would only wait for it, since libtest starts tests in the order of their
+    /// names, as many at once as the machine has threads, four on GitHub Actions (TESTING.md
+    /// T11).
+    #[test]
+    fn a_box_of_a_leaf_and_a_tile_is_labelled_in_time() {
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let t = topology(|e| {
+                e.activate([0, 0, 0]).unwrap();
+                e.add_tile(TileLevel::Lower, [8, 0, 0]).unwrap();
+            });
+            let f = Field::new(&t, 1.0_f32);
+            tx.send(label(&t, &f, positive, Connectivity::Six).map(|l| l.count())).unwrap_or(());
+        });
+        assert_eq!(rx.recv_timeout(std::time::Duration::from_secs(60)), Ok(Ok(1)));
+    }
+
+    /// Labelling a leaf in each of 16 root regions ends at once: the walk takes an upper node's empty places whole,
+    /// and a mutant that split each of them into its 4096 lower places, the same labels
+    /// found by 10⁸ more steps, fails here, in the first test binary (TESTING.md T11).
+    #[test]
+    fn a_bare_leaf_in_each_of_16_root_regions_is_labelled_in_time() {
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            // A leaf in each of 16 root regions, each holding an upper node of 32 767
+            // empty places.
+            let t = topology(|e| {
+                for i in 0..16 {
+                    e.activate([4096 * i, 0, 0]).unwrap();
+                }
+            });
+            let mut f = Field::new(&t, -1.0_f32);
+            for n in t.leaf_numbers() {
+                f.leaf_mut(&t, n).unwrap().fill(1.0);
+            }
+            tx.send(label(&t, &f, positive, Connectivity::Six).map(|l| l.count())).unwrap_or(());
+        });
+        let got = rx.recv_timeout(std::time::Duration::from_secs(20));
+        assert!(matches!(got, Ok(Ok(16))), "{got:?}");
+    }
+
     #[test]
     fn background_enclosed_by_leaves_is_apart_from_the_outside() {
         // A shell of leaves one region thick around the region at the origin.
@@ -862,23 +905,6 @@ mod tests {
         }
         assert!(!l.reaches_outside(inside) && l.reaches_outside(outside));
         assert_eq!(l.label_at(&t, [-8, 0, 0]).unwrap(), Label::Excluded);
-    }
-
-    /// Labelling a small grid ends: a mutant that makes it loop for ever fails here within a
-    /// minute, in the first test binary, before the tests that would only wait for it
-    /// (TESTING.md T11).
-    #[test]
-    fn labelling_a_small_grid_ends_in_time() {
-        let (tx, rx) = std::sync::mpsc::channel();
-        std::thread::spawn(move || {
-            let t = topology(|e| {
-                e.activate([0, 0, 0]).unwrap();
-                e.add_tile(TileLevel::Lower, [8, 0, 0]).unwrap();
-            });
-            let f = Field::new(&t, 1.0_f32);
-            tx.send(label(&t, &f, positive, Connectivity::Six).map(|l| l.count())).unwrap_or(());
-        });
-        assert_eq!(rx.recv_timeout(std::time::Duration::from_secs(60)), Ok(Ok(1)));
     }
 
     #[test]
@@ -1025,30 +1051,6 @@ mod tests {
                 assert!(!l.reaches_outside(a) && !l.reaches_outside(b));
             }
         }
-    }
-
-    /// Labelling a leaf in each of 16 root regions ends at once: the walk takes an upper node's empty places whole,
-    /// and a mutant that split each of them into its 4096 lower places, the same labels
-    /// found by 10⁸ more steps, fails here, in the first test binary (TESTING.md T11).
-    #[test]
-    fn labelling_a_few_leaves_ends_in_time() {
-        let (tx, rx) = std::sync::mpsc::channel();
-        std::thread::spawn(move || {
-            // A leaf in each of 16 root regions, each holding an upper node of 32 767
-            // empty places.
-            let t = topology(|e| {
-                for i in 0..16 {
-                    e.activate([4096 * i, 0, 0]).unwrap();
-                }
-            });
-            let mut f = Field::new(&t, -1.0_f32);
-            for n in t.leaf_numbers() {
-                f.leaf_mut(&t, n).unwrap().fill(1.0);
-            }
-            tx.send(label(&t, &f, positive, Connectivity::Six).map(|l| l.count())).unwrap_or(());
-        });
-        let got = rx.recv_timeout(std::time::Duration::from_secs(20));
-        assert!(matches!(got, Ok(Ok(16))), "{got:?}");
     }
 
     #[test]

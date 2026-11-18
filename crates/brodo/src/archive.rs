@@ -483,18 +483,16 @@ fn grid<'a, S: Source + ?Sized>(
     Ok((Found { meta, grid_blocks, value_type, kind: entry, values, chunks, at }, end))
 }
 
-/// Checks that the bytes between `parts`, each after the one before, are zeros. Padding not
+/// Checks that the bytes between `parts` are zeros, each part starting at the block after the
+/// one before and ending within the file, as `range` and `chunks` have checked. Padding not
 /// held, of a part a path's read did not take, is not checked (docs/formats.md §8.6 and
 /// §8.7, rule 1).
 fn padding<S: Source + ?Sized>(all: &S, parts: &[Range<usize>]) -> Result<(), CacheError> {
     for w in parts.windows(2) {
-        if let [a, b] = w {
-            if a.end > b.start || b.start > all.total() {
-                return Err(CacheError::Truncated("padding"));
-            }
-            if all.get(a.end..b.start).is_some_and(|pad| !zero(pad)) {
-                return Err(CacheError::Inconsistent("padding"));
-            }
+        if let [a, b] = w
+            && all.get(a.end..b.start).is_some_and(|pad| !zero(pad))
+        {
+            return Err(CacheError::Inconsistent("padding"));
         }
     }
     Ok(())
@@ -922,15 +920,21 @@ impl Source for Pieces {
     }
 }
 
-/// Fills `buf` from `file` at byte `at`, without moving a cursor shared between threads.
-#[cfg(unix)]
+/// Fills `buf` from `file` at byte `at`, without moving a cursor shared between threads
+/// where the platform reads at an offset.
 fn read_at(file: &File, buf: &mut [u8], at: u64) -> std::io::Result<()> {
-    std::os::unix::fs::FileExt::read_exact_at(file, buf, at)
+    #[cfg(unix)]
+    let read = <File as std::os::unix::fs::FileExt>::read_exact_at;
+    #[cfg(windows)]
+    let read = seek_read;
+    #[cfg(not(any(unix, windows)))]
+    let read = cursor_read;
+    read(file, buf, at)
 }
 
-/// Fills `buf` from `file` at byte `at`, without moving a cursor shared between threads.
+/// `read_at` on Windows, whose reads at an offset may return fewer bytes than asked for.
 #[cfg(windows)]
-fn read_at(file: &File, buf: &mut [u8], at: u64) -> std::io::Result<()> {
+fn seek_read(file: &File, buf: &mut [u8], at: u64) -> std::io::Result<()> {
     let (mut done, mut at) = (0, at);
     while let Some(rest) = buf.get_mut(done..).filter(|r| !r.is_empty()) {
         let n = std::os::windows::fs::FileExt::seek_read(file, rest, at)?;
@@ -943,9 +947,9 @@ fn read_at(file: &File, buf: &mut [u8], at: u64) -> std::io::Result<()> {
     Ok(())
 }
 
-/// Fills `buf` from `file` at byte `at`, through a cursor of its own.
+/// `read_at` elsewhere, through a cursor of its own.
 #[cfg(not(any(unix, windows)))]
-fn read_at(file: &File, buf: &mut [u8], at: u64) -> std::io::Result<()> {
+fn cursor_read(file: &File, buf: &mut [u8], at: u64) -> std::io::Result<()> {
     use std::io::{Read, Seek};
     let mut f = file.try_clone()?;
     f.seek(std::io::SeekFrom::Start(at))?;

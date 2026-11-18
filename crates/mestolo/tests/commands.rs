@@ -235,6 +235,7 @@ fn the_command_line_is_parsed_and_what_it_does_not_take_named() {
     assert_eq!((input.path, input.limit), (PathBuf::from("f"), DEFAULT_LIMIT));
     assert_eq!((output.path, output.force), (PathBuf::from("s.png"), true));
     assert_eq!(parse(args(&["help"])).unwrap(), Command::Help);
+    assert_eq!(parse(args(&["help", "look"])).unwrap(), Command::Help);
     let refused = |words: &[&str]| parse(args(words)).unwrap_err();
     assert!(matches!(parse(args(&[])), Err(MestoloError::NoCommand)));
     for (word, format) in [
