@@ -1071,3 +1071,23 @@ fn an_archive_written_entry_by_entry_is_the_one_written_at_once() {
     let names: Vec<_> = std::fs::read_dir(&dir).unwrap().map(|e| e.unwrap().file_name()).collect();
     assert_eq!(names, ["grids.brda"]);
 }
+
+/// Reads an archive of `n` entries of one byte, returning the seconds the read took.
+fn seconds_to_read(n: usize) -> f64 {
+    let one = CacheEntry::bytes("b", BTreeMap::new(), vec![1]).unwrap();
+    let bytes = to_bytes(&vec![one; n]).unwrap();
+    let start = std::time::Instant::now();
+    let read = from_bytes(&bytes, u64::MAX).unwrap();
+    let took = start.elapsed().as_secs_f64();
+    assert_eq!(read.bytes_entries().len(), n);
+    took
+}
+
+#[test]
+fn an_archives_read_takes_time_in_proportion_to_its_entries() {
+    // A read whose time grew as the square of the entries took 64 times as long for 8 times
+    // as many; one in proportion takes 8 times, and the margin is left to a busy machine.
+    let few = seconds_to_read(2_000).max(1e-3);
+    let many = seconds_to_read(16_000);
+    assert!(many < 24.0 * few, "{many} s for 16000 entries against {few} s for 2000");
+}

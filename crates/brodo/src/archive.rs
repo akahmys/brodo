@@ -574,10 +574,20 @@ fn unpack(found: &[Found<'_>], top: &[u8], blocks: usize) -> Result<Vec<Block>, 
     let mut out = vec![Block::new_zeroed(); blocks];
     let mut work = rooms(found, top, out.as_mut_bytes())?;
     run(found, work.iter_mut().filter(|w| w.chunk == 0).collect())?;
+    // `work` holds each entry's chunks together, in the entries' order, so each entry's are
+    // split off in turn and each kind's entries counted as they pass: a read takes time in
+    // proportion to its entries and chunks, however many there are.
+    let mut rest = &mut work[..];
+    let mut seen = BTreeMap::new();
     for (i, g) in found.iter().enumerate() {
-        let head = work.iter().find(|w| w.grid == i).map_or(&[][..], |w| &*w.room);
-        let pieces = pieces(number(found, i), g, head)?;
-        for (w, (_, leaf)) in work.iter_mut().filter(|w| w.grid == i).zip(pieces) {
+        let n = rest.iter().take_while(|w| w.grid == i).count();
+        let (own, after) = std::mem::take(&mut rest).split_at_mut(n);
+        rest = after;
+        let index = seen.entry(g.kind).or_insert(0_usize);
+        let head = own.first().map_or(&[][..], |w| &*w.room);
+        let pieces = pieces(*index, g, head)?;
+        *index += 1;
+        for (w, (_, leaf)) in own.iter_mut().zip(pieces) {
             w.leaf = leaf;
         }
     }

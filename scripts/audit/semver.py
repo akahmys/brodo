@@ -43,18 +43,7 @@ BREAKING = re.compile(r"^### Breaking\s*$", re.MULTILINE)
 COPY = ROOT / "target" / "semver" / "release-tests"
 
 # The baseline's mestolo tests not run, by tag and test name, each with why (ADR-0011).
-SET_ASIDE = {
-    ("v1.2.0", "info_writes_what_a_cache_file_an_archive_and_a_vdb_hold"):
-        "lists a .vdb's vector grid as skipped, which 1.3.0 reads (issue 3)",
-    ("v1.2.0", "what_a_format_does_not_hold_is_refused_by_name"):
-        "a vector grid refused as .vdb, which 1.3.0 writes (issue 3)",
-    ("v1.2.0", "convert_skips_and_names_the_grids_vdb_does_not_hold_when_asked"):
-        "a vector grid skipped from .vdb, which 1.3.0 writes (issue 3)",
-    ("v1.2.0", "every_grid_vdb_does_not_hold_is_named"):
-        "vector grids named as not held by .vdb, which 1.3.0 writes (issue 3)",
-    ("v1.2.0", "convert_writes_a_vdbs_grids_to_a_cache_file"):
-        "a .vdb's grids without its vector grid, which 1.3.0 reads (issue 3)",
-}
+SET_ASIDE: dict[tuple[str, str], str] = {}
 
 
 def run(args: list[str], cwd: Path = ROOT) -> subprocess.CompletedProcess:

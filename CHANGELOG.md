@@ -6,6 +6,17 @@ are recorded here when they change (V6).
 
 ## Unreleased
 
+## 1.3.1 (2026-11-18)
+
+Closes no milestone: a fix of 1.3.0 alone (TESTING.md V2, SECURITY.md). Nothing breaks a
+user, and no format version changes.
+
+- `archive::from_bytes` and `archive::read` took time growing as the square of an
+  archive's entries, each entry's chunks found by a scan of every entry's: an archive of
+  many small entries, within any `limit`, held a read for minutes or hours, 16,000 entries
+  of one byte, 2 MB, taking 242 ms where 1,000 took 1 ms. A read now takes time in
+  proportion to the entries and chunks, the same 16,000 in 9 ms. Affects 0.7.0 to 1.3.0.
+
 ## 1.3.0 (2026-11-12)
 
 Closes P12: grids picked by name and archives listed without decompressing, fields moved
