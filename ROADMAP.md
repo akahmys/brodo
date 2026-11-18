@@ -8,7 +8,12 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: P13's retrospective and refactoring (2026-11-18): new public functions take
+- **Done**: 1.3.1 released (2026-11-18), no milestone: `archive::from_bytes` and
+  `archive::read` took time quadratic in an archive's entries, found by the review of
+  speed and memory that day and fixed from v1.3.0 as SECURITY.md states; brodo, colino
+  and mestolo published by an agent at the owner's word for this release alone (ADR-0040
+  leaves it to the owner), the GitHub release made, and advisory GHSA-rh8f-f6hf-2c95
+  published, its CVE requested. Before it, P13's retrospective and refactoring (2026-11-18): new public functions take
   their settings as a struct (CODING.md Rule 22, ADR-0035's amendment), a slower verdict
   against another session's baseline measured again against the commit before (TESTING.md
   T10, ADR-0019's amendment), each test writing in a directory of its own (TESTING.md T15,
@@ -75,6 +80,7 @@ in this file as of `53f69d5` (P0 to P9), `711cf5b` (P10), `e27fd49` (P11) and `6
 | P10, rounding off 1.0 | 1.1.0 | 2026-11-09 |
 | P11, a view's leaves and tiles without thawing | 1.2.0 | 2026-11-10 |
 | P12, picking a grid, and fields between topologies | 1.3.0 | 2026-11-12 |
+| A fix of 1.3.0, no milestone | 1.3.1 | 2026-11-18 |
 
 ### P13 — reading only what is needed, and rounding off the issues
 
@@ -102,10 +108,16 @@ last applied by `akahmys` (checked 2026-11-12).
       against 1.3.0 (V9), T6's fuzzing of `any`, `archive`, `cache_file` and `vdb`, readers
       of untrusted bytes having changed, and both crates' benchmarks at rest, a slower
       verdict measured again by T10; not T7, no unsafe code being touched
-  - [ ] T6: `any`, `archive`, `cache_file` and `vdb` fuzzed 900 s each
+  - [x] T6: `any`, `archive`, `cache_file` and `vdb` fuzzed 900 s each on `a3c03aa`,
+        24,832,237, 1,156,580, 10,416,938 and 80,682 runs, nothing found (2026-11-18)
   - [x] V9: the gate's check against v1.3.0 passes on `d190057` (2026-11-18)
   - [ ] T11: the run on GitHub Actions
-  - [ ] T10: brodo's and colino's benchmarks at rest
+  - [x] T10: brodo's and colino's benchmarks on `a3c03aa`: `archive_read_8bit_x8`,
+        `archive_region_x8` and `convert_slab_320`, judged slower against their baselines,
+        measured again against v1.3.0 in the order A, B, B, A, within 4 % of it, every
+        item `ok` in both runs of `a3c03aa` but `cache_read_x16` in one;
+        `leaf_parallel_update_x32` 11 % slower than v1.3.0 but `ok` against its baseline, its
+        path unchanged since v1.3.0 and its drift B-026's (2026-11-18)
 - [ ] Version 1.4.0 (TESTING.md V2–V4)
 
 ### Held — `piatto`
