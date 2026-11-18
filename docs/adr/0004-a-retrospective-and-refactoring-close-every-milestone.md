@@ -43,3 +43,15 @@ refactoring again, whatever closing checks it is given (ADR-0033), and that it b
 `scripts/audit/documents.py` fails where a milestone in ROADMAP.md §2 does not list
 `The retrospective and refactoring (PLANNING.md §7)`, or ticks its version before it.
 Whether the unit was done well stays held by review.
+
+## Amendment: what refactoring looks at
+
+- **Date**: 2026-11-18
+
+PLANNING.md §7 said only that refactoring changes no behaviour, not what it looks at, and
+P12's and P13's refactoring looked for repetition alone. Saying that nothing needs tidying
+means something only once what is looked at is fixed. The owner decided, on 2026-11-18,
+that refactoring looks at the code the milestone changed for repetition, names, shape,
+dead code and stale comments, that its commit says what was found under each, and that
+the public API stays as it is. What it looked at is held by review, not checked: a check
+on the commit message would pass a list written without looking.

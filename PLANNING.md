@@ -108,10 +108,21 @@ chooses (ADR-0033), it is never left out.
    procedure, and the human decides it (AGENTS.md, "Changing the rules"). What is
    decided lands in the ADR on its topic; the rest is not recorded, since history is in
    git.
-2. **Refactoring changes no behaviour.** Tests are not changed, beyond TESTING.md T2, and the
-   gate passes before and after. A change that alters an output is not refactoring and
-   is planned as its own unit.
+2. **Refactoring looks at the code the milestone changed**, `git diff v<previous>..HEAD`
+   under `crates/`, for:
+   - **repetition**: the same steps written twice, kept in one place;
+   - **names**: one thing named two ways, or a name that no longer says what the item does;
+   - **shape**: a function doing two things, or two like items that take or return their
+     values differently;
+   - **dead code**: an item, feature, mutant exclusion or test-list entry nothing needs
+     any more;
+   - **comments** that describe code as it was.
+
+   Its commit says what was found under each, or that nothing was.
+3. **Refactoring changes no behaviour.** Outputs and the public API stay as they are. Tests
+   are not changed, beyond TESTING.md T2. The gate passes before and after. A change that
+   alters an output or the API is not refactoring, and is planned as its own unit.
 
 Enforced by `scripts/audit/documents.py`: every milestone in ROADMAP.md §2 lists
 `The retrospective and refactoring (PLANNING.md §7)`, ticked before its version is; whether
-the unit was done well, **nothing**.
+the unit was done well, and what its refactoring looked at, **nothing**.
