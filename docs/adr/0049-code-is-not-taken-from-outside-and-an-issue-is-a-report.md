@@ -92,3 +92,12 @@ decided, on 2026-11-07, as proposed:
 No check of its own was added: `scripts/audit/documents.py` fails a link that does not
 resolve, so README.md's and AGENTS.md's links fail the gate without `SECURITY.md`. Shown
 to fire (TESTING.md T3, 2026-11-07): `SECURITY.md` moved away failed it.
+
+## Amendment: RustSec may decline
+
+- **Date**: 2026-11-18
+
+The filing for 1.3.1's fix was declined on 2026-11-18: a RustSec maintainer closed it
+because brodo is below RustSec's minimum notability criteria. The owner decided, on
+2026-11-18, that SECURITY.md say so: a vulnerability is still filed with RustSec, and if
+it is declined, the GitHub advisory and its CVE stand alone.

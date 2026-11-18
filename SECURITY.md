@@ -36,4 +36,5 @@ an earlier MAJOR or MINOR receives none.
 The fix is made in private, in the report's advisory, and released. The advisory is then
 published on GitHub, with a CVE that GitHub assigns, and the vulnerability is filed with
 the [RustSec advisory database](https://rustsec.org/), so that `cargo audit` reports the
-affected versions. The reporter is credited, unless they ask not to be.
+affected versions. RustSec may decline a crate below its notability criteria; the
+advisory and its CVE then stand alone. The reporter is credited, unless they ask not to be.
