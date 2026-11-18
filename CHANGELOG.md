@@ -6,6 +6,14 @@ are recorded here when they change (V6).
 
 ## Unreleased
 
+## 1.4.0 (2026-11-18)
+
+Closes P13: an archive's region and listing read from only the bytes they need, components'
+labels read a leaf at a time, a conversion rebuilt from a grid read back, one reader for
+any mesh format, and mestolo's `convert` choosing an archive's encoding and `slice`
+drawing a component, a range and a region, without breaking a user (TESTING.md V2). It
+holds 1.3.1's fix. No format version changes.
+
 - `archive::read_region` and `archive::list`, with the `archive` feature, read from the
   file only its header, directory, every entry's metadata and chunk table, and the chunks
   they decompress, not the file whole: a leaf's region of a 2.16 GB archive in 0.6 ms

@@ -51,7 +51,9 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   colino and mestolo published by the owner, docs.rs building their reference, the new
   API used from a new crate depending on them by version, and `cargo install mestolo`
   installing the command (2026-11-12).
-- **Next**: version 1.4.0 (§2, TESTING.md V2–V4).
+- **Next**: P13's closing checks are done, and the version is 1.4.0. Its tag, GitHub
+  release and publication on crates.io follow (TESTING.md V4); then P14, its items GitHub
+  issues 18 to 29 of the milestone of that name, set by the owner on 2026-11-18.
 - **Unresolved**: none. `leaf_parallel_update_x32`'s drift between sessions is measured:
   other processes' work on the performance cores moves it either way, and the item and its
   baseline are kept (B-026, ADR-0019's amendment of 2026-11-12).
@@ -124,7 +126,7 @@ last applied by `akahmys` (checked 2026-11-12).
         item `ok` in both runs of `a3c03aa` but `cache_read_x16` in one;
         `leaf_parallel_update_x32` 11 % slower than v1.3.0 but `ok` against its baseline, its
         path unchanged since v1.3.0 and its drift B-026's (2026-11-18)
-- [ ] Version 1.4.0 (TESTING.md V2–V4)
+- [x] Version 1.4.0 (TESTING.md V2–V4, 2026-11-18)
 
 ### Held — `piatto`
 
