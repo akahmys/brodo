@@ -8,52 +8,16 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: 1.3.1 released (2026-11-18), no milestone: `archive::from_bytes` and
-  `archive::read` took time quadratic in an archive's entries, found by the review of
-  speed and memory that day and fixed from v1.3.0 as SECURITY.md states; brodo, colino
-  and mestolo published by an agent at the owner's word for this release alone (ADR-0040
-  leaves it to the owner), the GitHub release made, and advisory GHSA-rh8f-f6hf-2c95
-  published, its CVE requested. Before it, P13's retrospective and refactoring (2026-11-18): new public functions take
-  their settings as a struct (CODING.md Rule 22, ADR-0035's amendment), a slower verdict
-  against another session's baseline measured again against the commit before (TESTING.md
-  T10, ADR-0019's amendment), each test writing in a directory of its own (TESTING.md T15,
-  ADR-0048's amendment), and mestolo's test for a floating value type shared. Before it,
-  issue 11 (2026-11-17): mestolo's `slice` drawing a component, a range and a region, the
-  options chosen by the owner (ADR-0050's amendment); left open for the owner to close.
-  Before it, issue 12 (2026-11-17): mestolo's `convert --as archive --encoding`; left open
-  for the owner to close. Before it, issue 10 (2026-11-17): colino's `any::read` and `any::from_bytes` tell a mesh
-  file's format from its bytes and read it by its own reader, the shape chosen by the owner
-  (ADR-0055's amendment of 2026-11-17); left open for the owner to close. Before it,
-  issue 9 (2026-11-17): colino's `Converted::from_parts` rebuilds a conversion
-  from a grid read back, with the sign and accuracy given by the caller, the shape chosen by
-  the owner; left open for the owner to close. Before it, issue 5 (2026-11-17): `Labels::leaf`, `Labels::tile` and `Labels::outside`
-  read a leaf's 512 labels, a tile's and the outside's, the shape chosen by the owner;
-  left open for the owner to close. Before it, P13's first item (2026-11-16): `archive::read_region` and `archive::list` read
-  at a path only the structure and the chunks they decompress, one call a chunk in
-  parallel, their limit bounding what is read (ADR-0016's amendment of 2026-11-16). Before
-  it, B-027 answered by `spikes/chunkread/` (2026-11-16): a region and a listing of a
-  2.16 GB archive read from only the bytes they need, a leaf's region in 0.6 ms against
-  337 ms; the owner chose seeking reads at a path that keep every entry's structure checks,
-  chunks read in parallel, and `limit` bounding what is read (ADR-0016's amendment of
-  2026-11-16). Before it, issues 16 and 17 (2026-11-16): three provenance rows and a test's header
-  brought up to the code, and three texts up to the checks they describe (ADR-0003's
-  amendment); both left open for the owner to close. Before them, P12's retrospective
-  (2026-11-12): the retrospective made a rule every milestone
-  lists and the audit checks (PLANNING.md §7, ADR-0004, ADR-0033), V9's set-aside entries
-  emptied after each tag (TESTING.md V4, ADR-0040), and every reader held to a stated
-  verdict (TESTING.md T13, ADR-0037). Before it, B-026 answered by `spikes/updrift/`
-  (2026-11-12): `leaf_parallel_update_x32`
-  follows the performance cluster's state, which other processes' work on its cores sets,
-  17 % faster beside one busy thread and slower beside three; the owner kept the item and
-  its baseline (ADR-0019's amendment). Before it, P12 released as 1.3.0, grids picked by name, fields between topologies,
-  writers one entry at a time, `.vdb` vector grids and spread leaves labelled, without
-  breaking a user (ADR-0013, ADR-0014, ADR-0016, ADR-0046, ADR-0047, ADR-0055): brodo,
-  colino and mestolo published by the owner, docs.rs building their reference, the new
-  API used from a new crate depending on them by version, and `cargo install mestolo`
-  installing the command (2026-11-12).
-- **Next**: P13's closing checks are done, and the version is 1.4.0. Its tag, GitHub
-  release and publication on crates.io follow (TESTING.md V4); then P14, its items GitHub
-  issues 18 to 29 of the milestone of that name, set by the owner on 2026-11-18.
+- **Done**: P13 released as 1.4.0 (2026-11-18), an archive's region and listing read from
+  only the bytes they need, labels a leaf at a time, conversions rebuilt from grids read
+  back, one reader for any mesh format, and mestolo's encodings and slice options, without
+  breaking a user: brodo, colino and mestolo published by an agent at the owner's word for
+  this release too (ADR-0040 leaves it to the owner), the new API used from a new crate
+  depending on them by version, `cargo install mestolo` installing the command, and issues
+  5, 9, 10, 11, 12, 16 and 17 closed. Before it, 1.3.1 (2026-11-18): an archive's read,
+  quadratic in its entries, fixed from v1.3.0 as SECURITY.md states, advisory
+  GHSA-rh8f-f6hf-2c95 published and its CVE requested.
+- **Next**: P14's first item (§2), issue 18.
 - **Unresolved**: none. `leaf_parallel_update_x32`'s drift between sessions is measured:
   other processes' work on the performance cores moves it either way, and the item and its
   baseline are kept (B-026, ADR-0019's amendment of 2026-11-12).
@@ -63,8 +27,8 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
 Named after the project group's phases (ADR-0011); the checks a milestone closes with are
 TESTING.md §2's and its checklist lists them (ADR-0033). A closed milestone leaves this
 file: what it brought is in its version's CHANGELOG.md section, and its checklist in git,
-in this file as of `53f69d5` (P0 to P9), `711cf5b` (P10), `e27fd49` (P11) and `6f1140a`
-(P12).
+in this file as of `53f69d5` (P0 to P9), `711cf5b` (P10), `e27fd49` (P11), `6f1140a`
+(P12) and `f0a9c44` (P13).
 
 | Milestone | Version | Closed |
 | :--- | :--- | :--- |
@@ -83,50 +47,36 @@ in this file as of `53f69d5` (P0 to P9), `711cf5b` (P10), `e27fd49` (P11) and `6
 | P11, a view's leaves and tiles without thawing | 1.2.0 | 2026-11-10 |
 | P12, picking a grid, and fields between topologies | 1.3.0 | 2026-11-12 |
 | A fix of 1.3.0, no milestone | 1.3.1 | 2026-11-18 |
+| P13, reading only what is needed, and rounding off the issues | 1.4.0 | 2026-11-18 |
 
-### P13 — reading only what is needed, and rounding off the issues
+### P14 — speed and memory, outputs unchanged
 
-Set by the owner on 2026-11-12, to be released as 1.4.0, adding to the API without
-breaking a user. In this order; each change's API is put to the owner before it is
-written, its ADR amended where the design changes. Each issue's `owner-approved` label was
-last applied by `akahmys` (checked 2026-11-12).
+Set by the owner on 2026-11-18, to be released as 1.5.0: faster and smaller, no byte of a
+written file and no promised result changed, each change measured by a benchmark before
+it lands (TESTING.md T10), a benchmark item added first where none covers the code. Each
+item is a GitHub issue of the milestone P14, its `owner-approved` label last applied by
+`akahmys` (checked 2026-11-18). In this order, each after what it builds on: 18 before the
+spikes on colino's queries, 19 before labelling and the benchmarks it speeds, 20 before 24,
+and each spike after the item it is measured against.
 
-- [x] A region of an archive read from only the bytes of the chunks it needs, the file not
-      read whole, and a listing and a grid by name the same way: B-027 answered by its
-      spike and ADR-0016 amended before it is implemented (left to later by the human on
-      2026-10-29, taken into P13 on 2026-11-12)
-- [x] [Issue 5](https://github.com/akahmys/brodo/issues/5): components' labels read a leaf
-      at a time, with the outside component named
-- [x] [Issue 9](https://github.com/akahmys/brodo/issues/9): a `Converted` built from a grid
-      read back from a file
-- [x] [Issue 10](https://github.com/akahmys/brodo/issues/10): one mesh reader telling STL,
-      OBJ and 3MF apart from the file
-- [x] [Issue 12](https://github.com/akahmys/brodo/issues/12): mestolo's `convert --as
-      archive` choosing a quantised encoding
-- [x] [Issue 11](https://github.com/akahmys/brodo/issues/11): more `slice` options, the
-      options chosen by the owner before any is written
-- [x] The retrospective and refactoring (PLANNING.md §7)
-- [x] The closing checks, chosen by the owner (2026-11-18): T11's mutation run, the check
-      against 1.3.0 (V9), T6's fuzzing of `any`, `archive`, `cache_file` and `vdb`, readers
-      of untrusted bytes having changed, and both crates' benchmarks at rest, a slower
-      verdict measured again by T10; not T7, no unsafe code being touched
-  - [x] T6: `any`, `archive`, `cache_file` and `vdb` fuzzed 900 s each on `a3c03aa`,
-        24,832,237, 1,156,580, 10,416,938 and 80,682 runs, nothing found (2026-11-18)
-  - [x] V9: the gate's check against v1.3.0 passes on `d190057` (2026-11-18)
-  - [x] T11: the run on `a3c03aa`, GitHub Actions run 44169118604, reported all 4964
-        mutants and missed 18, and three timeouts with no failed test before them still ran
-        at 1800 s; eight killed by tests, one by removing a check no input reaches, nine
-        excluded with the owner's approval, eight of them of an archive's read at an offset
-        compiled on other platforms than Linux; the three, labelling looping for ever,
-        caught once its tests that end in time start first; and the 76 of the functions
-        touched run again on four test threads, none missed but those excluded (2026-11-18)
-  - [x] T10: brodo's and colino's benchmarks on `a3c03aa`: `archive_read_8bit_x8`,
-        `archive_region_x8` and `convert_slab_320`, judged slower against their baselines,
-        measured again against v1.3.0 in the order A, B, B, A, within 4 % of it, every
-        item `ok` in both runs of `a3c03aa` but `cache_read_x16` in one;
-        `leaf_parallel_update_x32` 11 % slower than v1.3.0 but `ok` against its baseline, its
-        path unchanged since v1.3.0 and its drift B-026's (2026-11-18)
-- [x] Version 1.4.0 (TESTING.md V2–V4, 2026-11-18)
+- [ ] [Issue 18](https://github.com/akahmys/brodo/issues/18): colino's sign only for the leaves kept in the band
+- [ ] [Issue 19](https://github.com/akahmys/brodo/issues/19): a node's child found by a rank table
+- [ ] [Issue 20](https://github.com/akahmys/brodo/issues/20): read buffers allocated zeroed
+- [ ] [Issue 21](https://github.com/akahmys/brodo/issues/21): gather by rows
+- [ ] [Issue 22](https://github.com/akahmys/brodo/issues/22): colino's Hermite signs, query stacks and candidates
+- [ ] [Issue 23](https://github.com/akahmys/brodo/issues/23): colino's parity sign shared along a leaf's lines
+- [ ] [Issue 24](https://github.com/akahmys/brodo/issues/24): an archive's ranges, binary16 and whole read
+- [ ] [Issue 25](https://github.com/akahmys/brodo/issues/25): labelling by each leaf's components
+- [ ] [Issue 26](https://github.com/akahmys/brodo/issues/26): benchmarks for the Euler characteristic, dilation and `.vdb`, and what
+      they show
+- [ ] B-028, B-029 and B-030 (§3, issues 27 to 29) answered by their spikes and ADRs, before
+      anything is written
+- [ ] A refactoring of the whole workspace, set by the owner on 2026-11-18: what is
+      repeated, named or shaped unevenly across brodo, colino and mestolo, outputs and API
+      unchanged, its scope put to the owner before it starts
+- [ ] The retrospective and refactoring (PLANNING.md §7)
+- [ ] The closing checks, chosen by the owner
+- [ ] Version 1.5.0 (TESTING.md V2–V4)
 
 ### Held — `piatto`
 
@@ -144,7 +94,11 @@ Not built for now (owner, 2026-10-24; ADR-0018; §3, B-021). If it is, then:
 Each question is answered by a spike's measurement and an ADR, never in passing by an
 implementation (PLANNING.md §2).
 
-None is open.
+| # | Question | Proposal so far |
+| :--- | :--- | :--- |
+| B-028 | Does contracting the winding number's far-field term once per node pay, and how many voxels' bytes does it change, a sign flipping where the number is within rounding of 1/2 ([Issue 27](https://github.com/akahmys/brodo/issues/27))? | A spike, P14 (owner, 2026-11-18): the time of `convert_*` and the bytes that differ, on closed and open meshes |
+| B-029 | Does a 16-bit encoding over a grid's range, or codes by difference along a leaf's rows, store an archive smaller than binary16 or 8 bits within its error ([Issue 28](https://github.com/akahmys/brodo/issues/28))? | A spike, P14 (owner, 2026-11-18): sizes, errors and speeds on `spikes/quantise/`'s grids; a new encoding is a new code of the archive's format |
+| B-030 | Does colino's hierarchy split by surface area query faster on meshes of thin triangles, and which bytes near an open mesh's surface does it change ([Issue 29](https://github.com/akahmys/brodo/issues/29))? | A spike, P14 (owner, 2026-11-18): query times and bytes on real meshes |
 
 Questions decided "not now", each revisited only when what it names happens:
 
@@ -192,8 +146,6 @@ No spike is running.
 
 - Dependencies, each to be approved before it is added (CODING.md Rule 20): after
   P1, for `piatto` if it is built: a GPU, window and GUI stack (B-013).
-- A smaller codec for the archive: `ruzstd` measured again as `spikes/archive/` did, once
-  it implements levels above its fastest (0.9.1 does not; ADR-0016, 2026-10-29).
 - The repository is public, since 2026-10-25 (the owner; ADR-0034). Kept so: every
   author and committer the noreply address, no path into a home directory and no name of
   the owner's local list of forbidden sources in any commit (checked 2026-11-02: none of
@@ -211,17 +163,12 @@ No spike is running.
   (2026-11-05), split by the owner (2026-11-08): those that round off what is there were
   P10's, released in 1.1.0; those that add a capability are GitHub issues 1 to 12, taken as any issue
   is (AGENTS.md S5).
-- For the next MAJOR, since it changes an output 1.0 promises (ARCHITECTURE.md §6.3,
-  TESTING.md V9): Hermite data and an archive's encodings shown by mestolo's `info`
-  (the owner, 2026-11-08; ADR-0050). Kept for a MAJOR on 2026-11-12, not shown by a flag
-  in a MINOR: the owner judged its value too small for either until a user asks.
-- For the next MAJOR, since it changes mestolo's library API (TESTING.md V9): `slice`'s
-  `--component`, `--range` and `--region` moved out of `Output`, where they are held since
-  a field added to `Command::Slice` would break a user, either by giving each command's
-  variant a `#[non_exhaustive]` struct of its options or by promising mestolo's command
-  line alone, its library hidden (the owner, 2026-11-17; ADR-0050). Taken when a MAJOR is
-  made for another reason, not made for this alone: brodo, colino and mestolo share one
-  version (V1).
+- Changes that break a user, held for a MAJOR made for a reason of its own, since brodo,
+  colino and mestolo share one version (TESTING.md V1): the GitHub issues of the milestone
+  "Next MAJOR", issues 30 to 36 (the owner, 2026-11-18), among them mestolo's `info`
+  showing Hermite data and encodings and `slice`'s options moved out of `Output` (ADR-0050),
+  and a smaller archive codec once `ruzstd` implements levels above its fastest (0.9.1 does
+  not; ADR-0016, 2026-10-29).
 - Requests from users. Held until one asks: merging into a root tile (ADR-0014);
   labelling many lone leaves faster, each one's upper node costing `label` about 1.3 ms
   and 0.4 MiB of empty places under 6-connectivity (`spikes/rootsparse/REPORT.md`,
