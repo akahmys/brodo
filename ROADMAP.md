@@ -108,6 +108,7 @@ Questions decided "not now", each revisited only when what it names happens:
 | B-021 | Does brodo build `piatto`? | Not now (owner, 2026-10-24; ADR-0018): no user has asked for a viewer, the slice as PNG and VTK for ParaView serve checking, `.vdb` from P7 would open in common tools, and a GPU, window and GUI stack is costly. Revisited when a user asks for a viewer or for drawing to embed, or grids too large for VTK and `.vdb` must be looked at |
 | B-013 | Which crates handle `piatto`'s window, input and GUI parts? | Left with B-021: `winit` and `egui`, to be measured against Rules 12 and 13 if `piatto` is built (ADR-0018) |
 | B-018 | Does model checking with Kani join the closing checks? | Not now (owner, 2026-10-23, kept 2026-11-02 and before 1.0 on 2026-11-04): it fits only integer bit work and `view.rs`'s small helpers, already fuzzed and mutation-tested, and cannot reach rayon or the memory mapping; this milestone's defects were numeric and in design claims. Revisited by a spike if Miri-unreachable unsafe code grows, an integer coordinate bug escapes the tests, or before 1.0 |
+| B-031 | Does brodo hold a field's frames over time in one file? | Not now (owner, 2026-11-19, from a study in the session against 1.4.0): a sequence of files, one frame each, already works, each frame replaced whole by the writer, topologies shared by `thaw_on` and moved between by `Remap::between`, a time kept in `GridMeta::extra`. One file of many frames would need a format version written without a count of entries and its directory last (ADR-0038), recovery from a file cut short, a new untrusted reader, and decoding back to a key frame on a random read. It pays only if coding along time, an exclusive or with the frame before compressed by LZ4, stores real sequences much smaller than LZ4 frame by frame; sharing a topology saves about 3 % of an `f32` field by its leaves' masks alone. Measured by nothing. A structural identity in place of the stamp was rejected: a leaf removed and made again leaves the structure as it was, so an unremapped field would keep the removed leaf's values silently (ADR-0014). Revisited when a user asks for frames in one file, or when B-029's spike or issue 36 measures codes along time; a writer needing no count is [Issue 37](https://github.com/akahmys/brodo/issues/37), a format with the directory last, held for the next MAJOR |
 
 Questions answered, each by its spike and ADR:
 
@@ -165,7 +166,7 @@ No spike is running.
   is (AGENTS.md S5).
 - Changes that break a user, held for a MAJOR made for a reason of its own, since brodo,
   colino and mestolo share one version (TESTING.md V1): the GitHub issues of the milestone
-  "Next MAJOR", issues 30 to 36 (the owner, 2026-11-18), among them mestolo's `info`
+  "Next MAJOR", issues 30 to 37 (the owner, 2026-11-18 and 2026-11-19), among them mestolo's `info`
   showing Hermite data and encodings and `slice`'s options moved out of `Output` (ADR-0050),
   and a smaller archive codec once `ruzstd` implements levels above its fastest (0.9.1 does
   not; ADR-0016, 2026-10-29).
