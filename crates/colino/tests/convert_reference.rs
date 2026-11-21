@@ -413,3 +413,35 @@ fn a_cubes_inside_tiles_reach_near_its_box() {
     assert!(matches!(c.topology.locate([24, 8, 8]), Location::Tile(..)));
     assert_eq!(check(&m, &o, &c, true), Ok(()));
 }
+
+/// A cube from `lo` to `hi` on each axis, facing out.
+fn cube(lo: f64, hi: f64) -> Mesh {
+    let corner = |i: u32| [0, 1, 2].map(|k| if i >> k & 1 == 1 { hi } else { lo });
+    let faces =
+        [[0, 2, 3, 1], [4, 5, 7, 6], [0, 1, 5, 4], [2, 6, 7, 3], [0, 4, 6, 2], [1, 3, 7, 5]];
+    let triangles = faces.iter().flat_map(|[a, b, c, d]| [[*a, *b, *c], [*a, *c, *d]]).collect();
+    Mesh::new((0..8).map(corner).collect(), triangles).with_unit(Some("millimeter".into()))
+}
+
+/// A cell stays a leaf only when one of its voxels lies within the band (ARCHITECTURE.md
+/// §5.1), even where the band is f32's least normal value, the −`f32::MIN_POSITIVE` an
+/// inside voxel on the mesh holds lying on the band's edge: a cube whose faces pass through
+/// voxels' centres, every other voxel a voxel or more from it, keeps no leaf holding only
+/// ±N·h, and one whose faces lie a quarter of a voxel off the centres keeps leaves.
+#[test]
+#[expect(clippy::cast_possible_truncation, reason = "the band's width as f32, as converted")]
+fn a_leaf_holds_a_value_in_the_band_at_the_least_voxel_size() {
+    let h = f64::from(f32::MIN_POSITIVE);
+    let o = exact(h).with_band(1);
+    let edge = (f64::from(o.band) * h) as f32;
+    for (offset, kept) in [(0.5, false), (0.25, true)] {
+        let c = convert(&cube(offset * h, (offset + 16.0) * h), &o).unwrap();
+        let mut leaves = 0;
+        for n in c.topology.leaf_numbers() {
+            let values = c.field.leaf(&c.topology, n).unwrap();
+            assert!(values.iter().any(|x| x.abs() < edge), "offset {offset}, leaf {n:?}");
+            leaves += 1;
+        }
+        assert_eq!(leaves > 0, kept, "offset {offset}");
+    }
+}

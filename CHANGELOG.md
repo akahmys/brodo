@@ -6,6 +6,9 @@ are recorded here when they change (V6).
 
 ## Unreleased
 
+- colino's `convert` finds signs only for the leaves it keeps in the band, the bytes it
+  writes unchanged (issue 18).
+
 ## 1.4.0 (2026-11-18)
 
 Closes P13: an archive's region and listing read from only the bytes they need, components'

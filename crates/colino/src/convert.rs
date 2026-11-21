@@ -76,9 +76,11 @@ impl<'a> Inside<'a> {
     /// share alike, where the winding number would turn on a rounded zero's sign and
     /// parity on the side its lines are moved to.
     pub(crate) fn at_distance(&self, p: Point, d: Option<f64>) -> bool {
-        if d == Some(0.0) {
-            return true;
-        }
+        d == Some(0.0) || self.off_mesh(p)
+    }
+
+    /// Whether `p`, not on the mesh, is inside by the sign asked for.
+    fn off_mesh(&self, p: Point) -> bool {
         match self.sign {
             Sign::Winding => self.winding.number(p, self.accuracy) >= 0.5,
             Sign::Parity => parity::inside(self.winding.bvh(), p),
@@ -325,17 +327,33 @@ fn candidates(winding: &Winding, o: &Options) -> Result<BTreeSet<Coord>, Convert
     Ok(cells)
 }
 
-/// A voxel's signed distance, clamped to ±`width`. An inside voxel whose distance rounds
-/// to zero holds −`f32::MIN_POSITIVE`, so that `v < 0` finds it inside.
-fn value(winding: &Winding, inside: &Inside<'_>, o: &Options, v: Coord, width: f64) -> f32 {
-    let p = o.world(v.map(|c| f64::from(c) + 0.5));
-    let nearest = winding.nearest(p);
-    let d = nearest.unwrap_or(f64::INFINITY);
-    let is_inside = inside.at_distance(p, nearest);
-    let signed = if is_inside { -d } else { d };
+/// A voxel's distance to the mesh, clamped to `width` and stored as `f32`: the magnitude
+/// of its value, which `f32`'s rounding to nearest gives alike for either sign.
+fn magnitude(winding: &Winding, o: &Options, v: Coord, width: f64) -> f32 {
+    let d = winding.nearest(centre(o, v)).unwrap_or(f64::INFINITY);
     #[expect(clippy::cast_possible_truncation, reason = "values are stored as f32 (ADR-0027)")]
-    let stored = signed.clamp(-width, width) as f32;
-    if is_inside && stored == 0.0 { -f32::MIN_POSITIVE } else { stored }
+    let stored = d.min(width) as f32;
+    stored
+}
+
+/// A voxel's signed distance from its `magnitude`. An inside voxel whose distance rounds
+/// to zero holds −`f32::MIN_POSITIVE`, so that `v < 0` finds it inside.
+fn signed(winding: &Winding, inside: &Inside<'_>, o: &Options, v: Coord, magnitude: f32) -> f32 {
+    let p = centre(o, v);
+    // Only a distance stored as zero may be exactly zero, on the mesh and so inside.
+    let on_mesh = magnitude == 0.0 && winding.nearest(p) == Some(0.0);
+    if !(on_mesh || inside.off_mesh(p)) {
+        magnitude
+    } else if magnitude == 0.0 {
+        -f32::MIN_POSITIVE
+    } else {
+        -magnitude
+    }
+}
+
+/// Voxel `v`'s centre, in the mesh's world coordinates.
+fn centre(o: &Options, v: Coord) -> Point {
+    o.world(v.map(|c| f64::from(c) + 0.5))
 }
 
 /// Converts `mesh` into a narrow-band signed distance field.
@@ -357,12 +375,23 @@ pub fn convert(mesh: &Mesh, o: &Options) -> Result<Converted, ConvertError> {
     let mut f = Field::new(&t, edge);
     par_update(&t, &mut f, |n, values| {
         for (v, x) in t.leaf_voxels(n).map_err(|_| FieldError::UnknownLeaf(n.get()))?.zip(values) {
-            *x = value(&winding, &signs, o, v, width);
+            *x = magnitude(&winding, o, v, width);
         }
         Ok::<(), FieldError>(())
     })?;
 
     // Each step takes the last one's topology and field, so that they are freed as it ends.
+    // Distances first, trimmed on them: a value's magnitude is its distance's but for an
+    // inside zero, held as −f32::MIN_POSITIVE, so the leaves kept include every leaf the
+    // values keep. Signs are found for those alone, then trimmed again on the values, which
+    // drops a leaf only where the band's edge is f32::MIN_POSITIVE.
+    let (t, mut f) = trimmed(t, f, edge)?;
+    par_update(&t, &mut f, |n, values| {
+        for (v, x) in t.leaf_voxels(n).map_err(|_| FieldError::UnknownLeaf(n.get()))?.zip(values) {
+            *x = signed(&winding, &signs, o, v, *x);
+        }
+        Ok::<(), FieldError>(())
+    })?;
     let (t, f) = trimmed(t, f, edge)?;
     let (t, f) = with_inside(t, f, &winding, &signs, o, edge)?;
 
