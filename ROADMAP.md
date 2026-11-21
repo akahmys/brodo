@@ -74,7 +74,20 @@ and each spike after the item it is measured against.
 - [ ] A refactoring of the whole workspace, set by the owner on 2026-11-18: what is
       repeated, named or shaped unevenly across brodo, colino and mestolo, outputs and API
       unchanged, its scope put to the owner before it starts
-- [ ] The retrospective and refactoring (PLANNING.md §7)
+- [ ] The retrospective and refactoring (PLANNING.md §7), with five additions to the audit
+      the owner proposed on 2026-11-21, not taken before it unless the owner brings them
+      forward: (1) the hand-written checks and guards tried in every gate on cases of known
+      answer, and a check running a tool telling "found", "none" and "did not run" apart;
+      (2) no name of the local list of forbidden sources (AGENTS.md S1) in a committed text
+      file or commit message, checked without writing the names into the repository;
+      (3) the gate run by a `pre-push` hook, refusing uncommitted changes, what is too slow
+      moved to the version step; (4) each figure a record quotes from a spike found in that
+      spike's output, and how older spikes are treated; (5) a CPU time and memory limit per
+      test binary, `NAME.md §N` references resolving, and every file of `scripts/audit/`
+      and `scripts/hooks/` described in AUDITING.md. For each: what brodo already does,
+      read and tried on known cases before deciding, then a recommendation to take, leave
+      or reshape it, with a plan, an estimate and pass conditions written before measuring,
+      put to the owner; each taken lands with its ADR (AGENTS.md, "Changing the rules")
 - [ ] The closing checks, chosen by the owner
 - [ ] Version 1.5.0 (TESTING.md V2–V4)
 
