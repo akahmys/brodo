@@ -8,10 +8,12 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: P14's issues 18 and 19. colino's `convert` finds signs only for the leaves
-  kept in the band, the bytes written unchanged (77fdbc1). brodo's nodes find a child's
-  offset from a table of counts before each mask word (ADR-0013's amendment of
-  2026-11-21): random access in less than half its time and activation in 37 % less.
+- **Done**: P14's issues 18 and 19, and issue 20 declined. colino's `convert` finds signs
+  only for the leaves kept in the band, the bytes written unchanged (77fdbc1). brodo's
+  nodes find a child's offset from a table of counts before each mask word (ADR-0013's
+  amendment of 2026-11-21): random access in less than half its time and activation in
+  37 % less (8143a85). Read buffers allocated zeroed were declined by the owner, gaining
+  4 % on one item and slowing `cache_map_x256` by 58 % for no cause found (§2).
   Before it, P13 released as 1.4.0 (2026-11-18), an archive's region and listing read from
   only the bytes they need, labels a leaf at a time, conversions rebuilt from grids read
   back, one reader for any mesh format, and mestolo's encodings and slice options, without
@@ -21,7 +23,7 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   5, 9, 10, 11, 12, 16 and 17 closed. Before it, 1.3.1 (2026-11-18): an archive's read,
   quadratic in its entries, fixed from v1.3.0 as SECURITY.md states, advisory
   GHSA-rh8f-f6hf-2c95 published and its CVE requested.
-- **Next**: P14's next item (§2), issue 20.
+- **Next**: P14's next item (§2), issue 21.
 - **Unresolved**: none. `leaf_parallel_update_x32`'s drift between sessions is measured:
   other processes' work on the performance cores moves it either way, and the item and its
   baseline are kept (B-026, ADR-0019's amendment of 2026-11-12).
@@ -65,7 +67,13 @@ and each spike after the item it is measured against.
 
 - [x] [Issue 18](https://github.com/akahmys/brodo/issues/18): colino's sign only for the leaves kept in the band
 - [x] [Issue 19](https://github.com/akahmys/brodo/issues/19): a node's child found by a rank table
-- [ ] [Issue 20](https://github.com/akahmys/brodo/issues/20): read buffers allocated zeroed
+- [x] [Issue 20](https://github.com/akahmys/brodo/issues/20): read buffers allocated zeroed:
+      declined (owner, 2026-11-21). Allocated by zerocopy's `new_vec_zeroed`, the four
+      read buffers gained only on `archive_read_8bit_x8`, 3.37 to 3.45 ms against 3.52 to
+      3.59, `archive_read_x8` and `cache_read_x16` within the runs' spread, and
+      `cache_map_x256`, whose path holds none of them, ran 12.3 to 12.6 ms against 7.8 to
+      7.9, again with the archive's three alone, and not with zerocopy's `alloc` feature
+      alone (A, B, B, A in one session, Apple M5); the cause is not established
 - [ ] [Issue 21](https://github.com/akahmys/brodo/issues/21): gather by rows
 - [ ] [Issue 22](https://github.com/akahmys/brodo/issues/22): colino's Hermite signs, query stacks and candidates
 - [ ] [Issue 23](https://github.com/akahmys/brodo/issues/23): colino's parity sign shared along a leaf's lines
