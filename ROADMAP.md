@@ -8,10 +8,10 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: P14's issue 18: colino's `convert` finds each voxel's distance first, trims
-  the candidate leaves on the distances, and finds signs only for the leaves kept, the
-  bytes written unchanged; `convert_sphere_r50` ran 399 to 421 ms against 448 ms before
-  it, `convert_slab_320` 239 to 243 ms against 248 to 257 ms (2026-11-21, Apple M5).
+- **Done**: P14's issues 18 and 19. colino's `convert` finds signs only for the leaves
+  kept in the band, the bytes written unchanged (77fdbc1). brodo's nodes find a child's
+  offset from a table of counts before each mask word (ADR-0013's amendment of
+  2026-11-21): random access in less than half its time and activation in 37 % less.
   Before it, P13 released as 1.4.0 (2026-11-18), an archive's region and listing read from
   only the bytes they need, labels a leaf at a time, conversions rebuilt from grids read
   back, one reader for any mesh format, and mestolo's encodings and slice options, without
@@ -21,7 +21,7 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   5, 9, 10, 11, 12, 16 and 17 closed. Before it, 1.3.1 (2026-11-18): an archive's read,
   quadratic in its entries, fixed from v1.3.0 as SECURITY.md states, advisory
   GHSA-rh8f-f6hf-2c95 published and its CVE requested.
-- **Next**: P14's next item (§2), issue 19.
+- **Next**: P14's next item (§2), issue 20.
 - **Unresolved**: none. `leaf_parallel_update_x32`'s drift between sessions is measured:
   other processes' work on the performance cores moves it either way, and the item and its
   baseline are kept (B-026, ADR-0019's amendment of 2026-11-12).
@@ -64,7 +64,7 @@ spikes on colino's queries, 19 before labelling and the benchmarks it speeds, 20
 and each spike after the item it is measured against.
 
 - [x] [Issue 18](https://github.com/akahmys/brodo/issues/18): colino's sign only for the leaves kept in the band
-- [ ] [Issue 19](https://github.com/akahmys/brodo/issues/19): a node's child found by a rank table
+- [x] [Issue 19](https://github.com/akahmys/brodo/issues/19): a node's child found by a rank table
 - [ ] [Issue 20](https://github.com/akahmys/brodo/issues/20): read buffers allocated zeroed
 - [ ] [Issue 21](https://github.com/akahmys/brodo/issues/21): gather by rows
 - [ ] [Issue 22](https://github.com/akahmys/brodo/issues/22): colino's Hermite signs, query stacks and candidates

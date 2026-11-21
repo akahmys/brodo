@@ -8,6 +8,8 @@ are recorded here when they change (V6).
 
 - colino's `convert` finds signs only for the leaves it keeps in the band, the bytes it
   writes unchanged (issue 18).
+- brodo's nodes find a child from a table of counts before each mask word: random access
+  takes less than half its time, and an upper node 1 KiB more memory (issue 19).
 
 ## 1.4.0 (2026-11-18)
 

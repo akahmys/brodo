@@ -103,14 +103,6 @@ impl<const W: usize> Mask<W> {
         self.0[i >> 6] &= !(1 << (i & 63));
     }
 
-    /// The number of set bits below bit `i`: the offset of child `i` among the children.
-    fn count_before(&self, i: usize) -> usize {
-        let w = i >> 6;
-        let whole: u32 = self.0[..w].iter().map(|x| x.count_ones()).sum();
-        let part = (self.0[w] & ((1_u64 << (i & 63)) - 1)).count_ones();
-        to_usize(whole + part)
-    }
-
     /// The set bits, lowest first.
     fn ones(&self) -> impl Iterator<Item = usize> + '_ {
         self.0.iter().enumerate().flat_map(|(w, word)| {
@@ -130,6 +122,57 @@ impl<const W: usize> Mask<W> {
     }
 }
 
+/// A mask of a node's children with the number of set bits before each word, so that a
+/// child's offset among the children is one read and one `count_ones`. An upper node's
+/// 32768 places count at most 32704 bits before its last word, within a `u16`.
+#[derive(Debug, Clone)]
+struct Ranked<const W: usize> {
+    mask: Mask<W>,
+    before: [u16; W],
+}
+
+impl<const W: usize> Ranked<W> {
+    const EMPTY: Self = Self { mask: Mask::EMPTY, before: [0; W] };
+
+    fn get(&self, i: usize) -> bool {
+        self.mask.get(i)
+    }
+
+    /// Sets bit `i`, which is clear.
+    fn set(&mut self, i: usize) {
+        debug_assert!(!self.mask.get(i), "the bit is clear");
+        self.mask.set(i);
+        for b in &mut self.before[(i >> 6) + 1..] {
+            *b += 1;
+        }
+    }
+
+    /// Clears bit `i`, which is set.
+    fn clear(&mut self, i: usize) {
+        debug_assert!(self.mask.get(i), "the bit is set");
+        self.mask.clear(i);
+        for b in &mut self.before[(i >> 6) + 1..] {
+            *b -= 1;
+        }
+    }
+
+    /// The number of set bits below bit `i`: the offset of child `i` among the children.
+    fn count_before(&self, i: usize) -> usize {
+        let w = i >> 6;
+        let part = (self.mask.0[w] & ((1_u64 << (i & 63)) - 1)).count_ones();
+        usize::from(self.before[w]) + to_usize(part)
+    }
+
+    /// The set bits, lowest first.
+    fn ones(&self) -> impl Iterator<Item = usize> + '_ {
+        self.mask.ones()
+    }
+
+    fn count(&self) -> usize {
+        self.mask.count()
+    }
+}
+
 /// What a node holds in one child's place.
 #[derive(Debug, Clone, Copy)]
 enum Slot {
@@ -145,7 +188,7 @@ macro_rules! internal_node {
         $(#[$doc])*
         #[derive(Debug, Clone)]
         struct $name {
-            children: Mask<$words>,
+            children: Ranked<$words>,
             tiles: Mask<$words>,
             /// Child numbers, in the order of their bits in `children`.
             child_ids: Vec<u32>,
@@ -153,7 +196,7 @@ macro_rules! internal_node {
 
         impl $name {
             fn new(tiles: Mask<$words>) -> Self {
-                Self { children: Mask::EMPTY, tiles, child_ids: Vec::new() }
+                Self { children: Ranked::EMPTY, tiles, child_ids: Vec::new() }
             }
 
             fn index(v: Coord) -> usize {
@@ -777,7 +820,7 @@ mod tests {
 
     #[test]
     fn mask_offsets_cross_word_boundaries() {
-        let mut m = Mask::<2>::EMPTY;
+        let mut m = Ranked::<2>::EMPTY;
         for i in [0, 63, 64, 127] {
             m.set(i);
         }

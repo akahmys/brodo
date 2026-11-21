@@ -74,8 +74,9 @@ The dependency order between crates is CODING.md Rule 11, listed in
 
 - Four levels: a root `BTreeMap` keyed by coordinate → internal nodes of 32³ → internal
   nodes of 16³ → leaves of 8³ (512 voxels).
-- Each node marks its children and tiles by bit masks; offsets come from `count_ones` and
-  `trailing_zeros`.
+- Each node marks its children and tiles by bit masks. A child's offset among the children
+  is the count of children before its mask's word, kept beside the mask as a `u16` a word,
+  plus `count_ones` within the word; children are walked by `trailing_zeros` (ADR-0013).
 - A **tile** stands for a uniform region in a child's place, without a leaf. The
   **background** is the value outside the tree.
 - A leaf holds no per-voxel active state: all 512 voxels are active (ADR-0025).

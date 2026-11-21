@@ -85,3 +85,21 @@ With it, `.cargo/mutants.toml` dropped the three mutants it excluded in the grid
 for their reason, a touching pair joined once whichever way it is walked, name `forward`,
 where that comparison now is (the owner, 2026-11-11). Shown to fire (TESTING.md T3,
 2026-11-11): an exclusion naming `Walk::root` again failed T11.
+
+## Amendment: a child's offset from a table of counts
+
+- **Date**: 2026-11-21
+
+A child's offset among a node's children was found by summing `count_ones` over every mask
+word below its place: up to 511 words for an upper node, 32 on average for a lower node's
+place, paid by every walk down the tree (issue 19). Each node's children's mask was given
+a count of the set bits before each word, a `u16` a word, raised or lowered past the word
+on each child inserted or removed, so that an offset is one read and one `count_ones`. An
+upper node grew from 8216 to 9240 bytes and a lower node from 1048 to 1176 (`size_of`,
+2026-11-21). On `cargo bench -p brodo --bench brodo --all-features` (2026-11-21, Apple M5,
+4 threads), `random_access_value_at` ran 2.35 to 2.36 ms against 5.26 to 5.28 ms before,
+`random_access_accessor` 2.54 ms against 5.34 to 5.36 ms and `activation` 1.02 to 1.03 ms
+against 1.61 to 1.63 ms; every other item within its baseline. The tiles' mask, never
+ranked, kept no table.
+
+The owner accepted it on 2026-11-21.
