@@ -117,3 +117,6 @@ gone with their code were removed with it.
   an entry of bytes, as `[open]`. Three timeouts with no failed test before them were
   labelling looping for ever, its tests that end in time started after four that wait on
   GitHub Actions' four threads; they were renamed to sort, and so start, first.
+- 2026-11-26: none new; the exclusion of `+` in the candidate cells' reach, approved on
+  2026-10-22, renamed from `candidates` to `near`, the function its line moved to when the
+  candidates were found in parallel (issue 22).

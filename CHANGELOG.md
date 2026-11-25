@@ -12,6 +12,9 @@ are recorded here when they change (V6).
   takes less than half its time, and an upper node 1 KiB more memory (issue 19).
 - brodo's `gather` and `gather_wide` copy each row of a leaf as a run, the values the same:
   `gather` in a fifth of its time and three ghost layers in half (issue 21).
+- colino's `hermite` and `convert` repeat less work, the bytes they write unchanged: a
+  sign asks only whether a triangle lies at distance 0, a query's stack is not allocated,
+  and the candidate cells are found in parallel (issue 22).
 
 ## 1.4.0 (2026-11-18)
 

@@ -8,9 +8,13 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: P14's issues 18, 19 and 21, and issue 20 declined. `gather` and `gather_wide`
+- **Done**: P14's issues 18, 19, 21 and 22, and issue 20 declined. colino's Hermite signs
+  and on-mesh voxels ask only whether a triangle lies at distance 0, its tree walks keep
+  their stacks in place, and `convert`'s candidates are found in parallel, the bytes
+  unchanged: `hermite_*_r50` 14 % faster and `convert_slab_320` 9 %, `convert_sphere_r50`
+  3 % slower (A, B, B, A, 2026-11-25, Apple M5). `gather` and `gather_wide`
   copy each row in three runs, a leaf's slice or a value repeated: `gather` 0.59 ms against
-  3.13 and `gather_w3` 2.16 against 4.47 (2026-11-23, Apple M5). colino's `convert` finds signs
+  3.13 and `gather_w3` 2.16 against 4.47 (2026-11-23, Apple M5) (9e97c27). colino's `convert` finds signs
   only for the leaves kept in the band, the bytes written unchanged (77fdbc1). brodo's
   nodes find a child's offset from a table of counts before each mask word (ADR-0013's
   amendment of 2026-11-21): random access in less than half its time and activation in
@@ -25,7 +29,7 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   5, 9, 10, 11, 12, 16 and 17 closed. Before it, 1.3.1 (2026-11-18): an archive's read,
   quadratic in its entries, fixed from v1.3.0 as SECURITY.md states, advisory
   GHSA-rh8f-f6hf-2c95 published and its CVE requested.
-- **Next**: P14's next item (§2), issue 22.
+- **Next**: P14's next item (§2), issue 23.
 - **Unresolved**: none. `leaf_parallel_update_x32`'s drift between sessions is measured:
   other processes' work on the performance cores moves it either way, and the item and its
   baseline are kept (B-026, ADR-0019's amendment of 2026-11-12).
@@ -77,7 +81,7 @@ and each spike after the item it is measured against.
       7.9, again with the archive's three alone, and not with zerocopy's `alloc` feature
       alone (A, B, B, A in one session, Apple M5); the cause is not established
 - [x] [Issue 21](https://github.com/akahmys/brodo/issues/21): gather by rows
-- [ ] [Issue 22](https://github.com/akahmys/brodo/issues/22): colino's Hermite signs, query stacks and candidates
+- [x] [Issue 22](https://github.com/akahmys/brodo/issues/22): colino's Hermite signs, query stacks and candidates
 - [ ] [Issue 23](https://github.com/akahmys/brodo/issues/23): colino's parity sign shared along a leaf's lines
 - [ ] [Issue 24](https://github.com/akahmys/brodo/issues/24): an archive's ranges, binary16 and whole read
 - [ ] [Issue 25](https://github.com/akahmys/brodo/issues/25): labelling by each leaf's components

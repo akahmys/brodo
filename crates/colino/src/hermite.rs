@@ -173,8 +173,9 @@ fn signs(
     par_update(t, &mut signs, |n, values| {
         for (v, x) in voxels(t, n)?.zip(values) {
             let p = lattice.world(v);
-            let d = bvh.nearest(p).map(|(d, _)| d);
-            *x = u8::from(inside.at_distance(p, d));
+            // Only whether a triangle lies at distance 0 decides it, not the distance.
+            let on = bvh.touches(p, |_| true).then_some(0.0);
+            *x = u8::from(inside.at_distance(p, on));
         }
         Ok::<(), FieldError>(())
     })?;

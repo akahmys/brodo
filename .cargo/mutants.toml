@@ -171,7 +171,7 @@ exclude_re = [
     # [same]
     'convert\.rs:\d+:31: replace \- with \+ in cell_range$',
     # As above.
-    'convert\.rs:\d+:23: replace \+ with \* in candidates$',
+    'convert\.rs:\d+:23: replace \+ with \* in near$',
     # As above.
     'convert\.rs:.*: replace < with <= in inside$',
     # As above.

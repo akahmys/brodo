@@ -28,6 +28,7 @@ use brodo::meta::{GridMeta, SDF_KEY, SDF_VERSION};
 use brodo::parallel::par_update;
 use brodo::topology::Topology;
 use brodo::tree::{Coord, TileLevel};
+use rayon::prelude::*;
 
 use crate::distance::{Point, on_triangle, squared};
 use crate::error::ConvertError;
@@ -301,25 +302,37 @@ fn origin_of(cell: [i64; 3]) -> Result<Coord, ConvertError> {
     Ok([c(cell[0])?, c(cell[1])?, c(cell[2])?])
 }
 
-/// The candidate cells: near enough a triangle that a voxel of theirs may be in the band.
-fn candidates(winding: &Winding, o: &Options) -> Result<BTreeSet<Coord>, ConvertError> {
+/// The candidate cells, in ascending order: near enough a triangle that a voxel of theirs
+/// may be in the band. Each triangle's are found in parallel.
+fn candidates(winding: &Winding, o: &Options) -> Result<Vec<Coord>, ConvertError> {
+    let per_triangle = winding
+        .triangles()
+        .par_iter()
+        .map(|t| near(t, o))
+        .collect::<Result<Vec<_>, ConvertError>>()?;
+    let mut cells = per_triangle.concat();
+    cells.sort_unstable();
+    cells.dedup();
+    Ok(cells)
+}
+
+/// The cells near triangle `t`: among those its box grown by the band overlaps, those whose
+/// centre lies within the band and half a cell's diagonal of it.
+fn near(t: &[Point; 3], o: &Options) -> Result<Vec<Coord>, ConvertError> {
     let band = f64::from(o.band);
     let reach = (band + 3.0_f64.sqrt() * 4.0) * o.voxel_size;
-    let mut cells = BTreeSet::new();
-    for t in winding.triangles() {
-        let ix = t.map(|p| o.index(p));
-        let lo = [0, 1, 2].map(|k| ix.iter().map(|p| p[k]).fold(f64::INFINITY, f64::min) - band);
-        let hi =
-            [0, 1, 2].map(|k| ix.iter().map(|p| p[k]).fold(f64::NEG_INFINITY, f64::max) + band);
-        let (first, last) = cell_range(lo, hi)?;
-        for z in first[2]..=last[2] {
-            for y in first[1]..=last[1] {
-                for x in first[0]..=last[0] {
-                    let mid = [x, y, z].map(|c| (c * CELL) as f64 + 4.0);
-                    let p = o.world(mid);
-                    if squared(p, on_triangle(p, *t)) <= reach * reach {
-                        cells.insert(origin_of([x, y, z])?);
-                    }
+    let ix = t.map(|p| o.index(p));
+    let lo = [0, 1, 2].map(|k| ix.iter().map(|p| p[k]).fold(f64::INFINITY, f64::min) - band);
+    let hi = [0, 1, 2].map(|k| ix.iter().map(|p| p[k]).fold(f64::NEG_INFINITY, f64::max) + band);
+    let (first, last) = cell_range(lo, hi)?;
+    let mut cells = Vec::new();
+    for z in first[2]..=last[2] {
+        for y in first[1]..=last[1] {
+            for x in first[0]..=last[0] {
+                let mid = [x, y, z].map(|c| (c * CELL) as f64 + 4.0);
+                let p = o.world(mid);
+                if squared(p, on_triangle(p, *t)) <= reach * reach {
+                    cells.push(origin_of([x, y, z])?);
                 }
             }
         }
@@ -341,7 +354,7 @@ fn magnitude(winding: &Winding, o: &Options, v: Coord, width: f64) -> f32 {
 fn signed(winding: &Winding, inside: &Inside<'_>, o: &Options, v: Coord, magnitude: f32) -> f32 {
     let p = centre(o, v);
     // Only a distance stored as zero may be exactly zero, on the mesh and so inside.
-    let on_mesh = magnitude == 0.0 && winding.nearest(p) == Some(0.0);
+    let on_mesh = magnitude == 0.0 && winding.bvh().touches(p, |_| true);
     if !(on_mesh || inside.off_mesh(p)) {
         magnitude
     } else if magnitude == 0.0 {

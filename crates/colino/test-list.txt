@@ -2,6 +2,7 @@ doc colino crates/colino/src/lib.rs - #1
 example torus tests::the_torus_keeps_its_tunnel_and_its_distances
 example vent tests::the_vent_closes_when_narrower_than_a_voxel
 lib colino bvh::tests::a_box_entered_first_does_not_hide_a_nearer_crossing
+lib colino bvh::tests::a_stack_gives_back_what_it_held_past_its_places
 lib colino bvh::tests::searching_a_tetrahedron_ends_in_time
 lib colino bvh::tests::the_first_crossing_of_a_segment_is_the_scans
 lib colino bvh::tests::the_first_crossing_passes_the_boxes_beyond_it

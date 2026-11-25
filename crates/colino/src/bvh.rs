@@ -25,6 +25,45 @@ const CROSSING_ROUNDING: f64 = 16.0 * f64::EPSILON;
 /// taken at, which `on_triangle` holds to at least √ε (ARCHITECTURE.md §5.1). 2⁻²⁵ is 2√ε.
 const DISTANCE_ROUNDING: f64 = 1.0 / 33_554_432.0;
 
+/// Nodes a walk has still to visit: the first 64 held in place, the rest, which a tree
+/// of fewer than 2³² triangles split at medians never needs, in a `Vec`; so that a query
+/// allocates nothing.
+struct Stack {
+    held: [usize; 64],
+    len: usize,
+    spilled: Vec<usize>,
+}
+
+impl Stack {
+    /// A stack holding the root.
+    fn root() -> Stack {
+        Stack { held: [0; 64], len: 1, spilled: Vec::new() }
+    }
+
+    fn push(&mut self, id: usize) {
+        if let Some(slot) = self.held.get_mut(self.len) {
+            *slot = id;
+            self.len += 1;
+        } else {
+            self.spilled.push(id);
+        }
+    }
+
+    fn extend(&mut self, ids: [usize; 2]) {
+        for id in ids {
+            self.push(id);
+        }
+    }
+
+    fn pop(&mut self) -> Option<usize> {
+        if let Some(id) = self.spilled.pop() {
+            return Some(id);
+        }
+        self.len = self.len.checked_sub(1)?;
+        self.held.get(self.len).copied()
+    }
+}
+
 /// A box, its smallest and largest corner.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) struct Aabb {
@@ -211,7 +250,7 @@ impl Bvh {
         // of every triangle would choose is left out.
         let margin = DISTANCE_ROUNDING * self.reach(&[p]);
         let mut best: Option<(f64, u32)> = None;
-        let mut stack = vec![0_usize];
+        let mut stack = Stack::root();
         while let Some(id) = stack.pop() {
             let Some(node) = self.nodes.get(id) else { continue };
             let gap = node.bounds.squared_to(p).sqrt();
@@ -247,6 +286,31 @@ impl Bvh {
         best.map(|(d, i)| (d.sqrt(), i))
     }
 
+    /// Whether a triangle `keep` accepts lies at distance 0 from `p`, as `nearest_where`
+    /// finds one: a node is passed when its box lies farther than a distance found may lie
+    /// below the true one, and the walk ends at the first such triangle.
+    pub(crate) fn touches(&self, p: Point, keep: impl Fn([Point; 3]) -> bool) -> bool {
+        let margin = DISTANCE_ROUNDING * self.reach(&[p]);
+        let mut stack = Stack::root();
+        while let Some(id) = stack.pop() {
+            let Some(node) = self.nodes.get(id) else { continue };
+            if node.bounds.squared_to(p).sqrt() > margin {
+                continue;
+            }
+            if node.children != 0 {
+                stack.extend([node.children, node.children + 1]);
+                continue;
+            }
+            for i in self.order.get(node.first..node.first + node.count).unwrap_or(&[]) {
+                let Some(t) = self.corners(*i).filter(|t| keep(*t)) else { continue };
+                if squared(p, on_triangle(p, t)) == 0.0 {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
     /// The largest coordinate in play, of the tree's box and `points`: the size every
     /// rounding here is a multiple of.
     fn reach(&self, points: &[Point]) -> f64 {
@@ -267,7 +331,7 @@ impl Bvh {
         let query = Aabb { lo: query.lo.map(|c| c - margin), hi: query.hi.map(|c| c + margin) };
         let meets = |x: &Aabb| (0..3).all(|k| x.lo[k] <= query.hi[k] && query.lo[k] <= x.hi[k]);
         let mut out = Vec::new();
-        let mut stack = vec![0_usize];
+        let mut stack = Stack::root();
         while let Some(id) = stack.pop() {
             let Some(node) = self.nodes.get(id) else { continue };
             if !meets(&node.bounds) {
@@ -312,7 +376,7 @@ impl Bvh {
             (p * p + q * q + r * r).sqrt()
         };
         let mut best: Option<(f64, f64, u32)> = None;
-        let mut stack = vec![0_usize];
+        let mut stack = Stack::root();
         while let Some(id) = stack.pop() {
             let Some(node) = self.nodes.get(id) else { continue };
             if best.is_some_and(|(_, d, _)| gap(&node.bounds) > d.sqrt() + margin) {
@@ -349,7 +413,7 @@ impl Bvh {
         let margin = CROSSING_ROUNDING * self.reach(&[a, b]);
         let enters = |x: &Aabb| entry(x, a, b, margin);
         let mut best: Option<f64> = None;
-        let mut stack = vec![0_usize];
+        let mut stack = Stack::root();
         while let Some(id) = stack.pop() {
             let Some(node) = self.nodes.get(id) else { continue };
             let Some(at) = enters(&node.bounds) else { continue };
@@ -437,6 +501,21 @@ mod tests {
     /// The tree's nearest triangle to a segment is the one a scan of every triangle in
     /// ascending order finds, ties and triangles `keep` refuses among them, for segments
     /// near and far.
+    /// A walk's stack gives back every node it was given, last first, past the 64 it holds
+    /// in place, so that a query visits what a scan of the tree would, however deep it is
+    /// (`Bvh::nearest`).
+    #[test]
+    fn a_stack_gives_back_what_it_held_past_its_places() {
+        let mut stack = Stack::root();
+        for id in 1..100 {
+            stack.push(id);
+        }
+        let popped: Vec<usize> = std::iter::from_fn(|| stack.pop()).collect();
+        assert_eq!(popped, (0..100).rev().collect::<Vec<_>>());
+        stack.extend([7, 8]);
+        assert_eq!((stack.pop(), stack.pop(), stack.pop()), (Some(8), Some(7), None));
+    }
+
     #[test]
     fn the_nearest_to_a_segment_is_the_scans() {
         let mut next = sequence();
