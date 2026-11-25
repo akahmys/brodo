@@ -57,15 +57,48 @@ pub fn gather<T: Value>(
     out: &mut [T; GATHER_VOXELS],
 ) -> Result<(), FieldError> {
     let sources = sources(t, f, n)?;
-    let cells =
-        (-1..=8_i32).flat_map(|z| (-1..=8).flat_map(move |y| (-1..=8).map(move |x| [x, y, z])));
-    for (o, g) in out.iter_mut().zip(cells) {
-        *o = match sources[block(g.map(|c| c.div_euclid(8)))] {
-            Source::Leaf(values) => values[local_index(g)],
-            Source::Value(v) => v,
-        };
-    }
+    let mut at = 0;
+    rows(&sources, GhostWidth::One, |run| match run {
+        Run::Copy(values) => {
+            out[at..at + values.len()].copy_from_slice(values);
+            at += values.len();
+        }
+        Run::Repeat(v, len) => {
+            out[at..at + len].fill(v);
+            at += len;
+        }
+    });
     Ok(())
+}
+
+/// A run of a gathered row: values copied from a leaf, or one value repeated.
+enum Run<'a, T> {
+    Copy(&'a [T]),
+    Repeat(T, usize),
+}
+
+/// The runs of a window of `width` layers around a leaf, in the window's order, z
+/// outermost and x fastest: each row in three, before the leaf's column along x, in it,
+/// and after it, each from its own block's source.
+fn rows<'a, T: Value>(
+    sources: &[Source<'a, T>; 27],
+    width: GhostWidth,
+    mut emit: impl FnMut(Run<'a, T>),
+) {
+    let (w, layers) = (width.layers(), (width.edge() - 8) / 2);
+    // Each part's step along x in leaves and its run of x within its block.
+    let parts = [(-1, 8 - layers..8), (0, 0..8), (1, 0..layers)];
+    for z in -w..8 + w {
+        for y in -w..8 + w {
+            let row = local_index([0, y, z]);
+            for (dx, xs) in parts.clone() {
+                emit(match sources[block([dx, y.div_euclid(8), z.div_euclid(8)])] {
+                    Source::Leaf(values) => Run::Copy(&values[row + xs.start..row + xs.end]),
+                    Source::Value(v) => Run::Repeat(v, xs.len()),
+                });
+            }
+        }
+    }
 }
 
 /// How many ghost layers `gather_wide` copies around a leaf (ADR-0015).
@@ -117,19 +150,11 @@ pub fn gather_wide<T: Value>(
     out: &mut Vec<T>,
 ) -> Result<(), FieldError> {
     let sources = sources(t, f, n)?;
-    let w = width.layers();
     out.clear();
     out.reserve(width.voxels());
-    for z in -w..8 + w {
-        for y in -w..8 + w {
-            for x in -w..8 + w {
-                let g = [x, y, z];
-                out.push(match sources[block(g.map(|c| c.div_euclid(8)))] {
-                    Source::Leaf(values) => values[local_index(g)],
-                    Source::Value(v) => v,
-                });
-            }
-        }
-    }
+    rows(&sources, width, |run| match run {
+        Run::Copy(values) => out.extend_from_slice(values),
+        Run::Repeat(v, len) => out.extend(std::iter::repeat_n(v, len)),
+    });
     Ok(())
 }

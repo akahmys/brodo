@@ -10,6 +10,8 @@ are recorded here when they change (V6).
   writes unchanged (issue 18).
 - brodo's nodes find a child from a table of counts before each mask word: random access
   takes less than half its time, and an upper node 1 KiB more memory (issue 19).
+- brodo's `gather` and `gather_wide` copy each row of a leaf as a run, the values the same:
+  `gather` in a fifth of its time and three ghost layers in half (issue 21).
 
 ## 1.4.0 (2026-11-18)
 
