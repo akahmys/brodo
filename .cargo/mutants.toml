@@ -8,11 +8,11 @@ exclude_re = [
     # Only the sign of a crossing's height is read, and dividing by a determinant that is
     # not 0 gives it as multiplying does.
     # [same]
-    'parity\.rs:.*: replace / with \* in height$',
+    'parity\.rs:.*: replace / with \* in Crossed::above$',
     # A line votes only when it crosses an even number of times, and then the count above
     # it and the count below have one parity, wherever a height of exactly 0 is counted.
     # [same]
-    'parity\.rs:.*: replace >= with < in inside$',
+    'parity\.rs:.*: replace >= with < in Line::vote$',
     # A section's width or the longest edge is 0 only for a triangle of no area, whose
     # sections hold no point, so the centroid is taken either way.
     # [same]

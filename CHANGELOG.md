@@ -15,6 +15,9 @@ are recorded here when they change (V6).
 - colino's `hermite` and `convert` repeat less work, the bytes they write unchanged: a
   sign asks only whether a triangle lies at distance 0, a query's stack is not allocated,
   and the candidate cells are found in parallel (issue 22).
+- colino's parity sign finds the crossings of each line through a leaf once for the eight
+  voxels on it, the bytes written unchanged: a conversion by parity in two thirds of its
+  time and its Hermite data in half (issue 23).
 
 ## 1.4.0 (2026-11-18)
 

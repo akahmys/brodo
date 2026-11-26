@@ -8,7 +8,10 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: P14's issues 18, 19, 21 and 22, and issue 20 declined. colino's Hermite signs
+- **Done**: P14's issues 18, 19, 21, 22 and 23, and issue 20 declined. colino's parity
+  sign finds each line of a leaf's crossings once for its eight voxels, the bytes
+  unchanged: `convert_holed_r50_parity` 32 % faster and `hermite_holed_r50_parity` 48 %,
+  items added for it (2026-11-25, Apple M5). colino's Hermite signs
   and on-mesh voxels ask only whether a triangle lies at distance 0, its tree walks keep
   their stacks in place, and `convert`'s candidates are found in parallel, the bytes
   unchanged: `hermite_*_r50` 14 % faster and `convert_slab_320` 9 %, `convert_sphere_r50`
@@ -29,7 +32,7 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   5, 9, 10, 11, 12, 16 and 17 closed. Before it, 1.3.1 (2026-11-18): an archive's read,
   quadratic in its entries, fixed from v1.3.0 as SECURITY.md states, advisory
   GHSA-rh8f-f6hf-2c95 published and its CVE requested.
-- **Next**: P14's next item (§2), issue 23.
+- **Next**: P14's next item (§2), issue 24.
 - **Unresolved**: none. `leaf_parallel_update_x32`'s drift between sessions is measured:
   other processes' work on the performance cores moves it either way, and the item and its
   baseline are kept (B-026, ADR-0019's amendment of 2026-11-12).
@@ -82,7 +85,8 @@ and each spike after the item it is measured against.
       alone (A, B, B, A in one session, Apple M5); the cause is not established
 - [x] [Issue 21](https://github.com/akahmys/brodo/issues/21): gather by rows
 - [x] [Issue 22](https://github.com/akahmys/brodo/issues/22): colino's Hermite signs, query stacks and candidates
-- [ ] [Issue 23](https://github.com/akahmys/brodo/issues/23): colino's parity sign shared along a leaf's lines
+- [x] [Issue 23](https://github.com/akahmys/brodo/issues/23): colino's parity sign shared along a leaf's lines
+      (label checked again 2026-11-26)
 - [ ] [Issue 24](https://github.com/akahmys/brodo/issues/24): an archive's ranges, binary16 and whole read
 - [ ] [Issue 25](https://github.com/akahmys/brodo/issues/25): labelling by each leaf's components
 - [ ] [Issue 26](https://github.com/akahmys/brodo/issues/26): benchmarks for the Euler characteristic, dilation and `.vdb`, and what

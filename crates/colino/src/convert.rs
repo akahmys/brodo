@@ -87,6 +87,34 @@ impl<'a> Inside<'a> {
             Sign::Parity => parity::inside(self.winding.bvh(), p),
         }
     }
+
+    /// Whether voxels, one leaf's or a few, are inside, each as `at_distance` finds it.
+    pub(crate) fn voxels(&self) -> Voxels<'_> {
+        let lines = (self.sign == Sign::Parity).then(|| parity::Lines::new(self.winding.bvh()));
+        Voxels { inside: self, lines }
+    }
+}
+
+/// Whether voxels are inside: by parity, the voxels on each line share its crossings.
+pub(crate) struct Voxels<'a> {
+    inside: &'a Inside<'a>,
+    lines: Option<parity::Lines<'a>>,
+}
+
+impl Voxels<'_> {
+    /// Whether voxel `v`, its point `p` on a lattice, at distance `d` from the mesh, is
+    /// inside, as [`Inside::at_distance`] finds it.
+    pub(crate) fn at_distance(&mut self, v: Coord, p: Point, d: Option<f64>) -> bool {
+        d == Some(0.0) || self.off_mesh(v, p)
+    }
+
+    /// Whether voxel `v`, its point `p` on a lattice not on the mesh, is inside.
+    fn off_mesh(&mut self, v: Coord, p: Point) -> bool {
+        match &mut self.lines {
+            Some(lines) => lines.inside(v, p),
+            None => self.inside.off_mesh(p),
+        }
+    }
 }
 
 /// How a mesh is converted.
@@ -351,11 +379,17 @@ fn magnitude(winding: &Winding, o: &Options, v: Coord, width: f64) -> f32 {
 
 /// A voxel's signed distance from its `magnitude`. An inside voxel whose distance rounds
 /// to zero holds −`f32::MIN_POSITIVE`, so that `v < 0` finds it inside.
-fn signed(winding: &Winding, inside: &Inside<'_>, o: &Options, v: Coord, magnitude: f32) -> f32 {
+fn signed(
+    winding: &Winding,
+    inside: &mut Voxels<'_>,
+    o: &Options,
+    v: Coord,
+    magnitude: f32,
+) -> f32 {
     let p = centre(o, v);
     // Only a distance stored as zero may be exactly zero, on the mesh and so inside.
     let on_mesh = magnitude == 0.0 && winding.bvh().touches(p, |_| true);
-    if !(on_mesh || inside.off_mesh(p)) {
+    if !(on_mesh || inside.off_mesh(v, p)) {
         magnitude
     } else if magnitude == 0.0 {
         -f32::MIN_POSITIVE
@@ -400,8 +434,9 @@ pub fn convert(mesh: &Mesh, o: &Options) -> Result<Converted, ConvertError> {
     // drops a leaf only where the band's edge is f32::MIN_POSITIVE.
     let (t, mut f) = trimmed(t, f, edge)?;
     par_update(&t, &mut f, |n, values| {
+        let mut voxels = signs.voxels();
         for (v, x) in t.leaf_voxels(n).map_err(|_| FieldError::UnknownLeaf(n.get()))?.zip(values) {
-            *x = signed(&winding, &signs, o, v, *x);
+            *x = signed(&winding, &mut voxels, o, v, *x);
         }
         Ok::<(), FieldError>(())
     })?;

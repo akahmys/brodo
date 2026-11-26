@@ -21,6 +21,7 @@ lib colino mesh::tests::the_default_limits_are_two_to_the_26_triangles_and_verti
 lib colino mesh::tests::welding_keeps_each_triangles_group
 lib colino parity::tests::a_cube_is_inside_along_its_split_edges_whatever_its_faces
 lib colino parity::tests::a_line_on_an_edge_or_a_corner_counts_once_and_a_fold_none_or_twice
+lib colino parity::tests::a_lines_crossings_serve_every_voxel_on_it
 lib colino parity::tests::an_edge_through_the_line_takes_the_moved_lines_sign
 lib colino parity::tests::tied_votes_are_outside_and_an_odd_line_does_not_vote
 lib colino parity::tests::whatever_an_axis_line_crosses_has_area

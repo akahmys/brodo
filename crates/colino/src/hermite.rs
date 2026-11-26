@@ -171,11 +171,12 @@ fn signs(
 ) -> Result<Field<u8>, HermiteError> {
     let mut signs = Field::new(t, 0_u8);
     par_update(t, &mut signs, |n, values| {
+        let mut inside = inside.voxels();
         for (v, x) in voxels(t, n)?.zip(values) {
             let p = lattice.world(v);
             // Only whether a triangle lies at distance 0 decides it, not the distance.
             let on = bvh.touches(p, |_| true).then_some(0.0);
-            *x = u8::from(inside.at_distance(p, on));
+            *x = u8::from(inside.at_distance(v, p, on));
         }
         Ok::<(), FieldError>(())
     })?;

@@ -120,3 +120,7 @@ gone with their code were removed with it.
 - 2026-11-26: none new; the exclusion of `+` in the candidate cells' reach, approved on
   2026-10-22, renamed from `candidates` to `near`, the function its line moved to when the
   candidates were found in parallel (issue 22).
+- 2026-11-27: none new; two of parity's, approved on 2026-11-27, renamed to the functions
+  their lines moved to when a line's crossings were found once for the voxels on it
+  (issue 23): `/` in a crossing's height from `height` to `Crossed::above`, and `>=` in
+  the count above a point from `inside` to `Line::vote`.

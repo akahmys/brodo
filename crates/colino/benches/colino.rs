@@ -13,9 +13,12 @@
 //! data refuses (ADR-0030). A slab, 320 by 320 by 6 voxels and turned about two axes, is
 //! twelve large slanted triangles: its conversion's candidate cells are the triangles'
 //! boxes rather than their areas.
+//!
+//! The holed sphere is also converted, and its Hermite data made, with the parity sign
+//! (ADR-0027), whose three line queries per point the winding number's items do not time.
 
 use brodo::analysis::{Connectivity, label};
-use colino::convert::{Converted, Options, convert};
+use colino::convert::{Converted, Options, Sign, convert};
 use colino::hermite::hermite;
 use colino::mesh::Mesh;
 
@@ -115,6 +118,7 @@ struct Data {
     converted: Converted,
     holed: Mesh,
     holed_converted: Converted,
+    holed_parity: Converted,
     slab: Mesh,
 }
 
@@ -125,7 +129,15 @@ impl Data {
         let converted = convert(&mesh, &o)?;
         let holed = capless(&mesh, 49.0);
         let holed_converted = convert(&holed, &o)?;
-        Ok(Data { mesh, converted, holed, holed_converted, slab: slab([320.0, 320.0, 6.0]) })
+        let holed_parity = convert(&holed, &o.with_sign(Sign::Parity))?;
+        Ok(Data {
+            mesh,
+            converted,
+            holed,
+            holed_converted,
+            holed_parity,
+            slab: slab([320.0, 320.0, 6.0]),
+        })
     }
 
     fn items(&self) -> Vec<Item<'_>> {
@@ -156,6 +168,19 @@ impl Data {
                 "hermite_holed_r50",
                 1,
                 Box::new(|| Ok(hermite(&self.holed, &self.holed_converted)?.unhit as f64)),
+            ),
+            repeated(
+                "convert_holed_r50_parity",
+                1,
+                Box::new(|| {
+                    let o = Options::new(1.0).with_sign(Sign::Parity);
+                    Ok(convert(&self.holed, &o)?.topology.leaf_count() as f64)
+                }),
+            ),
+            repeated(
+                "hermite_holed_r50_parity",
+                1,
+                Box::new(|| Ok(hermite(&self.holed, &self.holed_parity)?.unhit as f64)),
             ),
             repeated(
                 "convert_slab_320",

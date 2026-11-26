@@ -13,6 +13,10 @@
 //! edge's two triangles count once between them, a corner's fan once, and a line grazing a
 //! fold none or twice. A triangle seen edge on is not crossed.
 
+use std::collections::BTreeMap;
+
+use brodo::tree::Coord;
+
 use crate::bvh::Bvh;
 use crate::distance::{Point, has_area};
 use crate::intersect::edge;
@@ -41,54 +45,119 @@ fn side(a: [f64; 2], b: [f64; 2]) -> i8 {
     sign(b[0] - a[0])
 }
 
-/// Where the line through `p` along axis `k` crosses triangle `t`, as its height along the
-/// axis above `p`; nothing where it does not.
-fn height(p: Point, k: usize, t: [Point; 3]) -> Option<f64> {
+/// A triangle a line along an axis crosses: each corner's weight, the signed area its
+/// opposite edge spans with the line in the plane across the axis, each corner's place
+/// along the axis, and the weights' sum.
+#[derive(Debug, Clone, Copy)]
+struct Crossed {
+    w: [f64; 3],
+    along: [f64; 3],
+    det: f64,
+}
+
+impl Crossed {
+    /// The crossing's height along the axis above the line's point at `at` on it.
+    fn above(&self, at: f64) -> f64 {
+        let [a, b, c] = self.along.map(|x| x - at);
+        (self.w[0] * a + self.w[1] * b + self.w[2] * c) / self.det
+    }
+}
+
+/// Whether the line through `p` along axis `k` crosses triangle `t`, by `p`'s coordinates
+/// across the axis alone.
+fn crossed(p: Point, k: usize, t: [Point; 3]) -> Option<Crossed> {
     // Moved to the line, a triangle's corners on a line may round off it: it is refused by
     // its own corners first.
     if !has_area(t) {
         return None;
     }
     let (kx, ky) = ((k + 1) % 3, (k + 2) % 3);
-    let q = t.map(|c| [c[kx] - p[kx], c[ky] - p[ky], c[k] - p[k]]);
-    let flat = q.map(|c| [c[0], c[1]]);
-    let [a, b, c] = flat;
+    let [a, b, c] = t.map(|c| [c[kx] - p[kx], c[ky] - p[ky]]);
     let s = [side(a, b), side(b, c), side(c, a)];
     if !(s[0] == s[1] && s[1] == s[2]) || s[0] == 0 {
         return None;
     }
-    // Each corner's weight, the signed area its opposite edge spans with the origin.
     let area = |u: [f64; 2], v: [f64; 2]| edge(u[0], v[1], u[1], v[0]);
     let w = [area(b, c), area(c, a), area(a, b)];
     let det = w[0] + w[1] + w[2];
     if det == 0.0 {
         return None;
     }
-    Some((w[0] * q[0][2] + w[1] * q[1][2] + w[2] * q[2][2]) / det)
+    Some(Crossed { w, along: t.map(|c| c[k]), det })
+}
+
+/// Where the line through `p` along axis `k` crosses triangle `t`, as its height along the
+/// axis above `p`; nothing where it does not.
+#[cfg(test)]
+fn height(p: Point, k: usize, t: [Point; 3]) -> Option<f64> {
+    crossed(p, k, t).map(|c| c.above(p[k]))
+}
+
+/// The triangles one line along an axis crosses, found once for every point on it.
+#[derive(Debug)]
+struct Line {
+    crossed: Vec<Crossed>,
+}
+
+impl Line {
+    /// The line through `p` along axis `k`, run across the mesh's box, `p` within it: the
+    /// segment only finds the triangles whose boxes it meets, with the query's margin, and
+    /// each is then tested whole. Which triangles it crosses does not depend on `p[k]`:
+    /// one crossed holds `p`'s other two coordinates within its box exactly, its corners
+    /// moved to the line keeping their signs, and along the axis lies within the mesh's box,
+    /// which the segment spans wherever `p` is on the line.
+    fn new(bvh: &Bvh, p: Point, k: usize) -> Line {
+        let Some((lo, hi)) = bvh.bounds() else { return Line { crossed: Vec::new() } };
+        let (mut a, mut b) = (p, p);
+        (a[k], b[k]) = (lo[k].min(p[k]), hi[k].max(p[k]));
+        let crossed = bvh
+            .near_segment(a, b)
+            .into_iter()
+            .filter_map(|i| crossed(p, k, bvh.corners(i)?))
+            .collect();
+        Line { crossed }
+    }
+
+    /// The line's vote at its point at `at`: none where it crosses the mesh an odd number of
+    /// times, else 1 where it crosses an odd number of times above the point, −1 otherwise.
+    fn vote(&self, at: f64) -> i32 {
+        if self.crossed.len() % 2 == 1 {
+            return 0;
+        }
+        let above = self.crossed.iter().filter(|c| c.above(at) >= 0.0).count();
+        if above % 2 == 1 { 1 } else { -1 }
+    }
 }
 
 /// Whether `p` is inside the mesh `bvh` holds, by the parity count along the three axes.
-/// Each line runs across the mesh's box, `p` within it: the segment only finds the
-/// triangles whose boxes it meets, with the query's margin, and each is then tested whole.
 pub(crate) fn inside(bvh: &Bvh, p: Point) -> bool {
-    let Some((lo, hi)) = bvh.bounds() else { return false };
-    let mut votes = 0_i32;
-    for k in 0..3 {
-        let (mut a, mut b) = (p, p);
-        (a[k], b[k]) = (lo[k].min(p[k]), hi[k].max(p[k]));
-        let (mut all, mut above) = (0_u32, 0_u32);
-        for i in bvh.near_segment(a, b) {
-            let Some(t) = bvh.corners(i) else { continue };
-            if let Some(z) = height(p, k, t) {
-                all += 1;
-                above += u32::from(z >= 0.0);
-            }
-        }
-        if all % 2 == 0 {
-            votes += if above % 2 == 1 { 1 } else { -1 };
-        }
+    (0..3).map(|k| Line::new(bvh, p, k).vote(p[k])).sum::<i32>() > 0
+}
+
+/// Lines voxels share: the eight voxels along each of a leaf's lines find its crossings
+/// once (issue 23). Each line is kept by its voxels' coordinates across its axis.
+pub(crate) struct Lines<'a> {
+    bvh: &'a Bvh,
+    found: [BTreeMap<[i32; 2], Line>; 3],
+}
+
+impl<'a> Lines<'a> {
+    pub(crate) fn new(bvh: &'a Bvh) -> Lines<'a> {
+        Lines { bvh, found: Default::default() }
     }
-    votes > 0
+
+    /// Whether voxel `v`, its point at `p`, is inside, as `inside` finds it: `p`'s
+    /// coordinates across each axis are those of every voxel sharing `v`'s across it, each
+    /// a function of its voxel coordinate alone, as a lattice's are.
+    pub(crate) fn inside(&mut self, v: Coord, p: Point) -> bool {
+        let (bvh, mut votes) = (self.bvh, 0);
+        for (k, found) in self.found.iter_mut().enumerate() {
+            let across = [v[(k + 1) % 3], v[(k + 2) % 3]];
+            let line = found.entry(across).or_insert_with(|| Line::new(bvh, p, k));
+            votes += line.vote(p[k]);
+        }
+        votes > 0
+    }
 }
 
 #[cfg(test)]
@@ -128,6 +197,61 @@ mod tests {
             let p = [0, 1, 2].map(|i| a[i] + s * (b[i] - a[i]));
             if height(p, k, [a, b, c]).is_some() {
                 proptest::prop_assert!(has_area([a, b, c]), "{:?} crossed along {}", [a, b, c], k);
+            }
+        }
+    }
+
+    /// Where the line through `p` along axis `k` crosses triangle `t`, as its height above
+    /// `p`, the triangle moved to `p` whole and its height weighed there, a point at a time.
+    fn moved_to(p: Point, k: usize, t: [Point; 3]) -> Option<f64> {
+        let c = crossed(p, k, t)?;
+        let q = t.map(|c| c[k] - p[k]);
+        Some((c.w[0] * q[0] + c.w[1] * q[1] + c.w[2] * q[2]) / c.det)
+    }
+
+    /// The parity count by every triangle, one point at a time, as ARCHITECTURE.md §5.1
+    /// defines the sign.
+    fn scanned(m: &[[Point; 3]], p: Point) -> bool {
+        let mut votes = 0;
+        for k in 0..3 {
+            let z: Vec<f64> = m.iter().filter_map(|t| moved_to(p, k, *t)).collect();
+            if z.len().is_multiple_of(2) {
+                votes += if z.iter().filter(|z| **z >= 0.0).count() % 2 == 1 { 1 } else { -1 };
+            }
+        }
+        votes > 0
+    }
+
+    proptest::proptest! {
+        #![proptest_config(proptest::prelude::ProptestConfig::with_cases(512))]
+
+        /// A line's crossings found once serve every voxel on it, whichever voxel found
+        /// them: the sign each voxel gets is the parity count by every triangle at its own
+        /// point (ARCHITECTURE.md §5.1), lines through corners and along edges included, the
+        /// corners and the points on a lattice of half steps, and points beyond the mesh's
+        /// box along a line.
+        #[test]
+        fn a_lines_crossings_serve_every_voxel_on_it(
+            corners in proptest::collection::vec(
+                proptest::array::uniform3(proptest::array::uniform3(-3_i32..=3)),
+                1..12,
+            ),
+            order in proptest::collection::vec(proptest::array::uniform3(-9_i32..=9), 1..200),
+        ) {
+            let m: Vec<[Point; 3]> =
+                corners.iter().map(|t| t.map(|c| c.map(f64::from))).collect();
+            let indexed = (0..m.len() * 3).map(|i| u32::try_from(i).unwrap()).collect::<Vec<_>>();
+            let mesh = Mesh::new(
+                m.iter().flatten().copied().collect(),
+                indexed.chunks(3).map(|c| [c[0], c[1], c[2]]).collect(),
+            );
+            let bvh = Bvh::new(&mesh).unwrap();
+            let mut lines = Lines::new(&bvh);
+            for v in order {
+                let p = v.map(|c| f64::from(c) * 0.5);
+                let want = scanned(&m, p);
+                proptest::prop_assert_eq!(lines.inside(v, p), want, "{:?}", v);
+                proptest::prop_assert_eq!(inside(&bvh, p), want, "{:?}", v);
             }
         }
     }
