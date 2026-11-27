@@ -124,3 +124,7 @@ gone with their code were removed with it.
   their lines moved to when a line's crossings were found once for the voxels on it
   (issue 23): `/` in a crossing's height from `height` to `Crossed::above`, and `>=` in
   the count above a point from `inside` to `Line::vote`.
+- 2026-11-28: one replaced, approved on 2026-11-28 (issue 24): binary16 found by bit
+  arithmetic left no `<` in `to_binary16`, and its exclusion went with it; `>` in the
+  shift that keeps no bit of the significand, at exactly 54, is equivalent, the code
+  rounding to 0 either way.

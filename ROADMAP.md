@@ -8,7 +8,12 @@ the design is in [ARCHITECTURE.md](ARCHITECTURE.md); versions are in
 
 Overwritten at the end of every unit of work (PLANNING.md §1). History is in git.
 
-- **Done**: P14's issues 18, 19, 21, 22 and 23, and issue 20 declined. colino's parity
+- **Done**: P14's issues 18, 19, 21, 22, 23 and 24, and issue 20 declined. An archive's
+  quantised ranges are found in parallel, the same ties won, and binary16 by bit
+  arithmetic, held to the division before it on every `f32`, the bytes unchanged:
+  `archive_write_8bit` 7 % faster; a whole read at a path takes one entry at a time,
+  holding about half the memory on archives of many grids (B-032, ADR-0016's amendment of
+  2026-11-28), `archive_read_x8` 7 % faster (2026-11-28, Apple M5). colino's parity
   sign finds each line of a leaf's crossings once for its eight voxels, the bytes
   unchanged: `convert_holed_r50_parity` 32 % faster and `hermite_holed_r50_parity` 48 %,
   items added for it (2026-11-25, Apple M5). colino's Hermite signs
@@ -32,7 +37,7 @@ Overwritten at the end of every unit of work (PLANNING.md §1). History is in gi
   5, 9, 10, 11, 12, 16 and 17 closed. Before it, 1.3.1 (2026-11-18): an archive's read,
   quadratic in its entries, fixed from v1.3.0 as SECURITY.md states, advisory
   GHSA-rh8f-f6hf-2c95 published and its CVE requested.
-- **Next**: P14's next item (§2), issue 24.
+- **Next**: P14's next item (§2), issue 25.
 - **Unresolved**: none. `leaf_parallel_update_x32`'s drift between sessions is measured:
   other processes' work on the performance cores moves it either way, and the item and its
   baseline are kept (B-026, ADR-0019's amendment of 2026-11-12).
@@ -87,7 +92,8 @@ and each spike after the item it is measured against.
 - [x] [Issue 22](https://github.com/akahmys/brodo/issues/22): colino's Hermite signs, query stacks and candidates
 - [x] [Issue 23](https://github.com/akahmys/brodo/issues/23): colino's parity sign shared along a leaf's lines
       (label checked again 2026-11-26)
-- [ ] [Issue 24](https://github.com/akahmys/brodo/issues/24): an archive's ranges, binary16 and whole read
+- [x] [Issue 24](https://github.com/akahmys/brodo/issues/24): an archive's ranges, binary16 and whole read
+      (label checked again 2026-11-27)
 - [ ] [Issue 25](https://github.com/akahmys/brodo/issues/25): labelling by each leaf's components
 - [ ] [Issue 26](https://github.com/akahmys/brodo/issues/26): benchmarks for the Euler characteristic, dilation and `.vdb`, and what
       they show
@@ -157,6 +163,8 @@ Questions answered, each by its spike and ADR:
 - `spikes/region/`: reading a region of an archive (ADR-0016's amendment on a region)
 - `spikes/chunkread/`: B-027, a region and a listing read from only the bytes they need
   (ADR-0016's amendment of 2026-11-16)
+- `spikes/entryread/`: B-032, a whole read at a path one entry at a time (ADR-0016's
+  amendment of 2026-11-28)
 - `spikes/vtk/`: B-012 (ADR-0018)
 - `spikes/bench/`: B-007 (ADR-0019)
 - `spikes/parvar/`: B-024, a benchmark on the performance cores (ADR-0019)

@@ -5,6 +5,7 @@
 
 use std::sync::OnceLock;
 
+use rayon::prelude::*;
 use zerocopy::FromBytes;
 use zerocopy::little_endian::{F32, F64};
 
@@ -94,33 +95,50 @@ fn each(kind: Kind, bytes: &[u8], mut f: impl FnMut(f64)) -> bool {
 
 /// Each component's range over the leaf chunks `pieces`, values of `kind`: the first least
 /// and greatest in order, so that the same bytes give the same ranges, signed zeros too.
-/// `None` if a scalar is a NaN or an infinity, or a range is wider than an `f64` holds.
-pub(crate) fn ranges<'a>(kind: Kind, pieces: impl Iterator<Item = &'a [u8]>) -> Option<Vec<Range>> {
-    let mut r = vec![Range { lo: f64::INFINITY, hi: f64::NEG_INFINITY }; kind.components];
-    let mut finite = true;
-    for piece in pieces {
-        let mut k = 0;
-        let whole = each(kind, piece, |x| {
-            finite &= x.is_finite();
-            let at = k % kind.components;
-            k += 1;
-            if let Some(c) = r.get_mut(at) {
-                if x < c.lo {
-                    c.lo = x;
-                }
-                if x > c.hi {
-                    c.hi = x;
-                }
-            }
-        });
-        finite &= whole;
+/// Each piece's are found in parallel and folded in the pieces' order, an extreme replaced
+/// only by one strictly beyond it, so that the first is kept whatever the threads. `None`
+/// if a scalar is a NaN or an infinity, or a range is wider than an `f64` holds.
+pub(crate) fn ranges(kind: Kind, pieces: &[&[u8]]) -> Option<Vec<Range>> {
+    let none = vec![Range { lo: f64::INFINITY, hi: f64::NEG_INFINITY }; kind.components];
+    let each_piece: Vec<_> =
+        pieces.par_iter().map(|piece| piece_ranges(kind, piece, none.clone())).collect();
+    let mut r = none;
+    for p in each_piece {
+        for (c, d) in r.iter_mut().zip(p?) {
+            widen(c, d.lo);
+            widen(c, d.hi);
+        }
     }
     for c in &mut r {
         if c.lo > c.hi {
             *c = Range { lo: 0.0, hi: 0.0 };
         }
     }
-    (finite && r.iter().all(|c| (c.hi - c.lo).is_finite())).then_some(r)
+    r.iter().all(|c| (c.hi - c.lo).is_finite()).then_some(r)
+}
+
+/// `r` widened over one leaf chunk `piece`, its first scalar the first component's; `None`
+/// if a scalar is not finite or `piece` is not whole scalars.
+fn piece_ranges(kind: Kind, piece: &[u8], mut r: Vec<Range>) -> Option<Vec<Range>> {
+    let (mut k, mut finite) = (0, true);
+    let whole = each(kind, piece, |x| {
+        finite &= x.is_finite();
+        if let Some(c) = r.get_mut(k % kind.components) {
+            widen(c, x);
+        }
+        k += 1;
+    });
+    (whole && finite).then_some(r)
+}
+
+/// `c` taking `x` as its least or greatest where `x` lies strictly beyond it.
+fn widen(c: &mut Range, x: f64) {
+    if x < c.lo {
+        c.lo = x;
+    }
+    if x > c.hi {
+        c.hi = x;
+    }
 }
 
 /// The ranges' bytes, as they follow a chunk table.
@@ -153,10 +171,10 @@ pub(crate) fn encode(q: &Quantised, kind: Kind, piece: &[u8]) -> Option<Vec<u8>>
                 None => held = false,
             });
             // Shuffled: every code's low byte, then every code's high byte.
-            let [low, high] =
-                [0, 1].map(|b| codes.iter().map(move |h| h.to_le_bytes().get(b).copied()));
-            let out: Option<Vec<u8>> = low.chain(high).collect();
-            out.filter(|_| whole && held)
+            let mut out = Vec::with_capacity(2 * codes.len());
+            out.extend(codes.iter().map(|h| h.to_le_bytes()).map(|[low, _]| low));
+            out.extend(codes.iter().map(|h| h.to_le_bytes()).map(|[_, high]| high));
+            (whole && held).then_some(out)
         }
         Quantised::EightBit(r) => {
             let mut out = Vec::new();
@@ -191,29 +209,36 @@ fn to_eight_bits(x: f64, c: Range) -> u8 {
 const BINARY16_MAX: f64 = 65504.0;
 
 /// `x` as the IEEE 754 binary16 nearest it, ties to even, as its code; `None` for a NaN or
-/// a value beyond ±65504.
+/// a value beyond ±65504. Worked from `x`'s bits: its significand shifted to the binary16
+/// binade's, the bits shifted out rounding it.
 fn to_binary16(x: f64) -> Option<u16> {
-    let a = x.abs();
-    if a.is_nan() || a > BINARY16_MAX {
+    if x.is_nan() || x.abs() > BINARY16_MAX {
         return None;
     }
+    let bits = x.to_bits();
     let sign = if x.is_sign_negative() { 0x8000 } else { 0 };
-    // The binade's exponent, the subnormals sharing the least normal one, -14.
-    let e = if a < 2f64.powi(-14) {
-        -14
+    let biased = i32::try_from((bits >> 52) & 0x7ff).ok()?;
+    if biased == 0 {
+        // Zero, or an f64 subnormal, far below binary16's least subnormal, 2^-24.
+        return Some(sign);
+    }
+    let m = (bits & ((1 << 52) - 1)) | (1 << 52);
+    // x = m × 2^(e − 52); its binade's, the subnormals sharing the least normal one, -14.
+    let e = biased - 1023;
+    let binade = e.max(-14);
+    // r = x / 2^(binade − 10), rounded: m shifted right by 42 + (binade − e).
+    let shift = u32::try_from(42 + (binade - e)).ok()?;
+    let r = if shift > 54 {
+        // x below a quarter of 2^-24: rounds to zero.
+        0
     } else {
-        i32::try_from((a.to_bits() >> 52) & 0x7ff).ok()? - 1023
+        let (q, rest) = (m >> shift, m & ((1 << shift) - 1));
+        let half = 1 << (shift - 1);
+        q + u64::from(rest > half || (rest == half && q & 1 == 1))
     };
-    let r = (a / 2f64.powi(e - 10)).round_ties_even();
-    #[expect(
-        clippy::cast_possible_truncation,
-        clippy::cast_sign_loss,
-        reason = "a is below 2^(e + 1), so r is whole and in 0..=2048"
-    )]
-    let r = r as u16;
-    // (e + 14) << 10 plus r: a subnormal for e = -14 and r < 1024, and r = 2048 carries
-    // into the next binade; at most 65504's code, a being at most 65504.
-    Some(sign | ((u16::try_from(e + 14).ok()? << 10) + r))
+    // (binade + 14) << 10 plus r: a subnormal for binade -14 and r < 1024, and r = 2048
+    // carries into the next binade; at most 65504's code, x being at most 65504.
+    Some(sign | ((u16::try_from(binade + 14).ok()? << 10) + u16::try_from(r).ok()?))
 }
 
 /// The value of binary16 code `h`, which an `f32` holds exactly.
@@ -331,6 +356,61 @@ mod tests {
         }
     }
 
+    /// `to_binary16` as it was first written, by division in `f64`: a scale by a power of
+    /// two and a rounding, each exact, so that it holds the promise of docs/formats.md
+    /// §8.5 by construction.
+    fn binary16_by_division(x: f64) -> Option<u16> {
+        let a = x.abs();
+        if a.is_nan() || a > BINARY16_MAX {
+            return None;
+        }
+        let sign = if x.is_sign_negative() { 0x8000 } else { 0 };
+        let e = if a < 2f64.powi(-14) {
+            -14
+        } else {
+            i32::try_from((a.to_bits() >> 52) & 0x7ff).unwrap() - 1023
+        };
+        #[expect(
+            clippy::cast_possible_truncation,
+            clippy::cast_sign_loss,
+            reason = "a is below 2^(e + 1), so r is whole and in 0..=2048"
+        )]
+        let r = (a / 2f64.powi(e - 10)).round_ties_even() as u16;
+        Some(sign | ((u16::try_from(e + 14).unwrap() << 10) + r))
+    }
+
+    /// The scalars binary16's rounding turns on: every code's value, each halfway between
+    /// two codes, and their nearest `f32` and `f64` on either side, of both signs, with
+    /// values beyond the range and far below its least subnormal.
+    fn rounding_cases() -> Vec<f64> {
+        let mut xs = vec![f64::MIN_POSITIVE, f64::from_bits(1), 2f64.powi(-26), 1e-300];
+        xs.extend([65504.0, 65519.0, 65520.0, 65536.0, f64::MAX, f64::INFINITY]);
+        for h in 0..0x7bff_u16 {
+            let (v, w) = (f64::from(from_binary16(h)), f64::from(from_binary16(h + 1)));
+            for x in [v, (v + w) / 2.0] {
+                xs.extend([x, f64::from_bits(x.to_bits() + 1)]);
+                xs.extend((x > 0.0).then(|| f64::from_bits(x.to_bits() - 1)));
+                #[expect(clippy::cast_possible_truncation, reason = "the f32 nearest x")]
+                let y = x as f32;
+                xs.extend([y.next_up(), y.next_down()].map(f64::from));
+            }
+        }
+        let negatives: Vec<f64> = xs.iter().map(|x| -x).collect();
+        xs.extend(negatives);
+        xs
+    }
+
+    /// Binary16 by bits gives the code division gives at every scalar its rounding turns
+    /// on, an `f32`'s or an `f64`'s (docs/formats.md §8.5).
+    #[test]
+    fn binary16_by_bits_rounds_as_division_does() {
+        let cases = rounding_cases();
+        assert!(cases.len() > 300_000, "{} cases", cases.len());
+        for x in cases {
+            assert_eq!(to_binary16(x), binary16_by_division(x), "{x:e} ({:#018x})", x.to_bits());
+        }
+    }
+
     /// Binary16 codes read as their values: the infinities, a NaN, and negatives by the
     /// sign bit, zero too.
     #[test]
@@ -370,7 +450,7 @@ mod tests {
     fn a_range_keeps_the_first_extremes_and_refuses_what_is_not_finite() {
         let kind = Kind { scalar: Scalar::F64, components: 1 };
         let bits = |bytes: &[u8]| {
-            ranges(kind, [bytes].into_iter())
+            ranges(kind, &[bytes])
                 .map(|r| r.iter().map(|c| [c.lo.to_bits(), c.hi.to_bits()]).collect::<Vec<_>>())
         };
         let zero = |x: f64| Some(vec![[x.to_bits(); 2]]);
@@ -379,6 +459,36 @@ mod tests {
         assert_eq!(bits(&scalars(&[1.0, f64::NAN, 2.0])), None);
         assert_eq!(bits(&scalars(&[1.0, f64::INFINITY])), None);
         assert_eq!(bits(&scalars(&[1.0, 2.0])[..9]), None);
+    }
+
+    /// Ranges over many pieces are those over the pieces' bytes as one: the first least
+    /// and greatest across pieces too, each piece's first scalar its first component's,
+    /// and a NaN in any piece refused.
+    #[test]
+    fn ranges_over_pieces_are_those_over_their_bytes_together() {
+        let one = Kind { scalar: Scalar::F64, components: 1 };
+        let bits = |kind: Kind, pieces: &[&[u8]]| {
+            ranges(kind, pieces)
+                .map(|r| r.iter().map(|c| [c.lo.to_bits(), c.hi.to_bits()]).collect::<Vec<_>>())
+        };
+        let [neg, pos] = [scalars(&[-0.0]), scalars(&[0.0])];
+        assert_eq!(bits(one, &[&neg, &pos]), Some(vec![[(-0.0_f64).to_bits(); 2]]));
+        assert_eq!(bits(one, &[&pos, &neg]), Some(vec![[0.0_f64.to_bits(); 2]]));
+        assert_eq!(bits(one, &[&pos, &scalars(&[f64::NAN])]), None);
+        let three = Kind { scalar: Scalar::F64, components: 3 };
+        let xs: Vec<f64> =
+            (0..3 * 700).map(|i| f64::from((i * 7919 % 1013) - 500) * 0.25).collect();
+        let all = scalars(&xs);
+        let pieces: Vec<&[u8]> = all.chunks(3 * 8 * 50).collect();
+        assert!(pieces.len() > 10);
+        assert_eq!(bits(three, &pieces), bits(three, &[&all]));
+        let r = ranges(three, &pieces).unwrap();
+        for (c, k) in r.iter().zip(0..) {
+            let mine = xs.iter().skip(k).step_by(3);
+            let lo = mine.clone().copied().fold(f64::INFINITY, f64::min);
+            let hi = mine.copied().fold(f64::NEG_INFINITY, f64::max);
+            assert_eq!([c.lo, c.hi].map(f64::to_bits), [lo, hi].map(f64::to_bits), "component {k}");
+        }
     }
 
     /// Ranges read are of a finite width: from -f64::MAX to f64::MAX is refused, and a
@@ -422,7 +532,7 @@ mod tests {
         let kind = Kind { scalar: Scalar::F64, components: 1 };
         let xs = [-3.0_f64, 0.1, 2.0, 5.0];
         let bytes: Vec<u8> = xs.iter().flat_map(|x| x.to_le_bytes()).collect();
-        let r = ranges(kind, [bytes.as_slice()].into_iter()).unwrap();
+        let r = ranges(kind, &[bytes.as_slice()]).unwrap();
         let q = Quantised::EightBit(r);
         let codes = encode(&q, kind, &bytes).unwrap();
         assert_eq!(codes.first(), Some(&0));

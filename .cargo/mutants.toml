@@ -264,10 +264,10 @@ exclude_re = [
     'convert\.rs:\d+:42: replace && with \|\| in Options::check$',
     # As above.
     'convert\.rs:\d+:61: replace > with >= in Options::check$',
-    # Exactly 2⁻¹⁴, the least normal binary16, has the exponent -14 either way: by its bits
-    # or as the one the subnormals share.
+    # A shift of exactly 54 keeps no bit of a significand below 2⁵³ and leaves it all as
+    # the rest, below the half of 2⁵³, so the code rounds to 0 either way.
     # [same]
-    'quantise\.rs:.*: replace < with <= in to_binary16$',
+    'quantise\.rs:.*: replace > with >= in to_binary16$',
     # The sign is bit 15, and the rest of a code at most 65504's, 0x7bff, below it: they
     # share no bit, so `|` and `^` agree.
     # [same]

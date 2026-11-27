@@ -18,6 +18,12 @@ are recorded here when they change (V6).
 - colino's parity sign finds the crossings of each line through a leaf once for the eight
   voxels on it, the bytes written unchanged: a conversion by parity in two thirds of its
   time and its Hermite data in half (issue 23).
+- brodo's archive finds an 8-bit grid's ranges in parallel and binary16 codes by bit
+  arithmetic, the bytes it writes unchanged; `archive::read` at a path reads one entry at
+  a time, holding the cache file and one entry's compressed bytes rather than the whole
+  archive, about half the memory on archives of many grids (issue 24). A damaged archive
+  breaking a rule of structure and stating a cache file beyond the limit may now be
+  refused for its size rather than its structure.
 
 ## 1.4.0 (2026-11-18)
 

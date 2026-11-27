@@ -4,6 +4,8 @@ archive_read_8bit_x8	3330833	2026-10-31	Apple M5
 archive_read_x8	4630167	2026-10-31	Apple M5
 archive_region_x8	3326000	2026-10-31	Apple M5
 archive_write	5533709	2026-10-31	Apple M5
+archive_write_8bit	5635375	2026-11-27	Apple M5
+archive_write_binary16	5814792	2026-11-27	Apple M5
 cache_map_x256	7724166	2026-11-03	Apple M5
 cache_read_x16	2850416	2026-10-30	Apple M5
 cache_write_x8	43486750	2026-10-28	Apple M5

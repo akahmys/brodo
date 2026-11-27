@@ -49,10 +49,12 @@ lib brodo parallel::tests::same_bits_at_any_thread_count
 lib brodo parallel::tests::the_lowest_failing_leaf_is_reported
 lib brodo quantise::tests::a_chunk_restores_only_into_room_for_its_scalars
 lib brodo quantise::tests::a_range_keeps_the_first_extremes_and_refuses_what_is_not_finite
+lib brodo quantise::tests::binary16_by_bits_rounds_as_division_does
 lib brodo quantise::tests::binary16_codes_read_as_their_values
 lib brodo quantise::tests::binary16_rounds_to_nearest_ties_to_even
 lib brodo quantise::tests::eight_bits_refuse_what_they_cannot_hold
 lib brodo quantise::tests::eight_bits_restore_within_half_a_step
+lib brodo quantise::tests::ranges_over_pieces_are_those_over_their_bytes_together
 lib brodo quantise::tests::ranges_read_are_of_a_finite_width
 lib brodo quantise::tests::the_floating_types_alone_have_a_kind
 lib brodo slice::tests::a_colour_map_with_a_range_draws
@@ -107,6 +109,7 @@ test archive_format a_file_of_no_grid_is_its_header
 test archive_format a_listing_checks_the_structure_and_every_entrys_metadata
 test archive_format a_listing_gives_what_a_whole_read_gives_without_decompressing
 test archive_format a_paths_listing_and_region_read_what_the_bytes_do
+test archive_format a_read_at_a_path_gives_what_its_bytes_give
 test archive_format a_refused_entry_of_bytes_is_named_by_its_place_among_them
 test archive_format a_refused_grid_is_named_by_its_place_among_the_grids
 test archive_format a_region_about_a_root_tile_answers_as_the_whole_grid_does

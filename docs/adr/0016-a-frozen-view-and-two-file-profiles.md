@@ -132,3 +132,35 @@ The owner decided, on 2026-11-16, as proposed:
 - **A file changed while read**: nothing is added. brodo replaces a file whole by renaming
   (ARCHITECTURE.md §4.7), so an open file stays the one read; each part read is checked.
 
+
+## Amendment: a whole read at a path takes one entry at a time
+
+- **Date**: 2026-11-28
+
+`spikes/entryread/` (B-032, issue 24, 2026-11-27, `spikes/entryread/REPORT.md`) read
+archives of exact grids from their start to their end without a seek, each entry's
+metadata, chunk table and chunks taken and its chunks decompressed in parallel before the
+next entry was read, against the file read whole and every chunk decompressed together.
+The peak memory fell by about half on every case of more than one grid (four grids of
+32 768 leaves: 515 MiB to 387 MiB; 64 grids of 1 024: 259 to 133) and stayed the same on
+one grid. The time was the same or less on four cases of five, within 1 % of the whole
+read's on the largest; on 256 grids of one chunk each it was twice the whole read's,
+3.0 ms to 6.7 ms, each entry's one chunk decompressed alone. A reader zeroing its buffer
+before reading into it was 1.6 ms slower on one grid of 64 MiB, and the spike's reader was
+corrected to read as `std::fs::read` does.
+
+The owner decided, on 2026-11-28, to take entry by entry, the slower case accepted:
+
+- **What is held**: `archive::read` at a path holds the cache file it makes and one entry's
+  compressed bytes, not the archive's. A file that states no length, a pipe or a device,
+  is read whole as before, since there is no length to read to.
+- **What is checked**: every rule docs/formats.md §8.4 states, as before, each entry's
+  structure and padding checked before its chunks are decompressed; the cache file made is
+  checked whole at the end. The cache file's length, worked out from the directory, is
+  held to `limit` before the entries are checked, so that a file breaking a rule of
+  structure and stating a cache file beyond `limit` may now be refused for the size,
+  which no reader promised otherwise ("which is named is not promised").
+- **Batches of chunks across entries** were set aside: they would bring back a tunable
+  size the format does not state, for a case measured in milliseconds.
+- **A file changed while read**: nothing is added, as for a region (the amendment of
+  2026-11-16); the file is read to the length it states.

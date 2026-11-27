@@ -326,7 +326,9 @@ fastest, and an `Offset` is made from its number or its step as from what gives 
   boundaries, an entry of bytes cut every 256 KiB; its bytes are in
   [docs/formats.md](docs/formats.md) §8, and version 1 is not read (ADR-0054). A reader
   decompresses the chunks in parallel into the cache file of the same entries and checks it
-  as a cache file, so that an archive is read as a `CacheFile` (`archive::read`); it also
+  as a cache file, so that an archive is read as a `CacheFile` (`archive::read`); at a
+  path it reads one entry at a time, holding the cache file and one entry's compressed
+  bytes, a pipe or a device read whole (ADR-0016's amendment of 2026-11-28); it also
   checks the rest docs/formats.md §8.4 states, how each grid is cut into chunks among it,
   but not that a chunk's compressed bytes are brodo's compressor's. It carries no checksum
   (ADR-0016). It is written whole, as a cache file is.

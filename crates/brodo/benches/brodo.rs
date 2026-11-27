@@ -284,16 +284,39 @@ impl Data {
     /// The archive profile's file I/O (ADR-0016).
     #[cfg(feature = "archive")]
     fn archive_items(&self) -> Vec<Item<'_>> {
-        let [exact, eight] = &self.archives;
-        vec![
-            repeated(
-                "archive_write",
+        let [exact, _] = &self.archives;
+        let written = out_dir().join("sphere-written.archive");
+        let mut items = vec![repeated(
+            "archive_write",
+            1,
+            Box::new(move || {
+                archive::write(exact, std::slice::from_ref(&self.entry))?;
+                Ok(0.0)
+            }),
+        )];
+        for (name, encoding) in [
+            ("archive_write_binary16", Encoding::Binary16),
+            ("archive_write_8bit", Encoding::EightBit),
+        ] {
+            let path = written.clone();
+            items.push(repeated(
+                name,
                 1,
                 Box::new(move || {
-                    archive::write(exact, std::slice::from_ref(&self.entry))?;
+                    archive::write_with(&path, &[(&self.entry, encoding)])?;
                     Ok(0.0)
                 }),
-            ),
+            ));
+        }
+        items.extend(self.archive_read_items());
+        items
+    }
+
+    /// The archive profile's reads: whole, exact and in 8 bits, and a region (ADR-0016).
+    #[cfg(feature = "archive")]
+    fn archive_read_items(&self) -> Vec<Item<'_>> {
+        let [exact, eight] = &self.archives;
+        vec![
             repeated(
                 "archive_read",
                 8,

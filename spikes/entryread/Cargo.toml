@@ -1,0 +1,19 @@
+# Throwaway spike for B-032 (ROADMAP.md §3): what an archive's whole read gives up in time
+# and gains in memory by taking and decompressing one entry at a time. Never imported by
+# `crates/` (PLANNING.md §3); its own workspace.
+[package]
+name = "entryread-spike"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+brodo = { path = "../../crates/brodo", default-features = false, features = ["archive"] }
+rayon = "=1.12.0"
+lz4_flex = { version = "=0.14.0", default-features = false, features = ["std", "safe-encode", "safe-decode", "checked-decode"] }
+
+[profile.release]
+debug = false
+
+[workspace]
+members = ["."]

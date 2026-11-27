@@ -217,6 +217,63 @@ fn an_archive_of_grids_keeps_its_bytes_and_a_file_round_trips() {
     same(&read(&path, u64::MAX).unwrap(), &cached, &t);
 }
 
+/// What `file` holds: the cache file of its grids, then its entries of bytes, and each
+/// grid's encoding.
+fn held(file: &CacheFile) -> (Vec<u8>, Vec<Encoding>) {
+    let mut e: Vec<CacheEntry> = file.grids().into_iter().map(CacheEntry::copy).collect();
+    e.extend(file.bytes_entries().into_iter().map(CacheEntry::copy_bytes));
+    (cache::to_bytes(&e).unwrap(), file.grids().iter().map(|g| g.encoding()).collect())
+}
+
+/// What `from_bytes` gives of `bytes`, held to what `read` gives of them as a file, one
+/// entry at a time (ADR-0016's amendment of 2026-11-28): the same entries, or an error,
+/// the same one where `named`, as it is of a file that breaks one rule.
+fn read_both(bytes: &[u8], limit: u64, named: bool) -> Result<CacheFile, CacheError> {
+    let path = scratch::dir().join("read_both.brda");
+    std::fs::write(&path, bytes).unwrap();
+    let at_path = read(&path, limit);
+    let whole = from_bytes(bytes, limit);
+    match (&whole, &at_path) {
+        (Ok(a), Ok(b)) => assert_eq!(held(a), held(b)),
+        (Err(a), Err(b)) if named => assert_eq!(format!("{a:?}"), format!("{b:?}")),
+        (Err(_), Err(_)) => {}
+        (a, b) => {
+            panic!("{:?} as bytes, {:?} at a path", a.as_ref().map(|_| ()), b.as_ref().map(|_| ()))
+        }
+    }
+    whole
+}
+
+/// A read at a path gives what a read of its bytes gives, of archives of grids exact and
+/// quantised, of entries of bytes, of many entries, and of none.
+#[test]
+fn a_read_at_a_path_gives_what_its_bytes_give() {
+    let t = build(&(0..40).map(|i| [8 * i, 8 * (i % 3), 0]).collect::<Vec<_>>(), &[]);
+    let f = numbered(&t, 0.0_f32, |k| (k as f32 * 0.01).sin());
+    let grid = |name: &str| CacheEntry::new(&meta(name, &[]), &t, &f).unwrap();
+    let mut many = Vec::new();
+    for i in 0..30 {
+        many.push(grid(&format!("g{i}")));
+        many.push(CacheEntry::bytes(&format!("b{i}"), BTreeMap::new(), vec![i; 300]).unwrap());
+    }
+    let encodings = [Encoding::Exact, Encoding::Binary16, Encoding::EightBit];
+    let with: Vec<_> = many
+        .iter()
+        .enumerate()
+        .map(|(i, e)| (e, if i % 2 == 0 { encodings[i / 2 % 3] } else { Encoding::Exact }))
+        .collect();
+    for bytes in [
+        GOLDEN.to_vec(),
+        GOLDEN_2.to_vec(),
+        QUANTISED.to_vec(),
+        to_bytes(&[]).unwrap(),
+        to_bytes(&many).unwrap(),
+        to_bytes_with(&with).unwrap(),
+    ] {
+        read_both(&bytes, u64::MAX, true).unwrap();
+    }
+}
+
 fn with_word(bytes: &[u8], word: usize, value: u32) -> Vec<u8> {
     let mut out = bytes.to_vec();
     out[word * 4..word * 4 + 4].copy_from_slice(&value.to_le_bytes());
@@ -321,7 +378,7 @@ fn an_archive_longer_than_the_limit_is_refused_whatever_length_it_reports() {
 #[test]
 fn each_check_refuses_its_damage() {
     let g = GOLDEN.to_vec();
-    let read = |b: &[u8]| from_bytes(b, u64::MAX).map(|_| ());
+    let read = |b: &[u8]| read_both(b, u64::MAX, true).map(|_| ());
     let cache_file = cache::to_bytes(&golden_entries()).unwrap();
     assert!(matches!(read(&cache_file), Err(CacheError::BadMagic(_))));
     assert!(matches!(read(&with_word(&g, 1, 3)), Err(CacheError::UnsupportedVersion(3))));
@@ -361,6 +418,12 @@ fn each_check_refuses_its_damage() {
     let (first, second, chunks) = (word(&g, table), word(&g, table + 2), word(&g, 11) as usize);
     let moved = with_word(&with_word(&g, table, first + 1), table + 2, second - 1);
     assert!(matches!(read(&moved), Err(CacheError::Decompress { index: 0, chunk: 0 })));
+    // The same of grid 1, whose directory entry is words 16..24: an error names a grid by
+    // its number among the grids.
+    let later = word(&g, 18) as usize * 8;
+    let (one, two) = (word(&g, later), word(&g, later + 2));
+    let moved_later = with_word(&with_word(&g, later, one + 1), later + 2, two - 1);
+    assert!(matches!(read(&moved_later), Err(CacheError::Decompress { index: 1, chunk: 0 })));
     // A chunk of no blocks, the next holding its blocks, so that they still add up.
     let none = with_word(&with_word(&g, table, 0), table + 2, first + second);
     assert!(matches!(read(&none), Err(CacheError::Inconsistent("chunk table"))));
@@ -393,7 +456,7 @@ proptest! {
         if let Some(c) = cut {
             bytes.truncate(c.index(bytes.len()));
         }
-        if let Ok(file) = from_bytes(&bytes, 1 << 24) {
+        if let Ok(file) = read_both(&bytes, 1 << 24, false) {
             for g in file.grids() {
                 let _meta = g.meta();
                 if let Ok(view) = g.view::<f32>() {
